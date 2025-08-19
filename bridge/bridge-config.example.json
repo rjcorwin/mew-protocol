@@ -1,0 +1,26 @@
+{
+  "mcpx": {
+    "server": "ws://localhost:3000",
+    "topic": "room:general",
+    "token": "your-jwt-token-here"
+  },
+  "participant": {
+    "id": "weather-service",
+    "name": "Weather Service",
+    "kind": "agent"
+  },
+  "mcp_server": {
+    "type": "stdio",
+    "command": "python",
+    "args": ["weather_server.py"],
+    "env": {
+      "API_KEY": "your-api-key"
+    }
+  },
+  "options": {
+    "reconnectAttempts": 5,
+    "reconnectDelay": 1000,
+    "heartbeatInterval": 30000,
+    "logLevel": "info"
+  }
+}

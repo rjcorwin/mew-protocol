@@ -1,0 +1,186 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+build/
+out/
+*.tsbuildinfo
+.next/
+.nuxt/
+.vuepress/dist/
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-workspace
+*.sublime-project
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.iml
+.vim/
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+.coverage
+*.cover
+.hypothesis/
+.pytest_cache/
+junit.xml
+test-results/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Package manager files
+.npm
+.eslintcache
+.stylelintcache
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+tmp/
+temp/
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Lock files (keep package-lock.json for npm projects)
+yarn.lock
+pnpm-lock.yaml
+
+# Production builds
+/server/dist/
+/frontend/dist/
+/bridge/dist/
+
+# Local configuration
+/server/config.local.json
+/bridge/bridge-config.json
+/frontend/.env.local
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Debug files
+debug/
+.debug/
+
+# Documentation build
+docs/_build/
+docs/.docusaurus/
+
+# Miscellaneous
+.cache/
+.parcel-cache/
+.turbo/
+.vercel/
+.netlify/
+*.pid
+*.seed
+*.pid.lock
+
+# Python (for any Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Rust (if using Rust components)
+target/
+Cargo.lock
+
+# Go (if using Go components)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+vendor/
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# MCPx specific
+/server/data/
+/server/logs/
+/bridge/logs/
+/bridge/sessions/
+*.session.json
+
+# Doc reference
+modelcontextprotocol
+TODO.md

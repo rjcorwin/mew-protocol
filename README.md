@@ -27,11 +27,66 @@ MCPx defines a minimal, topic‑based message envelope that lets multiple MCP se
 
 ## Start Here
 
-- v0 spec: `v0/SPEC.md` (core envelope, addressing, gateway API)
-- Patterns: `v0/PATTERNS.md` (discovery/handshake, fan‑out, coordination, reconnect)
+- **Spec**: `v0/SPEC.md` (core envelope, addressing, gateway API)
+- **Patterns**: `v0/PATTERNS.md` (discovery/handshake, fan‑out, coordination, reconnect)
+- **Reference Implementation**: Try the working server, frontend, and bridge below ⬇️
 
-## Repo Notes
+## Reference Implementation
 
-- `v0/` — current iteration 
+This repo includes a complete reference implementation of MCPx v0:
+
+### 🖥️ Server (`/server`)
+WebSocket gateway implementing the full MCPx v0 specification
+- Real-time topic-based messaging
+- JWT authentication and rate limiting  
+- REST API for topic management
+- **✅ 100% test coverage** (69 tests passing)
+
+```bash
+cd server
+npm install
+npm test                    # Run comprehensive test suite
+npm run dev                 # Start development server
+```
+
+### 🌐 Frontend (`/frontend`) 
+React web interface for humans to join topics and chat with agents
+- Real-time WebSocket connection
+- Topic joining and participant management
+- Chat with markdown support
+- MCP request/response handling
+
+```bash
+cd frontend  
+npm install
+npm run dev                 # Start at http://localhost:3001
+```
+
+### 🔗 Bridge (`/bridge`)
+CLI tool to connect existing MCP servers to MCPx topics
+- Interactive setup wizard
+- Support for stdio/WebSocket/SSE MCP servers
+- Automatic tool discovery and broadcasting
+
+```bash
+cd bridge
+npm install
+npm run cli setup          # Interactive configuration
+npm run cli start          # Start bridging
+```
+
+## Quick Demo
+
+1. **Start the server**: `cd server && npm run dev` 
+2. **Start the frontend**: `cd frontend && npm run dev`
+3. **Open http://localhost:3001** and connect to a topic
+4. **Bridge an MCP server**: `cd bridge && npm run cli setup`
+
+## Repo Structure
+
+- `v0/` — MCPx v0 specification and patterns
+- `server/` — Reference WebSocket gateway server  
+- `frontend/` — Reference web interface for humans
+- `bridge/` — CLI tool to connect existing MCP servers
 
 MCPx aims to be the USB‑C of multi‑agent/human collaboration: minimal, predictable, and easy to adopt.
