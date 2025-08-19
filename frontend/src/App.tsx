@@ -1,59 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ConnectionForm, ConnectionFormData } from '@/components/ConnectionForm';
 import { ChatInterface } from '@/components/ChatInterface';
 import { useMCPx } from '@/hooks/useMCPx';
 
-interface AppState {
-  isConnected: boolean;
-  connectionData: (ConnectionFormData & { authToken: string }) | null;
-}
-
 function App() {
-  const [appState, setAppState] = useState<AppState>({
-    isConnected: false,
-    connectionData: null
-  });
+  const [connectionData, setConnectionData] = useState<(ConnectionFormData & { authToken: string }) | null>(null);
+  const [shouldConnect, setShouldConnect] = useState(false);
 
+  // Only use the hook with real connection data
   const mcpx = useMCPx({
-    serverUrl: appState.connectionData?.serverUrl || '',
-    participantId: appState.connectionData?.participantId || '',
-    topic: appState.connectionData?.topic || '',
-    authToken: appState.connectionData?.authToken,
+    serverUrl: connectionData?.serverUrl || 'http://localhost:3000',
+    participantId: connectionData?.participantId || '',
+    topic: connectionData?.topic || '',
+    authToken: connectionData?.authToken,
     autoConnect: false
   });
 
-  const handleConnect = async (connectionData: ConnectionFormData & { authToken: string }) => {
-    try {
-      setAppState({
-        isConnected: false,
-        connectionData
+  // Handle connection after data is set
+  useEffect(() => {
+    if (shouldConnect && connectionData?.authToken) {
+      mcpx.connect().catch(error => {
+        console.error('Connection failed:', error);
+        setConnectionData(null);
+        setShouldConnect(false);
       });
-
-      // Update the hook with new connection data
-      await mcpx.connect();
-      
-      setAppState({
-        isConnected: true,
-        connectionData
-      });
-    } catch (error) {
-      console.error('Connection failed:', error);
-      setAppState({
-        isConnected: false,
-        connectionData: null
-      });
+      setShouldConnect(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldConnect, connectionData?.authToken]);
+
+  const handleConnect = async (newConnectionData: ConnectionFormData & { authToken: string }) => {
+    setConnectionData(newConnectionData);
+    setShouldConnect(true);
   };
 
   const handleDisconnect = () => {
     mcpx.disconnect();
-    setAppState({
-      isConnected: false,
-      connectionData: null
-    });
+    setConnectionData(null);
   };
 
-  if (!appState.isConnected || !appState.connectionData) {
+  if (!mcpx.isConnected || !connectionData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <ConnectionForm 

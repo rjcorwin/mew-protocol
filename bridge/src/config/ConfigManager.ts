@@ -64,7 +64,9 @@ export class ConfigManager {
 
 // Utility functions for working with specific config sections
 export function generateAuthToken(serverUrl: string, participantId: string, topic: string): Promise<string> {
-  return fetch(`${serverUrl}/v0/auth/token`, {
+  // Convert WebSocket URL to HTTP URL for auth endpoint
+  const httpUrl = serverUrl.replace(/^ws:/, 'http:').replace(/^wss:/, 'https:');
+  return fetch(`${httpUrl}/v0/auth/token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -77,7 +79,7 @@ export function generateAuthToken(serverUrl: string, participantId: string, topi
     }
     return response.json();
   })
-  .then(data => data.token);
+  .then((data: any) => data.token);
 }
 
 export function validateMCPServerConfig(config: BridgeConfig['mcp_server']): { valid: boolean; error?: string } {

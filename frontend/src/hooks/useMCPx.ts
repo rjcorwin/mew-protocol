@@ -53,8 +53,12 @@ export function useMCPx(options: UseMCPxOptions): UseMCPxReturn {
     }
 
     const config: MCPxClientConfig = {
-      ...options,
-      authToken: options.authToken
+      serverUrl: options.serverUrl,
+      participantId: options.participantId,
+      topic: options.topic,
+      authToken: options.authToken,
+      reconnectAttempts: options.reconnectAttempts,
+      reconnectDelay: options.reconnectDelay
     };
 
     const client = new MCPxClient(config);
@@ -102,7 +106,9 @@ export function useMCPx(options: UseMCPxOptions): UseMCPxReturn {
     });
 
     await client.connect();
-  }, [options]);
+    // Only include primitive values in deps to avoid recreating on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.serverUrl, options.participantId, options.topic, options.authToken]);
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
@@ -150,9 +156,14 @@ export function useMCPx(options: UseMCPxOptions): UseMCPxReturn {
     }
 
     return () => {
-      disconnect();
+      if (clientRef.current) {
+        clientRef.current.disconnect();
+        clientRef.current = null;
+      }
     };
-  }, [options.autoConnect, options.authToken, connect, disconnect]);
+    // Only re-run if these specific values change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.autoConnect, options.authToken]);
 
   // Derived state
   const isConnected = connectionState.status === 'connected';

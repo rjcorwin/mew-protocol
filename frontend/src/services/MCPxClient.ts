@@ -55,12 +55,14 @@ export class MCPxClient {
       this.setConnectionState({ status: 'connecting', topic: this.config.topic });
 
       try {
-        const wsUrl = `${this.config.serverUrl}/v0/ws?topic=${encodeURIComponent(this.config.topic)}`;
-        this.ws = new WebSocket(wsUrl, [], {
-          headers: {
-            'Authorization': `Bearer ${this.config.authToken}`
-          }
-        });
+        // Convert http to ws protocol
+        const serverUrl = this.config.serverUrl
+          .replace('http://', 'ws://')
+          .replace('https://', 'wss://');
+        
+        // Pass auth token as query parameter since browser WebSocket doesn't support headers
+        const wsUrl = `${serverUrl}/v0/ws?topic=${encodeURIComponent(this.config.topic)}&token=${encodeURIComponent(this.config.authToken)}`;
+        this.ws = new WebSocket(wsUrl);
 
         const onOpen = () => {
           this.setConnectionState({ 

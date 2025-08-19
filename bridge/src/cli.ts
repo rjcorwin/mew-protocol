@@ -178,7 +178,7 @@ async function interactiveSetup(configManager: ConfigManager): Promise<BridgeCon
       name: 'server',
       message: 'MCPx server URL:',
       default: defaultConfig.mcpx?.server,
-      validate: (input) => {
+      validate: (input: string) => {
         try {
           new URL(input);
           return true;
@@ -192,7 +192,7 @@ async function interactiveSetup(configManager: ConfigManager): Promise<BridgeCon
       name: 'topic',
       message: 'Topic to join:',
       default: defaultConfig.mcpx?.topic,
-      validate: (input) => input.trim().length > 0 || 'Topic cannot be empty'
+      validate: (input: string) => input.trim().length > 0 || 'Topic cannot be empty'
     }
   ]);
 
@@ -204,14 +204,14 @@ async function interactiveSetup(configManager: ConfigManager): Promise<BridgeCon
       name: 'id',
       message: 'Participant ID:',
       default: defaultConfig.participant?.id,
-      validate: (input) => input.trim().length > 0 || 'Participant ID cannot be empty'
+      validate: (input: string) => input.trim().length > 0 || 'Participant ID cannot be empty'
     },
     {
       type: 'input',
       name: 'name',
       message: 'Display name:',
       default: defaultConfig.participant?.name,
-      validate: (input) => input.trim().length > 0 || 'Display name cannot be empty'
+      validate: (input: string) => input.trim().length > 0 || 'Display name cannot be empty'
     },
     {
       type: 'list',
@@ -247,14 +247,14 @@ async function interactiveSetup(configManager: ConfigManager): Promise<BridgeCon
           name: 'command',
           message: 'Command to run MCP server:',
           default: 'python',
-          validate: (input) => input.trim().length > 0 || 'Command cannot be empty'
+          validate: (input: string) => input.trim().length > 0 || 'Command cannot be empty'
         },
         {
           type: 'input',
           name: 'args',
           message: 'Command arguments (space-separated):',
           default: 'server.py',
-          filter: (input) => input.trim().split(' ').filter(arg => arg.length > 0)
+          filter: (input: string) => input.trim().split(' ').filter((arg: string) => arg.length > 0)
         }
       ]);
       
@@ -272,7 +272,7 @@ async function interactiveSetup(configManager: ConfigManager): Promise<BridgeCon
           type: 'input',
           name: 'url',
           message: `${mcpTypeAnswer.type.toUpperCase()} URL:`,
-          validate: (input) => {
+          validate: (input: string) => {
             try {
               new URL(input);
               return true;

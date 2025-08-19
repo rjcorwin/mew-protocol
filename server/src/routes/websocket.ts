@@ -20,12 +20,17 @@ export function setupWebSocketRoutes(
         return;
       }
 
-      // Extract and verify auth token
+      // Extract auth token from header or query parameter (for browser WebSocket)
       const authHeader = req.headers.authorization;
-      const token = authService.extractTokenFromAuth(authHeader);
+      let token = authService.extractTokenFromAuth(authHeader);
+      
+      // If no token in header, check query parameter (for browser WebSocket clients)
+      if (!token && url.query.token) {
+        token = url.query.token as string;
+      }
       
       if (!token) {
-        ws.close(1008, 'Authorization header required');
+        ws.close(1008, 'Authorization required (header or query param)');
         return;
       }
 

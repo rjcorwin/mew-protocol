@@ -293,7 +293,7 @@ export class BridgeService extends EventEmitter {
           jsonrpc: '2.0',
           method: 'notifications/tools/available',
           params: {
-            tools: tools.tools.map(tool => ({
+            tools: tools.tools.map((tool: any) => ({
               name: tool.name,
               description: tool.description
             })),

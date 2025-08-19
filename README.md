@@ -75,7 +75,29 @@ npm run cli setup          # Interactive configuration
 npm run cli start          # Start bridging
 ```
 
-## Quick Demo
+## Quick Start
+
+```bash
+# Install all dependencies
+./install.sh
+
+# Start both server and frontend
+./start.sh
+
+# Open http://localhost:3001 in your browser
+```
+
+### Script Options
+
+```bash
+./start.sh --help           # Show help
+./start.sh --server         # Start only server
+./start.sh --frontend       # Start only frontend  
+./start.sh --production     # Run in production mode
+./stop.sh                   # Stop all services
+```
+
+### Manual Setup
 
 1. **Start the server**: `cd server && npm run dev` 
 2. **Start the frontend**: `cd frontend && npm run dev`

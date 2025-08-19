@@ -1,16 +1,12 @@
 import { EventEmitter } from 'events';
 import { spawn, ChildProcess } from 'child_process';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { 
-  Client, 
-  StdioClientTransport, 
   CallToolRequest,
-  CallToolResult,
   ListToolsRequest,
-  ListToolsResult,
-  InitializeRequest,
-  InitializeResult,
-  InitializedNotification
-} from '@modelcontextprotocol/sdk/client/index.js';
+  InitializeRequest
+} from '@modelcontextprotocol/sdk/types.js';
 import { MCPServerConfig } from '../types/config';
 
 export interface MCPServerClientEvents {
@@ -59,33 +55,25 @@ export class MCPServerClient extends EventEmitter {
     await this.cleanup();
   }
 
-  async callTool(name: string, arguments_?: Record<string, any>): Promise<CallToolResult> {
+  async callTool(name: string, arguments_?: Record<string, any>): Promise<any> {
     if (!this.client || !this.isInitialized) {
       throw new Error('MCP server not initialized');
     }
 
-    const request: CallToolRequest = {
-      method: 'tools/call',
-      params: {
-        name,
-        arguments: arguments_ || {}
-      }
-    };
-
-    return await this.client.callTool(request);
+    // The new SDK takes params directly
+    return await this.client.callTool({
+      name,
+      arguments: arguments_ || {}
+    });
   }
 
-  async listTools(): Promise<ListToolsResult> {
+  async listTools(): Promise<any> {
     if (!this.client || !this.isInitialized) {
       throw new Error('MCP server not initialized');
     }
 
-    const request: ListToolsRequest = {
-      method: 'tools/list',
-      params: {}
-    };
-
-    return await this.client.listTools(request);
+    // The new SDK uses params directly, not wrapped in a request object
+    return await this.client.listTools();
   }
 
   async handleMCPRequest(method: string, params: any, id?: string | number): Promise<any> {
@@ -137,31 +125,11 @@ export class MCPServerClient extends EventEmitter {
       throw new Error('Invalid config for stdio connection');
     }
 
-    // Spawn the MCP server process
-    this.process = spawn(this.config.command, this.config.args, {
-      env: { ...process.env, ...this.config.env },
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    if (!this.process.stdin || !this.process.stdout) {
-      throw new Error('Failed to create stdio pipes');
-    }
-
-    // Set up process event handlers
-    this.process.on('error', (error) => {
-      console.error('MCP server process error:', error);
-      this.emit('error', error);
-    });
-
-    this.process.on('exit', (code, signal) => {
-      console.log(`MCP server process exited: code=${code}, signal=${signal}`);
-      this.emit('disconnected');
-    });
-
-    // Create transport and client
+    // Create transport with server parameters - new SDK spawns process internally
     this.transport = new StdioClientTransport({
-      readable: this.process.stdout,
-      writable: this.process.stdin
+      command: this.config.command,
+      args: this.config.args || [],
+      env: { ...process.env, ...this.config.env }
     });
 
     this.client = new Client(
@@ -178,10 +146,10 @@ export class MCPServerClient extends EventEmitter {
       }
     );
 
-    // Set up client notification handler
-    this.client.setNotificationHandler((method, params) => {
-      this.emit('notification', method, params);
-    });
+    // Note: setNotificationHandler doesn't exist in new SDK
+    // this.client.setNotificationHandler((method, params) => {
+    //   this.emit('notification', method, params);
+    // });
 
     await this.client.connect(this.transport);
   }
@@ -192,33 +160,8 @@ export class MCPServerClient extends EventEmitter {
     }
 
     try {
-      const initRequest: InitializeRequest = {
-        method: 'initialize',
-        params: {
-          protocolVersion: '2025-06-18',
-          capabilities: {
-            tools: {},
-            resources: {},
-            prompts: {}
-          },
-          clientInfo: {
-            name: 'mcpx-bridge',
-            version: '0.1.0'
-          }
-        }
-      };
-
-      const initResult = await this.client.initialize(initRequest);
-      console.log('MCP server initialized:', initResult);
-
-      // Send initialized notification
-      const initializedNotification: InitializedNotification = {
-        method: 'notifications/initialized',
-        params: {}
-      };
-
-      await this.client.sendNotification(initializedNotification);
-      
+      // The new SDK handles initialization automatically when connect() is called
+      // We just need to wait for it to complete
       this.isInitialized = true;
       this.emit('initialized');
 
