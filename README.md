@@ -15,6 +15,11 @@ MCPx defines a minimal, topic‑based message envelope that lets multiple MCP se
 - Presence tracking is supported; chat happens through MCP tools like any other functionality.
 - A small realtime gateway (WebSockets recommended) provides join/auth/presence/history but never rewrites MCP payloads.
 
+### What's NOT in v0 (by design)
+- **Topic management**: Topic creation, configuration, and deletion are implementation-specific. The spec assumes topics exist.
+- **Private messaging**: All messages in a topic are visible to all participants (addressing is metadata only).
+- **End-to-end encryption**: Use separate topics or higher-layer crypto if confidentiality is needed.
+
 ## Why this spec (goals)
 
 - Enable multi‑party MCP: make many MCP servers interoperable in the same room without inventing a new RPC.
@@ -22,8 +27,9 @@ MCPx defines a minimal, topic‑based message envelope that lets multiple MCP se
 - Reuse MCP unmodified: leverage existing tools/resources/prompts and the 2025‑06‑18 lifecycle/semantics.
 - Be transparent and observable: everyone can see topic traffic; great for debugging and human‑in‑the‑loop.
 - Transport‑friendly: recommend WebSockets with token auth, presence, and small history for practical apps.
-- Progressive adoption: works as a thin shim around today’s MCP servers and clients.
+- Progressive adoption: works as a __thin shim around today's MCP servers and clients__.
 - Clear security model: topics are not private—use separate topics or higher‑layer crypto for confidentiality.
+- **Platform interoperability**: Enable existing chat platforms (Slack, Discord, XMPP, Matrix) to bridge MCP agents into their native channels by implementing MCPx gateways that translate between protocols.
 
 ## Start Here
 
@@ -33,7 +39,12 @@ MCPx defines a minimal, topic‑based message envelope that lets multiple MCP se
 
 ## Reference Implementation
 
-This repo includes a complete reference implementation of MCPx v0:
+This repo includes a complete reference implementation of MCPx v0, designed to be:
+- **🧪 An experimentation platform** for exploring new human/robot/agent interaction paradigms
+- **🎯 Immediately useful** for hobbyists and researchers to build multi-agent systems
+- **💡 An inspiration** for chat providers and platforms considering MCPx integration
+
+The reference implementation demonstrates the full potential of MCPx while remaining simple enough to understand and extend:
 
 ### 🖥️ Server (`/server`)
 WebSocket gateway implementing the full MCPx v0 specification
@@ -111,4 +122,14 @@ npm run cli start          # Start bridging
 - `frontend/` — Reference web interface for humans
 - `bridge/` — CLI tool to connect existing MCP servers
 
-MCPx aims to be the USB‑C of multi‑agent/human collaboration: minimal, predictable, and easy to adopt.
+## Vision
+
+MCPx aims to be the **USB‑C of multi‑agent/human collaboration**: minimal, predictable, and easy to adopt.
+
+We believe the future of human-AI interaction isn't just chat—it's **collaborative workspaces** where humans, AI agents, and robots work together naturally. This reference implementation is our laboratory for discovering what that future looks like:
+
+- **For Researchers**: Explore multi-agent coordination, emergent behaviors, and human-in-the-loop systems
+- **For Hobbyists**: Build your own AI teams, automate workflows, or create interactive agent experiences  
+- **For Providers**: See how MCPx can enhance your platform with agent capabilities while maintaining your unique UX
+
+The simplicity of MCPx—just a thin envelope around MCP—means you can start experimenting today without waiting for complex infrastructure or standards bodies. Every participant is a peer, every tool is discoverable, and every interaction is transparent.

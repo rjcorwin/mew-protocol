@@ -29,15 +29,17 @@ This v0 deliberately focuses on MCP tools. Resources/Prompts are out of scope un
 ## 2. Goals and Non‑Goals
 
 ### 2.1 Goals
-- Simplicity: a “USB‑C for multi‑agent collaboration.”
-- Interop: treat all participants as MCP servers and let them call each other’s tools.
+- Simplicity: a "USB‑C for multi‑agent collaboration."
+- Interop: treat all participants as MCP servers and let them call each other's tools.
 - Transport: encourage realtime via WebSockets; clients can get presence and recent history easily.
 - Security: require token‑based auth; make the non‑private nature explicit.
+- Platform bridges: enable existing chat platforms (Slack, Discord, XMPP, Matrix) to implement MCPx gateways, allowing MCP agents to participate in their native channels.
 
 ### 2.2 Non‑Goals (v0)
 - Built‑in task semantics (handled via MCP tools if desired).
 - End‑to‑end encryption or private DMs (use separate topics or higher‑layer crypto if needed).
 - Schema registries/ACL granularity beyond topic admission.
+- Topic lifecycle management (creation, configuration, deletion) - topics are assumed to exist; management is implementation-specific.
 
 ---
 
@@ -439,3 +441,35 @@ Response (from robot):
   }
 }
 ```
+
+---
+
+## 14. Future Directions
+
+The following areas are intentionally not covered in MCPx v0 but represent potential areas for future specification versions:
+
+### 14.1 Topic Management
+- **Topic Creation**: Standardized APIs for creating new topics with configuration
+- **Topic Discovery**: Mechanisms for finding and browsing available topics
+- **Topic Metadata**: Schemas for topic descriptions, permissions, and settings
+- **Topic Lifecycle**: Rules for topic archival, deletion, and migration
+- **Topic Federation**: Cross-gateway topic bridging and routing
+
+### 14.2 Enhanced Security
+- **E2E Encryption**: End-to-end encryption for sensitive communications
+- **Granular Permissions**: Fine-grained ACLs beyond topic-level admission
+- **Identity Verification**: Cryptographic identity and signature verification
+
+### 14.3 Advanced Features
+- **Private Messaging**: Direct messages outside the public topic stream
+- **Message Editing/Deletion**: Protocols for modifying historical messages
+- **Presence Status**: Rich presence states beyond join/leave/heartbeat
+- **File Transfer**: Standardized binary data and large file handling
+
+### 14.4 Platform Integration Specifications
+- **Platform Adapters**: Standardized patterns for bridging MCPx to existing chat platforms
+- **UI Extensions**: Guidelines for native MCP tool rendering in chat UIs
+- **Identity Mapping**: Protocols for mapping platform users to MCPx participants
+- **Rate Limit Coordination**: Harmonizing MCPx and platform rate limits
+
+These features may be addressed in future versions as the protocol matures and implementation experience provides guidance on requirements.

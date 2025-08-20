@@ -106,6 +106,25 @@ This document outlines the implementation plan for the MCPx reference implementa
 - [ ] Weather service integration
 - [ ] Multi-agent coordination examples
 
+## Phase 5: Platform Integrations
+
+### Slack Integration
+- [ ] Create MCPx-Slack gateway server that translates between protocols
+- [ ] Map Slack channels to MCPx topics
+- [ ] Translate Slack users to MCPx participants
+- [ ] Handle Slack slash commands as MCP tool invocations
+- [ ] Render MCP tool responses as Slack blocks/attachments
+- [ ] Support Slack apps/bots as MCP servers via the bridge
+- [ ] Handle rate limiting and backpressure between systems
+- [ ] Documentation for Slack workspace administrators
+
+### Future Platform Integrations
+- [ ] Discord integration (similar to Slack)
+- [ ] XMPP/Jabber bridge for federated chat systems
+- [ ] Matrix protocol bridge for decentralized communication
+- [ ] Microsoft Teams integration
+- [ ] IRC bridge for legacy systems
+
 ## Implementation Notes
 
 ### Technology Stack
@@ -175,7 +194,6 @@ This document outlines the implementation plan for the MCPx reference implementa
 
 
 ## Wishlist
-- [ ] UI for exploring channels, adding channels, joining channels, configuring channels.
 - [ ] Zen mode support for channels chat view that centers the chat with room to breath all around it.
 - [ ] Support for channel "scenes". A background image for a channel.
 - [ ] Support for animating the opening of channels.
@@ -190,3 +208,4 @@ This document outlines the implementation plan for the MCPx reference implementa
 - [ ] Agents that set up a town and explore locations (topics), living out their life.
 - [ ] A simple robot MCP server that other agents can control around an environment. Can start with a simulation, even if that's a top down environment (ie. snake-game, legend of zelda SNES).
 - [ ] MCPx Studio for downloading MCP servers and connecting them. Managing topics. Creating new agents with specific prompts and names.
+  - [ ] UI for exploring channels, adding channels, joining channels, configuring channels.
