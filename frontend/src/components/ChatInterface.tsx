@@ -261,23 +261,25 @@ export function ChatInterface({
                 </div>
                 
                 <div className="flex items-center gap-4 text-sm">
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-foreground">
                     <input
                       type="radio"
                       name="format"
                       value="plain"
                       checked={messageFormat === 'plain'}
                       onChange={(e) => setMessageFormat(e.target.value as 'plain')}
+                      className="text-primary focus:ring-primary"
                     />
                     Plain text
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-foreground">
                     <input
                       type="radio"
                       name="format"
                       value="markdown"
                       checked={messageFormat === 'markdown'}
                       onChange={(e) => setMessageFormat(e.target.value as 'markdown')}
+                      className="text-primary focus:ring-primary"
                     />
                     Markdown
                   </label>

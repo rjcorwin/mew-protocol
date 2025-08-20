@@ -84,6 +84,17 @@ body {
   outline-offset: 2px;
 }
 
+/* Input styles */
+input, textarea, select {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+input::placeholder, textarea::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
 /* Prose styles for markdown */
 .prose {
   max-width: none;
