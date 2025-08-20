@@ -174,7 +174,7 @@ This document outlines the implementation plan for the MCPx reference implementa
 - [x] All core MCPx v0 spec features are implemented and tested
 
 
-## Wish list
+## Wishlist
 - [ ] UI for exploring channels, adding channels, joining channels, configuring channels.
 - [ ] Zen mode support for channels chat view that centers the chat with room to breath all around it.
 - [ ] Support for channel "scenes". A background image for a channel.
@@ -184,7 +184,9 @@ This document outlines the implementation plan for the MCPx reference implementa
 - [ ] Rejoin a session (password/token need when creating session?)
 - [ ] UI maintains session between reloads
 - [ ] Agent example that, given a user's suggestion in the chat, makes some MCP call.
+- [ ] Participant pictures (could be an MCP tool every participant has. MCP Bridge would supplement the MCP server it is representing with this tool and picture selection would be part of config).
 - [ ] UI support for dynamically injecting Web Components for interacting with specific MCP tool(s), AKA tool component (better name?).
 - [ ] Agent, that on request, generates a Tool Component for a user in the topic. User reviews, accepts, and then has it handy for using without having to go to the devtools.
 - [ ] Agents that set up a town and explore locations (topics), living out their life.
 - [ ] A simple robot MCP server that other agents can control around an environment. Can start with a simulation, even if that's a top down environment (ie. snake-game, legend of zelda SNES).
+- [ ] MCPx Studio for downloading MCP servers and connecting them. Managing topics. Creating new agents with specific prompts and names.
