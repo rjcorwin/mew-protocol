@@ -13,6 +13,12 @@ The MCPx Bridge connects existing MCP servers to MCPx topics, allowing them to p
 
 ## Quick Start
 
+### Prerequisites
+
+- Node.js 18+ 
+- Running MCPx server (see parent directory)
+- An MCP server to connect (e.g., `mcp-server-filesystem`)
+
 ### Installation
 
 ```bash
@@ -27,10 +33,15 @@ npm run build
 npm run cli setup
 ```
 
-This will guide you through configuring:
-- MCPx server connection (URL, topic, authentication)
-- Participant identity (ID, name, type)
-- MCP server connection (transport, command/URL)
+Example configuration for filesystem MCP server:
+- **MCPx server URL**: `ws://localhost:3000`
+- **Topic**: `room:general`
+- **Participant ID**: `mcp-bridge` (or any unique name)
+- **Display name**: `MCP Bridge`
+- **Participant type**: `robot`
+- **MCP transport**: `stdio`
+- **Command**: `mcp-server-filesystem`
+- **Arguments**: `/absolute/path/to/directory` (use absolute paths!)
 
 ### Start Bridging
 
@@ -44,6 +55,32 @@ The bridge will:
 3. Connect to the MCPx topic
 4. Announce available tools to other participants
 5. Route MCP requests/responses between the topic and your server
+
+### Testing with MCPx Frontend
+
+1. **Start MCPx Server** (if not running):
+   ```bash
+   cd ../server && npm run dev
+   ```
+
+2. **Start Frontend** (if not running):
+   ```bash
+   cd ../frontend && npm run dev
+   ```
+
+3. **Connect to MCPx**:
+   - Open frontend at `http://localhost:3002`
+   - Connect with your participant details
+
+4. **Test MCP Tools**:
+   - Click **"Dev Tools"** tab
+   - Select your bridge participant (e.g., `mcp-bridge`)
+   - Try **"List Tools"** to see available MCP tools
+   - Use **Custom Request** for specific tool calls:
+     ```json
+     {"name": "read_file", "arguments": {"path": "example.txt"}}
+     ```
+   - Check **"MCP"** tab for responses
 
 ## Usage
 
@@ -203,6 +240,23 @@ npm run cli test
 
 ## Troubleshooting
 
+### Common Setup Issues
+
+**"fetch failed" during setup**
+- MCPx server might not be running
+- Check: `curl http://localhost:3000/health`
+- Start server: `cd ../server && npm run dev`
+
+**"Invalid token" when connecting**
+- Token may have expired (default: 1 hour)
+- Run setup again to generate fresh token
+- Or manually generate: `curl -X POST http://localhost:3000/v0/auth/token -H "Content-Type: application/json" -d '{"participantId":"your-id","topic":"room:general"}'`
+
+**"Access denied - path outside allowed directories"**
+- Use **absolute paths** in MCP server args, not `~/path`
+- Example: `/Users/username/Desktop/folder` not `~/Desktop/folder`
+- Bridge sets working directory to first arg for relative path resolution
+
 ### Connection Issues
 
 **"MCPx server unreachable"**
@@ -214,13 +268,26 @@ npm run cli test
 - For stdio: Check command and arguments
 - For WebSocket/SSE: Verify URL and server availability
 - Check MCP server logs for errors
+- Ensure MCP server binary is in PATH
+
+### Frontend Dev Tools Issues
+
+**"Bridge not visible in participant dropdown"**
+- Refresh browser page to update participant list
+- Check bridge is connected (should see "Broadcast X tools" in logs)
+- All participants now shown - look for your bridge ID
+
+**"Relative paths not working"**
+- Bridge now sets working directory to first MCP server arg
+- Use relative paths like `"path": "file.txt"` 
+- Or absolute paths: `"path": "/full/path/to/file.txt"`
 
 ### Authentication
 
 **"Invalid token"**
 - Regenerate token using setup command
 - Verify participant ID matches token
-- Check token expiration
+- Check token expiration (1 hour default)
 
 ### Protocol Issues
 
@@ -228,6 +295,7 @@ npm run cli test
 - Verify MCP server implements required methods
 - Check MCP server initialization logs
 - Test MCP server independently
+- Check request format in MCP tab
 
 ### Performance
 
@@ -238,18 +306,47 @@ npm run cli test
 
 ## Examples
 
+### Filesystem Service Bridge
+
+```bash
+# Setup
+npm run cli setup
+# Server: ws://localhost:3000
+# Topic: room:general
+# Participant: mcp-bridge
+# MCP: mcp-server-filesystem /Users/username/Desktop/hello-world
+
+# Start
+npm run cli start
+```
+
+**Test in frontend Dev Tools:**
+```json
+// List all available tools
+{"method": "tools/list"}
+
+// Read a file (relative path)
+{"name": "read_file", "arguments": {"path": "example.txt"}}
+
+// List directory contents
+{"name": "list_directory", "arguments": {"path": "."}}
+
+// Create a new file
+{"name": "write_file", "arguments": {"path": "test.txt", "content": "Hello world!"}}
+```
+
 ### Weather Service Bridge
 
 ```bash
 # Setup
-mcpx-bridge setup
+npm run cli setup
 # Server: ws://localhost:3000
 # Topic: room:weather
 # Participant: weather-bot
 # MCP: python weather_server.py
 
 # Start
-mcpx-bridge start --verbose
+npm run cli start --verbose
 ```
 
 ### Calculator Service
