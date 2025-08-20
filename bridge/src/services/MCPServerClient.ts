@@ -126,10 +126,14 @@ export class MCPServerClient extends EventEmitter {
     }
 
     // Create transport with server parameters - new SDK spawns process internally
+    // Set working directory to the first allowed directory for relative paths
+    const cwd = this.config.args && this.config.args.length > 0 ? this.config.args[0] : undefined;
+    
     this.transport = new StdioClientTransport({
       command: this.config.command,
       args: this.config.args || [],
-      env: { ...process.env, ...this.config.env }
+      env: { ...process.env, ...this.config.env },
+      cwd: cwd
     });
 
     this.client = new Client(

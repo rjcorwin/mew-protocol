@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Users, Settings, MessageSquare, Zap } from 'lucide-react';
-import { format } from 'date-fns';
+import { Send, Users, Settings, MessageSquare, Zap, Code } from 'lucide-react';
 import { Envelope, Participant, isChatMessage, ConnectionState } from '@/types/mcpx';
 import { ParticipantsList } from './ParticipantsList';
 import { MessagesList } from './MessagesList';
 import { ConnectionStatus } from './ConnectionStatus';
+import { MCPDevTools } from './MCPDevTools';
 
 export interface ChatInterfaceProps {
   connectionState: ConnectionState;
@@ -26,7 +26,7 @@ export function ChatInterface({
   const [messageText, setMessageText] = useState('');
   const [messageFormat, setMessageFormat] = useState<'plain' | 'markdown'>('plain');
   const [showParticipants, setShowParticipants] = useState(true);
-  const [selectedTab, setSelectedTab] = useState<'chat' | 'all' | 'mcp'>('chat');
+  const [selectedTab, setSelectedTab] = useState<'chat' | 'all' | 'mcp' | 'dev'>('chat');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -123,6 +123,7 @@ export function ChatInterface({
             {[
               { key: 'chat', label: 'Chat', icon: MessageSquare },
               { key: 'mcp', label: 'MCP', icon: Zap },
+              { key: 'dev', label: 'Dev Tools', icon: Code },
               { key: 'all', label: 'All', icon: Settings }
             ].map(({ key, label, icon: Icon }) => (
               <button
@@ -142,15 +143,25 @@ export function ChatInterface({
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <MessagesList 
-            messages={filteredMessages}
-            currentParticipantId={connectionState.participantId}
-          />
-          <div ref={messagesEndRef} />
+        <div className="flex-1 overflow-y-auto">
+          {selectedTab === 'dev' ? (
+            <MCPDevTools 
+              participants={participants}
+              onSendMCPRequest={onSendMCPRequest}
+            />
+          ) : (
+            <div className="p-4">
+              <MessagesList 
+                messages={filteredMessages}
+                currentParticipantId={connectionState.participantId}
+              />
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
 
         {/* Message Input */}
+        {selectedTab !== 'dev' && (
         <div className="border-t bg-card p-4">
           <form onSubmit={handleSendMessage} className="space-y-2">
             <div className="flex gap-2">
@@ -210,6 +221,7 @@ export function ChatInterface({
             </div>
           </form>
         </div>
+        )}
       </div>
     </div>
   );
