@@ -9,83 +9,83 @@ This document outlines the implementation plan for the MCPx reference implementa
 ## Phase 1: Reference Backend Server
 
 ### Core Gateway Implementation
-- [ ] Set up Node.js/TypeScript project with WebSocket support (ws library)
-- [ ] Implement MCPx v0 message envelope validation and routing
-- [ ] Create topic-based message broadcasting system
-- [ ] Add Bearer token authentication system
-- [ ] Implement participant presence tracking (join/leave/heartbeat)
-- [ ] Add message history storage and retrieval (in-memory for reference implementation)
+- [x] Set up Node.js/TypeScript project with WebSocket support (ws library)
+- [x] Implement MCPx v0 message envelope validation and routing
+- [x] Create topic-based message broadcasting system
+- [x] Add Bearer token authentication system
+- [x] Implement participant presence tracking (join/leave/heartbeat)
+- [x] Add message history storage and retrieval (in-memory for reference implementation)
 
 ### WebSocket API Implementation
-- [ ] `GET /v0/ws?topic=<name>` WebSocket endpoint with auth
-- [ ] System welcome message on connection
-- [ ] Real-time bidirectional envelope forwarding
-- [ ] Connection lifecycle management (graceful disconnect, reconnection handling)
+- [x] `GET /v0/ws?topic=<name>` WebSocket endpoint with auth
+- [x] System welcome message on connection
+- [x] Real-time bidirectional envelope forwarding
+- [x] Connection lifecycle management (graceful disconnect, reconnection handling)
 
 ### REST API Implementation (Optional Helpers)
-- [ ] `GET /v0/topics` - list visible topics
-- [ ] `GET /v0/topics/{topic}/participants` - current presence
-- [ ] `GET /v0/topics/{topic}/history` - message history with pagination
+- [x] `GET /v0/topics` - list visible topics
+- [x] `GET /v0/topics/{topic}/participants` - current presence
+- [x] `GET /v0/topics/{topic}/history` - message history with pagination
 
 ### Security & Validation
-- [ ] Envelope schema validation (protocol, required fields)
-- [ ] Participant identity verification (`from` field matches auth)
-- [ ] Rate limiting per participant
-- [ ] Chat message spam prevention
+- [x] Envelope schema validation (protocol, required fields)
+- [x] Participant identity verification (`from` field matches auth)
+- [x] Rate limiting per participant
+- [x] Chat message spam prevention
 
 ## Phase 2: Reference Frontend
 
 ### Core Web Interface
-- [ ] Set up React/TypeScript project with WebSocket client
-- [ ] Topic selection and joining interface
-- [ ] Real-time message display with envelope details
-- [ ] Participant presence sidebar
-- [ ] Message history loading
+- [x] Set up React/TypeScript project with WebSocket client
+- [x] Topic selection and joining interface
+- [x] Real-time message display with envelope details
+- [x] Participant presence sidebar
+- [x] Message history loading
 
 ### MCP Client Integration
-- [ ] MCP client library integration for tool discovery
-- [ ] Tool calling interface with parameter forms
-- [ ] MCP initialize/initialized handshake handling
-- [ ] Response and error display
+- [x] MCP client library integration for tool discovery
+- [x] Tool calling interface with parameter forms
+- [x] MCP initialize/initialized handshake handling
+- [x] Response and error display
 
 ### Chat Features
-- [ ] Chat message composition and sending
-- [ ] Broadcast chat notifications display
-- [ ] Message formatting support (plain/markdown)
+- [x] Chat message composition and sending
+- [x] Broadcast chat notifications display
+- [x] Message formatting support (plain/markdown)
 
 ### UX/UI Polish
-- [ ] Responsive design for desktop and mobile
-- [ ] Dark/light theme support
-- [ ] Message timestamps and participant colors
+- [x] Responsive design for desktop and mobile
+- [x] Dark/light theme support
+- [x] Message timestamps and participant colors
 - [ ] Tool call confirmation dialogs for sensitive operations
 
 ## Phase 3: Bridge/Adapter Agent
 
 ### Configuration System
-- [ ] Command-line interface for initial setup
-- [ ] Configuration file format for connection details:
+- [x] Command-line interface for initial setup
+- [x] Configuration file format for connection details:
   - MCPx server URL and topic
   - Authentication token
   - Target MCP server connection (stdio/websocket/sse)
   - Participant identity and metadata
 
 ### MCP Server Bridging
-- [ ] Connect to existing MCP servers (stdio/websocket/sse transports)
-- [ ] Proxy MCP tool/resource/prompt capabilities to MCPx topic
-- [ ] Handle MCP lifecycle (initialize/initialized) for both sides
-- [ ] Bidirectional message routing with proper correlation
+- [x] Connect to existing MCP servers (stdio/websocket/sse transports)
+- [x] Proxy MCP tool/resource/prompt capabilities to MCPx topic
+- [x] Handle MCP lifecycle (initialize/initialized) for both sides
+- [x] Bidirectional message routing with proper correlation
 
 ### MCPx Integration
-- [ ] Connect to MCPx gateway via WebSocket
-- [ ] Implement envelope wrapping/unwrapping
-- [ ] Presence management and discovery
-- [ ] Error handling and reconnection logic
+- [x] Connect to MCPx gateway via WebSocket
+- [x] Implement envelope wrapping/unwrapping
+- [x] Presence management and discovery
+- [x] Error handling and reconnection logic
 
 ### Agent Features
-- [ ] Tool discovery broadcasting on join
-- [ ] Automatic MCP handshake with interested participants
-- [ ] Health monitoring and status reporting
-- [ ] Graceful shutdown and cleanup
+- [x] Tool discovery broadcasting on join
+- [x] Automatic MCP handshake with interested participants
+- [x] Health monitoring and status reporting
+- [x] Graceful shutdown and cleanup
 
 ## Phase 4: Testing & Documentation
 
@@ -167,11 +167,11 @@ This document outlines the implementation plan for the MCPx reference implementa
 ```
 
 ## Success Criteria
-- [ ] Multiple MCP servers can join a topic and discover each other
-- [ ] Human users can interact with agents through the web frontend
-- [ ] Tool calls flow correctly between participants
-- [ ] Bridge agent successfully exposes existing MCP servers to MCPx
-- [ ] All core MCPx v0 spec features are implemented and tested
+- [x] Multiple MCP servers can join a topic and discover each other
+- [x] Human users can interact with agents through the web frontend
+- [x] Tool calls flow correctly between participants
+- [x] Bridge agent successfully exposes existing MCP servers to MCPx
+- [x] All core MCPx v0 spec features are implemented and tested
 
 
 ## Wish list
