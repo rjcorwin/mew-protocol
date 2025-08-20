@@ -34,6 +34,7 @@ MCPx defines a minimal, topic‑based message envelope that lets multiple MCP se
 ## Start Here
 
 - **Spec**: `v0/SPEC.md` (core envelope, addressing, gateway API)
+- **Architecture**: `v0/ARCHITECTURE.md` (system design, components, data flows)
 - **Patterns**: `v0/PATTERNS.md` (discovery/handshake, fan‑out, coordination, reconnect)
 - **Reference Implementation**: Try the working server, frontend, and bridge below ⬇️
 
