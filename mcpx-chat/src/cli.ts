@@ -56,6 +56,7 @@ program
       }
       
       await client.disconnect();
+      process.exit(0);  // Explicitly exit after disconnecting
     } catch (error) {
       console.error('Error:', error);
       process.exit(1);
@@ -137,6 +138,7 @@ program
       client.showTools(options.peer);
       
       await client.disconnect();
+      process.exit(0);  // Explicitly exit after disconnecting
     } catch (error) {
       console.error('Error:', error);
       process.exit(1);
@@ -200,6 +202,7 @@ program
       }
       
       await client.disconnect();
+      process.exit(0);  // Explicitly exit after disconnecting
     } catch (error) {
       console.error('Error:', error);
       process.exit(1);
