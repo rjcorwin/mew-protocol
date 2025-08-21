@@ -69,13 +69,14 @@ export interface PresenceEvent {
 
 // System types
 export interface SystemWelcome {
+  event: 'welcome';
   participants: Array<{
     id: string;
     name?: string;
     kind: 'human' | 'agent' | 'robot';
     metadata?: Record<string, any>;
   }>;
-  history: Envelope[];
+  history?: any;
 }
 
 // Connection types
@@ -99,6 +100,7 @@ export interface MCPxEvents {
   peerJoined: (peer: Peer) => void;
   peerLeft: (peerId: string) => void;
   peerUpdated: (peer: Peer) => void;
+  peerReady: (peer: Peer) => void;
   chat: (message: ChatMessage) => void;
   toolCall: (request: ToolCallRequest) => Promise<any>;
   message: (envelope: Envelope) => void;

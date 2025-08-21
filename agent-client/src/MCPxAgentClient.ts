@@ -204,12 +204,15 @@ export class MCPxAgentClient extends EventEmitter<MCPxEvents> {
   }
   
   private handleSystemMessage(envelope: Envelope): void {
-    if (envelope.payload.type === 'welcome') {
+    debug('System message received:', JSON.stringify(envelope.payload));
+    if (envelope.payload.event === 'welcome') {
       const welcome = envelope.payload as SystemWelcome;
+      debug(`Welcome message received with ${welcome.participants.length} participants`);
       
       // Update peer list
       for (const participant of welcome.participants) {
         if (participant.id !== this.config.participantId) {
+          debug(`Adding peer: ${participant.id} (${participant.name}) - ${participant.kind}`);
           this.peers.set(participant.id, {
             id: participant.id,
             name: participant.name,
@@ -222,11 +225,12 @@ export class MCPxAgentClient extends EventEmitter<MCPxEvents> {
         }
       }
       
-      // Store history
-      if (welcome.history) {
+      // Store history (if it's an array)
+      if (welcome.history && Array.isArray(welcome.history)) {
         this.messageHistory = welcome.history;
       }
       
+      debug(`Initializing MCP with ${this.peers.size} peers`);
       // Send MCP initialize to all peers
       this.initializeMCPWithPeers();
     }
@@ -365,38 +369,90 @@ export class MCPxAgentClient extends EventEmitter<MCPxEvents> {
     if (mcp.method === 'initialized') {
       debug(`Peer ${envelope.from} initialized`);
       
-      // Request their tools
-      this.sendMCPRequest(envelope.from, 'tools/list', {});
-    }
-    
-    // Handle tools/list response
-    if (mcp.method === 'tools/list' && mcp.result) {
-      const peer = this.peers.get(envelope.from);
-      if (peer) {
-        peer.tools = mcp.result.tools.map((tool: any) => ({
-          peerId: envelope.from,
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema
-        }));
-        this.emit('peerUpdated', peer);
-      }
+      // Request their tools and wait for the response before emitting ready
+      this.requestPeerTools(envelope.from).then(() => {
+        // Emit an event when peer is fully initialized with tools
+        const peer = this.peers.get(envelope.from);
+        if (peer) {
+          this.emit('peerReady', peer);
+        }
+      });
     }
   }
   
   // MCP Protocol
-  private initializeMCPWithPeers(): void {
-    for (const peer of this.peers.values()) {
-      this.sendMCPInitialize(peer.id);
+  private async requestPeerTools(peerId: string): Promise<void> {
+    try {
+      const requestId = this.generateId();
+      
+      // Create promise to wait for response
+      const responsePromise = new Promise<any>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.pendingRequests.delete(requestId);
+          reject(new Error(`Timeout requesting tools from ${peerId}`));
+        }, 5000);
+        
+        this.pendingRequests.set(requestId, {
+          resolve,
+          reject,
+          timer
+        });
+      });
+      
+      // Send the request
+      this.sendMCPRequest(peerId, 'tools/list', {}, requestId);
+      
+      // Wait for response
+      const result = await responsePromise;
+      
+      // Update peer's tools
+      const peer = this.peers.get(peerId);
+      if (peer && result && result.tools) {
+        peer.tools = result.tools.map((tool: any) => ({
+          peerId: peerId,
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema
+        }));
+        debug(`Received ${peer.tools.length} tools from ${peerId}`);
+        this.emit('peerUpdated', peer);
+      }
+    } catch (error) {
+      debug(`Failed to get tools from ${peerId}:`, error);
     }
   }
   
-  private sendMCPInitialize(peerId: string): void {
-    const request: MCPRequest = {
-      jsonrpc: '2.0',
-      id: this.generateId(),
-      method: 'initialize',
-      params: {
+  private async initializeMCPWithPeers(): Promise<void> {
+    debug(`Sending MCP initialize to ${this.peers.size} peers`);
+    const promises = [];
+    for (const peer of this.peers.values()) {
+      debug(`Sending MCP initialize to ${peer.id}`);
+      promises.push(this.sendMCPInitialize(peer.id));
+    }
+    await Promise.allSettled(promises);
+    debug('Finished initializing with all peers');
+  }
+  
+  private async sendMCPInitialize(peerId: string): Promise<void> {
+    const requestId = this.generateId();
+    
+    try {
+      // Create promise to wait for initialize response
+      const responsePromise = new Promise<any>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.pendingRequests.delete(requestId);
+          reject(new Error(`Timeout initializing with ${peerId}`));
+        }, 5000);
+        
+        this.pendingRequests.set(requestId, {
+          resolve,
+          reject,
+          timer
+        });
+      });
+      
+      // Send initialize request
+      this.sendMCPRequest(peerId, 'initialize', {
         protocolVersion: '2024-11-05',
         capabilities: {
           tools: {}
@@ -405,10 +461,35 @@ export class MCPxAgentClient extends EventEmitter<MCPxEvents> {
           name: this.config.participantName || this.config.participantId,
           version: '0.1.0'
         }
-      }
-    };
-    
-    this.sendMCPRequest(peerId, request.method, request.params, request.id);
+      }, requestId);
+      
+      // Wait for initialize response
+      const result = await responsePromise;
+      debug(`Received initialize response from ${peerId}`, result);
+      
+      // Send initialized notification (no id)
+      const notificationEnvelope: Envelope = {
+        protocol: 'mcp-x/v0',
+        id: this.generateId(),
+        ts: new Date().toISOString(),
+        from: this.config.participantId,
+        to: [peerId],
+        kind: 'mcp',
+        payload: {
+          jsonrpc: '2.0',
+          method: 'initialized',
+          params: {}
+        }
+      };
+      this.sendEnvelope(notificationEnvelope);
+      debug(`Sent initialized notification to ${peerId}`);
+      
+      // Now request tools
+      await this.requestPeerTools(peerId);
+      
+    } catch (error) {
+      debug(`Failed to initialize with ${peerId}:`, error);
+    }
   }
   
   private sendMCPRequest(to: string, method: string, params: any, id?: string | number): void {
@@ -484,6 +565,40 @@ export class MCPxAgentClient extends EventEmitter<MCPxEvents> {
       
       this.on('peerJoined', handler);
     });
+  }
+  
+  async waitForPeersReady(timeout = 10000): Promise<void> {
+    debug('Waiting for all peers to be ready with tools...');
+    const startTime = Date.now();
+    
+    // Get all peers that don't have tools yet
+    const peersWithoutTools = Array.from(this.peers.values()).filter(p => p.tools.length === 0);
+    
+    if (peersWithoutTools.length === 0) {
+      debug('All peers already have tools');
+      return;
+    }
+    
+    // Wait for each peer to be ready
+    const promises = peersWithoutTools.map(peer => {
+      return new Promise<void>((resolve) => {
+        const checkReady = () => {
+          const updatedPeer = this.peers.get(peer.id);
+          if (updatedPeer && updatedPeer.tools.length > 0) {
+            resolve();
+          } else if (Date.now() - startTime > timeout) {
+            debug(`Timeout waiting for peer ${peer.id} tools`);
+            resolve(); // Resolve anyway after timeout
+          } else {
+            setTimeout(checkReady, 100);
+          }
+        };
+        checkReady();
+      });
+    });
+    
+    await Promise.all(promises);
+    debug('All peers ready with tools');
   }
   
   // Tool Operations

@@ -17,6 +17,7 @@ export interface AgentConfig {
     pattern: string | RegExp;
     response: string | ((match: RegExpMatchArray | null) => string);
   }>;
+  waitForPeersReady?: boolean; // Wait for peers to have tools before processing messages
   
   // Tool automation
   autoCallTools?: boolean;
@@ -187,6 +188,13 @@ export class GenericAgent {
     this.running = true;
     await this.client.connect();
     console.log(`Agent ${this.config.participantId} started`);
+    
+    // Wait for peers to be ready with their tools if configured
+    if (this.config.waitForPeersReady) {
+      console.log('Waiting for peers to be ready with tools...');
+      await this.client.waitForPeersReady();
+      console.log('All peers ready, agent is now fully operational');
+    }
   }
   
   async stop(): Promise<void> {

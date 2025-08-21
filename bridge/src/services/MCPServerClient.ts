@@ -90,8 +90,17 @@ export class MCPServerClient extends EventEmitter {
           return await this.callTool(params.name, params.arguments);
         
         case 'initialize':
-          // Re-initialization not supported
-          throw new Error('Server already initialized');
+          // Return bridge capabilities when another client initializes
+          return {
+            protocolVersion: '2024-11-05',
+            capabilities: {
+              tools: {}
+            },
+            serverInfo: {
+              name: 'MCPx Bridge',
+              version: '0.1.0'
+            }
+          };
         
         default:
           // For other methods, we'd need to extend the SDK or handle them manually

@@ -86,6 +86,8 @@ Guidelines:
 - Keep responses concise but informative
 - You can see tools from all peers - choose the right peer for each tool`;
 
+    // Clear conversation history and add system prompt
+    this.conversationHistory = [];
     this.conversationHistory.push({
       role: 'system',
       content: this.config.systemPrompt || defaultPrompt
@@ -260,33 +262,42 @@ Guidelines:
     
     // Add tool call results to conversation
     if (results.length > 0) {
-      // Add the assistant's tool call message
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: null,
-        tool_calls: toolCalls
-      });
-      
-      // Add tool results
-      results.forEach(result => {
-        this.conversationHistory.push(result);
-      });
-      
-      // Get AI's response to tool results
-      const completion = await this.openai.chat.completions.create({
-        model: this.config.model!,
-        messages: this.conversationHistory,
-        max_tokens: this.config.maxTokens,
-        temperature: this.config.temperature
-      });
-      
-      const followUp = completion.choices[0]?.message?.content;
-      if (followUp) {
-        this.client.sendChat(followUp);
+      try {
+        // Add the assistant's tool call message
         this.conversationHistory.push({
           role: 'assistant',
-          content: followUp
+          content: null,
+          tool_calls: toolCalls
         });
+        
+        // Add tool results
+        results.forEach(result => {
+          this.conversationHistory.push(result);
+        });
+        
+        // Get AI's response to tool results
+        const completion = await this.openai.chat.completions.create({
+          model: this.config.model!,
+          messages: this.conversationHistory,
+          max_tokens: this.config.maxTokens,
+          temperature: this.config.temperature
+        });
+        
+        const followUp = completion.choices[0]?.message?.content;
+        if (followUp) {
+          this.client.sendChat(followUp);
+          this.conversationHistory.push({
+            role: 'assistant',
+            content: followUp
+          });
+        }
+      } catch (error: any) {
+        console.error('Error getting AI response to tool results:', error);
+        // Reset conversation history if we get an error about tool calls
+        if (error.message?.includes('tool_call')) {
+          console.log('Resetting conversation history due to tool call error');
+          this.setupSystemPrompt();
+        }
       }
     }
   }
