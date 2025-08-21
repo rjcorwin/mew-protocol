@@ -4,7 +4,7 @@ export const defaultConfig: ServerConfig = {
   port: parseInt(process.env.PORT || '3000'),
   auth: {
     secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
-    tokenExpiry: process.env.TOKEN_EXPIRY || '1h'
+    tokenExpiry: process.env.TOKEN_EXPIRY || '1y'
   },
   topics: {
     maxParticipants: parseInt(process.env.MAX_PARTICIPANTS_PER_TOPIC || '50'),
