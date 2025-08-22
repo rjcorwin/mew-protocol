@@ -96,7 +96,11 @@ export class MCPxChatClient {
     // If no auth token provided, generate one
     if (!this.config.authToken) {
       try {
-        const response = await fetch('http://localhost:3000/v0/auth/token', {
+        // Extract the host from the WebSocket URL for the auth endpoint
+        const wsUrl = new URL(this.config.serverUrl);
+        const authUrl = `http://${wsUrl.host}/v0/auth/token`;
+        
+        const response = await fetch(authUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
