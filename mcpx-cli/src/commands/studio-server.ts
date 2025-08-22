@@ -164,7 +164,11 @@ export async function startStudioServer(options: any): Promise<void> {
   // Agent endpoints
   app.get('/api/agents', async (req, res) => {
     try {
-      const agents = await agentCommands.listAgents({ json: true });
+      // Get agents directly from AgentManager
+      const AgentManager = (await import('../lib/AgentManager')).AgentManager;
+      const manager = new AgentManager();
+      await manager.initialize();
+      const agents = await manager.listAgents();
       res.json({ success: true, data: agents });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -173,8 +177,26 @@ export async function startStudioServer(options: any): Promise<void> {
   
   app.post('/api/agents', async (req, res) => {
     try {
-      const { name, template, ...options } = req.body;
-      await agentCommands.createAgent(name, { template, ...options });
+      const { name, template, ...extraOptions } = req.body;
+      // Only pass template option that the CLI understands
+      const cliOptions = { template: template || 'basic' };
+      
+      await agentCommands.createAgent(name, cliOptions);
+      
+      // If it's an AI agent, we need to update the config with AI settings
+      if (template === 'ai' && extraOptions.aiProvider) {
+        const configPath = path.join(os.homedir(), '.mcpx', 'agents', name, 'config.json');
+        if (await fs.pathExists(configPath)) {
+          const config = await fs.readJson(configPath);
+          config.config.openai = {
+            apiKey: '${OPENAI_API_KEY}',
+            model: extraOptions.aiModel || 'gpt-4o',
+            temperature: 0.7
+          };
+          await fs.writeJson(configPath, config, { spaces: 2 });
+        }
+      }
+      
       res.json({ success: true, message: `Agent ${name} created` });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });

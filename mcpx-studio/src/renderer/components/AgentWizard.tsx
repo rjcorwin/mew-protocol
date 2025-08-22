@@ -94,16 +94,32 @@ const AgentWizard: React.FC<AgentWizardProps> = ({ visible, onClose, onComplete 
         timestamp: new Date().toISOString()
       };
       
-      // Call the CLI to create the agent
-      const result = await window.electronAPI.cli.execute('agent', ['create', values.name, '--type', agentType]);
+      // Call the agent API to create the agent
+      // Map agentType to template name
+      const templateMap: { [key: string]: string } = {
+        'AI': 'openai',
+        'Claude': 'claude',
+        'Basic': 'basic'
+      };
+      const template = templateMap[agentType] || 'basic';
       
-      if (result.success) {
+      const result = await window.electronAPI.agent.create(
+        values.name || `agent-${Date.now()}`,
+        template,
+        {
+          topic: values.topic || 'room:general',
+          aiProvider: values.aiProvider,
+          aiModel: values.model
+        }
+      );
+      
+      if (result) {
         onComplete(agentConfig);
         form.resetFields();
         setCurrentStep(0);
         onClose();
       } else {
-        throw new Error(result.error || 'Failed to create agent');
+        throw new Error('Failed to create agent');
       }
     } catch (error) {
       console.error('Failed to create agent:', error);
