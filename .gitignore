@@ -1,60 +1,14 @@
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+*/node_modules/
+packages/*/node_modules/
 
 # Build outputs
 dist/
 build/
-out/
 *.tsbuildinfo
-.next/
-.nuxt/
-.vuepress/dist/
-.serverless/
-.fusebox/
-.dynamodb/
-.tern-port
-
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.env
-
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-*.sublime-workspace
-*.sublime-project
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.iml
-.vim/
-
-# Testing
-coverage/
-.nyc_output/
-*.lcov
-.coverage
-*.cover
-.hypothesis/
-.pytest_cache/
-junit.xml
-test-results/
+packages/*/dist/
+packages/*/build/
 
 # Logs
 logs/
@@ -65,138 +19,54 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# OS files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# Package manager files
-.npm
-.eslintcache
-.stylelintcache
-.yarn-integrity
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
-
-# Temporary files
-*.tmp
-*.temp
-.tmp/
-.temp/
-tmp/
-temp/
-
-# Database files
-*.sqlite
-*.sqlite3
-*.db
-
-# Backup files
-*.backup
-*.bak
-*.old
-
-# Lock files (keep package-lock.json for npm projects)
-yarn.lock
-pnpm-lock.yaml
-
-# Production builds
-/server/dist/
-/frontend/dist/
-/bridge/dist/
-
-# Local configuration
-/server/config.local.json
-/bridge/bridge-config.json
-/frontend/.env.local
-
-# Certificates and keys
-*.pem
-*.key
-*.crt
-*.cer
-*.p12
-*.pfx
-
-# Debug files
-debug/
-.debug/
-
-# Documentation build
-docs/_build/
-docs/.docusaurus/
-
-# Miscellaneous
-.cache/
-.parcel-cache/
-.turbo/
-.vercel/
-.netlify/
+# Runtime data
+pids/
 *.pid
 *.seed
 *.pid.lock
 
-# Python (for any Python scripts)
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+# Testing
+coverage/
+*.lcov
+.nyc_output/
 
-# Rust (if using Rust components)
-target/
-Cargo.lock
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Go (if using Go components)
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-vendor/
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Archives
-*.zip
-*.tar.gz
-*.rar
-*.7z
+# Package manager files
+.npm
+.yarn-integrity
 
-# MCPx specific
-/server/data/
-/server/logs/
-/bridge/logs/
-/bridge/sessions/
-*.session.json
+# Optional npm cache directory
+.npm
 
-# MCPx Studio specific
-/mcpx-studio/release/
-/mcpx-studio/dist/
-/mcpx-studio/out/
-/mcpx-studio/.vite/
-/mcpx-studio/node_modules/
-/mcpx-studio/*.log
-/mcpx-studio/*.dmg
-/mcpx-studio/*.zip
-/mcpx-studio/*.blockmap
-/mcpx-studio/.DS_Store
+# Optional eslint cache
+.eslintcache
 
-# MCPx CLI build outputs
-/mcpx-cli/dist/
-/mcpx-cli/lib/
-/mcpx-cli/*.tsbuildinfo
+# Optional stylelint cache
+.stylelintcache
 
-# Doc reference
-modelcontextprotocol
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Production builds
+packages/web-client/dist/
+packages/web-client/.vite/
+
+# Monorepo
+lerna-debug.log
+.changelog/

@@ -1,0 +1,28 @@
+{
+  "name": "mcpx",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCPx Protocol Reference Implementation",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/mcpx.git"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "dev:gateway": "npm run dev -w @mcpx/gateway",
+    "dev:web": "npm run dev -w @mcpx/web-client",
+    "dev:bridge": "npm run dev -w @mcpx/bridge",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
