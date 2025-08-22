@@ -181,5 +181,22 @@ vendor/
 /bridge/sessions/
 *.session.json
 
+# MCPx Studio specific
+/mcpx-studio/release/
+/mcpx-studio/dist/
+/mcpx-studio/out/
+/mcpx-studio/.vite/
+/mcpx-studio/node_modules/
+/mcpx-studio/*.log
+/mcpx-studio/*.dmg
+/mcpx-studio/*.zip
+/mcpx-studio/*.blockmap
+/mcpx-studio/.DS_Store
+
+# MCPx CLI build outputs
+/mcpx-cli/dist/
+/mcpx-cli/lib/
+/mcpx-cli/*.tsbuildinfo
+
 # Doc reference
 modelcontextprotocol
