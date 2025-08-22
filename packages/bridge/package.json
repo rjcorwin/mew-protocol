@@ -1,5 +1,5 @@
 {
-  "name": "@mcpx/bridge",
+  "name": "@mcpxp/bridge",
   "version": "0.1.0",
   "description": "MCPx Bridge - Connects existing MCP servers to MCPx topics",
   "main": "dist/index.js",

@@ -1,5 +1,5 @@
 {
-  "name": "@mcpx/web-client",
+  "name": "@mcpxp/web-client",
   "version": "0.1.0",
   "description": "MCPx Reference Web Client - Human-friendly interface for MCPx topics",
   "private": true,

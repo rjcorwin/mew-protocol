@@ -1,5 +1,5 @@
 {
-  "name": "@mcpx/gateway",
+  "name": "@mcpxp/gateway",
   "version": "0.1.0",
   "description": "MCPx Reference Gateway Server",
   "main": "dist/index.js",
