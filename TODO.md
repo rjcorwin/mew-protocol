@@ -194,18 +194,38 @@ This document outlines the implementation plan for the MCPx reference implementa
 
 
 ## Wishlist
-- [ ] Zen mode support for channels chat view that centers the chat with room to breath all around it.
-- [ ] Support for channel "scenes". A background image for a channel.
-- [ ] Support for animating the opening of channels.
-- [ ] Support for automatically generating an image for a channel based on its description (choose what art to base it on).
-- [ ] Pattern for managing bridges to number of MCP servers and getting them to start/stop with the MCPx as a whole.
-- [ ] Rejoin a session (password/token need when creating session?)
-- [ ] UI maintains session between reloads
-- [ ] Agent example that, given a user's suggestion in the chat, makes some MCP call.
-- [ ] Participant pictures (could be an MCP tool every participant has. MCP Bridge would supplement the MCP server it is representing with this tool and picture selection would be part of config).
-- [ ] UI support for dynamically injecting Web Components for interacting with specific MCP tool(s), AKA tool component (better name?).
-- [ ] Agent, that on request, generates a Tool Component for a user in the topic. User reviews, accepts, and then has it handy for using without having to go to the devtools.
-- [ ] Agents that set up a town and explore locations (topics), living out their life.
-- [ ] A simple robot MCP server that other agents can control around an environment. Can start with a simulation, even if that's a top down environment (ie. snake-game, legend of zelda SNES).
-- [ ] MCPx Studio for downloading MCP servers and connecting them. Managing topics. Creating new agents with specific prompts and names.
-  - [ ] UI for exploring channels, adding channels, joining channels, configuring channels.
+- [x] W001: Agent example that, given a user's suggestion in the chat, makes some MCP call.
+- [ ] W002: agent config in ~/.mcpx/agent-config.json no scaleable to multiple agents, unless working in containers. Figure out the pattern. Explore patterns for managing agents. Something like mcpx-hub or something. Then mcpx-studio is a UI for managing it.
+- [ ] W003: Organize folders. For example, the v0 folder no longer seems like it is a spec folder. Seems random. Then we have various pieces of software. Packages and specs maybe? Also there is this docs folder which needs to go somewhere else maybe.
+- [ ] W004: More sophisticated agent that keeps calling tools until it has accomplished the task.
+- [ ] W005: In frontend, only seeing initialized MCP messages. Where are the others? (what do I see in mcpx-chat cli?)
+- [ ] W006: Code review!
+- [ ] W007: Docs
+- [ ] W008: Release npm packages?
+
+- [ ] W009: Zen mode support for channels chat view that centers the chat with room to breath all around it.
+- [ ] W010: Support for channel "scenes". A background image for a channel.
+- [ ] W011: Support for animating the opening of channels.
+- [ ] W012: Support for automatically generating an image for a channel based on its description (choose what art to base it on).
+- [ ] W013: Pattern for managing bridges to number of MCP servers and getting them to start/stop with the MCPx as a whole.
+- [ ] W014: Rejoin a session (password/token need when creating session?)
+- [ ] W015: UI maintains session between reloads
+- [ ] W016: Participant pictures (could be an MCP tool every participant has. MCP Bridge would supplement the MCP server it is representing with this tool and picture selection would be part of config).
+- [ ] W017: UI support for dynamically injecting Web Components for interacting with specific MCP tool(s), AKA tool component (better name?).
+- [ ] W018: Agent, that on request, generates a Tool Component for a user in the topic. User reviews, accepts, and then has it handy for using without having to go to the devtools.
+- [ ] W019: Agents that set up a town and explore locations (topics), living out their life.
+- [ ] W020: A simple robot MCP server that other agents can control around an environment. Can start with a simulation, even if that's a top down environment (ie. snake-game, legend of zelda SNES).
+- [ ] W021: MCPx Studio for downloading MCP servers and connecting them. Managing topics. Creating new agents with specific prompts and names.
+  - [ ] W021.1: UI for exploring channels, adding channels, joining channels, configuring channels.
+
+## Known Issues to Investigate
+
+### mcpx-cli Issues
+- [ ] I001: Detached mode timing - Commands don't exit immediately in detached mode when starting server/frontend/agents (processes do start but command hangs)
+- [ ] I002: Frontend script issue - Frontend manager uses `npm run dev` but no production build script exists
+- [ ] I003: Server process cleanup - Server PID file sometimes persists after process dies, causing status command to show incorrect state
+- [ ] I004: Agent stdio issues when started via `mcpx start --no-frontend` - Some agents fail to start with stdio errors
+
+### Integration Issues  
+- [ ] I005: Chat message event emitter - MCPxChatClient doesn't properly expose event emitter for message handling in non-interactive mode
+- [ ] I006: Auth endpoint hardcoding - Some components still have hardcoded localhost:3000 instead of deriving from server URL
