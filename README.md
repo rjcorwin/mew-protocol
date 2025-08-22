@@ -33,9 +33,9 @@ MCPx defines a minimal, topic‑based message envelope that lets multiple MCP se
 
 ## Start Here
 
-- **Spec**: `v0/SPEC.md` (core envelope, addressing, gateway API)
-- **Architecture**: `v0/ARCHITECTURE.md` (system design, components, data flows)
-- **Patterns**: `v0/PATTERNS.md` (discovery/handshake, fan‑out, coordination, reconnect)
+- **Spec**: `mcpx-spec/v0/SPEC.md` (core envelope, addressing, gateway API)
+- **Architecture**: `mcpx-spec/v0/ARCHITECTURE.md` (system design, components, data flows)
+- **Patterns**: `mcpx-spec/v0/PATTERNS.md` (discovery/handshake, fan‑out, coordination, reconnect)
 - **Reference Implementation**: Try the working server, frontend, and bridge below ⬇️
 
 ## Reference Implementation
@@ -87,7 +87,97 @@ npm run cli setup          # Interactive configuration
 npm run cli start          # Start bridging
 ```
 
+### 🎯 MCPx CLI (`/mcpx-cli`)
+Unified command-line interface for managing the entire MCPx ecosystem
+- **Complete lifecycle management** for server, frontend, bridges, and agents
+- **Multi-agent support** with template-based configuration
+- **Integrated chat** functionality for testing and debugging
+- **System-wide controls** to start/stop everything with one command
+
+```bash
+cd mcpx-cli
+npm install
+npm run build
+
+# System management
+npx tsx src/cli.ts start           # Start all components
+npx tsx src/cli.ts stop            # Stop all components
+npx tsx src/cli.ts status          # View system status
+
+# Agent management
+npx tsx src/cli.ts agent create myagent --template basic
+npx tsx src/cli.ts agent start myagent
+npx tsx src/cli.ts agent list
+npx tsx src/cli.ts agent logs myagent
+
+# Chat functionality
+npx tsx src/cli.ts chat            # Interactive chat
+npx tsx src/cli.ts send "Hello!"   # Send a message
+
+# Individual component control
+npx tsx src/cli.ts server start
+npx tsx src/cli.ts frontend start
+npx tsx src/cli.ts bridge create mybridge
+```
+
+### 🤖 Agent (`/agent`)
+Generic MCPx agent with OpenAI integration
+- Basic agent for simple message handling
+- OpenAI-powered agent for intelligent responses
+- Tool discovery and calling capabilities
+- Configurable via CLI or config file
+
+```bash
+cd agent
+npm install
+npm run cli setup          # Configure agent
+npm run cli start          # Start agent
+```
+
+### 💬 MCPx Chat (`/mcpx-chat`)
+Standalone chat client for MCPx topics
+- Command-line interface for quick testing
+- WebSocket connection with auto-authentication
+- Tool discovery and listing
+- Message sending and receiving
+
+```bash
+cd mcpx-chat
+npm install
+npm run build
+npm start                  # Interactive chat mode
+npm run send "message"     # Send a single message
+```
+
 ## Quick Start
+
+### Option 1: Using MCPx CLI (Recommended)
+
+```bash
+# Setup MCPx CLI
+cd mcpx-cli
+npm install && npm run build
+
+# Start everything with one command
+npx tsx src/cli.ts start
+
+# In another terminal, create and start an agent
+npx tsx src/cli.ts agent create my-agent --template basic
+npx tsx src/cli.ts agent start my-agent
+
+# Test with chat
+npx tsx src/cli.ts chat
+# Or send a message
+npx tsx src/cli.ts send "Hello MCPx!"
+
+# Check system status
+npx tsx src/cli.ts status
+
+# Stop everything
+npx tsx src/cli.ts stop
+```
+
+### Option 2: Using Shell Scripts
 
 ```bash
 # Install all dependencies
@@ -99,7 +189,7 @@ npm run cli start          # Start bridging
 # Open http://localhost:3001 in your browser
 ```
 
-### Script Options
+#### Script Options
 
 ```bash
 ./start.sh --help           # Show help
@@ -109,7 +199,7 @@ npm run cli start          # Start bridging
 ./stop.sh                   # Stop all services
 ```
 
-### Manual Setup
+### Option 3: Manual Setup
 
 1. **Start the server**: `cd server && npm run dev` 
 2. **Start the frontend**: `cd frontend && npm run dev`
@@ -118,10 +208,16 @@ npm run cli start          # Start bridging
 
 ## Repo Structure
 
-- `v0/` — MCPx v0 specification and patterns
+- `mcpx-spec/` — MCPx specifications and architecture documents
+  - `v0/` — Version 0 specification, patterns, and decisions
 - `server/` — Reference WebSocket gateway server  
 - `frontend/` — Reference web interface for humans
 - `bridge/` — CLI tool to connect existing MCP servers
+- `mcpx-cli/` — Unified CLI for managing all MCPx components
+- `agent/` — Generic MCPx agent with AI integrations
+- `agent-client/` — TypeScript client library for building MCPx agents
+- `mcpx-chat/` — Standalone chat client for MCPx topics
+- `docs/` — Additional documentation and guides
 
 ## Vision
 
