@@ -7,6 +7,7 @@ import * as frontendCommands from './commands/frontend';
 import * as bridgeCommands from './commands/bridge';
 import * as statusCommands from './commands/status';
 import * as chatCommands from './commands/chat';
+import * as studioServerCommands from './commands/studio-server';
 import { getVersion } from './utils/version';
 
 const program = new Command();
@@ -237,6 +238,13 @@ program
   .description('Show status of all MCPx components')
   .option('-j, --json', 'Output as JSON')
   .action(statusCommands.showStatus);
+
+// Studio backend server
+program
+  .command('studio-server')
+  .description('Start the MCPx Studio backend server')
+  .option('-p, --port <port>', 'Port to listen on', '3100')
+  .action(studioServerCommands.startStudioServer);
 
 // Utility commands
 program
