@@ -46,8 +46,14 @@ export class TopicService {
       throw new Error(`Topic ${topicName} is full`);
     }
 
+    // If participant already exists, disconnect the old connection
     if (topic.participants.has(participant.id)) {
-      throw new Error(`Participant ${participant.id} already in topic ${topicName}`);
+      const existingClient = topic.participants.get(participant.id);
+      if (existingClient && existingClient.ws.readyState === WebSocket.OPEN) {
+        console.log(`Disconnecting existing connection for ${participant.id} in ${topicName}`);
+        existingClient.ws.close(1000, 'Duplicate connection - disconnecting old session');
+      }
+      topic.participants.delete(participant.id);
     }
 
     const client: ConnectedClient = {

@@ -71,7 +71,10 @@ class MCPxChatClient {
         }
       }
 
-      this.rl.prompt();
+      // Ensure prompt is displayed with a small delay for terminal refresh
+      setImmediate(() => {
+        this.rl.prompt();
+      });
     });
 
     this.rl.on('close', () => {
@@ -394,7 +397,13 @@ class MCPxChatClient {
   private displayMessage(from: string, text: string, type: 'chat' | 'system' = 'chat'): void {
     const timestamp = new Date().toLocaleTimeString();
     const prefix = type === 'system' ? chalk.blue('[System]') : chalk.cyan(`[${from}]`);
+    
+    // Clear current line and display message
+    process.stdout.write('\r\x1b[K');
     console.log(`${chalk.gray(timestamp)} ${prefix} ${text}`);
+    
+    // Redraw the prompt
+    this.rl.prompt(true);
   }
 
   private displayEnvelope(envelope: Envelope): void {
@@ -431,18 +440,32 @@ class MCPxChatClient {
       return;
     }
 
-    console.log(chalk.cyan('\n=== Participants ===\n'));
+    // Build output string
+    let output = '\n' + chalk.cyan('=== Participants ===') + '\n\n';
     
     if (this.peers.size === 0) {
-      console.log(chalk.gray('No other participants'));
+      output += chalk.gray('No other participants') + '\n';
     } else {
       this.peers.forEach((peer, id) => {
         const kind = peer.kind ? chalk.gray(`(${peer.kind})`) : '';
         const mcp = peer.mcp ? chalk.green(' [MCP]') : '';
-        console.log(`  ${id} ${kind}${mcp}`);
+        output += `  ${id} ${kind}${mcp}\n`;
       });
     }
-    console.log();
+    output += '\n';
+    
+    // Write directly to process.stdout, completely bypassing readline
+    process.stdout.write(output);
+    
+    // Force flush
+    if (process.stdout.isTTY) {
+      process.stdout.write('');
+    }
+    
+    // Redraw prompt on next tick
+    process.nextTick(() => {
+      this.rl.prompt(true);
+    });
   }
 
   private async listTools(peerId: string): Promise<void> {
