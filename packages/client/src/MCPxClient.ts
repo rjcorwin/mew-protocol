@@ -315,8 +315,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
     
     // Debug log all MCP messages
     if (envelope.correlation_id) {
-      console.log(`[MCPxClient] Received MCP with correlation_id: ${envelope.correlation_id}`);
-      console.log(`[MCPxClient] Pending requests:`, Array.from(this.pendingRequests.keys()));
+      // Debug: Received MCP response with correlation_id
     }
     
     // Check for chat messages
@@ -365,7 +364,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
 
     // Debug logging for MCP responses
     if (envelope.kind === 'mcp' && envelope.correlation_id) {
-      console.log(`[MCPxClient] Sending MCP response with correlation_id: ${envelope.correlation_id}`);
+      // Debug: Sending MCP response with correlation_id
     }
 
     this.ws.send(JSON.stringify(fullEnvelope));
