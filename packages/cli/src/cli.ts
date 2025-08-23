@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import ora from 'ora';
-import { MCPxClient, Envelope, Peer, SystemWelcomePayload } from '@mcpx-protocol/client';
+import { MCPxClient, Envelope, Peer, SystemWelcomePayload, ChatMessage } from '@mcpx-protocol/client';
 import readline from 'readline';
 import fs from 'fs/promises';
 import path from 'path';
@@ -33,6 +33,7 @@ class MCPxChatClient {
   private isConnected = false;
   private peers: Map<string, Peer> = new Map();
   private currentConfig: ConnectionConfig | null = null;
+  private isPrompting = false;
 
   constructor() {
     this.rl = readline.createInterface({
@@ -46,6 +47,11 @@ class MCPxChatClient {
 
   private setupReadline(): void {
     this.rl.on('line', async (line) => {
+      // Ignore input while prompting
+      if (this.isPrompting) {
+        return;
+      }
+      
       const trimmed = line.trim();
       
       if (!trimmed) {
@@ -73,7 +79,6 @@ class MCPxChatClient {
         this.client.disconnect();
       }
       console.log(chalk.yellow('\nGoodbye!'));
-      process.exit(0);
     });
   }
 
@@ -160,6 +165,10 @@ class MCPxChatClient {
       return;
     }
 
+    // Pause readline while prompting
+    this.isPrompting = true;
+    this.rl.pause();
+
     // Check for saved configs
     const configs = await this.loadConfigs();
     let config: ConnectionConfig;
@@ -216,6 +225,10 @@ class MCPxChatClient {
     } catch (error) {
       spinner.fail(chalk.red(`Failed to connect: ${error}`));
       this.client = null;
+    } finally {
+      // Resume readline after prompting
+      this.isPrompting = false;
+      this.rl.resume();
     }
   }
 
@@ -295,16 +308,20 @@ class MCPxChatClient {
       }
     });
 
-    this.client.on('chat', (message, from) => {
-      this.displayMessage(from, message.params.text, 'chat');
+    this.client.on('chat', (message: ChatMessage, from: string) => {
+      // Don't show our own messages twice
+      if (from !== this.currentConfig?.participantId) {
+        const text = message.params?.text || '';
+        this.displayMessage(from, text, 'chat');
+      }
     });
 
-    this.client.on('peer-joined', (peer) => {
+    this.client.on('peer-joined', (peer: Peer) => {
       this.peers.set(peer.id, peer);
       console.log(chalk.green(`→ ${peer.id} joined the topic`));
     });
 
-    this.client.on('peer-left', (peer) => {
+    this.client.on('peer-left', (peer: Peer) => {
       this.peers.delete(peer.id);
       console.log(chalk.yellow(`← ${peer.id} left the topic`));
     });
@@ -569,6 +586,13 @@ class MCPxChatClient {
     console.log(chalk.gray('Type /help for commands or /connect to start\n'));
     
     this.rl.prompt();
+    
+    // Keep the process alive
+    return new Promise((resolve) => {
+      this.rl.on('close', () => {
+        resolve();
+      });
+    });
   }
 }
 
@@ -580,9 +604,8 @@ program
   .description('MCPx interactive chat client')
   .version('0.1.0');
 
+// Default action when no command is specified
 program
-  .command('chat', { isDefault: true })
-  .description('Start interactive chat session')
   .action(async () => {
     const client = new MCPxChatClient();
     await client.run();
@@ -600,4 +623,7 @@ program
     await client.run();
   });
 
-program.parse();
+// Parse and handle commands
+(async () => {
+  await program.parseAsync();
+})();
