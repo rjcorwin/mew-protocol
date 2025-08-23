@@ -342,11 +342,15 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
       throw new Error('Not connected');
     }
 
+    if (!this.participantId) {
+      throw new Error('Not authenticated yet - waiting for welcome message');
+    }
+
     const fullEnvelope: Envelope = {
       protocol: PROTOCOL_VERSION,
       id: uuidv4(),
       ts: new Date().toISOString(),
-      from: this.participantId!,
+      from: this.participantId,
       ...envelope,
     };
 

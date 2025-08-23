@@ -76,16 +76,11 @@ export type PresencePayload = z.infer<typeof PresencePayloadSchema>;
 
 // System payload schema
 export const SystemWelcomePayloadSchema = z.object({
-  event: z.literal('welcome'),
-  participant: z.object({
-    id: z.string()
-  }),
+  type: z.literal('welcome'),
+  participant_id: z.string(),
+  topic: z.string(),
   participants: z.array(ParticipantSchema),
-  history: z.object({
-    enabled: z.boolean(),
-    limit: z.number()
-  }),
-  protocol: MCPxProtocolSchema
+  history: z.array(EnvelopeSchema).optional()
 });
 export type SystemWelcomePayload = z.infer<typeof SystemWelcomePayloadSchema>;
 

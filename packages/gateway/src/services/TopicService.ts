@@ -163,16 +163,13 @@ export class TopicService {
 
   private sendWelcomeMessage(client: ConnectedClient, topic: TopicState): void {
     const welcomePayload: SystemWelcomePayload = {
-      event: 'welcome',
-      participant: { id: client.participant.id },
+      type: 'welcome',
+      participant_id: client.participant.id,
+      topic: client.topic,
       participants: Array.from(topic.participants.values())
         .filter(c => c.participant.id !== client.participant.id)
         .map(c => c.participant),
-      history: {
-        enabled: true,
-        limit: this.config.topics.historyLimit
-      },
-      protocol: 'mcp-x/v0'
+      history: topic.messageHistory.slice(-this.config.topics.historyLimit)
     };
 
     const envelope = createEnvelope('system:gateway', 'system', welcomePayload, [client.participant.id]);
