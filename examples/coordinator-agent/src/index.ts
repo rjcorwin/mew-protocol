@@ -59,7 +59,7 @@ class CoordinatorAgent extends MCPxAgent {
         console.log('Found calculator agent, listing its tools...');
         
         // List tools from calculator
-        const tools = await this.callTool(calculatorPeer, 'tools/list', {});
+        const tools = await this.listPeerTools(calculatorPeer);
         console.log('Calculator tools:', tools);
         
         // Queue some demo calculations
@@ -245,17 +245,29 @@ async function main() {
   try {
     console.log('Getting auth token...');
     const token = await getToken(participantId, topic);
+    console.log('Got token:', token ? 'yes' : 'no');
     
     console.log(`Starting coordinator agent as ${participantId} in topic ${topic}...`);
     const agent = new CoordinatorAgent({ gateway, topic, token });
-    await agent.start();
     
-    // Handle graceful shutdown
-    process.on('SIGINT', async () => {
-      console.log('\nShutting down...');
-      await agent.stop();
-      process.exit(0);
-    });
+    try {
+      console.log('About to call agent.start()...');
+      await agent.start();
+      console.log('Coordinator agent connected and running...');
+      
+      // Handle graceful shutdown
+      process.on('SIGINT', async () => {
+        console.log('\nShutting down...');
+        await agent.stop();
+        process.exit(0);
+      });
+      
+      // Keep the process running
+      await new Promise(() => {});
+    } catch (error) {
+      console.error('Failed to start coordinator:', error);
+      throw error;
+    }
     
   } catch (error) {
     console.error('Failed to start agent:', error);

@@ -313,6 +313,12 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
   private handleMCPMessage(envelope: Envelope): void {
     const message = envelope.payload as JsonRpcMessage;
     
+    // Debug log all MCP messages
+    if (envelope.correlation_id) {
+      console.log(`[MCPxClient] Received MCP with correlation_id: ${envelope.correlation_id}`);
+      console.log(`[MCPxClient] Pending requests:`, Array.from(this.pendingRequests.keys()));
+    }
+    
     // Check for chat messages
     if ('method' in message && !('id' in message)) {
       const notification = message as JsonRpcNotification;
@@ -356,6 +362,11 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
       from: this.participantId,
       ...envelope,
     };
+
+    // Debug logging for MCP responses
+    if (envelope.kind === 'mcp' && envelope.correlation_id) {
+      console.log(`[MCPxClient] Sending MCP response with correlation_id: ${envelope.correlation_id}`);
+    }
 
     this.ws.send(JSON.stringify(fullEnvelope));
   }
@@ -411,7 +422,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
 
       this.pendingRequests.set(fullEnvelope.id, pending);
       
-      this.send(envelope).catch((error) => {
+      this.send(fullEnvelope).catch((error) => {
         this.pendingRequests.delete(fullEnvelope.id);
         if (pending.timeout) clearTimeout(pending.timeout);
         reject(error);

@@ -133,7 +133,12 @@ export abstract class MCPxAgent {
           },
         };
         console.log(`[${this.config.name}] Response envelope:`, JSON.stringify(responseEnvelope));
-        await this.client.send(responseEnvelope);
+        try {
+          await this.client.send(responseEnvelope);
+          console.log(`[${this.config.name}] Response sent successfully`);
+        } catch (sendError) {
+          console.error(`[${this.config.name}] Failed to send response:`, sendError);
+        }
       } catch (error: any) {
         // Send error response
         await this.client.send({
