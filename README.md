@@ -66,10 +66,10 @@ npm run cli:blessed -- ws://localhost:3000 test-room your-name
 - **@mcpx-protocol/agent** - Agent abstractions for MCP server/client functionality
 
 ### Tools & Infrastructure
-- **@mcpxp/gateway** - Reference gateway server implementation
+- **@mcpx-protocol/gateway** - Reference gateway server implementation
 - **@mcpx-protocol/cli** - Interactive terminal client with blessed TUI
-- **@mcpxp/web-client** - Reference web client for testing
-- **@mcpxp/bridge** - Bridge to connect MCP servers to MCPx topics
+- **@mcpx-protocol/web-client** - Reference web client for testing
+- **@mcpx-protocol/bridge** - Bridge to connect MCP servers to MCPx topics
 
 ### Examples
 - **echo-bot** - Simple chat echo agent demonstrating message handling

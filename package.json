@@ -13,9 +13,9 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
-    "dev:gateway": "npm run dev -w @mcpxp/gateway",
-    "dev:web": "npm run dev -w @mcpxp/web-client",
-    "dev:bridge": "npm run dev -w @mcpxp/bridge",
+    "dev:gateway": "npm run dev -w @mcpx-protocol/gateway",
+    "dev:web": "npm run dev -w @mcpx-protocol/web-client",
+    "dev:bridge": "npm run dev -w @mcpx-protocol/bridge",
     "build:client": "npm run build -w @mcpx-protocol/client",
     "build:agent": "npm run build -w @mcpx-protocol/agent",
     "test:client": "npm run test -w @mcpx-protocol/client",
