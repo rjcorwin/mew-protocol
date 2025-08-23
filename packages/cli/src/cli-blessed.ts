@@ -58,8 +58,8 @@ class BlessedCLI {
       left: 0,
       width: '100%',
       height: 1,
-      content: `{cyan-fg}MCPx{/} | {red-fg}Disconnected{/} | ${topic} | Peers: 0 | {gray-fg}Ctrl+C to exit, /help for commands{/}`,
-      tags: true,
+      content: `MCPx | Disconnected | ${topic} | Peers: 0 | Ctrl+C to exit, /help for commands`,
+      tags: false,
     });
 
     // Create input box
@@ -287,7 +287,7 @@ class BlessedCLI {
 
   private showHelp() {
     const help = `
-{cyan-fg}Commands:{/}
+Commands:
   /help              - Show this help
   /list              - List participants
   /tools <id>        - List tools from participant
@@ -295,7 +295,7 @@ class BlessedCLI {
   /clear             - Clear messages
   /quit              - Exit
 
-{cyan-fg}Examples:{/}
+Examples:
   /tools calculator-agent
   /call calculator-agent add {"a": 5, "b": 3}
   calculate 10 + 20
@@ -370,50 +370,40 @@ class BlessedCLI {
   private addMessage(from: string, text: string, type: 'chat' | 'error' | 'success' | 'info' | 'mcp' | 'join' | 'leave') {
     const timestamp = new Date().toLocaleTimeString();
     
-    let color = 'white-fg';
-    let prefix = '';
+    // Build the formatted message without color tags
+    let messageText = '';
     
     switch (type) {
       case 'chat':
-        color = from === 'You' ? 'green-fg' : 'cyan-fg';
-        prefix = `{gray-fg}${timestamp}{/} {${color}}[${from}]{/}`;
+        messageText = `${timestamp} [${from}] ${text}`;
         break;
       case 'error':
-        color = 'red-fg';
-        prefix = `{${color}}[${from}]{/}`;
+        messageText = `[ERROR] ${text}`;
         break;
       case 'success':
-        color = 'green-fg';
-        prefix = `{${color}}[${from}]{/}`;
+        messageText = `[SUCCESS] ${text}`;
         break;
       case 'info':
-        color = 'yellow-fg';
-        prefix = from === 'System' ? '' : `{${color}}[${from}]{/}`;
+        messageText = from === 'System' ? text : `[${from}] ${text}`;
         break;
       case 'mcp':
-        color = 'magenta-fg';
-        prefix = `{gray-fg}${timestamp}{/} {${color}}[${from}]{/}`;
+        messageText = `${timestamp} [${from}] ${text}`;
         break;
       case 'join':
-        color = 'green-fg';
-        prefix = `{${color}}`;
+        messageText = text;
         break;
       case 'leave':
-        color = 'yellow-fg';
-        prefix = `{${color}}`;
+        messageText = text;
         break;
+      default:
+        messageText = `${timestamp} [${from}] ${text}`;
     }
     
     // For multiline content (like help), split and format each line
-    const lines = text.split('\n');
+    const lines = messageText.split('\n');
     lines.forEach(line => {
       if (line.trim()) {
-        if (type === 'info' && from === 'System' && !line.includes('{')) {
-          // System info messages without formatting
-          this.messages.log(`{yellow-fg}${line}{/}`);
-        } else {
-          this.messages.log(prefix ? `${prefix} ${line}` : line);
-        }
+        this.messages.log(line);
       }
     });
     
@@ -425,7 +415,7 @@ class BlessedCLI {
     const statusText = this.isConnected ? 'Connected' : 'Disconnected';
     
     this.statusBar.setContent(
-      `{cyan-fg}MCPx{/} | {${statusColor}}${statusText}{/} | ${this.topic} | Peers: ${this.peers.size} | {gray-fg}Ctrl+C to exit, /help for commands{/}`
+      `MCPx | ${statusText} | ${this.topic} | Peers: ${this.peers.size} | Ctrl+C to exit, /help for commands`
     );
     
     this.screen.render();
