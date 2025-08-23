@@ -35,35 +35,47 @@ Pure MCPx protocol implementation handling wire format, transport, and message c
 
 ### Responsibilities
 - WebSocket connection management
-- MCPx envelope creation and parsing
+- System welcome message processing
+- MCPx envelope creation and parsing (with validation)
 - Message correlation (request/response matching)
 - Topic operations (join/leave/history)
 - Peer registry maintenance
-- MCP JSON-RPC passthrough
+- JSON-RPC passthrough (no MCP knowledge)
 - Authentication and reconnection
 
 ### API Surface
 ```typescript
 interface MCPxClient {
   // Connection
-  connect(topic: string): Promise<void>
+  connect(gateway: string, topic: string, token: string): Promise<void>
   disconnect(): void
+  reconnect(): Promise<void>  // With history reconciliation
+  getParticipantId(): string  // From welcome message
   
   // Messaging
   send(envelope: Partial<Envelope>): Promise<void>
-  request(to: string, method: string, params: any): Promise<any>
+  request(to: string, method: string, params: any): Promise<any>  // Single recipient only
+  notify(to: string | string[] | null, method: string, params: any): void
   broadcast(kind: string, payload: any): void
+  
+  // Chat
+  chat(text: string, format?: 'plain' | 'markdown'): void
+  
   
   // Peer Management
   getPeers(): Peer[]
   getPeer(id: string): Peer | null
   
-  // Events
-  on(event: 'message' | 'peer-joined' | 'peer-left', handler: Function): void
+  // REST API
+  getTopics(): Promise<string[]>
+  getParticipants(topic: string): Promise<Peer[]>
+  getHistory(limit?: number, before?: string): Promise<Envelope[]>
   
-  // Topic
-  getHistory(limit?: number): Envelope[]
-  getParticipantId(): string
+  // Events
+  on(event: 'welcome' | 'message' | 'chat' | 'peer-joined' | 'peer-left' | 'error' | 'reconnected', handler: Function): void
+  
+  // Outstanding Requests (for reconnection)
+  getPendingRequests(): Map<string, PendingRequest>
 }
 
 interface Envelope {
@@ -86,9 +98,11 @@ interface Peer {
 ```
 
 ### Key Features
-- **Stateless**: No agent concepts, just protocol
+- **Protocol Only**: No MCP semantics, just MCPx envelopes
+- **Request Validation**: Enforces single-recipient rule for requests
 - **Transport agnostic**: WebSocket primary, but extensible
 - **Correlation tracking**: Automatic request/response matching
+- **Chat Support**: Built-in chat notification helpers
 - **Event-driven**: All messages exposed as events
 
 ## Layer 2: @mcpx/agent (Generic Agent Layer)
@@ -98,104 +112,62 @@ Provides core agent abstractions and capabilities independent of any specific do
 
 ### Responsibilities
 - Agent lifecycle management
-- Memory systems (short-term, long-term, working)
-- State management
-- Behavior orchestration
-- Goal and plan management
-- Tool calling with retry/fallback
+- MCP server implementation (tools, resources, prompts)
+- MCP client implementation (calling peer tools)
+- MCP handshake management per peer
+- Simple context storage
+- Basic state tracking
 - Message handling patterns
-- Plugin system
+- Error recovery and retry
 
 ### API Surface
 ```typescript
 abstract class MCPxAgent {
   protected client: MCPxClient
-  protected memory: Memory
-  protected state: AgentState
+  protected context: Map<string, any>  // Simple context storage
+  protected status: 'idle' | 'busy' | 'error'
+  private peerStates: Map<string, PeerState>  // Track MCP handshakes
   
   // Lifecycle (must implement)
   abstract onStart(): Promise<void>
   abstract onStop(): Promise<void>
   
-  // Message handling (can override)
-  async onMessage(from: string, message: any): Promise<void>
-  async onPeerJoined(peer: Peer): Promise<void>
-  async onPeerLeft(peer: Peer): Promise<void>
+  // MCP Server - Override these to expose functionality
+  async getCapabilities(): Promise<ServerCapabilities> {
+    return { tools: { list: true } }
+  }
   
-  // Tool operations
+  async listTools(): Promise<Tool[]> { 
+    return [] 
+  }
+  
+  async executeTool(name: string, params: any): Promise<any> { 
+    throw new Error(`Tool ${name} not implemented`) 
+  }
+  
+  // MCP Client - Call peer tools (framework handles handshake)
   async callTool(peerId: string, tool: string, params: any): Promise<any>
-  async exposeTools(tools: ToolDefinition[]): void
   
-  // Communication
-  async send(to: string, content: any): Promise<void>
-  async broadcast(content: any): void
+  // High-level message handlers (framework routes MCP protocol)
+  async onChat(from: string, text: string): Promise<void> {}
+  async onPeerJoined(peer: Peer): Promise<void> {}
+  async onPeerLeft(peer: Peer): Promise<void> {}
+  
+  // Communication helpers
   async chat(text: string, format?: 'plain' | 'markdown'): void
   
-  // Memory operations
-  remember(key: string, value: any, ttl?: number): void
-  recall(key: string): any
-  forget(key: string): void
-  
-  // Behavior management
-  addBehavior(behavior: Behavior): void
-  removeBehavior(name: string): void
-  
-  // Plugin system
-  use(plugin: Plugin): void
-}
-
-interface Memory {
-  shortTerm: ShortTermMemory  // Recent events (FIFO, size-limited)
-  longTerm?: LongTermMemory   // Persistent storage (optional)
-  working: WorkingMemory      // Current task context
-}
-
-interface Behavior {
-  name: string
-  priority: number
-  condition: (state: AgentState) => boolean
-  execute: (agent: MCPxAgent) => Promise<void>
-}
-
-interface Plugin {
-  name: string
-  install: (agent: MCPxAgent) => void
-  uninstall?: (agent: MCPxAgent) => void
+  // Context operations
+  setContext(key: string, value: any): void
+  getContext(key: string): any
+  clearContext(): void
 }
 ```
 
-### Built-in Behaviors
-- **Heartbeat**: Periodic liveness signals
-- **Discovery**: Tool discovery on peer join
-- **Retry**: Automatic retry with exponential backoff
-- **Fallback**: Alternative peer selection on failure
-
-### Memory Management
-```typescript
-class ShortTermMemory {
-  private items: MemoryItem[] = []
-  private maxSize: number = 100
-  
-  add(item: MemoryItem): void
-  search(query: string): MemoryItem[]
-  clear(): void
-}
-
-class WorkingMemory {
-  private context: Map<string, any> = new Map()
-  
-  set(key: string, value: any): void
-  get(key: string): any
-  clear(): void
-}
-
-// Long-term memory is pluggable
-interface LongTermMemory {
-  store(key: string, value: any): Promise<void>
-  retrieve(key: string): Promise<any>
-  search(query: string): Promise<any[]>
-}
-```
+### Built-in Features
+- **Automatic MCP Handshake**: Handles initialization before tool calls
+- **Tool Provider**: Responds to tools/list requests
+- **Simple Retry**: 3 attempts with exponential backoff for network errors
+- **Error Recovery**: Automatic reconnection and request retry
 
 ## Layer 3: @mcpx/biome-agent (Biomes Framework)
 

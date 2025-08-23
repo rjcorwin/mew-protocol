@@ -8,17 +8,20 @@ The @mcpx/client package needs to handle MCPx protocol mechanics without imposin
 
 ## Decision
 Design the client as a thin, stateless protocol layer that:
-- Manages WebSocket connections
-- Handles envelope wrapping/unwrapping
+- Manages WebSocket connections and welcome messages
+- Handles envelope wrapping/unwrapping with validation
+- Enforces MCPx rules (single recipient for requests)
+- Manages MCP handshakes per peer
 - Tracks correlation between requests and responses
-- Maintains a peer registry
-- Emits events for all messages
+- Maintains a peer registry with initialization state
+- Provides chat notification helpers
+- Emits typed events for all message kinds
 
 The client will NOT include:
 - Agent lifecycle concepts
 - Memory or state management
 - Behavior orchestration
-- Domain-specific logic
+- Domain-specific logic beyond protocol requirements
 
 ## Consequences
 
@@ -29,9 +32,10 @@ The client will NOT include:
 - Protocol changes isolated here
 
 ### Negative
-- Developers need to handle correlation manually if not using agent layer
-- No built-in retry or error recovery
+- More complexity than originally planned (MCP handshakes)
+- Developers still need retry logic if not using agent layer
 - Raw protocol exposure may be confusing
+- Must track initialization state per peer
 
 ## Implementation
 ```typescript

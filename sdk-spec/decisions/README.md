@@ -10,6 +10,7 @@ This directory contains Architecture Decision Records (ADRs) for the MCPx SDK. T
 | [002](002-client-layer-design.md) | Client Layer Design | Proposed | 2025-01-23 |
 | [003](003-agent-memory-system.md) | Agent Memory System | Proposed | 2025-01-23 |
 | [004](004-biome-participant-model.md) | Biome Participant Unification | Proposed | 2025-01-23 |
+| [005](005-mcp-handshake-management.md) | MCP Handshake Management | Proposed | 2025-01-23 |
 
 ## Architecture Overview
 
@@ -31,13 +32,16 @@ Implementations (GreenhouseBot, PirateNPC)
 Clean separation of protocol, agent abstractions, domain framework, and implementations. Each layer only depends on layers below it.
 
 ### Client Design (ADR-002)
-The client layer is a thin, stateless protocol handler useful for any MCPx client, not just agents. No agent concepts at this layer.
+The client layer handles MCPx protocol including envelopes, MCP handshakes, and chat notifications. Useful for any MCPx client, not just agents.
 
 ### Memory System (ADR-003)
 Three-tier memory (short-term, working, long-term) provides flexibility for different agent complexities while working out-of-the-box.
 
 ### Participant Model (ADR-004)
 In Biomes, users, agents, and spaces are all unified as participants with different roles, simplifying the model and enabling space representatives.
+
+### MCP Handshake Management (ADR-005)
+Automatic MCP initialization handshake management ensures protocol compliance and handles capability negotiation transparently.
 
 ## Design Principles
 
