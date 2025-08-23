@@ -1,9 +1,15 @@
 export { MCPxAgent } from './MCPxAgent';
 export * from './types';
 
-// Re-export commonly used client types
+// Re-export runtime values from client
 export {
   MCPxClient,
+  MCP_VERSION,
+  PROTOCOL_VERSION,
+} from '@mcpx-protocol/client';
+
+// Re-export types from client  
+export type {
   ConnectionOptions,
   Envelope,
   JsonRpcRequest,
@@ -11,6 +17,4 @@ export {
   JsonRpcNotification,
   JsonRpcMessage,
   Peer,
-  MCP_VERSION,
-  PROTOCOL_VERSION,
 } from '@mcpx-protocol/client';

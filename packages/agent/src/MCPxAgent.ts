@@ -23,8 +23,8 @@ export abstract class MCPxAgent {
   protected config: AgentConfig;
   private isRunning = false;
 
-  constructor(config: AgentConfig, connectionOptions: ConnectionOptions) {
-    this.config = config;
+  constructor(connectionOptions: ConnectionOptions, config?: AgentConfig) {
+    this.config = config || { name: 'agent', description: 'MCPx Agent', version: '1.0.0' };
     this.client = new MCPxClient(connectionOptions);
     this.setupEventHandlers();
   }
@@ -458,6 +458,13 @@ export abstract class MCPxAgent {
    */
   getPeers(): string[] {
     return this.client.getPeers().map(p => p.id);
+  }
+
+  /**
+   * Get participant ID
+   */
+  getParticipantId(): string {
+    return this.client.getParticipantId();
   }
 
   /**

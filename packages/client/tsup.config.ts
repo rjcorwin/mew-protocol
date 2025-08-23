@@ -11,5 +11,6 @@ export default defineConfig({
   target: 'node18',
   outDir: 'dist',
   external: [],
-  treeshake: true,
+  treeshake: false,
+  bundle: true,
 });
