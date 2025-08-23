@@ -1,0 +1,21 @@
+{
+  "name": "openai-agent-example",
+  "version": "1.0.0",
+  "description": "MCPx agent that uses OpenAI for intelligent responses and tool orchestration",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@mcpx-protocol/agent": "file:../../packages/agent",
+    "openai": "^4.56.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.5.0"
+  }
+}

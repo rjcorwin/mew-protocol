@@ -24,6 +24,7 @@
     "example:echo": "cd examples/echo-bot && npm start",
     "example:calculator": "cd examples/calculator-agent && npm start",
     "example:coordinator": "cd examples/coordinator-agent && npm start",
+    "example:openai": "cd examples/openai-agent && npm start",
     "example:all": "npm run example:echo & npm run example:calculator & npm run example:coordinator & wait",
     "cli": "npm run cli -w @mcpx-protocol/cli",
     "cli:blessed": "npm run cli:blessed -w @mcpx-protocol/cli",

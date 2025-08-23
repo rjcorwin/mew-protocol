@@ -61,6 +61,9 @@ npm run example:calculator
 
 # Terminal 4: Coordinator Agent
 npm run example:coordinator
+
+# Terminal 5: OpenAI Agent (optional, requires API key)
+npm run example:openai
 ```
 
 ### Step 3: Connect with the Blessed CLI
@@ -176,6 +179,42 @@ This demonstrates:
 - Coordinated task completion
 - Agent-to-agent MCP communication
 
+### 4. OpenAI Agent Tests (Optional - Requires API Key)
+
+The OpenAI agent provides intelligent, context-aware responses using GPT models.
+
+#### Setup
+```bash
+cd examples/openai-agent
+cp .env.example .env
+# Add your OpenAI API key to .env
+```
+
+#### Natural Conversations
+```
+You: What is machine learning?
+OpenAI: 🤖 Machine learning is a subset of AI that enables systems to learn from data...
+
+You: Explain it simpler
+OpenAI: 🤖 It's like teaching a computer to recognize patterns by showing it examples...
+```
+
+#### Tool Orchestration
+With calculator agent running:
+```
+You: Can you calculate 15 * 8 for me?
+OpenAI: 🤖 Let me calculate that for you...
+[Calls calculator agent]
+OpenAI: 🤖 15 * 8 equals 120.
+```
+
+#### MCP Tools
+```
+/call openai-agent generate_text {"prompt": "Write a joke about debugging"}
+/call openai-agent analyze_sentiment {"text": "This is fantastic!"}
+/call openai-agent summarize {"text": "Long article...", "max_length": 30}
+```
+
 ## Available Commands
 
 In the blessed CLI, use these commands:
@@ -199,6 +238,7 @@ In the blessed CLI, use these commands:
 - **Echo messages**: Prefixed with `[Echo #N]`
 - **Calculator messages**: Prefixed with 📊
 - **Coordinator messages**: Prefixed with 📋
+- **OpenAI messages**: Prefixed with 🤖
 
 ### Participant Roles
 
@@ -208,6 +248,7 @@ When you run `/list`, you'll see:
   echo-bot (agent) [MCP]
   calculator-agent (agent) [MCP]
   coordinator-agent (agent) [MCP]
+  openai-agent (agent) [MCP]
   your-name (user) [none]
 ```
 
