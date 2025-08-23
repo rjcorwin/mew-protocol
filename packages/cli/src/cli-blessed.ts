@@ -6,6 +6,7 @@ import { SystemWelcomePayload, ChatMessage, Peer, Envelope } from '@mcpx-protoco
 class BlessedCLI {
   private screen: blessed.Widgets.Screen;
   private messages: blessed.Widgets.Log;
+  private console: blessed.Widgets.Log;
   private input: blessed.Widgets.Textbox;
   private statusBar: blessed.Widgets.BoxElement;
   private client: MCPxClient | null = null;
@@ -15,6 +16,8 @@ class BlessedCLI {
   private topic: string;
   private participantId: string;
   private token: string = '';
+  private showConsole = false;
+  private pendingRequests: Map<string, { method: string; to: string; timestamp: Date }> = new Map();
 
   constructor(gateway: string, topic: string, participantId: string) {
     this.gateway = gateway;
@@ -28,7 +31,7 @@ class BlessedCLI {
       fullUnicode: true,
     });
 
-    // Create message log
+    // Create message log (left pane when console is shown)
     this.messages = blessed.log({
       parent: this.screen,
       top: 0,
@@ -51,6 +54,30 @@ class BlessedCLI {
       },
     });
 
+    // Create console log (right pane for protocol debugging)
+    this.console = blessed.log({
+      parent: this.screen,
+      top: 0,
+      left: '50%',
+      width: '50%',
+      height: '100%-3',
+      border: {
+        type: 'line',
+      },
+      label: ' Protocol Console (F2 to toggle) ',
+      scrollable: true,
+      alwaysScroll: true,
+      mouse: true,
+      keys: true,
+      vi: true,
+      hidden: true, // Start hidden
+      style: {
+        border: {
+          fg: 'yellow',
+        },
+      },
+    });
+
     // Create status bar
     this.statusBar = blessed.box({
       parent: this.screen,
@@ -58,7 +85,7 @@ class BlessedCLI {
       left: 0,
       width: '100%',
       height: 1,
-      content: `MCPx | Disconnected | ${topic} | Peers: 0 | Ctrl+C to exit, /help for commands`,
+      content: `MCPx | Disconnected | ${topic} | Peers: 0 | Console: OFF | F2: Toggle Console | Ctrl+C: Exit | /help for commands`,
       tags: false,
     });
 
@@ -89,12 +116,17 @@ class BlessedCLI {
       this.screen.render();
     });
 
-    // Handle Ctrl+C
+    // Handle key bindings
     this.screen.key(['C-c'], () => {
       if (this.client) {
         this.client.disconnect();
       }
       process.exit(0);
+    });
+
+    // Toggle console view with F2
+    this.screen.key(['f2'], () => {
+      this.toggleConsole();
     });
 
     // Focus input by default
@@ -203,6 +235,10 @@ class BlessedCLI {
     });
 
     this.client.on('message', (envelope: Envelope) => {
+      // Log all protocol messages to console
+      this.logToConsole(envelope);
+      
+      // Display MCP messages (non-chat) in main view
       if (envelope.kind === 'mcp' && envelope.payload.method !== 'notifications/chat/message') {
         this.displayEnvelope(envelope);
       }
@@ -280,6 +316,10 @@ class BlessedCLI {
         this.screen.render();
         break;
 
+      case 'console':
+        this.toggleConsole();
+        break;
+
       default:
         this.addMessage('System', `Unknown command: ${command}`, 'error');
     }
@@ -293,7 +333,12 @@ Commands:
   /tools <id>        - List tools from participant
   /call <id> <tool>  - Call a tool
   /clear             - Clear messages
+  /console           - Toggle protocol console
   /quit              - Exit
+
+Key Bindings:
+  F2                 - Toggle protocol console
+  Ctrl+C             - Exit
 
 Examples:
   /tools calculator-agent
@@ -410,12 +455,91 @@ Examples:
     this.screen.render();
   }
 
+  private toggleConsole() {
+    this.showConsole = !this.showConsole;
+    
+    if (this.showConsole) {
+      // Split view: messages on left, console on right
+      this.messages.width = '50%';
+      this.console.show();
+    } else {
+      // Full width messages
+      this.messages.width = '100%';
+      this.console.hide();
+    }
+    
+    this.screen.render();
+  }
+
+  private logToConsole(envelope: Envelope) {
+    const timestamp = new Date().toISOString();
+    const direction = envelope.to?.includes(this.participantId) ? '⬅️  IN' : '➡️  OUT';
+    
+    // Track requests for correlation
+    if (envelope.payload.method && envelope.payload.id) {
+      // This is a request
+      this.pendingRequests.set(envelope.id, {
+        method: envelope.payload.method,
+        to: envelope.to?.[0] || 'broadcast',
+        timestamp: new Date(),
+      });
+      
+      const logLine = `${timestamp} ${direction} REQ [${envelope.from} → ${envelope.to?.[0] || 'broadcast'}] ${envelope.payload.method}`;
+      this.console.log(logLine);
+      
+      // Show params if they exist
+      if (envelope.payload.params) {
+        this.console.log(`    Params: ${JSON.stringify(envelope.payload.params)}`);
+      }
+    } else if (envelope.payload.result !== undefined || envelope.payload.error) {
+      // This is a response
+      const correlationId = envelope.correlation_id;
+      const pending = correlationId ? this.pendingRequests.get(correlationId) : null;
+      
+      if (pending) {
+        const duration = Date.now() - pending.timestamp.getTime();
+        const status = envelope.payload.error ? '❌ ERR' : '✅ OK';
+        const logLine = `${timestamp} ${direction} RES [${envelope.from} → ${pending.to}] ${pending.method} ${status} (${duration}ms)`;
+        this.console.log(logLine);
+        
+        if (envelope.payload.error) {
+          this.console.log(`    Error: ${JSON.stringify(envelope.payload.error)}`);
+        } else if (envelope.payload.result) {
+          const resultStr = JSON.stringify(envelope.payload.result);
+          const truncated = resultStr.length > 200 ? resultStr.substring(0, 200) + '...' : resultStr;
+          this.console.log(`    Result: ${truncated}`);
+        }
+        
+        this.pendingRequests.delete(correlationId);
+      } else {
+        const status = envelope.payload.error ? '❌ ERR' : '✅ RES';
+        this.console.log(`${timestamp} ${direction} ${status} [${envelope.from}] (no correlation)`);
+      }
+    } else if (envelope.payload.method && !envelope.payload.id) {
+      // This is a notification
+      this.console.log(`${timestamp} ${direction} NOT [${envelope.from}] ${envelope.payload.method}`);
+      
+      if (envelope.payload.params) {
+        this.console.log(`    Params: ${JSON.stringify(envelope.payload.params)}`);
+      }
+    } else {
+      // Unknown message type
+      this.console.log(`${timestamp} ${direction} ??? [${envelope.from}] ${envelope.kind}`);
+    }
+    
+    // Auto-scroll if console is visible
+    if (this.showConsole) {
+      this.screen.render();
+    }
+  }
+
   private updateStatus() {
     const statusColor = this.isConnected ? 'green-fg' : 'red-fg';
     const statusText = this.isConnected ? 'Connected' : 'Disconnected';
+    const consoleStatus = this.showConsole ? ' | Console: ON' : ' | Console: OFF';
     
     this.statusBar.setContent(
-      `MCPx | ${statusText} | ${this.topic} | Peers: ${this.peers.size} | Ctrl+C to exit, /help for commands`
+      `MCPx | ${statusText} | ${this.topic} | Peers: ${this.peers.size}${consoleStatus} | F2: Toggle Console | Ctrl+C: Exit | /help for commands`
     );
     
     this.screen.render();
