@@ -20,7 +20,14 @@
     "build:agent": "npm run build -w @mcpx-protocol/agent",
     "test:client": "npm run test -w @mcpx-protocol/client",
     "test:agent": "npm run test -w @mcpx-protocol/agent",
-    "clean": "npm run clean --workspaces --if-present"
+    "clean": "npm run clean --workspaces --if-present",
+    "example:echo": "cd examples/echo-bot && npm start",
+    "example:calculator": "cd examples/calculator-agent && npm start",
+    "example:coordinator": "cd examples/coordinator-agent && npm start",
+    "example:all": "npm run example:echo & npm run example:calculator & npm run example:coordinator & wait",
+    "cli": "npm run cli -w @mcpx-protocol/cli",
+    "cli:blessed": "npm run cli:blessed -w @mcpx-protocol/cli",
+    "cli:test": "npm run cli:blessed -w @mcpx-protocol/cli ws://localhost:3000 test-room test-user"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
