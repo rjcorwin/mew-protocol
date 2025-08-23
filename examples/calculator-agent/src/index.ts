@@ -191,15 +191,15 @@ class CalculatorAgent extends MCPxAgent {
 
   // Handle chat messages
   protected onChatMessage(text: string, from: string): void {
-    // Skip our own messages
-    if (from === this.getParticipantId()) {
+    // Skip our own messages and echo bot's echoes
+    if (from === this.getParticipantId() || from === 'echo-bot' || from === 'echo-bot-test') {
       return;
     }
 
     console.log(`[CHAT] ${from}: ${text}`);
 
-    // Respond to help requests
-    if (text.toLowerCase().includes('help') || text.toLowerCase().includes('tools')) {
+    // Respond to direct help requests (not echoes)
+    if (!text.includes('[Echo') && (text.toLowerCase().includes('help') || text.toLowerCase() === 'tools')) {
       this.sendChat('Available tools: add, subtract, multiply, divide, sqrt, power. Use /tools command to list details.');
     }
   }

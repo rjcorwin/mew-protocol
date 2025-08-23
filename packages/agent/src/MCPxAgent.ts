@@ -81,6 +81,7 @@ export abstract class MCPxAgent {
   private setupEventHandlers(): void {
     // Handle incoming MCP messages
     this.client.on('message', (envelope: Envelope) => {
+      console.log(`[${this.config.name}] Received envelope: kind=${envelope.kind}, from=${envelope.from}, to=${envelope.to?.join(',') || 'broadcast'}`);
       if (envelope.kind === 'mcp') {
         this.handleMCPMessage(envelope);
       }
@@ -109,25 +110,30 @@ export abstract class MCPxAgent {
    */
   private async handleMCPMessage(envelope: Envelope): Promise<void> {
     const message = envelope.payload as JsonRpcMessage;
+    console.log(`[${this.config.name}] MCP message:`, JSON.stringify(message));
 
     // Check if it's a request
     if ('method' in message && 'id' in message) {
       const request = message as JsonRpcRequest;
+      console.log(`[${this.config.name}] Handling MCP request: ${request.method}`);
       
       try {
         const result = await this.handleMCPRequest(envelope.from, request);
+        console.log(`[${this.config.name}] Sending response:`, JSON.stringify(result));
         
         // Send response
-        await this.client.send({
+        const responseEnvelope = {
           to: [envelope.from],
-          kind: 'mcp',
+          kind: 'mcp' as const,
           correlation_id: envelope.id,
           payload: {
             jsonrpc: '2.0',
             id: request.id,
             result,
           },
-        });
+        };
+        console.log(`[${this.config.name}] Response envelope:`, JSON.stringify(responseEnvelope));
+        await this.client.send(responseEnvelope);
       } catch (error: any) {
         // Send error response
         await this.client.send({
