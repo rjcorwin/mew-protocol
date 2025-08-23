@@ -1,6 +1,5 @@
 import { 
   Envelope, 
-  Participant, 
   ConnectionState, 
   SystemWelcomePayload, 
   PresencePayload,

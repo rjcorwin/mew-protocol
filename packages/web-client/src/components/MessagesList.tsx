@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { User, Bot, Zap, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { User, Bot, Zap, CheckCircle, XCircle } from 'lucide-react';
 import { 
   Envelope, 
   isChatMessage, 
@@ -103,7 +103,7 @@ function MessageBubble({
   }
 
   // MCP Request/Response/Notification
-  const { jsonrpc, method, id, result, error } = envelope.payload;
+  const { method, id, result, error } = envelope.payload;
   const isRequest = method && id;
   const isResponse = id && (result !== undefined || error);
   const isNotification = method && !id;
