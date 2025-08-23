@@ -5,14 +5,16 @@ MCPx is a protocol specification that extends the Model Context Protocol (MCP) t
 ## Repository Structure
 
 ```
-mcpx/
-├── spec/           # Protocol specification
-├── packages/       # Reference implementations
-│   ├── gateway/    # WebSocket gateway server
-│   ├── web-client/ # Web interface
-│   ├── bridge/     # MCP-to-MCPx bridge
-│   └── sdk-typescript/ # TypeScript SDK
-└── examples/       # Usage examples
+mcpx-protocol/
+├── protocol-spec/     # Protocol specification
+├── sdk-spec/          # SDK architecture specification
+├── packages/          # Reference implementations
+│   ├── client/        # Protocol layer (WebSocket, envelopes)
+│   ├── agent/         # Agent abstractions (MCP server/client)
+│   ├── gateway/       # WebSocket gateway server
+│   ├── web-client/    # Web interface
+│   └── bridge/        # MCP-to-MCPx bridge
+└── examples/          # Usage examples
 ```
 
 ## Quick Start
@@ -33,14 +35,20 @@ npm run dev:bridge
 
 ## Packages
 
-- **@mcpx/gateway** - Reference gateway server implementation
-- **@mcpx/web-client** - Reference web client for testing
-- **@mcpx/bridge** - Bridge to connect MCP servers to MCPx topics
-- **@mcpx/sdk-typescript** - TypeScript SDK for building MCPx clients
+### Core SDK
+- **@mcpx-protocol/client** - Protocol layer handling WebSocket, envelopes, and correlation
+- **@mcpx-protocol/agent** - Agent abstractions for MCP server/client functionality
+
+### Infrastructure
+- **@mcpxp/gateway** - Reference gateway server implementation
+- **@mcpxp/web-client** - Reference web client for testing
+- **@mcpxp/bridge** - Bridge to connect MCP servers to MCPx topics
 
 ## Documentation
 
-See the [spec/](spec/) directory for the protocol specification.
+- [Protocol Specification](protocol-spec/v0/SPEC.md) - MCPx v0 protocol specification
+- [SDK Architecture](sdk-spec/mcpx-sdk-architecture.md) - SDK layered architecture
+- [Implementation Patterns](protocol-spec/v0/PATTERNS.md) - Common implementation patterns
 
 ## License
 
