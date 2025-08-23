@@ -76,7 +76,7 @@ class BlessedCLI {
       hidden: true, // Start hidden
       style: {
         border: {
-          fg: 'yellow',
+          fg: 'green',
         },
       },
     });
@@ -88,7 +88,7 @@ class BlessedCLI {
       left: 0,
       width: '100%',
       height: 1,
-      content: `MCPx | Disconnected | ${topic} | Peers: 0 | Console: OFF | F2: Toggle Console | Ctrl+C: Exit | /help for commands`,
+      content: `MCPx | Disconnected | ${topic} | Peers: 0 | F2: Console | /help: Commands | Ctrl+C: Exit`,
       tags: false,
     });
 
@@ -465,8 +465,8 @@ Examples:
         }
         break;
       case 'mcp':
-        // MCP messages with clearer formatting
-        messageText = `\n${timestamp} [M] [${cleanFrom}] MCP: ${cleanText}`;
+        // MCP messages - more compact
+        messageText = `\n${timestamp} [M] [${cleanFrom}]: ${cleanText}`;
         break;
       case 'join':
         messageText = `\n--> ${cleanText}`;
@@ -506,7 +506,13 @@ Examples:
   }
 
   private logToConsole(envelope: Envelope) {
-    const timestamp = new Date().toLocaleTimeString();
+    // Shorter timestamp format (HH:MM:SS)
+    const timestamp = new Date().toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
     const direction = envelope.to?.includes(this.participantId) ? 'IN ' : 'OUT';
     
     // Track requests for correlation
@@ -520,17 +526,17 @@ Examples:
       
       const method = envelope.payload.method.replace('notifications/', '').replace('tools/', '');
       const target = envelope.to?.[0] || 'broadcast';
-      const logLine = `${timestamp} ${direction} REQ [${envelope.from} > ${target}] ${method}`;
+      const logLine = `${timestamp} ${direction} REQ [${envelope.from} → ${target}] ${method}`;
       this.console.log(logLine);
       
-      // Show params on separate line with better formatting
+      // Show params more compactly
       if (envelope.payload.params) {
         const paramsStr = JSON.stringify(envelope.payload.params);
-        if (paramsStr.length > 80) {
+        if (paramsStr.length > 70) {
           // For long params, truncate
-          this.console.log(`         Params: ${paramsStr.substring(0, 80)}...`);
+          this.console.log(`            ${paramsStr.substring(0, 70)}...`);
         } else {
-          this.console.log(`         Params: ${paramsStr}`);
+          this.console.log(`            ${paramsStr}`);
         }
       }
     } else if (envelope.payload.result !== undefined || envelope.payload.error) {
@@ -540,20 +546,20 @@ Examples:
       
       if (pending) {
         const duration = Date.now() - pending.timestamp.getTime();
-        const status = envelope.payload.error ? 'ERR' : 'OK ';
+        const status = envelope.payload.error ? '[ERR]' : '[OK] ';
         const method = pending.method.replace('notifications/', '').replace('tools/', '');
-        const logLine = `${timestamp} ${direction} RES [${envelope.from}] ${method} ${status} (${duration}ms)`;
+        const logLine = `${timestamp} ${direction} RES ${status} ${method} (${duration}ms)`;
         this.console.log(logLine);
         
         if (envelope.payload.error) {
           const errorStr = JSON.stringify(envelope.payload.error);
-          this.console.log(`         Error: ${errorStr.substring(0, 80)}`);
-        } else if (envelope.payload.result) {
+          this.console.log(`            Error: ${errorStr.substring(0, 65)}`);
+        } else if (envelope.payload.result && JSON.stringify(envelope.payload.result) !== '{}') {
           const resultStr = JSON.stringify(envelope.payload.result);
-          if (resultStr.length > 80) {
-            this.console.log(`         Result: ${resultStr.substring(0, 80)}...`);
+          if (resultStr.length > 70) {
+            this.console.log(`            ${resultStr.substring(0, 70)}...`);
           } else {
-            this.console.log(`         Result: ${resultStr}`);
+            this.console.log(`            ${resultStr}`);
           }
         }
         
@@ -570,22 +576,22 @@ Examples:
       if (envelope.payload.params && envelope.payload.params.text) {
         // For chat messages, show text preview
         const text = envelope.payload.params.text;
-        const preview = text.length > 60 ? text.substring(0, 60) + '...' : text;
-        this.console.log(`         Text: "${preview}"`);
+        const preview = text.length > 50 ? text.substring(0, 50) + '...' : text;
+        this.console.log(`            Text: "${preview}"`);
       } else if (envelope.payload.params) {
         const paramsStr = JSON.stringify(envelope.payload.params);
-        if (paramsStr.length > 80) {
-          this.console.log(`         Params: ${paramsStr.substring(0, 80)}...`);
-        } else {
-          this.console.log(`         Params: ${paramsStr}`);
+        if (paramsStr.length > 70) {
+          this.console.log(`            ${paramsStr.substring(0, 70)}...`);
+        } else if (paramsStr !== '{}') {
+          this.console.log(`            ${paramsStr}`);
         }
       }
-    } else {
-      // Unknown message type
+    } else if (envelope.kind === 'presence' || envelope.kind === 'system') {
+      // System messages
       this.console.log(`${timestamp} ${direction} ??? [${envelope.from}] ${envelope.kind}`);
     }
     
-    // Add spacing between entries
+    // Add a subtle separator line
     this.console.log('');
     
     // Auto-scroll if console is visible
@@ -597,10 +603,10 @@ Examples:
   private updateStatus() {
     const statusColor = this.isConnected ? 'green-fg' : 'red-fg';
     const statusText = this.isConnected ? 'Connected' : 'Disconnected';
-    const consoleStatus = this.showConsole ? ' | Console: ON' : ' | Console: OFF';
+    const consoleStatus = this.showConsole ? '[Console ON]' : '';
     
     this.statusBar.setContent(
-      `MCPx | ${statusText} | ${this.topic} | Peers: ${this.peers.size}${consoleStatus} | F2: Toggle Console | Ctrl+C: Exit | /help for commands`
+      `MCPx | ${statusText} | ${this.topic} | Peers: ${this.peers.size} ${consoleStatus} | F2: Console | /help: Commands | Ctrl+C: Exit`
     );
     
     this.screen.render();
