@@ -28,7 +28,10 @@ class BlessedCLI {
     this.screen = blessed.screen({
       smartCSR: true,
       title: 'MCPx Chat Client',
-      fullUnicode: true,
+      fullUnicode: false, // Disable unicode to avoid character issues
+      forceUnicode: false,
+      dockBorders: true,
+      ignoreDockContrast: true
     });
 
     // Create message log (left pane when console is shown)
@@ -408,46 +411,77 @@ Examples:
 
   private displayEnvelope(envelope: Envelope) {
     const timestamp = new Date().toLocaleTimeString();
-    const method = envelope.payload.method || (envelope.payload.result ? 'result' : 'unknown');
-    this.addMessage(envelope.from, `MCP ${method}`, 'mcp');
+    const payload = envelope.payload;
+    
+    // Format based on the type of MCP message
+    let description = '';
+    if (payload.method) {
+      // Request or notification
+      description = payload.method.replace('notifications/', '').replace('tools/', '');
+    } else if (payload.result) {
+      // Response
+      description = 'response';
+    } else if (payload.error) {
+      // Error response
+      description = `error: ${payload.error.message}`;
+    } else {
+      description = 'unknown';
+    }
+    
+    this.addMessage(envelope.from, description, 'mcp');
   }
 
   private addMessage(from: string, text: string, type: 'chat' | 'error' | 'success' | 'info' | 'mcp' | 'join' | 'leave') {
     const timestamp = new Date().toLocaleTimeString();
     
-    // Build the formatted message without color tags
+    // Strip any control characters from the text
+    const cleanText = text.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    const cleanFrom = from.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    
+    // Build the formatted message with better visual separation
     let messageText = '';
+    let prefix = '';
     
     switch (type) {
       case 'chat':
-        messageText = `${timestamp} [${from}] ${text}`;
+        // Add visual separator and clear formatting for chat messages
+        prefix = cleanFrom === 'You' ? '> ' : '< ';
+        messageText = `\n${timestamp} ${prefix}[${cleanFrom}]\n   ${cleanText}`;
         break;
       case 'error':
-        messageText = `[ERROR] ${text}`;
+        messageText = `\n[X] ERROR: ${cleanText}`;
         break;
       case 'success':
-        messageText = `[SUCCESS] ${text}`;
+        messageText = `\n[+] ${cleanText}`;
         break;
       case 'info':
-        messageText = from === 'System' ? text : `[${from}] ${text}`;
+        if (cleanFrom === 'System' && cleanText.startsWith('===')) {
+          // Section headers
+          messageText = `\n${cleanText}`;
+        } else if (cleanFrom === 'System') {
+          messageText = `   ${cleanText}`;
+        } else {
+          messageText = `\n[${cleanFrom}] ${cleanText}`;
+        }
         break;
       case 'mcp':
-        messageText = `${timestamp} [${from}] ${text}`;
+        // MCP messages with clearer formatting
+        messageText = `\n${timestamp} [M] [${cleanFrom}] MCP: ${cleanText}`;
         break;
       case 'join':
-        messageText = text;
+        messageText = `\n--> ${cleanText}`;
         break;
       case 'leave':
-        messageText = text;
+        messageText = `\n<-- ${cleanText}`;
         break;
       default:
-        messageText = `${timestamp} [${from}] ${text}`;
+        messageText = `\n${timestamp} [${cleanFrom}] ${cleanText}`;
     }
     
-    // For multiline content (like help), split and format each line
+    // For multiline content, preserve formatting but indent continuation lines
     const lines = messageText.split('\n');
-    lines.forEach(line => {
-      if (line.trim()) {
+    lines.forEach((line, index) => {
+      if (line.trim() || index === 0) {  // Always show first line even if empty (for spacing)
         this.messages.log(line);
       }
     });
@@ -472,8 +506,8 @@ Examples:
   }
 
   private logToConsole(envelope: Envelope) {
-    const timestamp = new Date().toISOString();
-    const direction = envelope.to?.includes(this.participantId) ? '⬅️  IN' : '➡️  OUT';
+    const timestamp = new Date().toLocaleTimeString();
+    const direction = envelope.to?.includes(this.participantId) ? 'IN ' : 'OUT';
     
     // Track requests for correlation
     if (envelope.payload.method && envelope.payload.id) {
@@ -484,12 +518,20 @@ Examples:
         timestamp: new Date(),
       });
       
-      const logLine = `${timestamp} ${direction} REQ [${envelope.from} → ${envelope.to?.[0] || 'broadcast'}] ${envelope.payload.method}`;
+      const method = envelope.payload.method.replace('notifications/', '').replace('tools/', '');
+      const target = envelope.to?.[0] || 'broadcast';
+      const logLine = `${timestamp} ${direction} REQ [${envelope.from} > ${target}] ${method}`;
       this.console.log(logLine);
       
-      // Show params if they exist
+      // Show params on separate line with better formatting
       if (envelope.payload.params) {
-        this.console.log(`    Params: ${JSON.stringify(envelope.payload.params)}`);
+        const paramsStr = JSON.stringify(envelope.payload.params);
+        if (paramsStr.length > 80) {
+          // For long params, truncate
+          this.console.log(`         Params: ${paramsStr.substring(0, 80)}...`);
+        } else {
+          this.console.log(`         Params: ${paramsStr}`);
+        }
       }
     } else if (envelope.payload.result !== undefined || envelope.payload.error) {
       // This is a response
@@ -498,34 +540,53 @@ Examples:
       
       if (pending) {
         const duration = Date.now() - pending.timestamp.getTime();
-        const status = envelope.payload.error ? '❌ ERR' : '✅ OK';
-        const logLine = `${timestamp} ${direction} RES [${envelope.from} → ${pending.to}] ${pending.method} ${status} (${duration}ms)`;
+        const status = envelope.payload.error ? 'ERR' : 'OK ';
+        const method = pending.method.replace('notifications/', '').replace('tools/', '');
+        const logLine = `${timestamp} ${direction} RES [${envelope.from}] ${method} ${status} (${duration}ms)`;
         this.console.log(logLine);
         
         if (envelope.payload.error) {
-          this.console.log(`    Error: ${JSON.stringify(envelope.payload.error)}`);
+          const errorStr = JSON.stringify(envelope.payload.error);
+          this.console.log(`         Error: ${errorStr.substring(0, 80)}`);
         } else if (envelope.payload.result) {
           const resultStr = JSON.stringify(envelope.payload.result);
-          const truncated = resultStr.length > 200 ? resultStr.substring(0, 200) + '...' : resultStr;
-          this.console.log(`    Result: ${truncated}`);
+          if (resultStr.length > 80) {
+            this.console.log(`         Result: ${resultStr.substring(0, 80)}...`);
+          } else {
+            this.console.log(`         Result: ${resultStr}`);
+          }
         }
         
         this.pendingRequests.delete(correlationId);
       } else {
-        const status = envelope.payload.error ? '❌ ERR' : '✅ RES';
+        const status = envelope.payload.error ? 'ERR' : 'RES';
         this.console.log(`${timestamp} ${direction} ${status} [${envelope.from}] (no correlation)`);
       }
     } else if (envelope.payload.method && !envelope.payload.id) {
       // This is a notification
-      this.console.log(`${timestamp} ${direction} NOT [${envelope.from}] ${envelope.payload.method}`);
+      const method = envelope.payload.method.replace('notifications/', '').replace('tools/', '');
+      this.console.log(`${timestamp} ${direction} NOT [${envelope.from}] ${method}`);
       
-      if (envelope.payload.params) {
-        this.console.log(`    Params: ${JSON.stringify(envelope.payload.params)}`);
+      if (envelope.payload.params && envelope.payload.params.text) {
+        // For chat messages, show text preview
+        const text = envelope.payload.params.text;
+        const preview = text.length > 60 ? text.substring(0, 60) + '...' : text;
+        this.console.log(`         Text: "${preview}"`);
+      } else if (envelope.payload.params) {
+        const paramsStr = JSON.stringify(envelope.payload.params);
+        if (paramsStr.length > 80) {
+          this.console.log(`         Params: ${paramsStr.substring(0, 80)}...`);
+        } else {
+          this.console.log(`         Params: ${paramsStr}`);
+        }
       }
     } else {
       // Unknown message type
       this.console.log(`${timestamp} ${direction} ??? [${envelope.from}] ${envelope.kind}`);
     }
+    
+    // Add spacing between entries
+    this.console.log('');
     
     // Auto-scroll if console is visible
     if (this.showConsole) {
