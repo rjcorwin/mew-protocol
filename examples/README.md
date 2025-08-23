@@ -130,44 +130,51 @@ Expected results:
 - divide: 25
 - sqrt: 12
 
-#### Natural Language Calculations
+#### Using the Calculator
 
-The calculator also responds to natural language:
+**Direct tool calls (calculator agent only):**
 ```
-calculate 25 + 17
-what is 100 divided by 4?
-compute sqrt(64)
+/call calculator-agent add {"a": 25, "b": 17}
+/call calculator-agent subtract {"a": 20, "b": 8}
+/call calculator-agent multiply {"a": 7, "b": 6}
+/call calculator-agent divide {"a": 100, "b": 4}
+/call calculator-agent sqrt {"n": 64}
 ```
 
-### 3. Coordinator Agent Tests
+### 3. Coordinator Agent (Multi-Agent Orchestration)
 
-The coordinator orchestrates other agents to complete tasks:
+The coordinator demonstrates how agents can work together by orchestrating calls to other agents' tools.
 
-#### Basic Coordination
+#### How It Works
+
+When both coordinator and calculator are running:
+
+1. **User sends**: `calculate 100 + 200`
+2. **Coordinator responds**: `Processing "100 + 200" for user...`
+3. **Coordinator calls**: calculator's add tool via MCP
+4. **Calculator responds**: `📊 Calculation for coordinator: 100 + 200 = 300`
+
+#### Supported Commands
+
 ```
 calculate 50 * 3
+calculate 100 + 200
+calculate 75 - 25
+calculate 10 / 2
+sqrt 625
+help
 ```
 
-Expected: The coordinator will use the calculator agent to compute the result.
+The coordinator recognizes these patterns:
+- `calculate [number] [+|-|*|/] [number]`
+- `sqrt [number]`
+- Any message containing "help"
 
-#### Complex Expressions
-```
-calculate (10 + 5) * 3
-what is the square root of 625?
-```
-
-### 4. Multi-Agent Interaction
-
-Test how agents work together:
-
-```
-Hey coordinator, can you ask the calculator to add 100 and 200?
-```
-
-The coordinator should:
-1. Recognize the request
-2. Call the calculator's add tool
-3. Return the result
+This demonstrates:
+- Message routing between agents
+- Tool discovery and invocation
+- Coordinated task completion
+- Agent-to-agent MCP communication
 
 ## Available Commands
 
@@ -297,9 +304,9 @@ Tool result: {
 [coordinator-agent] Processing "100 + 50" for your-name...
 [calculator-agent] 📊 Calculation for coordinator-agent: 100 + 50 = 150
 
-> what is the square root of 256?
-[Echo #3] your-name said: "what is the square root of 256?"
-[coordinator-agent] Processing "square root of 256" for your-name...
+> sqrt 256
+[Echo #3] your-name said: "sqrt 256"
+[coordinator-agent] Calculating √256 for your-name...
 [calculator-agent] 📊 Calculation for coordinator-agent: √256 = 16
 ```
 
