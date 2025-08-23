@@ -9,6 +9,7 @@ class BlessedCLI {
   private console: blessed.Widgets.Log;
   private input: blessed.Widgets.Textbox;
   private statusBar: blessed.Widgets.BoxElement;
+  private detailView: blessed.Widgets.BoxElement;
   private client: MCPxClient | null = null;
   private peers: Map<string, Peer> = new Map();
   private isConnected = false;
@@ -18,6 +19,8 @@ class BlessedCLI {
   private token: string = '';
   private showConsole = false;
   private pendingRequests: Map<string, { method: string; to: string; timestamp: Date }> = new Map();
+  private consoleMessages: Array<{ timestamp: string; summary: string; fullEnvelope: any }> = [];
+  private selectedConsoleIndex = -1;
 
   constructor(gateway: string, topic: string, participantId: string) {
     this.gateway = gateway;
@@ -67,7 +70,7 @@ class BlessedCLI {
       border: {
         type: 'line',
       },
-      label: ' Protocol Console (F2 to toggle) ',
+      label: ' Protocol Console (F2 toggle, F3 detail view) ',
       scrollable: true,
       alwaysScroll: true,
       mouse: true,
@@ -88,7 +91,7 @@ class BlessedCLI {
       left: 0,
       width: '100%',
       height: 1,
-      content: `MCPx | Disconnected | ${topic} | Peers: 0 | F2: Console | /help: Commands | Ctrl+C: Exit`,
+      content: `MCPx | Disconnected | ${topic} | Peers: 0 | F2: Console | F3: Detail | /help: Commands | Ctrl+C: Exit`,
       tags: false,
     });
 
@@ -107,6 +110,35 @@ class BlessedCLI {
       style: {
         border: {
           fg: 'cyan',
+        },
+      },
+    });
+
+    // Create detail view (initially hidden)
+    this.detailView = blessed.box({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: '80%',
+      height: '80%',
+      border: {
+        type: 'line',
+      },
+      label: ' Message Detail (ESC to close) ',
+      hidden: true,
+      scrollable: true,
+      alwaysScroll: true,
+      mouse: true,
+      keys: true,
+      vi: true,
+      style: {
+        border: {
+          fg: 'magenta',
+        },
+        focus: {
+          border: {
+            fg: 'white',
+          },
         },
       },
     });
@@ -130,6 +162,26 @@ class BlessedCLI {
     // Toggle console view with F2
     this.screen.key(['f2'], () => {
       this.toggleConsole();
+    });
+
+    // Open detail view with F3 or Enter when console is focused
+    this.screen.key(['f3'], () => {
+      if (this.showConsole && this.consoleMessages.length > 0) {
+        this.showDetailView(this.consoleMessages.length - 1);
+      }
+    });
+
+    // Navigate console messages with arrow keys when console is visible
+    this.console.key(['enter'], () => {
+      if (this.consoleMessages.length > 0) {
+        // Find the most recent message and show details
+        this.showDetailView(this.consoleMessages.length - 1);
+      }
+    });
+
+    // Close detail view with ESC
+    this.detailView.key(['escape', 'q'], () => {
+      this.hideDetailView();
     });
 
     // Focus input by default
@@ -323,6 +375,15 @@ class BlessedCLI {
         this.toggleConsole();
         break;
 
+      case 'detail':
+      case 'd':
+        if (this.showConsole && this.consoleMessages.length > 0) {
+          this.showDetailView(this.consoleMessages.length - 1);
+        } else {
+          this.addMessage('System', 'Open the console first (F2 or /console) to view message details', 'info');
+        }
+        break;
+
       default:
         this.addMessage('System', `Unknown command: ${command}`, 'error');
     }
@@ -337,11 +398,19 @@ Commands:
   /call <id> <tool>  - Call a tool
   /clear             - Clear messages
   /console           - Toggle protocol console
+  /detail or /d      - Show detail view of last message
   /quit              - Exit
 
 Key Bindings:
   F2                 - Toggle protocol console
+  F3 (or fn+F3)      - Show detail view (when console is open)
+  ESC                - Close detail view
   Ctrl+C             - Exit
+
+Console Features:
+  - View all protocol messages in real-time
+  - Press F3 to see full JSON of any message
+  - Truncated data shows "..." (use F3 to see full content)
 
 Examples:
   /tools calculator-agent
@@ -515,6 +584,9 @@ Examples:
     });
     const direction = envelope.to?.includes(this.participantId) ? 'IN ' : 'OUT';
     
+    // Store the full envelope for detail view
+    let summary = '';
+    
     // Track requests for correlation
     if (envelope.payload.method && envelope.payload.id) {
       // This is a request
@@ -527,6 +599,7 @@ Examples:
       const method = envelope.payload.method.replace('notifications/', '').replace('tools/', '');
       const target = envelope.to?.[0] || 'broadcast';
       const logLine = `${timestamp} ${direction} REQ [${envelope.from} → ${target}] ${method}`;
+      summary = logLine;
       this.console.log(logLine);
       
       // Show params more compactly
@@ -549,6 +622,7 @@ Examples:
         const status = envelope.payload.error ? '[ERR]' : '[OK] ';
         const method = pending.method.replace('notifications/', '').replace('tools/', '');
         const logLine = `${timestamp} ${direction} RES ${status} ${method} (${duration}ms)`;
+        summary = logLine;
         this.console.log(logLine);
         
         if (envelope.payload.error) {
@@ -566,12 +640,16 @@ Examples:
         this.pendingRequests.delete(correlationId);
       } else {
         const status = envelope.payload.error ? 'ERR' : 'RES';
-        this.console.log(`${timestamp} ${direction} ${status} [${envelope.from}] (no correlation)`);
+        const logLine = `${timestamp} ${direction} ${status} [${envelope.from}] (no correlation)`;
+        summary = logLine;
+        this.console.log(logLine);
       }
     } else if (envelope.payload.method && !envelope.payload.id) {
       // This is a notification
       const method = envelope.payload.method.replace('notifications/', '').replace('tools/', '');
-      this.console.log(`${timestamp} ${direction} NOT [${envelope.from}] ${method}`);
+      const logLine = `${timestamp} ${direction} NOT [${envelope.from}] ${method}`;
+      summary = logLine;
+      this.console.log(logLine);
       
       if (envelope.payload.params && envelope.payload.params.text) {
         // For chat messages, show text preview
@@ -588,7 +666,23 @@ Examples:
       }
     } else if (envelope.kind === 'presence' || envelope.kind === 'system') {
       // System messages
-      this.console.log(`${timestamp} ${direction} ??? [${envelope.from}] ${envelope.kind}`);
+      const logLine = `${timestamp} ${direction} ??? [${envelope.from}] ${envelope.kind}`;
+      summary = logLine;
+      this.console.log(logLine);
+    }
+    
+    // Store the message for detail view
+    if (summary) {
+      this.consoleMessages.push({
+        timestamp,
+        summary,
+        fullEnvelope: envelope
+      });
+      
+      // Keep only last 100 messages to avoid memory issues
+      if (this.consoleMessages.length > 100) {
+        this.consoleMessages.shift();
+      }
     }
     
     // Add a subtle separator line
@@ -600,13 +694,46 @@ Examples:
     }
   }
 
+  private showDetailView(index: number) {
+    if (index < 0 || index >= this.consoleMessages.length) return;
+    
+    const message = this.consoleMessages[index];
+    const envelope = message.fullEnvelope;
+    
+    // Format the JSON with proper indentation
+    const formatted = JSON.stringify(envelope, null, 2);
+    
+    // Set the content
+    const content = `
+Message Summary: ${message.summary}
+${'-'.repeat(80)}
+
+Full Envelope:
+${formatted}
+
+${'-'.repeat(80)}
+Press ESC or Q to close
+Press F3 to see the next recent message`;
+    
+    this.detailView.setContent(content);
+    this.detailView.show();
+    this.detailView.focus();
+    this.screen.render();
+  }
+  
+  private hideDetailView() {
+    this.detailView.hide();
+    this.input.focus();
+    this.screen.render();
+  }
+
   private updateStatus() {
     const statusColor = this.isConnected ? 'green-fg' : 'red-fg';
     const statusText = this.isConnected ? 'Connected' : 'Disconnected';
     const consoleStatus = this.showConsole ? '[Console ON]' : '';
     
     this.statusBar.setContent(
-      `MCPx | ${statusText} | ${this.topic} | Peers: ${this.peers.size} ${consoleStatus} | F2: Console | /help: Commands | Ctrl+C: Exit`
+      `MCPx | ${statusText} | ${this.topic} | Peers: ${this.peers.size} ${consoleStatus} | F2: Console | F3: Detail | /help: Commands | Ctrl+C: Exit`
     );
     
     this.screen.render();
