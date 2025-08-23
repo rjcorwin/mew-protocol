@@ -93,7 +93,12 @@ class MCPxChatClient {
         break;
 
       case '/connect':
-        await this.connect();
+        // Support quick connect: /connect gateway topic participant
+        if (parts.length === 4) {
+          await this.quickConnect(parts[1], parts[2], parts[3]);
+        } else {
+          await this.connect();
+        }
         break;
 
       case '/disconnect':
@@ -229,6 +234,44 @@ class MCPxChatClient {
       // Resume readline after prompting
       this.isPrompting = false;
       this.rl.resume();
+    }
+  }
+
+  private async quickConnect(gateway: string, topic: string, participantId: string): Promise<void> {
+    if (this.isConnected) {
+      console.log(chalk.yellow('Already connected. Use /disconnect first.'));
+      return;
+    }
+
+    const config: ConnectionConfig = {
+      name: `${participantId}@${topic}`,
+      gateway,
+      topic,
+      participantId,
+    };
+
+    // Get token
+    config.token = await this.getToken(config);
+
+    const spinner = ora('Connecting to MCPx gateway...').start();
+
+    try {
+      this.client = new MCPxClient({
+        gateway: config.gateway,
+        topic: config.topic,
+        token: config.token,
+      });
+
+      this.setupClientHandlers();
+      await this.client.connect();
+      
+      this.isConnected = true;
+      this.currentConfig = config;
+      
+      spinner.succeed(chalk.green(`Connected to ${config.topic} as ${config.participantId}`));
+    } catch (error) {
+      spinner.fail(chalk.red(`Failed to connect: ${error}`));
+      this.client = null;
     }
   }
 

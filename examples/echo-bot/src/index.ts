@@ -19,6 +19,7 @@ class EchoBot extends MCPxAgent {
 
   async onStart(): Promise<void> {
     console.log('Echo bot started!');
+    console.log('Participant ID:', this.getParticipantId());
     this.sendChat('Echo bot online. I will echo your messages!');
   }
 
@@ -29,8 +30,11 @@ class EchoBot extends MCPxAgent {
 
   // Echo any incoming chat messages
   protected onChatMessage(text: string, from: string): void {
+    console.log(`[CHAT EVENT] from=${from}, myId=${this.getParticipantId()}, text="${text}"`);
+    
     // Don't echo our own messages
     if (from === this.getParticipantId()) {
+      console.log('[CHAT EVENT] Ignoring own message');
       return;
     }
 

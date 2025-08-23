@@ -242,8 +242,15 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
       return;
     }
 
-    // Check if message is for us
-    if (envelope.to && envelope.to.length > 0 && !envelope.to.includes(this.participantId!)) {
+    // Special case: always process system messages (includes welcome)
+    if (envelope.kind === 'system') {
+      this.emit('message', envelope);
+      this.handleSystemMessage(envelope);
+      return;
+    }
+    
+    // Check if message is for us (skip check if participantId not set yet)
+    if (envelope.to && envelope.to.length > 0 && this.participantId && !envelope.to.includes(this.participantId)) {
       // Not for us, ignore
       return;
     }
@@ -251,10 +258,6 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
     this.emit('message', envelope);
 
     switch (envelope.kind) {
-      case 'system':
-        this.handleSystemMessage(envelope);
-        break;
-      
       case 'presence':
         this.handlePresenceMessage(envelope);
         break;
