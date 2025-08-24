@@ -66,9 +66,13 @@ npm run dev:gateway
 
 You should see:
 ```
-MCPx Gateway starting on http://localhost:3000
-WebSocket server listening on ws://localhost:3000
-Health check endpoint: http://localhost:3000/health
+MCPx Server starting...
+Configuration: port=3000, historyLimit=1000
+WebSocket server configured
+MCPx Server running on port 3000
+WebSocket endpoint: ws://localhost:3000/v0/ws
+Health check: http://localhost:3000/health
+API: http://localhost:3000/v0/
 ```
 
 ✅ **Gateway is running!** Leave this terminal open - it's now waiting for agents to connect.
@@ -85,7 +89,7 @@ npm run example:echo
 You'll see:
 ```
 Echo Bot Agent starting...
-Connecting to ws://localhost:3000
+Connecting to ws://localhost:3000 (full path: ws://localhost:3000/v0/ws)
 ✓ Connected to test-room
 Echo bot is online and ready!
 ```
@@ -753,7 +757,8 @@ OpenAI agent, create a markdown file with the results of calculating squares fro
 
 ### Agent Won't Connect
 - Check the gateway is running (Terminal 1)
-- Verify the WebSocket URL: `ws://localhost:3000`
+- The gateway WebSocket endpoint is `ws://localhost:3000/v0/ws`
+- Agents using MCPxClient can connect with just `ws://localhost:3000` (the client adds `/v0/ws`)
 - Ensure no firewall is blocking port 3000
 
 ### Tools Not Working
