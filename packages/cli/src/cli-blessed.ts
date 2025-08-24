@@ -681,13 +681,50 @@ Examples:
   private showDetailInMessages(index: number) {
     if (index < 0 || index >= this.consoleMessages.length) return;
     
+    // Clear messages first to avoid overflow
+    this.messages.setContent('');
+    
     const message = this.consoleMessages[index];
-    const envelope = message.fullEnvelope;
+    let envelope = message.fullEnvelope;
+    
+    // Check if this is a system message with nested data
+    if (envelope.kind === 'system' && envelope.payload) {
+      // System messages might contain complex payloads
+      // Check if payload has messages array
+      if (Array.isArray(envelope.payload)) {
+        // The payload itself is an array of messages - this is the history!
+        this.addMessage('System', 'Note: This system message contains message history', 'info');
+        // Show just the envelope metadata, not the full history
+        envelope = {
+          ...envelope,
+          payload: `[Array of ${envelope.payload.length} messages - use /m to list]`
+        };
+      } else if (envelope.payload.messages) {
+        // Payload has a messages field
+        envelope = {
+          ...envelope,
+          payload: {
+            ...envelope.payload,
+            messages: `[${envelope.payload.messages.length} messages - use /m to list]`
+          }
+        };
+      } else if (envelope.payload.history) {
+        // Welcome message with history field!
+        const historyLength = Array.isArray(envelope.payload.history) ? envelope.payload.history.length : 0;
+        envelope = {
+          ...envelope,
+          payload: {
+            ...envelope.payload,
+            history: `[${historyLength} historical messages omitted]`
+          }
+        };
+      }
+    }
     
     // Format the JSON with proper indentation and cleaner output
     const formatted = this.formatJsonForDisplay(envelope);
     
-    // Clear and show detail with better formatting
+    // Show detail with better formatting
     this.addMessage('System', '', 'info');
     this.addMessage('System', '=' + '='.repeat(78) + '=', 'info');
     this.addMessage('System', `  MESSAGE DETAIL (${index + 1} of ${this.consoleMessages.length})`, 'info');
@@ -727,6 +764,10 @@ Examples:
     this.addMessage('System', '  Commands: /d <n> for message n, /m to list all messages', 'info');
     this.addMessage('System', '=' + '='.repeat(78) + '=', 'info');
     this.addMessage('System', '', 'info');
+    
+    // Scroll to top to show the beginning of the detail
+    this.messages.setScrollPerc(0);
+    this.screen.render();
   }
 
   private formatJsonForDisplay(obj: any): string {
