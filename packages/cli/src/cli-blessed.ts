@@ -9,7 +9,6 @@ class BlessedCLI {
   private console: blessed.Widgets.Log;
   private input: blessed.Widgets.Textbox;
   private statusBar: blessed.Widgets.BoxElement;
-  private detailView: blessed.Widgets.BoxElement;
   private client: MCPxClient | null = null;
   private peers: Map<string, Peer> = new Map();
   private isConnected = false;
@@ -20,7 +19,6 @@ class BlessedCLI {
   private showConsole = false;
   private pendingRequests: Map<string, { method: string; to: string; timestamp: Date }> = new Map();
   private consoleMessages: Array<{ timestamp: string; summary: string; fullEnvelope: any }> = [];
-  private selectedConsoleIndex = -1;
 
   constructor(gateway: string, topic: string, participantId: string) {
     this.gateway = gateway;
@@ -70,7 +68,7 @@ class BlessedCLI {
       border: {
         type: 'line',
       },
-      label: ' Protocol Console (F2 toggle, F3 detail view) ',
+      label: ' Protocol Console (F2 toggle, /d [n] for detail) ',
       scrollable: true,
       alwaysScroll: true,
       mouse: true,
@@ -107,38 +105,11 @@ class BlessedCLI {
       },
       label: ' Input ',
       inputOnFocus: true,
+      keys: true,
+      mouse: true,
       style: {
         border: {
           fg: 'cyan',
-        },
-      },
-    });
-
-    // Create detail view (initially hidden)
-    this.detailView = blessed.box({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '80%',
-      height: '80%',
-      border: {
-        type: 'line',
-      },
-      label: ' Message Detail (ESC to close) ',
-      hidden: true,
-      scrollable: true,
-      alwaysScroll: true,
-      mouse: true,
-      keys: true,
-      vi: true,
-      style: {
-        border: {
-          fg: 'magenta',
-        },
-        focus: {
-          border: {
-            fg: 'white',
-          },
         },
       },
     });
@@ -164,24 +135,11 @@ class BlessedCLI {
       this.toggleConsole();
     });
 
-    // Open detail view with F3 or Enter when console is focused
+    // Simple F3 shortcut to show last message detail
     this.screen.key(['f3'], () => {
-      if (this.showConsole && this.consoleMessages.length > 0) {
-        this.showDetailView(this.consoleMessages.length - 1);
-      }
-    });
-
-    // Navigate console messages with arrow keys when console is visible
-    this.console.key(['enter'], () => {
       if (this.consoleMessages.length > 0) {
-        // Find the most recent message and show details
-        this.showDetailView(this.consoleMessages.length - 1);
+        this.showDetailInMessages(this.consoleMessages.length - 1);
       }
-    });
-
-    // Close detail view with ESC
-    this.detailView.key(['escape', 'q'], () => {
-      this.hideDetailView();
     });
 
     // Focus input by default
@@ -377,10 +335,32 @@ class BlessedCLI {
 
       case 'detail':
       case 'd':
-        if (this.showConsole && this.consoleMessages.length > 0) {
-          this.showDetailView(this.consoleMessages.length - 1);
+        if (this.consoleMessages.length === 0) {
+          this.addMessage('System', 'No protocol messages captured yet', 'info');
+        } else if (args.length > 0 && !isNaN(parseInt(args[0]))) {
+          // Show specific message number
+          const msgNum = parseInt(args[0]) - 1; // Convert to 0-based index
+          if (msgNum >= 0 && msgNum < this.consoleMessages.length) {
+            this.showDetailInMessages(msgNum);
+          } else {
+            this.addMessage('System', `Message number out of range. Valid: 1-${this.consoleMessages.length}`, 'error');
+          }
         } else {
-          this.addMessage('System', 'Open the console first (F2 or /console) to view message details', 'info');
+          // Show last message
+          this.showDetailInMessages(this.consoleMessages.length - 1);
+        }
+        break;
+
+      case 'messages':
+      case 'm':
+        if (this.consoleMessages.length === 0) {
+          this.addMessage('System', 'No protocol messages captured yet', 'info');
+        } else {
+          this.addMessage('System', `\n=== Protocol Messages (${this.consoleMessages.length} total) ===`, 'info');
+          this.consoleMessages.forEach((msg, i) => {
+            this.addMessage('System', `  ${i + 1}. ${msg.summary}`, 'info');
+          });
+          this.addMessage('System', 'Use /d <number> to view full details', 'info');
         }
         break;
 
@@ -398,19 +378,20 @@ Commands:
   /call <id> <tool>  - Call a tool
   /clear             - Clear messages
   /console           - Toggle protocol console
-  /detail or /d      - Show detail view of last message
+  /detail or /d [n]  - Show detail view (last msg or msg #n)
   /quit              - Exit
 
 Key Bindings:
   F2                 - Toggle protocol console
-  F3 (or fn+F3)      - Show detail view (when console is open)
-  ESC                - Close detail view
+  F3 (or fn+F3)      - Show last message detail
   Ctrl+C             - Exit
 
 Console Features:
   - View all protocol messages in real-time
-  - Press F3 to see full JSON of any message
-  - Truncated data shows "..." (use F3 to see full content)
+  - Use /d to see full JSON of any message
+  - Use /d <n> to see message number n
+  - Use /m to list all captured messages
+  - Truncated data shows "..." (use /d to see full content)
 
 Examples:
   /tools calculator-agent
@@ -587,6 +568,9 @@ Examples:
     // Store the full envelope for detail view
     let summary = '';
     
+    // We'll add the message number after we store it
+    const msgNum = this.consoleMessages.length + 1;
+    
     // Track requests for correlation
     if (envelope.payload.method && envelope.payload.id) {
       // This is a request
@@ -598,18 +582,18 @@ Examples:
       
       const method = envelope.payload.method.replace('notifications/', '').replace('tools/', '');
       const target = envelope.to?.[0] || 'broadcast';
-      const logLine = `${timestamp} ${direction} REQ [${envelope.from} → ${target}] ${method}`;
-      summary = logLine;
+      summary = `${timestamp} ${direction} REQ [${envelope.from} → ${target}] ${method}`;
+      const logLine = `[${String(msgNum).padStart(3, ' ')}] ${summary}`;
       this.console.log(logLine);
       
-      // Show params more compactly
+      // Show params more compactly with indentation
       if (envelope.payload.params) {
         const paramsStr = JSON.stringify(envelope.payload.params);
-        if (paramsStr.length > 70) {
+        if (paramsStr.length > 65) {
           // For long params, truncate
-          this.console.log(`            ${paramsStr.substring(0, 70)}...`);
+          this.console.log(`       ${paramsStr.substring(0, 65)}...`);
         } else {
-          this.console.log(`            ${paramsStr}`);
+          this.console.log(`       ${paramsStr}`);
         }
       }
     } else if (envelope.payload.result !== undefined || envelope.payload.error) {
@@ -619,55 +603,55 @@ Examples:
       
       if (pending) {
         const duration = Date.now() - pending.timestamp.getTime();
-        const status = envelope.payload.error ? '[ERR]' : '[OK] ';
+        const status = envelope.payload.error ? 'ERR' : 'OK ';
         const method = pending.method.replace('notifications/', '').replace('tools/', '');
-        const logLine = `${timestamp} ${direction} RES ${status} ${method} (${duration}ms)`;
-        summary = logLine;
+        summary = `${timestamp} ${direction} RES [${status}] ${method} (${duration}ms)`;
+        const logLine = `[${String(msgNum).padStart(3, ' ')}] ${summary}`;
         this.console.log(logLine);
         
         if (envelope.payload.error) {
           const errorStr = JSON.stringify(envelope.payload.error);
-          this.console.log(`            Error: ${errorStr.substring(0, 65)}`);
+          this.console.log(`       Error: ${errorStr.substring(0, 60)}`);
         } else if (envelope.payload.result && JSON.stringify(envelope.payload.result) !== '{}') {
           const resultStr = JSON.stringify(envelope.payload.result);
-          if (resultStr.length > 70) {
-            this.console.log(`            ${resultStr.substring(0, 70)}...`);
+          if (resultStr.length > 65) {
+            this.console.log(`       ${resultStr.substring(0, 65)}...`);
           } else {
-            this.console.log(`            ${resultStr}`);
+            this.console.log(`       ${resultStr}`);
           }
         }
         
         this.pendingRequests.delete(correlationId);
       } else {
         const status = envelope.payload.error ? 'ERR' : 'RES';
-        const logLine = `${timestamp} ${direction} ${status} [${envelope.from}] (no correlation)`;
-        summary = logLine;
+        summary = `${timestamp} ${direction} ${status} [${envelope.from}] (no correlation)`;
+        const logLine = `[${String(msgNum).padStart(3, ' ')}] ${summary}`;
         this.console.log(logLine);
       }
     } else if (envelope.payload.method && !envelope.payload.id) {
       // This is a notification
       const method = envelope.payload.method.replace('notifications/', '').replace('tools/', '');
-      const logLine = `${timestamp} ${direction} NOT [${envelope.from}] ${method}`;
-      summary = logLine;
+      summary = `${timestamp} ${direction} NOT [${envelope.from}] ${method}`;
+      const logLine = `[${String(msgNum).padStart(3, ' ')}] ${summary}`;
       this.console.log(logLine);
       
       if (envelope.payload.params && envelope.payload.params.text) {
         // For chat messages, show text preview
         const text = envelope.payload.params.text;
-        const preview = text.length > 50 ? text.substring(0, 50) + '...' : text;
-        this.console.log(`            Text: "${preview}"`);
+        const preview = text.length > 45 ? text.substring(0, 45) + '...' : text;
+        this.console.log(`       Text: "${preview}"`);
       } else if (envelope.payload.params) {
         const paramsStr = JSON.stringify(envelope.payload.params);
-        if (paramsStr.length > 70) {
-          this.console.log(`            ${paramsStr.substring(0, 70)}...`);
+        if (paramsStr.length > 65) {
+          this.console.log(`       ${paramsStr.substring(0, 65)}...`);
         } else if (paramsStr !== '{}') {
-          this.console.log(`            ${paramsStr}`);
+          this.console.log(`       ${paramsStr}`);
         }
       }
     } else if (envelope.kind === 'presence' || envelope.kind === 'system') {
       // System messages
-      const logLine = `${timestamp} ${direction} ??? [${envelope.from}] ${envelope.kind}`;
-      summary = logLine;
+      summary = `${timestamp} ${direction} ??? [${envelope.from}] ${envelope.kind}`;
+      const logLine = `[${String(msgNum).padStart(3, ' ')}] ${summary}`;
       this.console.log(logLine);
     }
     
@@ -694,37 +678,85 @@ Examples:
     }
   }
 
-  private showDetailView(index: number) {
+  private showDetailInMessages(index: number) {
     if (index < 0 || index >= this.consoleMessages.length) return;
     
     const message = this.consoleMessages[index];
     const envelope = message.fullEnvelope;
     
-    // Format the JSON with proper indentation
-    const formatted = JSON.stringify(envelope, null, 2);
+    // Format the JSON with proper indentation and cleaner output
+    const formatted = this.formatJsonForDisplay(envelope);
     
-    // Set the content
-    const content = `
-Message Summary: ${message.summary}
-${'-'.repeat(80)}
-
-Full Envelope:
-${formatted}
-
-${'-'.repeat(80)}
-Press ESC or Q to close
-Press F3 to see the next recent message`;
+    // Clear and show detail with better formatting
+    this.addMessage('System', '', 'info');
+    this.addMessage('System', '=' + '='.repeat(78) + '=', 'info');
+    this.addMessage('System', `  MESSAGE DETAIL (${index + 1} of ${this.consoleMessages.length})`, 'info');
+    this.addMessage('System', '=' + '='.repeat(78) + '=', 'info');
+    this.addMessage('System', '', 'info');
+    this.addMessage('System', `  Summary: ${message.summary}`, 'info');
+    this.addMessage('System', '', 'info');
+    this.addMessage('System', '-' + '-'.repeat(78) + '-', 'info');
+    this.addMessage('System', '  Full Envelope:', 'info');
+    this.addMessage('System', '', 'info');
     
-    this.detailView.setContent(content);
-    this.detailView.show();
-    this.detailView.focus();
-    this.screen.render();
+    // Add the formatted JSON with tree-like hierarchy markers
+    const lines = formatted.split('\n');
+    lines.forEach((line, index) => {
+      // Count leading spaces to determine indent level
+      const indent = line.match(/^(\s*)/)?.[1] || '';
+      const indentLevel = Math.floor(indent.length / 2);
+      
+      // Create tree-like prefix
+      let prefix = '';
+      if (indentLevel > 0) {
+        // Build the tree structure
+        for (let i = 0; i < indentLevel - 1; i++) {
+          prefix += '| ';
+        }
+        prefix += '|-';
+      }
+      
+      const content = line.trim();
+      if (content) {
+        this.addMessage('System', prefix + content, 'info');
+      }
+    });
+    
+    this.addMessage('System', '', 'info');
+    this.addMessage('System', '-' + '-'.repeat(78) + '-', 'info');
+    this.addMessage('System', '  Commands: /d <n> for message n, /m to list all messages', 'info');
+    this.addMessage('System', '=' + '='.repeat(78) + '=', 'info');
+    this.addMessage('System', '', 'info');
+  }
+
+  private formatJsonForDisplay(obj: any): string {
+    // Pretty print with proper indentation preserved
+    const cleanObj = this.removeEmptyFields(obj);
+    return JSON.stringify(cleanObj, null, 2);
   }
   
-  private hideDetailView() {
-    this.detailView.hide();
-    this.input.focus();
-    this.screen.render();
+  private removeEmptyFields(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    
+    if (Array.isArray(obj)) {
+      const filtered = obj.map(item => this.removeEmptyFields(item)).filter(item => item !== undefined);
+      return filtered.length > 0 ? filtered : undefined;
+    }
+    
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        const cleanValue = this.removeEmptyFields(value);
+        if (cleanValue !== undefined && cleanValue !== '' && 
+            !(Array.isArray(cleanValue) && cleanValue.length === 0) &&
+            !(typeof cleanValue === 'object' && Object.keys(cleanValue).length === 0)) {
+          cleaned[key] = cleanValue;
+        }
+      }
+      return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+    }
+    
+    return obj;
   }
 
   private updateStatus() {
