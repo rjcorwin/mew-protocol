@@ -52,9 +52,10 @@ async function startBridge() {
   }
   
   // Start the bridge
-  const bridge = spawn('npx', ['mcpx-bridge', 'start', '--config', CONFIG_FILE], {
+  const bridge = spawn('node', [path.join(BRIDGE_PATH, 'dist/cli.js'), 'start', '--config', CONFIG_FILE], {
     cwd: BRIDGE_PATH,
-    stdio: 'inherit'
+    stdio: 'inherit',
+    shell: true
   });
   
   bridge.on('error', (error) => {

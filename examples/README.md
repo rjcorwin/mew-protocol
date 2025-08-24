@@ -256,6 +256,30 @@ You: Explain it simpler
 OpenAI: 🤖 It's like teaching a computer to recognize patterns by showing it examples...
 ```
 
+#### Cross-Agent File Access
+With documents-agent running, the OpenAI agent can access shared files:
+```
+You: Hey OpenAI agent, can you read the file 'the-answer.txt' from the documents-agent?
+OpenAI: 🤖 The allowed directory is:
+- `/users/rj/git/rjcorwin/mcpx-monorepo/mcpx-protocol/examples/documents-agent/documents`
+
+You: Perfect! Now please read the file at /users/rj/git/rjcorwin/mcpx-monorepo/mcpx-protocol/examples/documents-agent/documents/the-answer.txt
+OpenAI: 🤖 The content of the file 'the-answer.txt' is: `42`. Let me know if there's anything else you need!
+
+You: Can you also list all the files in that documents directory?
+OpenAI: 🤖 Here are the files in the documents directory:
+- `example-data.json`
+- `readme.md`
+- `test-write.txt`
+- `the-answer.txt`
+
+You: Could you read the example-data.json file and tell me what it contains?
+OpenAI: 🤖 The `example-data.json` file contains the following data:
+[Shows formatted JSON with sample dataset]
+```
+
+This demonstrates the OpenAI agent discovering and using the documents-agent's filesystem tools to access shared documents.
+
 #### Tool Orchestration
 With calculator agent running:
 ```

@@ -2,7 +2,7 @@
   "mcpx": {
     "server": "ws://localhost:3000",
     "topic": "test-room",
-    "token": "will-be-generated-on-start"
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0aWNpcGFudElkIjoiZG9jdW1lbnRzLWFnZW50IiwidG9waWMiOiJ0ZXN0LXJvb20iLCJpYXQiOjE3NTYwMjM3OTksImV4cCI6MTc4NzU4MTM5OX0.tX3zqtkJrofrdlVM6svLfCoPPrPhh4fx2SWUsYHohHk"
   },
   "participant": {
     "id": "documents-agent",
@@ -11,9 +11,9 @@
   },
   "mcp_server": {
     "type": "stdio",
-    "command": "npx",
+    "command": "node",
     "args": [
-      "@modelcontextprotocol/server-filesystem",
+      "/Users/rj/Git/rjcorwin/mcpx-monorepo/mcpx-protocol/examples/documents-agent/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js",
       "/Users/rj/Git/rjcorwin/mcpx-monorepo/mcpx-protocol/examples/documents-agent/documents"
     ]
   },

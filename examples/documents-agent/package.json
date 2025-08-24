@@ -9,7 +9,7 @@
     "bridge": "cd ../../packages/bridge && npx mcpx-bridge start --config ../../examples/documents-agent/bridge-config.json"
   },
   "dependencies": {
-    "@modelcontextprotocol/server-filesystem": "^0.8.0"
+    "@modelcontextprotocol/server-filesystem": "^0.6.2"
   },
   "keywords": [
     "mcpx",
