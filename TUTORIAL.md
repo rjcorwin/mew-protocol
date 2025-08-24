@@ -17,6 +17,16 @@ Imagine you're building a collaborative workspace where multiple AI agents work 
 
 Let's build this system step by step.
 
+## Understanding MCPx Envelopes
+
+Before we dive in, here's what you need to know: MCPx uses **envelopes** to wrap all messages. Think of an envelope as a shipping package with:
+- **from**: Who sent it
+- **to**: Who should receive it (optional, omit for broadcast)
+- **kind**: Type of content (chat, mcp, system)
+- **payload**: The actual message
+
+We'll inspect these envelopes as we go to understand the protocol!
+
 ## Prerequisites
 
 Before we begin, ensure you have:
@@ -97,6 +107,40 @@ You should see:
 3. Your message was broadcast to all participants
 4. The echo bot received it and sent its response
 5. Everyone in the topic saw both messages
+
+### 🔍 Protocol Deep Dive: Chat Envelopes
+
+When you sent "Hello agents!", here's what actually happened:
+
+**Your message envelope:**
+```json
+{
+  "from": "test-user",
+  "kind": "chat",
+  "payload": {
+    "params": {
+      "text": "Hello agents!",
+      "format": "plain"
+    }
+  }
+}
+```
+
+**Echo bot's response envelope:**
+```json
+{
+  "from": "echo-bot",
+  "kind": "chat",
+  "payload": {
+    "params": {
+      "text": "[Echo #1] test-user said: \"Hello agents!\"",
+      "format": "plain"
+    }
+  }
+}
+```
+
+Notice: No `to` field means these are **broadcast** to everyone in the topic!
 
 ### Stopping the Echo Bot
 
@@ -190,6 +234,53 @@ The calculator agent demonstrates a key MCPx concept:
 - Anyone can **call** these tools with proper parameters
 - Results are returned in a **standardized format**
 
+### 🔍 Protocol Deep Dive: MCP Tool Calls
+
+When you called the calculator's add tool, here's the envelope exchange:
+
+**Your tool call request:**
+```json
+{
+  "from": "test-user",
+  "to": ["calculator-agent"],
+  "kind": "mcp",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "add",
+      "arguments": {"a": 25, "b": 17}
+    }
+  }
+}
+```
+
+**Calculator's response:**
+```json
+{
+  "from": "calculator-agent",
+  "to": ["test-user"],
+  "kind": "mcp",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "content": [{
+        "type": "text",
+        "text": "25 + 17 = 42"
+      }]
+    }
+  }
+}
+```
+
+Key differences from chat:
+- **`to` field**: Direct messaging between specific participants
+- **`kind: "mcp"`**: Contains MCP protocol messages
+- **JSON-RPC format**: Standard request/response structure
+- **Correlation**: Response `id` matches request `id`
+
 ## Step 4: Multi-Agent Coordination
 
 The coordinator agent shows how agents can work together. It listens for calculation requests in chat and automatically uses the calculator agent's tools.
@@ -226,6 +317,68 @@ sqrt 625
 ```
 
 This demonstrates **agent orchestration** - agents working together without direct user intervention.
+
+### 🔍 Protocol Deep Dive: Agent-to-Agent Communication
+
+Here's the complete envelope flow when you said "calculate 100 + 200":
+
+**1. Your chat message (broadcast):**
+```json
+{
+  "from": "test-user",
+  "kind": "chat",
+  "payload": {
+    "params": {"text": "calculate 100 + 200"}
+  }
+}
+```
+
+**2. Coordinator calls calculator (directed MCP):**
+```json
+{
+  "from": "coordinator-agent",
+  "to": ["calculator-agent"],
+  "kind": "mcp",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "add",
+      "arguments": {"a": 100, "b": 200}
+    }
+  }
+}
+```
+
+**3. Calculator responds to coordinator:**
+```json
+{
+  "from": "calculator-agent",
+  "to": ["coordinator-agent"],
+  "kind": "mcp",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "content": [{"type": "text", "text": "100 + 200 = 300"}]
+    }
+  }
+}
+```
+
+**4. Calculator announces result (broadcast chat):**
+```json
+{
+  "from": "calculator-agent",
+  "kind": "chat",
+  "payload": {
+    "params": {"text": "📊 Calculation for coordinator-agent: 100 + 200 = 300"}
+  }
+}
+```
+
+Notice the mix of broadcast chat and directed MCP messages!
 
 ## Step 5: Bridging External Services - Documents Agent
 
@@ -282,6 +435,34 @@ You can also write files that all agents can access:
 ```
 
 Now any agent (or user) in the topic can read this file. You've just created a shared workspace!
+
+### 🔍 Protocol Deep Dive: Bridge Translation
+
+The bridge translates between MCPx envelopes and the filesystem MCP server. When you call a tool:
+
+**MCPx envelope (what you send):**
+```json
+{
+  "from": "test-user",
+  "to": ["documents-agent"],
+  "kind": "mcp",
+  "payload": {
+    "method": "tools/call",
+    "params": {
+      "name": "read_file",
+      "arguments": {"path": "..."}
+    }
+  }
+}
+```
+
+The bridge:
+1. **Extracts** the MCP payload from the envelope
+2. **Forwards** it to the filesystem MCP server via stdio
+3. **Wraps** the response back in an MCPx envelope
+4. **Routes** it back to you
+
+This is how ANY MCP server can join the MCPx ecosystem!
 
 ## Step 6: AI-Powered Collaboration - OpenAI Agent
 
@@ -391,6 +572,24 @@ and can discover and use other agents' tools
 4. **Protocol Bridging**: External MCP servers integrate seamlessly
 5. **Natural Language Processing**: AI agents understand context and intent
 6. **Shared Resources**: Files and data accessible to all participants
+
+### 🔍 Protocol Summary: Envelope Types
+
+Through this tutorial, you've seen three envelope types in action:
+
+| Kind | Purpose | To Field | Example Use |
+|------|---------|----------|-------------|
+| **chat** | Human-readable messages | Optional (broadcast) | User messages, agent announcements |
+| **mcp** | MCP protocol (tools, resources) | Usually specific | Tool calls, responses |
+| **system** | Gateway control messages | N/A | Welcome, participant join/leave |
+
+**Key Protocol Patterns:**
+- **Broadcast**: Omit `to` field → everyone receives it
+- **Direct**: Include `to: ["participant-id"]` → only they receive it
+- **Request/Response**: MCP messages include `id` for correlation
+- **JSON-RPC**: MCP payloads follow JSON-RPC 2.0 specification
+
+You now understand how MCPx orchestrates multi-agent collaboration!
 
 ## Experiments to Try
 
