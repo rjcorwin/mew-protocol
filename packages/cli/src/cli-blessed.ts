@@ -230,9 +230,12 @@ class BlessedCLI {
     });
 
     this.client.on('chat', (message: ChatMessage, from: string) => {
-      if (from !== this.participantId) {
-        const text = message.params?.text || '';
-        this.addMessage(from, text, 'chat');
+      const text = message.params?.text || '';
+      // In debug mode, show all messages (including your own)
+      // In normal mode, only show messages from others
+      if (this.debugMode || from !== this.participantId) {
+        const displayFrom = from === this.participantId ? 'You' : from;
+        this.addMessage(displayFrom, text, 'chat');
       }
     });
 
@@ -319,7 +322,11 @@ class BlessedCLI {
     } else if (this.isConnected && this.client) {
       // Send chat message
       this.client.chat(value);
-      this.addMessage('You', value, 'chat');
+      // Only show immediate feedback if not in debug mode
+      // (debug mode will show the full envelope)
+      if (!this.debugMode) {
+        this.addMessage('You', value, 'chat');
+      }
     } else {
       this.addMessage('System', 'Not connected', 'error');
     }
