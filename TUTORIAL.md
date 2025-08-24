@@ -97,7 +97,36 @@ The echo bot is now listening for messages. Let's test it!
 npm run cli:test
 ```
 
-You're now in the MCPx CLI. Try sending a message:
+You're now in the MCPx CLI. 
+
+### 🔍 Protocol Deep Dive: System Welcome Envelope
+
+When you connected, the gateway sent you this welcome envelope:
+
+```json
+{
+  "protocol": "mcp-x/v0",
+  "id": "env-welcome-1",
+  "ts": "2025-08-17T14:00:00Z",
+  "from": "system:gateway",
+  "kind": "system",
+  "payload": {
+    "event": "welcome",
+    "participant_id": "test-user",
+    "topic": "test-room",
+    "participants": [
+      {"id": "echo-bot", "name": "Echo Bot", "kind": "agent", "mcp": {"version": "2025-06-18"}}
+    ]
+  }
+}
+```
+
+This `kind: "system"` envelope gives you:
+- Your assigned participant ID
+- Current participants in the topic
+- MCP capabilities of each participant
+
+Now try sending a message:
 ```
 > Hello agents!
 ```
@@ -177,6 +206,30 @@ In your **CLI (Terminal 3)**, you might see:
 
 Good! The echo bot is gone, and we can continue without the noise.
 
+### 🔍 Protocol Deep Dive: Presence Envelopes
+
+When the echo bot left, the gateway sent this presence envelope to all participants:
+
+```json
+{
+  "protocol": "mcp-x/v0",
+  "id": "env-leave-1",
+  "ts": "2025-08-17T13:59:59Z",
+  "from": "system:gateway",
+  "kind": "presence",
+  "payload": {
+    "event": "leave",
+    "participant": {
+      "id": "echo-bot",
+      "name": "Echo Bot",
+      "kind": "agent"
+    }
+  }
+}
+```
+
+Notice the `kind: "presence"` - these are gateway-generated events for participant status changes!
+
 ## Step 3: Adding Intelligence - Calculator Agent
 
 Now let's add an agent with actual capabilities. The calculator agent exposes MCP tools that other participants can use.
@@ -199,7 +252,57 @@ You'll see:
   test-user (user) [none]
 ```
 
-Notice the `[MCP]` tag? That means these agents expose MCP tools. Let's see what tools the calculator offers:
+Notice the `[MCP]` tag? That means these agents expose MCP tools. 
+
+### 🔍 Protocol Deep Dive: MCP Initialization Handshake
+
+Before you can use tools, an MCP handshake happens behind the scenes. When you first query tools, this exchange occurs:
+
+**Initialize request (from you to calculator):**
+```json
+{
+  "protocol": "mcp-x/v0",
+  "id": "env-init-1",
+  "from": "test-user",
+  "to": ["calculator-agent"],
+  "kind": "mcp",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {},
+      "clientInfo": {"name": "MCPx CLI", "version": "0.1.0"}
+    }
+  }
+}
+```
+
+**Initialize response (from calculator to you):**
+```json
+{
+  "protocol": "mcp-x/v0",
+  "id": "env-init-2",
+  "from": "calculator-agent",
+  "to": ["test-user"],
+  "kind": "mcp",
+  "correlation_id": "env-init-1",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {"tools": {}},
+      "serverInfo": {"name": "Calculator Agent", "version": "1.0.0"}
+    }
+  }
+}
+```
+
+Notice the `correlation_id` in the response - it links back to the request envelope!
+
+Now let's see what tools the calculator offers:
 
 ```
 /tools calculator-agent
@@ -258,6 +361,8 @@ When you called the calculator's add tool, here's the envelope exchange:
 **Your tool call request:**
 ```json
 {
+  "protocol": "mcp-x/v0",
+  "id": "env-calc-request-1",
   "from": "test-user",
   "to": ["calculator-agent"],
   "kind": "mcp",
@@ -276,12 +381,15 @@ When you called the calculator's add tool, here's the envelope exchange:
 **Calculator's response:**
 ```json
 {
+  "protocol": "mcp-x/v0",
+  "id": "env-calc-response-1",
   "from": "calculator-agent",
   "to": ["test-user"],
   "kind": "mcp",
+  "correlation_id": "env-calc-request-1",  // Links to request envelope!
   "payload": {
     "jsonrpc": "2.0",
-    "id": 1,
+    "id": 1,  // Matches the request's payload.id
     "result": {
       "content": [{
         "type": "text",
@@ -296,7 +404,9 @@ Key differences from chat:
 - **`to` field**: Direct messaging between specific participants
 - **`kind: "mcp"`**: Contains MCP protocol messages
 - **JSON-RPC format**: Standard request/response structure
-- **Correlation**: Response `id` matches request `id`
+- **Dual correlation**: 
+  - `correlation_id` links envelope to envelope
+  - `payload.id` links JSON-RPC request to response
 
 ## Step 4: Multi-Agent Coordination
 
