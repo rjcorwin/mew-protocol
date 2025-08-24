@@ -195,6 +195,15 @@ npm run cli:simple
    - Chat events pass `(message: ChatMessage, from: string)`
    - Access text via: `message.params.text`
 
+## Release Process
+
+When asked to help with releasing packages to npm, refer to the detailed instructions in `RELEASE.md` which covers:
+- Pre-release checks and version updates
+- Build and test procedures
+- npm publish commands with proper dependency order
+- Git tagging conventions using package-specific tags (@mcpx-protocol/package@version)
+- Post-release verification steps
+
 ## Important Notes
 
 - NEVER proactively create documentation files unless explicitly requested
