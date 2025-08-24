@@ -202,7 +202,7 @@ class BlessedCLI {
   private setupClientHandlers() {
     if (!this.client) return;
 
-    this.client.on('welcome', (data: SystemWelcomePayload) => {
+    this.client.onWelcome((data: SystemWelcomePayload) => {
       this.isConnected = true;
       this.updateStatus();
       
@@ -229,7 +229,7 @@ class BlessedCLI {
       }
     });
 
-    this.client.on('chat', (message: ChatMessage, from: string) => {
+    this.client.onChat((message: ChatMessage, from: string) => {
       const text = message.params?.text || '';
       // In debug mode, show all messages (including your own)
       // In normal mode, only show messages from others
@@ -239,19 +239,19 @@ class BlessedCLI {
       }
     });
 
-    this.client.on('peer-joined', (peer: Peer) => {
+    this.client.onPeerJoined((peer: Peer) => {
       this.peers.set(peer.id, peer);
       this.addMessage('System', `→ ${peer.id} joined`, 'join');
       this.updateStatus();
     });
 
-    this.client.on('peer-left', (peer: Peer) => {
+    this.client.onPeerLeft((peer: Peer) => {
       this.peers.delete(peer.id);
       this.addMessage('System', `← ${peer.id} left`, 'leave');
       this.updateStatus();
     });
 
-    this.client.on('message', (envelope: Envelope) => {
+    this.client.onMessage((envelope: Envelope) => {
       // Log all protocol messages to console
       this.logToConsole(envelope);
       
@@ -297,17 +297,17 @@ class BlessedCLI {
       }
     });
 
-    this.client.on('error', (error: Error) => {
+    this.client.onError((error: Error) => {
       this.addMessage('System', `Error: ${error.message}`, 'error');
     });
 
-    this.client.on('disconnected', () => {
+    this.client.onDisconnected(() => {
       this.isConnected = false;
       this.addMessage('System', 'Disconnected', 'error');
       this.updateStatus();
     });
 
-    this.client.on('reconnected', () => {
+    this.client.onReconnected(() => {
       this.isConnected = true;
       this.addMessage('System', 'Reconnected', 'success');
       this.updateStatus();

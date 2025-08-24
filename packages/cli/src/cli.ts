@@ -345,7 +345,7 @@ class MCPxChatClient {
   private setupClientHandlers(): void {
     if (!this.client) return;
 
-    this.client.on('welcome', (data: SystemWelcomePayload) => {
+    this.client.onWelcome((data: SystemWelcomePayload) => {
       console.log(chalk.green(`\n✓ Welcome to ${data.topic}`));
       console.log(chalk.gray(`Your ID: ${data.participant_id}`));
       console.log(chalk.gray(`Participants: ${data.participants.length}`));
@@ -361,7 +361,7 @@ class MCPxChatClient {
       }
     });
 
-    this.client.on('chat', (message: ChatMessage, from: string) => {
+    this.client.onChat((message: ChatMessage, from: string) => {
       // Don't show our own messages twice
       if (from !== this.currentConfig?.participantId) {
         const text = message.params?.text || '';
@@ -369,17 +369,17 @@ class MCPxChatClient {
       }
     });
 
-    this.client.on('peer-joined', (peer: Peer) => {
+    this.client.onPeerJoined((peer: Peer) => {
       this.peers.set(peer.id, peer);
       console.log(chalk.green(`→ ${peer.id} joined the topic`));
     });
 
-    this.client.on('peer-left', (peer: Peer) => {
+    this.client.onPeerLeft((peer: Peer) => {
       this.peers.delete(peer.id);
       console.log(chalk.yellow(`← ${peer.id} left the topic`));
     });
 
-    this.client.on('message', (envelope) => {
+    this.client.onMessage((envelope) => {
       // Show debug output if enabled
       if (this.debugMode) {
         console.log(chalk.gray('--- Debug: Raw Envelope ---'));
@@ -393,16 +393,16 @@ class MCPxChatClient {
       }
     });
 
-    this.client.on('error', (error) => {
+    this.client.onError((error) => {
       console.log(chalk.red(`Error: ${error.message}`));
     });
 
-    this.client.on('disconnected', () => {
+    this.client.onDisconnected(() => {
       console.log(chalk.yellow('Disconnected from gateway'));
       this.isConnected = false;
     });
 
-    this.client.on('reconnected', () => {
+    this.client.onReconnected(() => {
       console.log(chalk.green('Reconnected to gateway'));
       this.isConnected = true;
     });
