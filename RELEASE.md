@@ -60,6 +60,8 @@ ls -la packages/*/dist/
 
 **IMPORTANT**: Publish in dependency order!
 
+**Note**: npm may auto-correct some package.json fields during publish (e.g., normalizing repository URLs, converting file: references to version references). This is normal and will update package-lock.json.
+
 1. **Core packages first** (no internal dependencies):
    ```bash
    npm publish -w @mcpx-protocol/client --access public --otp=XXXXXX
@@ -100,12 +102,20 @@ git push origin --tags
    # ... check each package
    ```
 
-2. **Create GitHub Release** (optional):
+2. **Commit package-lock.json changes**:
+   ```bash
+   # npm publish may auto-correct dependencies, updating package-lock.json
+   git add package-lock.json
+   git commit -m "chore: Update package-lock.json after npm publish"
+   git push
+   ```
+
+3. **Create GitHub Release** (optional):
    - Go to GitHub releases page
    - Create release from tags
    - Add changelog notes
 
-3. **Update Documentation**:
+4. **Update Documentation**:
    - Update README if needed
    - Update CHANGELOG.md with release notes
 
