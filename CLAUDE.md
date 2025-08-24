@@ -43,7 +43,8 @@ mcpx-protocol/
 │   ├── documents-agent/  # Filesystem bridge example
 │   └── openai-agent/     # AI-powered assistant
 ├── docs/                 # Additional documentation
-├── TUTORIAL.md          # Step-by-step tutorial
+├── tutorials/           # Tutorial series
+│   └── 01-getting-started.md  # Step-by-step introduction
 ├── QUICK-TEST.md        # Quick testing guide
 └── README.md            # Project overview
 ```

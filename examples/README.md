@@ -4,7 +4,7 @@ This directory contains example agents demonstrating the MCPx multi-agent coordi
 
 ## 📚 Complete Tutorial
 
-**New to MCPx?** Start with the [TUTORIAL.md](../TUTORIAL.md) in the root directory for a comprehensive step-by-step guide through all these examples.
+**New to MCPx?** Start with the [Getting Started Tutorial](../tutorials/01-getting-started.md) for a comprehensive step-by-step guide through all these examples.
 
 ## 📁 Directory Structure
 
@@ -105,7 +105,8 @@ calculate 10 * 20                              # Trigger coordinator
 
 ## 📚 Further Reading
 
-- [TUTORIAL.md](../TUTORIAL.md) - Complete step-by-step guide
+- [Getting Started Tutorial](../tutorials/01-getting-started.md) - Complete step-by-step guide
+- [All Tutorials](../tutorials/) - Full learning path from basics to production
 - [MCPx Protocol Specification](../protocol-spec/v0/SPEC.md)
 - [Implementation Patterns](../protocol-spec/v0/PATTERNS.md)
 - [Bridge Documentation](../packages/bridge/README.md)
@@ -117,4 +118,4 @@ When adding a new example:
 2. Include a comprehensive README
 3. Add appropriate npm scripts
 4. Update this README with your example
-5. Consider adding it to the TUTORIAL if it demonstrates new concepts
+5. Consider adding it to the tutorials if it demonstrates new concepts

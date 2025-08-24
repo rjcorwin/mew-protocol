@@ -30,7 +30,10 @@ npm run cli:test
 
 ## Documentation
 
-- 📖 **[Tutorial](TUTORIAL.md)** - Step-by-step guide with protocol deep-dives
+- 📖 **[Tutorials](tutorials/)** - Complete learning path from basics to production
+  - [Getting Started](tutorials/01-getting-started.md) - Hands-on introduction with protocol deep-dives
+  - [Build Your Agent](tutorials/02-build-your-agent.md) - Create custom MCPx agents
+  - [More tutorials...](tutorials/README.md)
 - 📋 **[Protocol Spec](protocol-spec/v0/SPEC.md)** - Complete protocol specification
 - 🧪 **[Examples](examples/)** - Working example agents
 - 🛠️ **[Bridge Guide](packages/bridge/)** - Bridging MCP servers
