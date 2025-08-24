@@ -22,7 +22,7 @@ Let's build this system step by step.
 Before we dive in, here's what you need to know: MCPx uses **envelopes** to wrap all messages. Think of an envelope as a shipping package with:
 - **from**: Who sent it
 - **to**: Who should receive it (optional, omit for broadcast)
-- **kind**: Type of content (chat, mcp, system)
+- **kind**: Type of content (mcp, presence, system)
 - **payload**: The actual message
 
 We'll inspect these envelopes as we go to understand the protocol!
@@ -600,9 +600,9 @@ Through this tutorial, you've seen three envelope types in action:
 
 | Kind | Purpose | To Field | Example Use |
 |------|---------|----------|-------------|
-| **chat** | Human-readable messages | Optional (broadcast) | User messages, agent announcements |
-| **mcp** | MCP protocol (tools, resources) | Usually specific | Tool calls, responses |
-| **system** | Gateway control messages | N/A | Welcome, participant join/leave |
+| **mcp** | MCP protocol messages (including chat via notifications/chat/message) | Varies | Tool calls, chat messages, responses |
+| **presence** | Participant status updates | N/A | Join/leave events from gateway |
+| **system** | Gateway control messages | N/A | Welcome message with initial state |
 
 **Key Protocol Patterns:**
 - **Broadcast**: Omit `to` field → everyone receives it
