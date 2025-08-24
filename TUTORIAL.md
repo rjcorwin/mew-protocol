@@ -1,10 +1,10 @@
-# MCPx Protocol Walkthrough
+# MCPx Protocol Tutorial
 
-Welcome to the MCPx multi-agent coordination platform! This walkthrough will guide you through running and understanding the example agents, from simple message handling to sophisticated AI-powered collaboration.
+Welcome to the MCPx multi-agent coordination platform! This tutorial will guide you through running and understanding the example agents, from simple message handling to sophisticated AI-powered collaboration.
 
 ## What You'll Learn
 
-By the end of this walkthrough, you'll understand how to:
+By the end of this tutorial, you'll understand how to:
 - Run a multi-agent system with MCPx
 - Connect agents that expose MCP tools
 - Enable agents to discover and use each other's capabilities
@@ -467,9 +467,9 @@ Combine agents to build:
 
 ### Explore the Protocol
 
-- Read the [MCPx Specification](../protocol-spec/v0/SPEC.md)
-- Understand [Implementation Patterns](../protocol-spec/v0/PATTERNS.md)
-- Review the [SDK Architecture](../sdk-spec/README.md)
+- Read the [MCPx Specification](protocol-spec/v0/SPEC.md)
+- Understand [Implementation Patterns](protocol-spec/v0/PATTERNS.md)
+- Review the [SDK Architecture](sdk-spec/README.md)
 
 ## Summary
 
