@@ -4,14 +4,15 @@
   "description": "MCPx CLI chat client for testing and interaction",
   "main": "dist/index.js",
   "bin": {
-    "mcpx-chat": "dist/cli.js"
+    "mcpx-chat": "dist/cli-blessed.js",
+    "mcpx-chat-simple": "dist/cli.js"
   },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "start": "node dist/cli.js",
-    "cli": "tsx src/cli.ts",
-    "cli:blessed": "tsx src/cli-blessed.ts",
+    "start": "node dist/cli-blessed.js",
+    "cli": "tsx src/cli-blessed.ts",
+    "cli:simple": "tsx src/cli.ts",
     "test": "vitest",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"

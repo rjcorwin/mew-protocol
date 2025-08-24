@@ -105,7 +105,7 @@ npm start
 npm run example:calculator
 
 # Terminal 4: Connect with CLI
-npm run cli:blessed -- ws://localhost:3000 test-room user
+npm run cli -- ws://localhost:3000 test-room user
 ```
 
 ### 2. Test Chat Interactions
