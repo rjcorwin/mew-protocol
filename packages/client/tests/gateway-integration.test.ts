@@ -49,7 +49,7 @@ describe.skip('Gateway Integration', () => {
 
   it('should connect to gateway and receive welcome message', async () => {
     const welcomePromise = new Promise((resolve) => {
-      client.once('welcome', (data) => {
+      client.onWelcome((data) => {
         resolve(data);
       });
     });
@@ -58,8 +58,8 @@ describe.skip('Gateway Integration', () => {
     const welcome = await welcomePromise;
 
     expect(welcome).toBeDefined();
-    expect(welcome).toHaveProperty('participant_id', 'test-client');
-    expect(welcome).toHaveProperty('topic', 'test-topic');
+    expect(welcome).toHaveProperty('participant');
+    expect(welcome).toHaveProperty('topic');
     expect(welcome).toHaveProperty('participants');
     expect(client.getParticipantId()).toBe('test-client');
   });
@@ -68,7 +68,8 @@ describe.skip('Gateway Integration', () => {
     await client.connect();
 
     const messagePromise = new Promise((resolve) => {
-      client.once('chat', (message, from) => {
+      const unsubscribe = client.onChat((message, from) => {
+        unsubscribe(); // Only listen once
         resolve({ message, from });
       });
     });

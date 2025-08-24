@@ -80,7 +80,7 @@ export abstract class MCPxAgent {
    */
   private setupEventHandlers(): void {
     // Handle incoming MCP messages
-    this.client.on('message', (envelope: Envelope) => {
+    this.client.onMessage((envelope) => {
       console.log(`[${this.config.name}] Received envelope: kind=${envelope.kind}, from=${envelope.from}, to=${envelope.to?.join(',') || 'broadcast'}`);
       if (envelope.kind === 'mcp') {
         this.handleMCPMessage(envelope);
@@ -88,19 +88,22 @@ export abstract class MCPxAgent {
     });
 
     // Track peer joins/leaves
-    this.client.on('peer-joined', (peer) => {
+    this.client.onPeerJoined((peer) => {
       this.peerStates.set(peer.id, {
         id: peer.id,
         initialized: false,
       });
     });
 
-    this.client.on('peer-left', (peer) => {
+    this.client.onPeerLeft((peer) => {
       this.peerStates.delete(peer.id);
     });
 
     // Handle chat messages
-    this.client.on('chat', (message, from) => {
+    // Note: Chat messages are a special case in MCPx envelopes. They arrive 
+    // in envelopes with kind='mcp' containing a JSON-RPC notification with 
+    // method='notifications/message/chat' and the text in params.text
+    this.client.onChat((message, from) => {
       this.onChatMessage(message.params.text, from);
     });
   }

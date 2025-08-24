@@ -1,5 +1,4 @@
 import WebSocket from 'ws';
-import { EventEmitter } from 'eventemitter3';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Envelope,
@@ -14,12 +13,77 @@ import {
   ChatMessage,
   ConnectionOptions,
   PendingRequest,
-  ClientEventMap,
   HistoryOptions,
   PROTOCOL_VERSION,
 } from './types';
 
-export class MCPxClient extends EventEmitter<ClientEventMap> {
+/**
+ * Event names emitted by MCPxClient
+ */
+export const ClientEvents = {
+  /** Emitted when WebSocket connection is established */
+  CONNECTED: 'connected',
+  
+  /** Emitted when WebSocket connection is closed */
+  DISCONNECTED: 'disconnected',
+  
+  /** Emitted when connection is re-established after disconnect */
+  RECONNECTED: 'reconnected',
+  
+  /** Emitted when any envelope is received */
+  MESSAGE: 'message',
+  
+  /** Emitted when welcome message is received from gateway */
+  WELCOME: 'welcome',
+  
+  /** Emitted when an error occurs */
+  ERROR: 'error',
+  
+  /** Emitted when a peer joins the topic */
+  PEER_JOINED: 'peer-joined',
+  
+  /** Emitted when a peer leaves the topic */
+  PEER_LEFT: 'peer-left',
+  
+  /** Emitted when a chat message is received (kind='mcp' with method='notifications/message/chat') */
+  CHAT: 'chat',
+} as const;
+
+/**
+ * Type-safe event parameter types
+ * Maps each event name to its corresponding parameter types
+ * 
+ * Usage example:
+ * ```typescript
+ * client.on(ClientEvents.CHAT, (message, from) => {
+ *   // message is typed as ChatMessage
+ *   // from is typed as string
+ * });
+ * ```
+ */
+export type ClientEventParams = {
+  [ClientEvents.CONNECTED]: [];
+  [ClientEvents.DISCONNECTED]: [];
+  [ClientEvents.RECONNECTED]: [];
+  [ClientEvents.MESSAGE]: [envelope: Envelope];
+  [ClientEvents.WELCOME]: [data: SystemWelcomePayload];
+  [ClientEvents.ERROR]: [error: Error];
+  [ClientEvents.PEER_JOINED]: [peer: Peer];
+  [ClientEvents.PEER_LEFT]: [peer: Peer];
+  [ClientEvents.CHAT]: [message: ChatMessage, from: string];
+};
+
+/**
+ * Type definitions for event handlers
+ */
+export type ChatHandler = (message: ChatMessage, from: string) => void;
+export type ErrorHandler = (error: Error) => void;
+export type WelcomeHandler = (data: SystemWelcomePayload) => void;
+export type PeerHandler = (peer: Peer) => void;
+export type MessageHandler = (envelope: Envelope) => void;
+export type VoidHandler = () => void;
+
+export class MCPxClient {
   private ws: WebSocket | null = null;
   private options: Required<ConnectionOptions>;
   private participantId: string | null = null;
@@ -30,9 +94,21 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
   private reconnectAttempts = 0;
   private isConnecting = false;
   private connectionPromise: Promise<void> | null = null;
+  
+  // Event handlers
+  private handlers = {
+    chat: new Set<ChatHandler>(),
+    error: new Set<ErrorHandler>(),
+    welcome: new Set<WelcomeHandler>(),
+    peerJoined: new Set<PeerHandler>(),
+    peerLeft: new Set<PeerHandler>(),
+    message: new Set<MessageHandler>(),
+    connected: new Set<VoidHandler>(),
+    disconnected: new Set<VoidHandler>(),
+    reconnected: new Set<VoidHandler>(),
+  };
 
   constructor(options: ConnectionOptions) {
-    super();
     this.options = {
       reconnect: true,
       reconnectDelay: 1000,
@@ -41,6 +117,95 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
       requestTimeout: 30000,
       ...options,
     };
+  }
+
+  /**
+   * Event handler registration methods
+   */
+  
+  onChat(handler: ChatHandler): () => void {
+    this.handlers.chat.add(handler);
+    return () => this.handlers.chat.delete(handler);
+  }
+
+  onError(handler: ErrorHandler): () => void {
+    this.handlers.error.add(handler);
+    return () => this.handlers.error.delete(handler);
+  }
+
+  onWelcome(handler: WelcomeHandler): () => void {
+    this.handlers.welcome.add(handler);
+    return () => this.handlers.welcome.delete(handler);
+  }
+
+  onPeerJoined(handler: PeerHandler): () => void {
+    this.handlers.peerJoined.add(handler);
+    return () => this.handlers.peerJoined.delete(handler);
+  }
+
+  onPeerLeft(handler: PeerHandler): () => void {
+    this.handlers.peerLeft.add(handler);
+    return () => this.handlers.peerLeft.delete(handler);
+  }
+
+  onMessage(handler: MessageHandler): () => void {
+    this.handlers.message.add(handler);
+    return () => this.handlers.message.delete(handler);
+  }
+
+  onConnected(handler: VoidHandler): () => void {
+    this.handlers.connected.add(handler);
+    return () => this.handlers.connected.delete(handler);
+  }
+
+  onDisconnected(handler: VoidHandler): () => void {
+    this.handlers.disconnected.add(handler);
+    return () => this.handlers.disconnected.delete(handler);
+  }
+
+  onReconnected(handler: VoidHandler): () => void {
+    this.handlers.reconnected.add(handler);
+    return () => this.handlers.reconnected.delete(handler);
+  }
+
+  /**
+   * Internal event emission methods
+   */
+  
+  private emitChat(message: ChatMessage, from: string): void {
+    this.handlers.chat.forEach(handler => handler(message, from));
+  }
+
+  private emitError(error: Error): void {
+    this.handlers.error.forEach(handler => handler(error));
+  }
+
+  private emitWelcome(data: SystemWelcomePayload): void {
+    this.handlers.welcome.forEach(handler => handler(data));
+  }
+
+  private emitPeerJoined(peer: Peer): void {
+    this.handlers.peerJoined.forEach(handler => handler(peer));
+  }
+
+  private emitPeerLeft(peer: Peer): void {
+    this.handlers.peerLeft.forEach(handler => handler(peer));
+  }
+
+  private emitMessage(envelope: Envelope): void {
+    this.handlers.message.forEach(handler => handler(envelope));
+  }
+
+  private emitConnected(): void {
+    this.handlers.connected.forEach(handler => handler());
+  }
+
+  private emitDisconnected(): void {
+    this.handlers.disconnected.forEach(handler => handler());
+  }
+
+  private emitReconnected(): void {
+    this.handlers.reconnected.forEach(handler => handler());
   }
 
   /**
@@ -84,7 +249,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
       this.ws.on('open', () => {
         clearTimeout(connectionTimeout);
         this.setupHeartbeat();
-        this.emit('connected');
+        this.emitConnected();
       });
 
       this.ws.on('message', (data: WebSocket.Data) => {
@@ -100,20 +265,20 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
             }
           }
         } catch (error) {
-          this.emit('error', error as Error);
+          this.emitError(error as Error);
         }
       });
 
       this.ws.on('error', (error: Error) => {
         clearTimeout(connectionTimeout);
-        this.emit('error', error);
+        this.emitError(error);
         reject(error);
       });
 
       this.ws.on('close', () => {
         clearTimeout(connectionTimeout);
         this.cleanup();
-        this.emit('disconnected');
+        this.emitDisconnected();
         
         if (this.options.reconnect) {
           this.scheduleReconnect();
@@ -165,7 +330,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
       }
     }
     
-    this.emit('reconnected');
+    this.emitReconnected();
   }
 
   private scheduleReconnect(): void {
@@ -238,13 +403,13 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
   private handleEnvelope(envelope: Envelope): void {
     // Validate envelope
     if (envelope.protocol !== PROTOCOL_VERSION) {
-      this.emit('error', new Error(`Invalid protocol version: ${envelope.protocol}`));
+      this.emitError(new Error(`Invalid protocol version: ${envelope.protocol}`));
       return;
     }
 
     // Special case: always process system messages (includes welcome)
     if (envelope.kind === 'system') {
-      this.emit('message', envelope);
+      this.emitMessage(envelope);
       this.handleSystemMessage(envelope);
       return;
     }
@@ -255,7 +420,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
       return;
     }
 
-    this.emit('message', envelope);
+    this.emitMessage(envelope);
 
     switch (envelope.kind) {
       case 'presence':
@@ -281,9 +446,9 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
         this.peers.set(participant.id, participant);
       }
       
-      this.emit('welcome', welcome);
+      this.emitWelcome(welcome);
     } else if (payload.type === 'error') {
-      this.emit('error', new Error(payload.message));
+      this.emitError(new Error(payload.message));
     }
   }
 
@@ -293,12 +458,12 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
     switch (payload.event) {
       case 'join':
         this.peers.set(payload.participant.id, payload.participant);
-        this.emit('peer-joined', payload.participant);
+        this.emitPeerJoined(payload.participant);
         break;
       
       case 'leave':
         this.peers.delete(payload.participant.id);
-        this.emit('peer-left', payload.participant);
+        this.emitPeerLeft(payload.participant);
         break;
       
       case 'heartbeat':
@@ -322,7 +487,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
     if ('method' in message && !('id' in message)) {
       const notification = message as JsonRpcNotification;
       if (notification.method === 'notifications/chat/message') {
-        this.emit('chat', message as ChatMessage, envelope.from);
+        this.emitChat(message as ChatMessage, envelope.from);
         return;
       }
     }
@@ -444,7 +609,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
     };
 
     this.send(envelope).catch((error) => {
-      this.emit('error', error);
+      this.emitError(error);
     });
   }
 
@@ -458,7 +623,7 @@ export class MCPxClient extends EventEmitter<ClientEventMap> {
     };
 
     this.send(envelope).catch((error) => {
-      this.emit('error', error);
+      this.emitError(error);
     });
   }
 
