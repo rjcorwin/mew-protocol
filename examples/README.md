@@ -351,6 +351,111 @@ Tool result: {
 [calculator-agent] 📊 Calculation for coordinator-agent: √256 = 16
 ```
 
+## Bridging Existing MCP Servers
+
+The MCPx Bridge allows you to connect any existing MCP server to an MCPx topic, making its tools available to all participants. This is the easiest way to integrate existing MCP servers into the MCPx ecosystem.
+
+### Quick Start with Common MCP Servers
+
+#### 1. Filesystem MCP Server
+
+Connect the popular `@modelcontextprotocol/server-filesystem` to MCPx:
+
+```bash
+# Install the MCP server globally (one-time setup)
+npm install -g @modelcontextprotocol/server-filesystem
+
+# Run the bridge with the filesystem server
+cd packages/bridge
+npm run build
+npx mcpx-bridge run npx @modelcontextprotocol/server-filesystem /path/to/directory
+
+# Or with custom parameters
+npx mcpx-bridge run npx @modelcontextprotocol/server-filesystem /Users/you/Documents \
+  --server ws://localhost:3000 \
+  --topic my-workspace \
+  --name "Filesystem Server"
+```
+
+Now all participants can read/write files through the bridge!
+
+#### 2. GitHub MCP Server
+
+```bash
+# Install the GitHub MCP server
+npm install -g @modelcontextprotocol/server-github
+
+# Run with your GitHub token
+GITHUB_TOKEN=your_token_here npx mcpx-bridge run npx @modelcontextprotocol/server-github
+```
+
+#### 3. Weather MCP Server (Example)
+
+```bash
+# If you have a weather MCP server
+npx mcpx-bridge run python weather_server.py \
+  --topic weather-room \
+  --name "Weather Service"
+```
+
+#### 4. Custom Python MCP Server
+
+```bash
+# For any Python-based MCP server
+npx mcpx-bridge run python /path/to/your/mcp_server.py \
+  --id my-service \
+  --name "My Custom Service" \
+  --verbose
+```
+
+### Bridge CLI Options
+
+The `run` command supports these options:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-s, --server <url>` | MCPx server URL | `ws://localhost:3000` |
+| `-t, --topic <name>` | Topic to join | `test-room` |
+| `-i, --id <id>` | Participant ID | Auto-generated from command |
+| `-n, --name <name>` | Display name | Auto-generated from command |
+| `-v, --verbose` | Enable verbose logging | Off |
+
+### Testing Bridged MCP Servers
+
+Once your MCP server is bridged:
+
+1. **Connect with the CLI** in another terminal:
+   ```bash
+   npm run cli:test
+   ```
+
+2. **List available tools**:
+   ```
+   /list
+   /tools filesystem-bridge
+   ```
+
+3. **Call MCP server tools**:
+   ```
+   /call filesystem-bridge read_file {"path": "README.md"}
+   /call filesystem-bridge list_directory {"path": "."}
+   ```
+
+### Advanced Bridge Configuration
+
+For more control, create a configuration file:
+
+```bash
+# Interactive setup
+cd packages/bridge
+npx mcpx-bridge setup
+
+# Start with config
+npx mcpx-bridge start --config bridge-config.json
+```
+
+See the [Bridge Documentation](../packages/bridge/README.md) for detailed configuration options.
+
 ## Available NPM Scripts
 
 All these commands run from the root `mcpx-protocol` directory:

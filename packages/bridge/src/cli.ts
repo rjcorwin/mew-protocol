@@ -167,6 +167,110 @@ program
     }
   });
 
+// Run command - quick start with MCP server command
+program
+  .command('run <mcp-command...>')
+  .description('Run bridge with an MCP server command directly')
+  .option('-s, --server <url>', 'MCPx server URL', 'ws://localhost:3000')
+  .option('-t, --topic <name>', 'Topic to join', 'test-room')
+  .option('-i, --id <id>', 'Participant ID (defaults to MCP command name)')
+  .option('-n, --name <name>', 'Display name (defaults to MCP command name)')
+  .option('-v, --verbose', 'Enable verbose logging')
+  .action(async (mcpCommand, options) => {
+    const command = mcpCommand[0];
+    const args = mcpCommand.slice(1);
+    
+    // Extract command name for defaults
+    const commandName = command.split('/').pop()?.split('.')[0] || 'mcp-server';
+    const participantId = options.id || `${commandName}-bridge`;
+    const displayName = options.name || `${commandName} Bridge`;
+    
+    console.log(chalk.blue('MCPx Bridge - Quick Start'));
+    console.log(chalk.gray(`MCP Server: ${command} ${args.join(' ')}`));
+    console.log(chalk.gray(`MCPx Server: ${options.server}`));
+    console.log(chalk.gray(`Topic: ${options.topic}`));
+    console.log(chalk.gray(`Participant: ${displayName} (${participantId})\n`));
+    
+    try {
+      // Generate authentication token
+      const tokenSpinner = ora('Generating authentication token...').start();
+      const token = await generateAuthToken(
+        options.server,
+        participantId,
+        options.topic
+      );
+      tokenSpinner.succeed('Authentication token generated');
+      
+      // Create runtime configuration
+      const config: BridgeConfig = {
+        mcpx: {
+          server: options.server,
+          topic: options.topic,
+          token
+        },
+        participant: {
+          id: participantId,
+          name: displayName,
+          kind: 'agent'
+        },
+        mcp_server: {
+          type: 'stdio',
+          command,
+          args
+        },
+        options: {
+          reconnectAttempts: 5,
+          reconnectDelay: 1000,
+          heartbeatInterval: 30000,
+          logLevel: options.verbose ? 'debug' : 'info'
+        }
+      };
+      
+      // Start the bridge
+      const bridge = new BridgeService(config);
+      
+      // Set up event handlers
+      bridge.on('started', () => {
+        console.log(chalk.green('✓ Bridge started successfully'));
+        console.log(chalk.yellow('\nPress Ctrl+C to stop the bridge\n'));
+      });
+      
+      bridge.on('error', (error) => {
+        console.error(chalk.red('Bridge error:'), error.message);
+      });
+      
+      if (options.verbose) {
+        bridge.on('mcpxMessage', (envelope) => {
+          console.log(chalk.gray(`MCPx: ${envelope.from} -> ${envelope.kind}`));
+        });
+        
+        bridge.on('mcpMessage', (method, params) => {
+          console.log(chalk.gray(`MCP: ${method}`));
+        });
+      }
+      
+      // Graceful shutdown
+      process.on('SIGINT', async () => {
+        console.log(chalk.yellow('\nShutting down...'));
+        await bridge.stop();
+        process.exit(0);
+      });
+      
+      process.on('SIGTERM', async () => {
+        console.log(chalk.yellow('\nShutting down...'));
+        await bridge.stop();
+        process.exit(0);
+      });
+      
+      // Start the bridge
+      await bridge.start();
+      
+    } catch (error) {
+      console.error(chalk.red('Failed to start bridge:'), (error as Error).message);
+      process.exit(1);
+    }
+  });
+
 async function interactiveSetup(configManager: ConfigManager): Promise<BridgeConfig> {
   const defaultConfig = createDefaultConfig();
   

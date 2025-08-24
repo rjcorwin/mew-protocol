@@ -17,7 +17,7 @@ The MCPx Bridge connects existing MCP servers to MCPx topics, allowing them to p
 
 - Node.js 18+ 
 - Running MCPx server (see parent directory)
-- An MCP server to connect (e.g., `mcp-server-filesystem`)
+- An MCP server to connect (e.g., `@modelcontextprotocol/server-filesystem`)
 
 ### Installation
 
@@ -27,7 +27,33 @@ npm install
 npm run build
 ```
 
-### Interactive Setup
+### Option 1: Quick Run (Recommended)
+
+The fastest way to bridge an MCP server is using the `run` command:
+
+```bash
+# Bridge any MCP server with a single command
+npx mcpx-bridge run <mcp-command> [args...]
+
+# Examples:
+
+# Bridge the filesystem MCP server
+npx mcpx-bridge run npx @modelcontextprotocol/server-filesystem /path/to/directory
+
+# Bridge a Python MCP server
+npx mcpx-bridge run python weather_server.py
+
+# With custom options
+npx mcpx-bridge run npx @modelcontextprotocol/server-filesystem ~/Documents \
+  --server ws://localhost:3000 \
+  --topic my-workspace \
+  --name "My Files" \
+  --verbose
+```
+
+### Option 2: Interactive Setup
+
+For persistent configuration, use the interactive setup:
 
 ```bash
 npm run cli setup
@@ -40,10 +66,10 @@ Example configuration for filesystem MCP server:
 - **Display name**: `MCP Bridge`
 - **Participant type**: `robot`
 - **MCP transport**: `stdio`
-- **Command**: `mcp-server-filesystem`
-- **Arguments**: `/absolute/path/to/directory` (use absolute paths!)
+- **Command**: `npx`
+- **Arguments**: `@modelcontextprotocol/server-filesystem /absolute/path/to/directory`
 
-### Start Bridging
+Then start the bridge:
 
 ```bash
 npm run cli start
@@ -117,10 +143,19 @@ The bridge uses a JSON configuration file (default: `bridge-config.json`):
 ### CLI Commands
 
 ```bash
+# Quick run with MCP server command
+mcpx-bridge run <mcp-command> [args...] [options]
+  Options:
+    -s, --server <url>    MCPx server URL (default: ws://localhost:3000)
+    -t, --topic <name>    Topic to join (default: test-room)
+    -i, --id <id>         Participant ID (auto-generated if not provided)
+    -n, --name <name>     Display name (auto-generated if not provided)
+    -v, --verbose         Enable verbose logging
+
 # Interactive setup
 mcpx-bridge setup [--file <config-path>]
 
-# Start bridge service
+# Start bridge service with config file
 mcpx-bridge start [--config <config-path>] [--verbose]
 
 # Validate configuration
