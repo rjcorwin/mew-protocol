@@ -134,7 +134,7 @@ describe('MCPx Server Basic Workflows', () => {
             const message = JSON.parse(data.toString());
             console.log('Received message:', message.kind, message.payload?.event);
             
-            if (message.kind === 'system' && message.payload?.event === 'welcome') {
+            if (message.kind === 'system' && message.payload?.type === 'welcome') {
               welcomeReceived = true;
               clearTimeout(timeout);
               ws.close();
@@ -196,7 +196,7 @@ describe('MCPx Server Basic Workflows', () => {
           const message = JSON.parse(data.toString());
           console.log('WS1 received:', message.kind, message.payload?.event);
           
-          if (message.kind === 'system' && message.payload?.event === 'welcome') {
+          if (message.kind === 'system' && message.payload?.type === 'welcome') {
             user1Ready = true;
             
             // Connect second user after first is ready
@@ -208,7 +208,7 @@ describe('MCPx Server Basic Workflows', () => {
               const message = JSON.parse(data.toString());
               console.log('WS2 received:', message.kind, message.payload?.event);
               
-              if (message.kind === 'system' && message.payload?.event === 'welcome') {
+              if (message.kind === 'system' && message.payload?.type === 'welcome') {
                 user2Ready = true;
                 checkComplete(resolve, timeout);
               }
@@ -266,7 +266,7 @@ describe('MCPx Server Basic Workflows', () => {
         new Promise<void>((resolve) => {
           receiverWs.on('message', (data) => {
             const msg = JSON.parse(data.toString());
-            if (msg.kind === 'system' && msg.payload?.event === 'welcome') {
+            if (msg.kind === 'system' && msg.payload?.type === 'welcome') {
               resolve();
             }
           });
@@ -329,7 +329,7 @@ describe('MCPx Server Basic Workflows', () => {
         const timeout = setTimeout(() => reject(new Error('Connection timeout')), 3000);
         ws.on('message', (data) => {
           const msg = JSON.parse(data.toString());
-          if (msg.kind === 'system' && msg.payload?.event === 'welcome') {
+          if (msg.kind === 'system' && msg.payload?.type === 'welcome') {
             clearTimeout(timeout);
             resolve();
           }

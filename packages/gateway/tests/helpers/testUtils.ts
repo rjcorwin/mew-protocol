@@ -97,6 +97,37 @@ export function waitForWebSocketMessage(ws: WebSocket): Promise<any> {
   });
 }
 
+// Helper to wait for welcome message specifically
+export function waitForWelcomeMessage(ws: WebSocket): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Welcome message timeout'));
+    }, 5000);
+
+    const messageHandler = (data: any) => {
+      try {
+        const message = JSON.parse(data.toString());
+        if (message.kind === 'system' && message.payload?.type === 'welcome') {
+          clearTimeout(timeout);
+          ws.off('message', messageHandler);
+          resolve(message);
+        }
+        // Keep listening if not welcome message
+      } catch (error) {
+        // Ignore parse errors and keep listening
+      }
+    };
+
+    ws.on('message', messageHandler);
+
+    ws.once('error', (error) => {
+      clearTimeout(timeout);
+      ws.off('message', messageHandler);
+      reject(error);
+    });
+  });
+}
+
 // Helper to create auth token for testing
 export function createTestAuthToken(
   participantId: string = 'test-user',

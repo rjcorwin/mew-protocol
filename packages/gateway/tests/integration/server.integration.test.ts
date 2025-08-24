@@ -10,7 +10,7 @@ import { TopicService } from '../../src/services/TopicService';
 import { AuthService } from '../../src/services/AuthService';
 import { createApiRoutes } from '../../src/routes/api';
 import { setupWebSocketRoutes } from '../../src/routes/websocket';
-import { testConfig, findAvailablePort, waitForWebSocketOpen, waitForWebSocketMessage } from '../helpers/testUtils';
+import { testConfig, findAvailablePort, waitForWebSocketOpen, waitForWebSocketMessage, waitForWelcomeMessage } from '../helpers/testUtils';
 
 describe('MCPx Server Integration Tests', () => {
   let server: any;
@@ -199,9 +199,9 @@ describe('MCPx Server Integration Tests', () => {
       await waitForWebSocketOpen(ws);
 
       // Should receive welcome message
-      const welcomeMessage = await waitForWebSocketMessage(ws);
+      const welcomeMessage = await waitForWelcomeMessage(ws);
       expect(welcomeMessage.kind).toBe('system');
-      expect(welcomeMessage.payload.event).toBe('welcome');
+      expect(welcomeMessage.payload.type).toBe('welcome');
 
       ws.close();
     });
@@ -258,8 +258,8 @@ describe('MCPx Server Integration Tests', () => {
       });
 
       await waitForWebSocketOpen(ws1);
-      const welcome1 = await waitForWebSocketMessage(ws1);
-      expect(welcome1.payload.event).toBe('welcome');
+      const welcome1 = await waitForWelcomeMessage(ws1);
+      expect(welcome1.payload.type).toBe('welcome');
 
       // Connect second participant
       const ws2 = new WebSocket(wsUrl, {
@@ -275,8 +275,8 @@ describe('MCPx Server Integration Tests', () => {
       expect(joinMessage.payload.participant.id).toBe('user2');
 
       // Second participant should see welcome
-      const welcome2 = await waitForWebSocketMessage(ws2);
-      expect(welcome2.payload.event).toBe('welcome');
+      const welcome2 = await waitForWelcomeMessage(ws2);
+      expect(welcome2.payload.type).toBe('welcome');
       expect(welcome2.payload.participants).toHaveLength(1);
       expect(welcome2.payload.participants[0].id).toBe('user1');
 

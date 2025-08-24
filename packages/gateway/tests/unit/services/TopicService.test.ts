@@ -94,15 +94,25 @@ describe('TopicService', () => {
       }).toThrow('Topic test-topic is full');
     });
 
-    it('should reject duplicate participant', () => {
+    it('should disconnect old connection when duplicate participant joins', () => {
       const topicName = 'test-topic';
       const participant = createTestParticipant('user1');
       
-      topicService.joinTopic(topicName, participant, mockWebSocket);
+      const mockWs1 = { ...mockWebSocket, close: vi.fn() } as any as WebSocket;
+      const mockWs2 = { ...mockWebSocket, close: vi.fn() } as any as WebSocket;
       
-      expect(() => {
-        topicService.joinTopic(topicName, participant, mockWebSocket);
-      }).toThrow('Participant user1 already in topic test-topic');
+      // First connection
+      topicService.joinTopic(topicName, participant, mockWs1);
+      
+      // Second connection with same participant
+      topicService.joinTopic(topicName, participant, mockWs2);
+      
+      // Old connection should be closed
+      expect(mockWs1.close).toHaveBeenCalledWith(1000, 'Duplicate connection - disconnecting old session');
+      
+      // New connection should be active
+      const topic = topicService.getTopic(topicName);
+      expect(topic!.participants.get('user1')!.ws).toBe(mockWs2);
     });
   });
 
