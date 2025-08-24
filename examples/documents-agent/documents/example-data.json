@@ -1,0 +1,29 @@
+{
+  "name": "Example Dataset",
+  "description": "Sample data accessible through MCPx",
+  "data": [
+    {
+      "id": 1,
+      "name": "Alice",
+      "role": "Developer",
+      "score": 95
+    },
+    {
+      "id": 2,
+      "name": "Bob",
+      "role": "Designer",
+      "score": 87
+    },
+    {
+      "id": 3,
+      "name": "Charlie",
+      "role": "Manager",
+      "score": 92
+    }
+  ],
+  "metadata": {
+    "created": "2024-01-01",
+    "version": "1.0",
+    "source": "MCPx Documents Agent"
+  }
+}

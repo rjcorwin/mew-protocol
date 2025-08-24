@@ -1,0 +1,23 @@
+{
+  "name": "documents-agent",
+  "version": "1.0.0",
+  "description": "MCPx Documents Agent - Exposes a documents folder via filesystem MCP server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node start.js",
+    "setup": "cd ../../packages/bridge && npx mcpx-bridge setup --file ../../examples/documents-agent/bridge-config.json",
+    "bridge": "cd ../../packages/bridge && npx mcpx-bridge start --config ../../examples/documents-agent/bridge-config.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "^0.8.0"
+  },
+  "keywords": [
+    "mcpx",
+    "mcp",
+    "filesystem",
+    "documents",
+    "bridge"
+  ],
+  "author": "",
+  "license": "MIT"
+}

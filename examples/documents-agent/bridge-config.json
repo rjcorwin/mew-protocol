@@ -1,0 +1,26 @@
+{
+  "mcpx": {
+    "server": "ws://localhost:3000",
+    "topic": "test-room",
+    "token": "will-be-generated-on-start"
+  },
+  "participant": {
+    "id": "documents-agent",
+    "name": "Documents Agent",
+    "kind": "agent"
+  },
+  "mcp_server": {
+    "type": "stdio",
+    "command": "npx",
+    "args": [
+      "@modelcontextprotocol/server-filesystem",
+      "/Users/rj/Git/rjcorwin/mcpx-monorepo/mcpx-protocol/examples/documents-agent/documents"
+    ]
+  },
+  "options": {
+    "reconnectAttempts": 5,
+    "reconnectDelay": 1000,
+    "heartbeatInterval": 30000,
+    "logLevel": "info"
+  }
+}

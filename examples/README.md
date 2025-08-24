@@ -62,7 +62,10 @@ npm run example:calculator
 # Terminal 4: Coordinator Agent
 npm run example:coordinator
 
-# Terminal 5: OpenAI Agent (optional, requires API key)
+# Terminal 5: Documents Agent (filesystem bridge)
+npm run example:documents
+
+# Terminal 6: OpenAI Agent (optional, requires API key)
 npm run example:openai
 ```
 
@@ -179,7 +182,61 @@ This demonstrates:
 - Coordinated task completion
 - Agent-to-agent MCP communication
 
-### 4. OpenAI Agent Tests (Optional - Requires API Key)
+### 4. Documents Agent Tests (Filesystem Bridge)
+
+The documents agent exposes a filesystem folder through the MCP filesystem server, allowing all participants to access shared documents.
+
+#### List Available Tools
+
+```
+/tools documents-agent
+```
+
+Expected tools include:
+- `read_file` - Read file contents
+- `write_file` - Write to a file
+- `list_directory` - List folder contents
+- `search_files` - Search for files
+
+#### Read Sample Documents
+
+```
+/call documents-agent read_file {"path": "the-answer.txt"}
+```
+Expected: "42"
+
+```
+/call documents-agent read_file {"path": "example-data.json"}
+```
+Expected: JSON data with sample records
+
+#### List Directory
+
+```
+/call documents-agent list_directory {"path": "."}
+```
+
+Shows all files in the documents folder.
+
+#### Create New Files
+
+```
+/call documents-agent write_file {"path": "test.txt", "content": "Hello from MCPx!"}
+```
+
+#### Search Files
+
+```
+/call documents-agent search_files {"query": "answer", "path": "."}
+```
+
+This demonstrates:
+- Bridging existing MCP servers to MCPx
+- File system access for all participants
+- Shared document workspace
+- Integration with standard MCP tools
+
+### 5. OpenAI Agent Tests (Optional - Requires API Key)
 
 The OpenAI agent provides intelligent, context-aware responses using GPT models.
 
@@ -248,6 +305,7 @@ When you run `/list`, you'll see:
   echo-bot (agent) [MCP]
   calculator-agent (agent) [MCP]
   coordinator-agent (agent) [MCP]
+  documents-agent (agent) [MCP]
   openai-agent (agent) [MCP]
   your-name (user) [none]
 ```
@@ -466,6 +524,7 @@ All these commands run from the root `mcpx-protocol` directory:
 | `npm run example:echo` | Start the echo bot example |
 | `npm run example:calculator` | Start the calculator agent |
 | `npm run example:coordinator` | Start the coordinator agent |
+| `npm run example:documents` | Start the documents agent (filesystem bridge) |
 | `npm run example:all` | Start all example agents |
 | `npm run cli` | Start the readline CLI |
 | `npm run cli:blessed` | Start the blessed TUI CLI |
