@@ -48,5 +48,18 @@
     "multi-agent"
   ],
   "author": "MCPx Working Group",
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mcpx-protocol.git",
+    "directory": "packages/bridge"
+  },
+  "homepage": "https://github.com/rjcorwin/mcpx-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mcpx-protocol/issues"
+  }
 }

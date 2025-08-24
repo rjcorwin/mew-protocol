@@ -1,0 +1,24 @@
+# Source files
+src/
+tsconfig.json
+jest.config.js
+
+# Test files
+*.test.ts
+*.spec.ts
+__tests__/
+coverage/
+
+# Development files
+.env
+.env.local
+*.log
+node_modules/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store

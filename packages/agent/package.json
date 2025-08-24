@@ -31,7 +31,7 @@
   "author": "MCPx Working Group",
   "license": "MIT",
   "dependencies": {
-    "@mcpx-protocol/client": "file:../client"
+    "@mcpx-protocol/client": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -45,6 +45,15 @@
     "dist",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mcpx-protocol.git",
+    "directory": "packages/agent"
+  },
+  "homepage": "https://github.com/rjcorwin/mcpx-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mcpx-protocol/issues"
+  },
   "engines": {
     "node": ">=18.0.0"
   }

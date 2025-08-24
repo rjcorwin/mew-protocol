@@ -7,10 +7,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "test": "vitest",
-    "test:run": "vitest run",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:clean": "./test-runner.sh",
-    "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.config.ts",
     "lint": "eslint src/**/*.ts",
@@ -45,5 +44,18 @@
   },
   "keywords": ["mcp", "mcpx", "websocket", "real-time", "multi-agent"],
   "author": "MCPx Working Group",
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mcpx-protocol.git",
+    "directory": "packages/gateway"
+  },
+  "homepage": "https://github.com/rjcorwin/mcpx-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mcpx-protocol/issues"
+  }
 }
