@@ -27,6 +27,15 @@ Before we dive in, here's what you need to know: MCPx uses **envelopes** to wrap
 
 We'll inspect these envelopes as we go to understand the protocol!
 
+### 🔍 CLI Inspection Tools
+
+The CLI has built-in commands to see the actual protocol messages:
+- **`/debug`** - Toggle debug mode to see raw envelopes in real-time
+- **`/detail`** or **`/d`** - Show full JSON of the last message (or `/d <n>` for message #n)
+- **`/console`** - Toggle split view with protocol console
+
+Try these as you follow the tutorial to see what's really happening!
+
 ## Prerequisites
 
 Before we begin, ensure you have:
@@ -99,6 +108,8 @@ You should see:
 ```
 
 🎉 **Success!** You've just witnessed your first agent interaction. The echo bot received your message and responded.
+
+**💡 Try this:** Type `/debug` to enable debug mode, then send another message. You'll see the actual envelopes! Type `/debug` again to turn it off.
 
 ### What Just Happened?
 
@@ -219,6 +230,8 @@ Result:
   ]
 }
 ```
+
+**💡 Pro tip:** Turn on `/debug` before calling tools to see the MCP envelopes with their JSON-RPC payloads! You can also use `/m` to review the message history.
 
 Try a few more:
 ```
@@ -683,6 +696,7 @@ MCPx provides the foundation for building sophisticated multi-agent systems wher
 
 ## Commands Reference
 
+### Basic Commands
 | Command | Description |
 |---------|-------------|
 | `/help` | Show available commands |
@@ -691,6 +705,15 @@ MCPx provides the foundation for building sophisticated multi-agent systems wher
 | `/call <agent> <tool> <json>` | Call a specific tool |
 | `/clear` | Clear the message log |
 | `/quit` | Exit the CLI |
+
+### Inspection Commands
+| Command | Description |
+|---------|-------------|
+| `/debug` | Toggle debug mode (see raw envelopes) |
+| `/detail` or `/d [n]` | Show full JSON of last message or message #n |
+| `/console` | Toggle protocol console split view |
+
+Use these inspection commands to understand the protocol as you learn!
 
 ## Quick Start Commands
 

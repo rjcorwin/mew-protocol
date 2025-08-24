@@ -17,6 +17,7 @@ class BlessedCLI {
   private participantId: string;
   private token: string = '';
   private showConsole = false;
+  private debugMode = false;
   private pendingRequests: Map<string, { method: string; to: string; timestamp: Date }> = new Map();
   private consoleMessages: Array<{ timestamp: string; summary: string; fullEnvelope: any }> = [];
 
@@ -251,6 +252,42 @@ class BlessedCLI {
       // Log all protocol messages to console
       this.logToConsole(envelope);
       
+      // In debug mode, show all envelopes in main view
+      if (this.debugMode) {
+        // Add header with visual separator
+        this.addMessage('System', '', 'info');
+        this.addMessage('System', `=== DEBUG: ${envelope.kind} envelope from ${envelope.from}${envelope.to ? ` to ${envelope.to.join(',')}` : ' (broadcast)'} ===`, 'info');
+        
+        // Format the JSON with proper indentation
+        const formatted = this.formatJsonForDisplay(envelope);
+        
+        // Add the formatted JSON with tree-like hierarchy markers
+        const lines = formatted.split('\n');
+        lines.forEach((line) => {
+          // Count leading spaces to determine indent level
+          const indent = line.match(/^(\s*)/)?.[1] || '';
+          const indentLevel = Math.floor(indent.length / 2);
+          
+          // Create tree-like prefix
+          let prefix = '';
+          if (indentLevel > 0) {
+            // Build the tree structure
+            for (let i = 0; i < indentLevel - 1; i++) {
+              prefix += '| ';
+            }
+            prefix += '|-';
+          }
+          
+          const content = line.trim();
+          if (content) {
+            this.addMessage('System', prefix + content, 'info');
+          }
+        });
+        
+        // Add footer
+        this.addMessage('System', '------', 'info');
+      }
+      
       // Display MCP messages (non-chat) in main view
       if (envelope.kind === 'mcp' && envelope.payload.method !== 'notifications/chat/message') {
         this.displayEnvelope(envelope);
@@ -332,6 +369,14 @@ class BlessedCLI {
       case 'console':
         this.toggleConsole();
         break;
+      
+      case 'debug':
+        this.debugMode = !this.debugMode;
+        this.addMessage('System', `Debug mode ${this.debugMode ? 'enabled' : 'disabled'}`, 'info');
+        if (this.debugMode) {
+          this.addMessage('System', 'You will now see raw protocol envelopes in the main view', 'info');
+        }
+        break;
 
       case 'detail':
       case 'd':
@@ -377,6 +422,7 @@ Commands:
   /tools <id>        - List tools from participant
   /call <id> <tool>  - Call a tool
   /clear             - Clear messages
+  /debug             - Toggle debug mode (show raw envelopes)
   /console           - Toggle protocol console
   /detail or /d [n]  - Show detail view (last msg or msg #n)
   /quit              - Exit
@@ -481,7 +527,7 @@ Examples:
     this.addMessage(envelope.from, description, 'mcp');
   }
 
-  private addMessage(from: string, text: string, type: 'chat' | 'error' | 'success' | 'info' | 'mcp' | 'join' | 'leave') {
+  private addMessage(from: string, text: string, type: 'chat' | 'error' | 'success' | 'info' | 'mcp' | 'join' | 'leave' | 'debug') {
     const timestamp = new Date().toLocaleTimeString();
     
     // Strip any control characters from the text
@@ -523,6 +569,10 @@ Examples:
         break;
       case 'leave':
         messageText = `\n<-- ${cleanText}`;
+        break;
+      case 'debug':
+        // Debug messages - show in gray/subdued
+        messageText = `\n${timestamp} [DEBUG] ${cleanText}`;
         break;
       default:
         messageText = `\n${timestamp} [${cleanFrom}] ${cleanText}`;

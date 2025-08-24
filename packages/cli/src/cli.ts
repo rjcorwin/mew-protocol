@@ -34,6 +34,7 @@ class MCPxChatClient {
   private peers: Map<string, Peer> = new Map();
   private currentConfig: ConnectionConfig | null = null;
   private isPrompting = false;
+  private debugMode = false;
 
   constructor() {
     this.rl = readline.createInterface({
@@ -137,6 +138,11 @@ class MCPxChatClient {
         await this.loadConfig(parts[1]);
         break;
 
+      case '/debug':
+        this.debugMode = !this.debugMode;
+        console.log(chalk.yellow(`Debug mode ${this.debugMode ? 'enabled' : 'disabled'}${this.debugMode ? ' - showing raw protocol envelopes' : ''}`));
+        break;
+        
       case '/quit':
       case '/exit':
         this.rl.close();
@@ -161,6 +167,7 @@ class MCPxChatClient {
     console.log('  /call <peer> <tool> <args> - Call a peer\'s tool');
     console.log('  /history           - Show message history');
     console.log('  /status            - Show connection status');
+    console.log('  /debug             - Toggle debug mode (show raw envelopes)');
     console.log('  /save <name>       - Save current connection config');
     console.log('  /load <name>       - Load a saved connection');
     console.log('  /quit              - Exit the client');
@@ -373,6 +380,13 @@ class MCPxChatClient {
     });
 
     this.client.on('message', (envelope) => {
+      // Show debug output if enabled
+      if (this.debugMode) {
+        console.log(chalk.gray('--- Debug: Raw Envelope ---'));
+        console.log(chalk.gray(JSON.stringify(envelope, null, 2)));
+        console.log(chalk.gray('--------------------------'));
+      }
+      
       // Handle non-chat MCP messages
       if (envelope.kind === 'mcp' && envelope.payload.method !== 'notifications/chat/message') {
         this.displayEnvelope(envelope);
