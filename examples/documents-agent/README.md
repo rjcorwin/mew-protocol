@@ -14,7 +14,8 @@ This agent uses the MCPx Bridge to connect `@modelcontextprotocol/server-filesys
 
 - `documents/` - The folder containing documents exposed by this agent
   - `the-answer.txt` - A sample file containing "42"
-- `bridge-config.json` - Configuration for the MCPx bridge
+- `bridge-config.example.json` - Example configuration for the MCPx bridge
+- `bridge-config.json` - Runtime configuration (auto-generated, git-ignored)
 - `start.js` - Script to start the bridge with authentication
 
 ## Quick Start

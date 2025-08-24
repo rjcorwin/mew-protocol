@@ -2,7 +2,7 @@
   "mcpx": {
     "server": "ws://localhost:3000",
     "topic": "test-room",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0aWNpcGFudElkIjoiZG9jdW1lbnRzLWFnZW50IiwidG9waWMiOiJ0ZXN0LXJvb20iLCJpYXQiOjE3NTYwMjM3OTksImV4cCI6MTc4NzU4MTM5OX0.tX3zqtkJrofrdlVM6svLfCoPPrPhh4fx2SWUsYHohHk"
+    "token": "will-be-generated-at-runtime"
   },
   "participant": {
     "id": "documents-agent",

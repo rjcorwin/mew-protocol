@@ -5,10 +5,21 @@ const fs = require('fs');
 const path = require('path');
 
 const CONFIG_FILE = path.join(__dirname, 'bridge-config.json');
+const CONFIG_EXAMPLE_FILE = path.join(__dirname, 'bridge-config.example.json');
 const BRIDGE_PATH = path.join(__dirname, '../../packages/bridge');
 
 async function generateToken() {
   console.log('Generating authentication token...');
+  
+  // If config doesn't exist, create from example
+  if (!fs.existsSync(CONFIG_FILE)) {
+    if (!fs.existsSync(CONFIG_EXAMPLE_FILE)) {
+      console.error('bridge-config.example.json not found!');
+      process.exit(1);
+    }
+    console.log('Creating bridge-config.json from example...');
+    fs.copyFileSync(CONFIG_EXAMPLE_FILE, CONFIG_FILE);
+  }
   
   const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
   

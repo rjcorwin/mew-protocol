@@ -70,3 +70,6 @@ packages/web-client/.vite/
 # Monorepo
 lerna-debug.log
 .changelog/
+
+# Runtime configuration files with tokens
+examples/documents-agent/bridge-config.json
