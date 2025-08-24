@@ -11,13 +11,17 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build:client && npm run build:agent && npm run build:bridge && npm run build:cli && npm run build:gateway",
+    "build:all-parallel": "npm run build --workspaces",
     "test": "npm run test --workspaces",
     "dev:gateway": "npm run dev -w @mcpx-protocol/gateway",
     "dev:web": "npm run dev -w @mcpx-protocol/web-client",
     "dev:bridge": "npm run dev -w @mcpx-protocol/bridge",
     "build:client": "npm run build -w @mcpx-protocol/client",
     "build:agent": "npm run build -w @mcpx-protocol/agent",
+    "build:bridge": "npm run build -w @mcpx-protocol/bridge",
+    "build:cli": "npm run build -w @mcpx-protocol/cli",
+    "build:gateway": "npm run build -w @mcpx-protocol/gateway",
     "test:client": "npm run test -w @mcpx-protocol/client",
     "test:agent": "npm run test -w @mcpx-protocol/agent",
     "clean": "npm run clean --workspaces --if-present",
