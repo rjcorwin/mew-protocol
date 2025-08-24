@@ -105,7 +105,8 @@ class CLIFifoBridge {
     });
     
     console.log('CLI FIFO Bridge started successfully');
-    console.log('Send commands with: echo "command" > ' + this.inputFifo);
+    console.log('Send commands with: ./fifo-send.sh "command"');
+    console.log('Or directly: echo "command" > ' + this.inputFifo);
     
     // Keep the bridge running
     process.on('SIGINT', () => {
@@ -145,41 +146,9 @@ class CLIFifoBridge {
   }
 }
 
-// Helper script for sending commands
-function createHelperScript() {
-  const scriptPath = path.join(__dirname, 'fifo-send.sh');
-  const scriptContent = `#!/bin/bash
-# FIFO Bridge Helper Script
-# Usage: ./fifo-send.sh "command"
-
-FIFO_PATH="${path.join(__dirname, '.cli-fifos/input.fifo')}"
-
-if [ ! -p "$FIFO_PATH" ]; then
-  echo "Error: FIFO not found at $FIFO_PATH"
-  echo "Make sure the bridge is running first"
-  exit 1
-fi
-
-if [ $# -eq 0 ]; then
-  echo "Usage: $0 <command>"
-  exit 1
-fi
-
-echo "$1" > "$FIFO_PATH"
-echo "Sent: $1"
-`;
-
-  fs.writeFileSync(scriptPath, scriptContent);
-  fs.chmodSync(scriptPath, '755');
-  console.log(`Created helper script: ${scriptPath}`);
-}
-
 // Main execution
 if (require.main === module) {
   const bridge = new CLIFifoBridge();
-  
-  // Create helper script
-  createHelperScript();
   
   bridge.start().catch(error => {
     console.error('Failed to start CLI FIFO Bridge:', error);

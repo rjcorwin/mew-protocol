@@ -153,10 +153,20 @@ There are two versions of the CLI:
 ### Interactive CLI Testing (for AI Agents)
 When testing with AI coding agents, use the FIFO bridge with the simple CLI:
 ```bash
+# Terminal 1: Start gateway (if not already running)
+npm run dev:gateway
+
+# Terminal 2: Start FIFO bridge
 cd packages/cli
 node cli-fifo-bridge.js  # Uses cli:simple automatically
+
+# Terminal 3: Send commands
 ./fifo-send.sh "/connect ws://localhost:3000 test-room user1"
+./fifo-send.sh "Hello from AI agent"
+./fifo-send.sh "/list"
 ```
+
+**Note:** The `fifo-send.sh` script uses dynamic path detection to find its location, making it portable across different systems. The FIFO bridge creates named pipes at `.cli-fifos/` relative to the CLI package directory.
 
 ### Debug Mode
 Both CLIs include a `/debug` command that shows raw protocol envelopes:

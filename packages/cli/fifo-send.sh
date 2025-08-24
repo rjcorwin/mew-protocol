@@ -2,7 +2,9 @@
 # FIFO Bridge Helper Script
 # Usage: ./fifo-send.sh "command"
 
-FIFO_PATH="/Users/rj/Git/rjcorwin/mcpx-monorepo/mcpx-protocol/packages/cli/.cli-fifos/input.fifo"
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+FIFO_PATH="${SCRIPT_DIR}/.cli-fifos/input.fifo"
 
 if [ ! -p "$FIFO_PATH" ]; then
   echo "Error: FIFO not found at $FIFO_PATH"
