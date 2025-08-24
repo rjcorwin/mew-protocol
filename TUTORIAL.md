@@ -127,8 +127,10 @@ When you sent "Hello agents!", here's what actually happened:
 ```json
 {
   "from": "test-user",
-  "kind": "chat",
+  "kind": "mcp",
   "payload": {
+    "jsonrpc": "2.0",
+    "method": "notifications/chat/message",
     "params": {
       "text": "Hello agents!",
       "format": "plain"
@@ -141,8 +143,10 @@ When you sent "Hello agents!", here's what actually happened:
 ```json
 {
   "from": "echo-bot",
-  "kind": "chat",
+  "kind": "mcp",
   "payload": {
+    "jsonrpc": "2.0",
+    "method": "notifications/chat/message",
     "params": {
       "text": "[Echo #1] test-user said: \"Hello agents!\"",
       "format": "plain"
@@ -339,8 +343,10 @@ Here's the complete envelope flow when you said "calculate 100 + 200":
 ```json
 {
   "from": "test-user",
-  "kind": "chat",
+  "kind": "mcp",
   "payload": {
+    "jsonrpc": "2.0",
+    "method": "notifications/chat/message",
     "params": {"text": "calculate 100 + 200"}
   }
 }
@@ -384,8 +390,10 @@ Here's the complete envelope flow when you said "calculate 100 + 200":
 ```json
 {
   "from": "calculator-agent",
-  "kind": "chat",
+  "kind": "mcp",
   "payload": {
+    "jsonrpc": "2.0",
+    "method": "notifications/chat/message",
     "params": {"text": "📊 Calculation for coordinator-agent: 100 + 200 = 300"}
   }
 }
