@@ -107,7 +107,7 @@ class OpenAIAgent extends MCPxAgent {
     setTimeout(() => this.discoverTools(), 2000);
     
     // Re-discover tools when new peers join
-    (this as any).client.on('peer-joined', (peer: any) => {
+    (this as any).client.onPeerJoined((peer: any) => {
       console.log(`New peer joined: ${peer.id}, discovering tools...`);
       setTimeout(() => this.discoverToolsFromPeer(peer.id), 1000);
     });
@@ -170,13 +170,13 @@ class OpenAIAgent extends MCPxAgent {
     console.log(`[CHAT] ${from}: ${text}`);
 
     // Check if message is directed at us or mentions AI/help
-    const isDirected = text.toLowerCase().includes('ai') || 
-                      text.toLowerCase().includes('gpt') ||
-                      text.toLowerCase().includes('help') ||
-                      text.toLowerCase().includes('@openai');
+    const isDirected = text.toLowerCase().includes('@openai-agent') || 
+                      text.toLowerCase().includes('@openai') ||
+                      (text.toLowerCase().includes('ai') && text.toLowerCase().includes('?')) ||
+                      text.toLowerCase().includes('help');
 
-    // For now, respond to all messages (can be configured)
-    const shouldRespond = true; // or use isDirected for selective responses
+    // Only respond to directed messages to avoid conversation history corruption
+    const shouldRespond = isDirected;
 
     if (shouldRespond) {
       try {
@@ -309,6 +309,43 @@ class OpenAIAgent extends MCPxAgent {
       return '🤖 I couldn\'t generate a response.';
     } catch (error: any) {
       console.error('OpenAI API error:', error);
+      
+      // If we get a tool/tool_calls mismatch error, reset conversation history
+      if (error.message?.includes('messages with role \'tool\'')) {
+        console.log('Resetting conversation history due to tool message corruption');
+        // Keep only system messages and start fresh
+        this.conversationHistory = this.conversationHistory.filter(m => m.role === 'system');
+        // Add the current user message again
+        this.conversationHistory.push({
+          role: 'user',
+          content: `[${from}]: ${message}`,
+        });
+        
+        // Try again with clean history
+        try {
+          const retryCompletion = await this.openai.chat.completions.create({
+            model: this.model,
+            messages: this.conversationHistory,
+            max_tokens: this.maxTokens,
+            temperature: this.temperature,
+            tools: tools.length > 0 ? tools : undefined,
+          });
+          
+          const retryMessage = retryCompletion.choices[0]?.message;
+          if (retryMessage?.content) {
+            this.conversationHistory.push({
+              role: 'assistant',
+              content: retryMessage.content,
+            });
+            this.trimHistory();
+            return `🤖 ${retryMessage.content}`;
+          }
+        } catch (retryError: any) {
+          console.error('Retry failed:', retryError);
+          return `🤖 Sorry, I encountered an error. Let's start fresh.`;
+        }
+      }
+      
       return `🤖 Error: ${error.message}`;
     }
   }
@@ -320,7 +357,21 @@ class OpenAIAgent extends MCPxAgent {
     // Keep system prompt and last N messages
     if (this.conversationHistory.length > this.maxHistoryLength) {
       const systemMessages = this.conversationHistory.filter(m => m.role === 'system');
-      const recentMessages = this.conversationHistory.slice(-this.maxHistoryLength + systemMessages.length);
+      let recentMessages = this.conversationHistory.slice(-this.maxHistoryLength + systemMessages.length);
+      
+      // Ensure we don't start with a tool response without its corresponding tool_calls
+      while (recentMessages.length > 0 && recentMessages[0].role === 'tool') {
+        recentMessages = recentMessages.slice(1);
+      }
+      
+      // Also ensure we don't have orphaned assistant messages with tool_calls but no tool response
+      if (recentMessages.length > 0 && 
+          recentMessages[recentMessages.length - 1].role === 'assistant' && 
+          recentMessages[recentMessages.length - 1].tool_calls) {
+        // Remove the orphaned assistant message with tool_calls
+        recentMessages = recentMessages.slice(0, -1);
+      }
+      
       this.conversationHistory = [...systemMessages, ...recentMessages];
     }
   }

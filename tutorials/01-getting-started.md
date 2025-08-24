@@ -253,7 +253,6 @@ You'll see:
 ```
 === Participants ===
   calculator-agent (agent) [MCP]
-  test-user (user) [none]
 ```
 
 Notice the `[MCP]` tag? That means these agents expose MCP tools. 
@@ -608,8 +607,10 @@ Now for the grand finale - an AI agent that can use other agents' tools intellig
 **Terminal 7 (if you have an API key):**
 ```bash
 cd examples/openai-agent
+npm install  # Install dependencies first
 cp .env.example .env
 # Edit .env and add your OPENAI_API_KEY
+# Note: Default model is gpt-4o-mini, change to gpt-4o if you have access
 npm start
 ```
 
@@ -618,19 +619,21 @@ npm start
 With both the documents-agent and openai-agent running, try this natural conversation in the **CLI**:
 
 ```
-Hey OpenAI agent, can you read the file 'the-answer.txt' from the documents-agent?
+@openai-agent can you read the file 'the-answer.txt'?
 ```
+
+**Note:** The OpenAI agent responds only to messages directed at it (using @openai-agent) to avoid responding to every message in the chat room.
 
 The OpenAI agent will:
 1. Understand your request
-2. Discover the documents-agent's capabilities
+2. Use the documents-agent's capabilities it discovered
 3. Find the correct path
 4. Call the appropriate tool
 5. Return the result in natural language
 
 Example response:
 ```
-🤖 The content of the file 'the-answer.txt' is: `42`. Let me know if there's anything else you need!
+🤖 The content of the file "the-answer.txt" is: 42.
 ```
 
 ### Intelligent Multi-Tool Usage
@@ -638,7 +641,7 @@ Example response:
 Try asking for more complex operations:
 
 ```
-Can you list all files in the documents folder and tell me what example-data.json contains?
+@openai-agent can you list all files in the documents folder and tell me what example-data.json contains?
 ```
 
 The OpenAI agent will:
@@ -651,13 +654,11 @@ The OpenAI agent will:
 With the calculator also running:
 
 ```
-What's 156 multiplied by 89?
+@openai-agent what's 156 multiplied by 89?
 ```
 
 The OpenAI agent recognizes this needs calculation and automatically uses the calculator agent:
 ```
-🤖 Let me calculate that for you...
-[Calls calculator agent]
 🤖 156 × 89 = 13,884
 ```
 
@@ -859,6 +860,24 @@ npm run example:coordinator
 npm run example:documents
 npm run example:openai  # (requires API key)
 ```
+
+## Troubleshooting
+
+### Common Issues
+
+**OpenAI Agent not responding:**
+- Make sure to address it with `@openai-agent` in your messages
+- Check that your API key is set correctly in the .env file
+- Verify you have access to the model specified (gpt-4o-mini or gpt-4o)
+
+**"Command not found" errors:**
+- Run `npm install` and `npm run build` from the root directory first
+- For individual example agents, run `npm install` in their directories
+
+**Connection issues:**
+- Ensure the gateway is running on port 3000
+- Check no other services are using that port
+- Try restarting the gateway if agents can't connect
 
 ---
 
