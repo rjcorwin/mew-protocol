@@ -32,7 +32,6 @@ npm run cli:test
 
 - 📖 **[Tutorial](TUTORIAL.md)** - Step-by-step guide with protocol deep-dives
 - 📋 **[Protocol Spec](protocol-spec/v0/SPEC.md)** - Complete protocol specification
-- 🏗️ **[SDK Architecture](sdk-spec/)** - SDK design and patterns
 - 🧪 **[Examples](examples/)** - Working example agents
 - 🛠️ **[Bridge Guide](packages/bridge/)** - Bridging MCP servers
 
