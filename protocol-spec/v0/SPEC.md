@@ -321,8 +321,7 @@ Alignment with MCP security guidance (2025‑06‑18):
 - Data privacy: do not leak user data into public topics; hosts MUST obtain consent before exposing resources.
 - Origin/transport: if using HTTP variants, validate `Origin`, prefer localhost binding for local servers, and authenticate all connections.
 - Participant verification: gateways MUST verify that `from` matches the authenticated participant identity. Consider cryptographic signatures for high-security deployments.
-- Rate limiting: apply per-participant rate limits to prevent abuse and implement backpressure.
-- Chat notifications: gateways SHOULD apply rate limits to `notifications/chat/message` broadcasts to prevent spam (e.g., 10 messages per minute per participant).
+- Rate limiting: implementations MAY apply per-participant rate limits to prevent abuse and implement backpressure.
 
 ---
 
