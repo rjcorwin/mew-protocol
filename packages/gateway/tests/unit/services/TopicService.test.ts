@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { TopicService } from '../../../src/services/TopicService';
 import { testConfig, createTestParticipant, createTestEnvelope } from '../../helpers/testUtils';
@@ -6,8 +7,8 @@ import { validateEnvelope } from '../../../src/types/mcpx';
 // Mock WebSocket
 const mockWebSocket = {
   readyState: WebSocket.OPEN,
-  send: jest.fn(),
-  close: jest.fn()
+  send: vi.fn(),
+  close: vi.fn()
 } as any as WebSocket;
 
 describe('TopicService', () => {
@@ -15,7 +16,7 @@ describe('TopicService', () => {
 
   beforeEach(() => {
     topicService = new TopicService(testConfig);
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('createTopic', () => {
@@ -142,8 +143,8 @@ describe('TopicService', () => {
       const participant1 = createTestParticipant('user1');
       const participant2 = createTestParticipant('user2');
       
-      const mockWs1 = { ...mockWebSocket, send: jest.fn() } as any as WebSocket;
-      const mockWs2 = { ...mockWebSocket, send: jest.fn() } as any as WebSocket;
+      const mockWs1 = { ...mockWebSocket, send: vi.fn() } as any as WebSocket;
+      const mockWs2 = { ...mockWebSocket, send: vi.fn() } as any as WebSocket;
       
       topicService.joinTopic(topicName, participant1, mockWs1);
       topicService.joinTopic(topicName, participant2, mockWs2);
@@ -161,16 +162,16 @@ describe('TopicService', () => {
       const participant2 = createTestParticipant('user2');
       const participant3 = createTestParticipant('user3');
       
-      const mockWs1 = { ...mockWebSocket, send: jest.fn() } as any as WebSocket;
-      const mockWs2 = { ...mockWebSocket, send: jest.fn() } as any as WebSocket;
-      const mockWs3 = { ...mockWebSocket, send: jest.fn() } as any as WebSocket;
+      const mockWs1 = { ...mockWebSocket, send: vi.fn() } as any as WebSocket;
+      const mockWs2 = { ...mockWebSocket, send: vi.fn() } as any as WebSocket;
+      const mockWs3 = { ...mockWebSocket, send: vi.fn() } as any as WebSocket;
       
       topicService.joinTopic(topicName, participant1, mockWs1);
       topicService.joinTopic(topicName, participant2, mockWs2);
       topicService.joinTopic(topicName, participant3, mockWs3);
       
       // Clear mock calls from join operations
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       
       const envelope = createTestEnvelope('user1');
       envelope.to = ['user2']; // Only send to user2

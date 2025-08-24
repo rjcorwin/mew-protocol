@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { AuthService } from '../../../src/services/AuthService';
 import { testConfig } from '../../helpers/testUtils';
 
