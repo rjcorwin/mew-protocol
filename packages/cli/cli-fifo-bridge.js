@@ -19,7 +19,7 @@ class CLIFifoBridge {
     this.outputFile = path.join(this.basePath, 'output.log');
     this.stateFile = path.join(this.basePath, 'state.txt');
     this.command = options.command || 'npm';
-    this.args = options.args || ['run', 'cli'];
+    this.args = options.args || ['run', 'cli:simple'];
     this.cwd = options.cwd || __dirname;
     
     this.process = null;

@@ -50,11 +50,6 @@ mcpx-protocol/
 
 ## Development Guidelines
 
-### Working with TODO.md
-- Check off items as they are completed
-- Update with new items or changes in direction
-- Keep current to reflect actual project state
-
 ### Testing
 Always run tests before committing:
 ```bash
@@ -141,18 +136,37 @@ MCPx wraps MCP messages in envelopes for routing:
 
 ## Debugging
 
-### Interactive CLI Testing
-For testing CLI applications, use the FIFO bridge:
+### CLI Versions
+There are two versions of the CLI:
+
+1. **Blessed CLI** (default, for humans):
+   - Full-screen TUI with better UX
+   - Enhanced `/debug` command with formatted output
+   - Run with: `npm run cli` or `mcpx-chat`
+
+2. **Simple CLI** (for AI coding agents):
+   - Line-based readline interface
+   - Works with FIFO bridge for automation
+   - Also includes `/debug` command for protocol inspection
+   - Run with: `npm run cli:simple` or `mcpx-chat-simple`
+
+### Interactive CLI Testing (for AI Agents)
+When testing with AI coding agents, use the FIFO bridge with the simple CLI:
 ```bash
 cd packages/cli
-node cli-fifo-bridge.js
+node cli-fifo-bridge.js  # Uses cli:simple automatically
 ./fifo-send.sh "/connect ws://localhost:3000 test-room user1"
 ```
 
 ### Debug Mode
-The blessed CLI includes a `/debug` command that shows raw protocol envelopes:
+Both CLIs include a `/debug` command that shows raw protocol envelopes:
 ```bash
-npm run cli:blessed
+# In blessed CLI (formatted with tree structure)
+npm run cli
+# Then type: /debug
+
+# In simple CLI (plain JSON output)
+npm run cli:simple
 # Then type: /debug
 ```
 

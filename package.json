@@ -28,8 +28,8 @@
     "example:openai": "cd examples/openai-agent && npm start",
     "example:all": "npm run example:echo & npm run example:calculator & npm run example:coordinator & npm run example:documents & wait",
     "cli": "npm run cli -w @mcpx-protocol/cli",
-    "cli:blessed": "npm run cli:blessed -w @mcpx-protocol/cli",
-    "cli:test": "npm run cli:blessed -w @mcpx-protocol/cli ws://localhost:3000 test-room test-user"
+    "cli:simple": "npm run cli:simple -w @mcpx-protocol/cli",
+    "cli:test": "npm run cli -w @mcpx-protocol/cli ws://localhost:3000 test-room test-user"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

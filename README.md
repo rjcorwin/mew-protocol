@@ -56,7 +56,7 @@ npm run example:calculator  # Calculator with MCP tools
 npm run example:coordinator # Multi-agent coordinator
 
 # Connect with the CLI
-npm run cli:blessed -- ws://localhost:3000 test-room your-name
+npm run cli -- ws://localhost:3000 test-room your-name
 ```
 
 ## Packages
@@ -67,7 +67,7 @@ npm run cli:blessed -- ws://localhost:3000 test-room your-name
 
 ### Tools & Infrastructure
 - **@mcpx-protocol/gateway** - Reference gateway server implementation
-- **@mcpx-protocol/cli** - Interactive terminal client with blessed TUI
+- **@mcpx-protocol/cli** - Interactive terminal client with full-screen TUI
 - **@mcpx-protocol/web-client** - Reference web client for testing
 - **@mcpx-protocol/bridge** - Bridge to connect MCP servers to MCPx topics
 
