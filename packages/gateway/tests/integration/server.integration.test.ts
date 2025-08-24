@@ -261,6 +261,22 @@ describe('MCPx Server Integration Tests', () => {
       const welcome1 = await waitForWelcomeMessage(ws1);
       expect(welcome1.payload.type).toBe('welcome');
 
+      // Set up listener for join message before connecting second participant
+      const joinPromise = new Promise<any>((resolve) => {
+        const handler = (data: any) => {
+          try {
+            const msg = JSON.parse(data.toString());
+            if (msg.kind === 'presence' && msg.payload?.event === 'join') {
+              ws1.off('message', handler);
+              resolve(msg);
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        };
+        ws1.on('message', handler);
+      });
+
       // Connect second participant
       const ws2 = new WebSocket(wsUrl, {
         headers: { 'Authorization': `Bearer ${token2}` }
@@ -268,14 +284,18 @@ describe('MCPx Server Integration Tests', () => {
 
       await waitForWebSocketOpen(ws2);
       
-      // First participant should see join message
-      const joinMessage = await waitForWebSocketMessage(ws1);
+      // Wait for both the join message and welcome message in parallel
+      const [joinMessage, welcome2] = await Promise.all([
+        joinPromise,
+        waitForWelcomeMessage(ws2)
+      ]);
+
+      // Verify join message
       expect(joinMessage.kind).toBe('presence');
       expect(joinMessage.payload.event).toBe('join');
       expect(joinMessage.payload.participant.id).toBe('user2');
 
-      // Second participant should see welcome
-      const welcome2 = await waitForWelcomeMessage(ws2);
+      // Verify welcome message
       expect(welcome2.payload.type).toBe('welcome');
       expect(welcome2.payload.participants).toHaveLength(1);
       expect(welcome2.payload.participants[0].id).toBe('user1');

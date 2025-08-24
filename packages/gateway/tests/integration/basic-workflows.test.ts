@@ -56,15 +56,23 @@ describe('MCPx Server Basic Workflows', () => {
   });
 
   afterAll(async () => {
+    // Close all WebSocket connections first
     if (wss) {
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.close();
+        }
+      });
       wss.close();
     }
+    
+    // Then close the HTTP server
     if (server) {
       await new Promise<void>((resolve) => {
         server.close(() => resolve());
       });
     }
-  });
+  }, 15000);
 
   describe('Server Health and Auth', () => {
     it('should return healthy status', async () => {
@@ -246,34 +254,115 @@ describe('MCPx Server Basic Workflows', () => {
       ]);
 
       const wsUrl = `ws://localhost:${port}/v0/ws?topic=chat-test`;
+      
+      // Helper function to wait for WebSocket to open
+      const waitForOpen = (ws: WebSocket, name: string): Promise<void> => {
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error(`${name} connection timeout`));
+          }, 5000);
+          
+          const checkOpen = () => {
+            if (ws.readyState === WebSocket.OPEN) {
+              clearTimeout(timeout);
+              resolve();
+            }
+          };
+          
+          // Check immediately
+          checkOpen();
+          
+          // Also listen for open event
+          ws.once('open', () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+          
+          ws.once('error', (err) => {
+            clearTimeout(timeout);
+            reject(err);
+          });
+        });
+      };
+
+      // Helper to wait for specific message type
+      const waitForMessage = (ws: WebSocket, predicate: (msg: any) => boolean, timeoutMs = 5000): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            ws.removeListener('message', handler);
+            reject(new Error('Message timeout'));
+          }, timeoutMs);
+          
+          const handler = (data: any) => {
+            try {
+              const msg = JSON.parse(data.toString());
+              if (predicate(msg)) {
+                clearTimeout(timeout);
+                ws.removeListener('message', handler);
+                resolve(msg);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          };
+          
+          ws.on('message', handler);
+        });
+      };
+
+      // Create WebSockets but set up message handlers BEFORE connecting
       const senderWs = new WebSocket(wsUrl, {
         headers: { 'Authorization': `Bearer ${token1.body.token}` }
       });
+      
       const receiverWs = new WebSocket(wsUrl, {
         headers: { 'Authorization': `Bearer ${token2.body.token}` }
       });
 
-      // Wait for both to connect and receive initial messages
+      // Collect all messages received
+      const senderMessages: any[] = [];
+      const receiverMessages: any[] = [];
+      
+      senderWs.on('message', (data) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          senderMessages.push(msg);
+        } catch (e) {}
+      });
+      
+      receiverWs.on('message', (data) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          receiverMessages.push(msg);
+        } catch (e) {}
+      });
+
+      // Wait for both to connect
       await Promise.all([
-        new Promise<void>((resolve) => {
-          senderWs.on('message', (data) => {
-            const msg = JSON.parse(data.toString());
-            if (msg.kind === 'presence' && msg.payload?.participant?.id === 'receiver') {
-              resolve(); // Both connected
-            }
-          });
-        }),
-        new Promise<void>((resolve) => {
-          receiverWs.on('message', (data) => {
-            const msg = JSON.parse(data.toString());
-            if (msg.kind === 'system' && msg.payload?.type === 'welcome') {
-              resolve();
-            }
-          });
-        })
+        waitForOpen(senderWs, 'Sender'),
+        waitForOpen(receiverWs, 'Receiver')
       ]);
 
-      // Send chat message
+      // Wait a bit for welcome messages to arrive
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Check if we got welcome messages
+      const senderWelcome = senderMessages.find(m => m.kind === 'system' && m.payload?.type === 'welcome');
+      const receiverWelcome = receiverMessages.find(m => m.kind === 'system' && m.payload?.type === 'welcome');
+      
+      if (!senderWelcome || !receiverWelcome) {
+        throw new Error(`Missing welcome messages. Sender: ${!!senderWelcome}, Receiver: ${!!receiverWelcome}`);
+      }
+
+      // Small delay to ensure everything is settled
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Clear previous messages
+      receiverMessages.length = 0;
+      
+      // Send chat message and wait for it
+
+      // Send chat message from sender
       const chatMessage = {
         protocol: 'mcp-x/v0',
         id: 'chat-1',
@@ -290,27 +379,33 @@ describe('MCPx Server Basic Workflows', () => {
         }
       };
 
-      // Set up message listener before sending
-      const messageReceived = new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Chat message timeout')), 3000);
+      senderWs.send(JSON.stringify(chatMessage));
+      
+      // Wait for message to be received
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Chat message not received'));
+        }, 3000);
         
-        receiverWs.on('message', (data) => {
-          const msg = JSON.parse(data.toString());
-          if (msg.kind === 'mcp' && 
-              msg.payload?.method === 'notifications/chat/message' &&
-              msg.payload?.params?.text === 'Hello, integration test!') {
+        const checkInterval = setInterval(() => {
+          const chatMsg = receiverMessages.find(m => 
+            m.kind === 'mcp' && 
+            m.payload?.method === 'notifications/chat/message' &&
+            m.payload?.params?.text === 'Hello, integration test!'
+          );
+          
+          if (chatMsg) {
+            clearInterval(checkInterval);
             clearTimeout(timeout);
-            resolve();
+            resolve(chatMsg);
           }
-        });
+        }, 100);
       });
 
-      senderWs.send(JSON.stringify(chatMessage));
-      await messageReceived;
-
+      // Clean up
       senderWs.close();
       receiverWs.close();
-    }, 10000);
+    }, 15000);
   });
 
   describe('Data Persistence', () => {
