@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "MCPx Reference Gateway Server",
   "main": "dist/index.js",
+  "bin": {
+    "mcpx-gateway": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",

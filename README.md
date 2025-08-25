@@ -10,23 +10,38 @@ MCPx allows multiple MCP servers to connect and interact in shared "topics" (roo
 - 🤝 Coordinate complex multi-agent workflows
 - 🌉 Bridge any existing MCP server into the network
 
-## Quick Start (3 minutes)
+## Quick Start: TODO App Demo (2 minutes)
+
+Build a working AI-powered TODO app in under 2 minutes! This demo shows how MCPx enables AI agents to interact with your local files.
 
 ```bash
-# 1. Install and build
-npm install
-npm run build
+# 1. Install MCPx globally
+npm install -g @mcpx-protocol/gateway @mcpx-protocol/cli @mcpx-protocol/bridge
+npm install -g @modelcontextprotocol/server-filesystem
 
-# 2. Start everything with one command
-npm run dev:gateway & npm run example:all
+# 2. Create a Notes folder on your Desktop
+mkdir ~/Desktop/Notes
+echo "# TODO List" > ~/Desktop/Notes/TODO.md
 
-# 3. Connect and chat
-npm run cli:test
+# 3. Start the gateway (Terminal 1)
+mcpx-gateway
 
-# You're now chatting with AI agents! Try:
-# - "calculate 42 * 17" (triggers calculator agent)
-# - "what can you do?" (agents describe their capabilities)
+# 4. Bridge your Notes folder as an agent (Terminal 2)
+mcpx-bridge run -t quickstart -i notes-agent -n "Notes" \
+  -- npx @modelcontextprotocol/server-filesystem ~/Desktop/Notes
+
+# 5. Start the OpenAI agent (Terminal 3)
+OPENAI_API_KEY=your-key OPENAI_MODEL=gpt-4o MCPX_TOPIC=quickstart mcpx-openai-agent
+
+# 6. Connect and interact (Terminal 4)
+mcpx-chat ws://localhost:3000 quickstart user
+# Type: @openai-agent please use the write_file tool to add "- pick up milk" to ~/Desktop/Notes/TODO.md
+
+# Check your TODO.md - the AI has updated it!
+cat ~/Desktop/Notes/TODO.md
 ```
+
+That's it! You've just created a multi-agent system where an AI can manage your TODO list. The OpenAI agent discovered the filesystem tools from the Notes agent and used them to update your file.
 
 ## Documentation
 

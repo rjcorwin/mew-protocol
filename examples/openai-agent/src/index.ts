@@ -367,7 +367,8 @@ class OpenAIAgent extends MCPxAgent {
       // Also ensure we don't have orphaned assistant messages with tool_calls but no tool response
       if (recentMessages.length > 0 && 
           recentMessages[recentMessages.length - 1].role === 'assistant' && 
-          recentMessages[recentMessages.length - 1].tool_calls) {
+          'tool_calls' in recentMessages[recentMessages.length - 1] &&
+          (recentMessages[recentMessages.length - 1] as any).tool_calls) {
         // Remove the orphaned assistant message with tool_calls
         recentMessages = recentMessages.slice(0, -1);
       }
@@ -534,7 +535,7 @@ async function getToken(participantId: string, topic: string): Promise<string> {
     throw new Error(`Failed to get token: ${response.statusText}`);
   }
   
-  const data = await response.json();
+  const data = await response.json() as { token: string };
   return data.token;
 }
 

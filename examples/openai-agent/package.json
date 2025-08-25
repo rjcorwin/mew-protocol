@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "MCPx agent that uses OpenAI for intelligent responses and tool orchestration",
   "main": "dist/index.js",
+  "bin": {
+    "mcpx-openai-agent": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "tsx src/index.ts",
