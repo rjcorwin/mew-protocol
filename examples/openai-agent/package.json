@@ -1,6 +1,6 @@
 {
-  "name": "openai-agent-example",
-  "version": "1.0.0",
+  "name": "@mcpx-protocol/openai-agent",
+  "version": "0.1.0",
   "description": "MCPx agent that uses OpenAI for intelligent responses and tool orchestration",
   "main": "dist/index.js",
   "bin": {
@@ -12,7 +12,7 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
-    "@mcpx-protocol/agent": "file:../../packages/agent",
+    "@mcpx-protocol/agent": "^0.1.0",
     "openai": "^4.56.0",
     "dotenv": "^16.4.5"
   },
@@ -20,5 +20,35 @@
     "@types/node": "^20.14.0",
     "tsx": "^4.7.0",
     "typescript": "^5.5.0"
+  },
+  "keywords": [
+    "mcpx",
+    "mcp",
+    "ai",
+    "openai",
+    "gpt",
+    "agent",
+    "multi-agent"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mcpx-protocol.git",
+    "directory": "examples/openai-agent"
+  },
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mcpx-protocol/issues"
+  },
+  "homepage": "https://github.com/rjcorwin/mcpx-protocol#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

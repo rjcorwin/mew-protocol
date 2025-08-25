@@ -1,4 +1,4 @@
-# OpenAI Agent Example
+# @mcpx-protocol/openai-agent
 
 An intelligent MCPx agent powered by OpenAI's GPT models that can engage in natural conversations and orchestrate other agents' tools.
 
@@ -25,25 +25,40 @@ Provides three MCP tools for other agents:
 - Can handle complex queries
 - Provides helpful, concise responses
 
-## Setup
+## Installation
 
-### 1. Install Dependencies
+### Global Install (Recommended)
 
 ```bash
-cd examples/openai-agent
+npm install -g @mcpx-protocol/openai-agent
+```
+
+### Local Development
+
+```bash
+git clone https://github.com/rjcorwin/mcpx-protocol.git
+cd mcpx-protocol/examples/openai-agent
 npm install
 ```
 
-### 2. Configure OpenAI
+## Setup
 
-Copy the example environment file:
+### 1. Get OpenAI API Key
+
+Get your API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+
+### 2. Configure (Optional)
+
+For global install, set environment variables:
 ```bash
-cp .env.example .env
+export OPENAI_API_KEY=sk-your-api-key-here
+export OPENAI_MODEL=gpt-4o  # Optional: defaults to gpt-4o-mini
 ```
 
-Edit `.env` and add your OpenAI API key:
-```env
-OPENAI_API_KEY=sk-your-api-key-here
+For local development, create `.env` file:
+```bash
+cp .env.example .env
+# Edit .env with your API key
 ```
 
 ### 3. Optional Configuration
@@ -71,21 +86,26 @@ MCPX_PARTICIPANT_ID=openai-agent
 
 ## Running the Agent
 
-### Basic Usage
+### Global Install
 
 ```bash
+# Basic usage
+OPENAI_API_KEY=your-key mcpx-openai-agent
+
+# With custom settings
+OPENAI_API_KEY=your-key OPENAI_MODEL=gpt-4o MCPX_TOPIC=my-room mcpx-openai-agent
+```
+
+### Local Development
+
+```bash
+# Basic usage
 npm start
-```
 
-### With Custom Settings
-
-```bash
+# With custom settings
 OPENAI_MODEL=gpt-4o OPENAI_TEMPERATURE=0.9 npm start
-```
 
-### Development Mode (auto-restart)
-
-```bash
+# Development mode (auto-restart)
 npm run dev
 ```
 
