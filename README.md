@@ -31,11 +31,20 @@ mcpx-bridge run -t quickstart -i notes-agent -n "Notes" \
   -- npx @modelcontextprotocol/server-filesystem ~/Desktop/Notes
 
 # 5. Start the OpenAI agent (Terminal 3)
-OPENAI_API_KEY=your-key OPENAI_MODEL=gpt-4o MCPX_TOPIC=quickstart mcpx-openai-agent
+# Install the OpenAI agent globally first
+npm install -g @mcpx-protocol/openai-agent
+
+# Run with your OpenAI API key and TODO-specific prompt
+OPENAI_API_KEY=your-key \
+OPENAI_MODEL=gpt-4o \
+MCPX_TOPIC=quickstart \
+OPENAI_SYSTEM_PROMPT="You are a helpful TODO list manager. You have access to a TODO.md file located at /Users/$USER/Desktop/Notes/TODO.md. When asked about TODO items, ALWAYS: 1) First use notes-agent.read_text_file tool to read the file, 2) Then immediately use notes-agent.write_file tool with the full path /Users/$USER/Desktop/Notes/TODO.md to save changes. Never just show changes without saving. Always maintain markdown format with '# TODO List' as the header and items as bullet points." \
+mcpx-openai-agent
 
 # 6. Connect and interact (Terminal 4)
 mcpx-chat ws://localhost:3000 quickstart user
-# Type: @openai-agent please use the write_file tool to add "- pick up milk" to ~/Desktop/Notes/TODO.md
+# Type: @openai-agent please add "pick up milk" to my TODO list
+# The AI understands TODO context and manages your file!
 
 # Check your TODO.md - the AI has updated it!
 cat ~/Desktop/Notes/TODO.md
@@ -70,11 +79,17 @@ npm run cli:test
 
 ### 🧠 AI-Powered Assistant
 ```bash
-# Set your OpenAI API key
-export OPENAI_API_KEY=sk-...
+# Install globally
+npm install -g @mcpx-protocol/openai-agent
 
-# Start the OpenAI agent
-npm run example:openai
+# Basic usage
+OPENAI_API_KEY=sk-... OPENAI_MODEL=gpt-4o mcpx-openai-agent
+
+# Custom system prompt for specialized behavior
+OPENAI_API_KEY=sk-... \
+OPENAI_MODEL=gpt-4o \
+OPENAI_SYSTEM_PROMPT="You are a helpful TODO list manager..." \
+mcpx-openai-agent
 
 # The AI agent can now orchestrate other agents' tools!
 ```
