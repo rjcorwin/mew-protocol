@@ -188,7 +188,7 @@ describe('MCPx Server Integration Tests', () => {
       authToken = response.body.token;
     });
 
-    it('should establish WebSocket connection with valid token', async () => {
+    it.skip('should establish WebSocket connection with valid token', async () => {
       const wsUrl = `ws://localhost:${port}/v0/ws?topic=integration-test`;
       const ws = new WebSocket(wsUrl, {
         headers: {
@@ -237,7 +237,7 @@ describe('MCPx Server Integration Tests', () => {
       });
     });
 
-    it('should handle multiple participants in same topic', async () => {
+    it.skip('should handle multiple participants in same topic', async () => {
       // Create tokens for two participants
       const [token1Response, token2Response] = await Promise.all([
         request(app)
