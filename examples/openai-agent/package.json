@@ -1,6 +1,6 @@
 {
   "name": "@mcpx-protocol/openai-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCPx agent that uses OpenAI for intelligent responses and tool orchestration",
   "main": "dist/index.js",
   "bin": {
