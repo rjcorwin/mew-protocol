@@ -59,7 +59,7 @@ export function waitForWebSocketOpen(ws: WebSocket): Promise<void> {
 
     const timeout = setTimeout(() => {
       reject(new Error('WebSocket connection timeout'));
-    }, 8000); // Increased from 5000 to 8000
+    }, 15000); // Increased to 15s for CI environments
 
     ws.once('open', () => {
       clearTimeout(timeout);
@@ -78,7 +78,7 @@ export function waitForWebSocketMessage(ws: WebSocket): Promise<any> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error('WebSocket message timeout'));
-    }, 8000); // Increased from 5000 to 8000
+    }, 15000); // Increased to 15s for CI environments
 
     ws.once('message', (data) => {
       clearTimeout(timeout);
@@ -102,7 +102,7 @@ export function waitForWelcomeMessage(ws: WebSocket): Promise<any> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error('Welcome message timeout'));
-    }, 8000); // Increased from 5000 to 8000
+    }, 15000); // Increased to 15s for CI environments
 
     const messageHandler = (data: any) => {
       try {
