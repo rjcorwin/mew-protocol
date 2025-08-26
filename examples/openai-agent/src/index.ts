@@ -237,12 +237,21 @@ class OpenAIAgent extends MCPxAgent {
 
       // Handle tool calls if any
       if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-        const toolResults: string[] = [];
+        // First, add the assistant message with tool calls to history
+        this.conversationHistory.push({
+          role: 'assistant',
+          content: responseMessage.content || '',
+          tool_calls: responseMessage.tool_calls,
+        });
+
+        // Process each tool call and create individual tool response messages
+        const toolResponses: any[] = [];
         
         for (const toolCall of responseMessage.tool_calls) {
           const functionName = toolCall.function.name.replace('_', '.');
           const toolInfo = this.availableTools.get(functionName);
           
+          let toolResult: string;
           if (toolInfo) {
             try {
               const args = JSON.parse(toolCall.function.arguments);
@@ -254,29 +263,28 @@ class OpenAIAgent extends MCPxAgent {
                 args
               );
               
-              toolResults.push(`Tool ${functionName}: ${JSON.stringify(result)}`);
+              toolResult = JSON.stringify(result);
             } catch (error) {
               console.error(`Error calling tool ${functionName}:`, error);
-              toolResults.push(`Tool ${functionName}: Error - ${error}`);
+              toolResult = `Error: ${error}`;
             }
+          } else {
+            toolResult = 'Tool not available';
           }
+
+          // Add a tool response message for each tool call
+          toolResponses.push({
+            role: 'tool',
+            content: toolResult,
+            tool_call_id: toolCall.id,
+          });
         }
 
-        // Add tool results to conversation and get final response
-        if (toolResults.length > 0) {
-          this.conversationHistory.push({
-            role: 'assistant',
-            content: responseMessage.content || '',
-            tool_calls: responseMessage.tool_calls,
-          });
-          
-          this.conversationHistory.push({
-            role: 'tool',
-            content: toolResults.join('\n'),
-            tool_call_id: responseMessage.tool_calls[0].id,
-          });
+        // Add all tool responses to conversation history
+        this.conversationHistory.push(...toolResponses);
 
-          // Get final response after tool execution
+        // Get final response after tool execution
+        if (toolResponses.length > 0) {
           const finalCompletion = await this.openai.chat.completions.create({
             model: this.model,
             messages: this.conversationHistory,
@@ -311,7 +319,9 @@ class OpenAIAgent extends MCPxAgent {
       console.error('OpenAI API error:', error);
       
       // If we get a tool/tool_calls mismatch error, reset conversation history
-      if (error.message?.includes('messages with role \'tool\'')) {
+      if (error.message?.includes('messages with role \'tool\'') || 
+          error.message?.includes('tool_calls\' must be followed by tool messages') ||
+          error.message?.includes('tool_call_ids did not have response messages')) {
         console.log('Resetting conversation history due to tool message corruption');
         // Keep only system messages and start fresh
         this.conversationHistory = this.conversationHistory.filter(m => m.role === 'system');
