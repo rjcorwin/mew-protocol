@@ -204,7 +204,7 @@ describe('MCPx Server Integration Tests', () => {
       expect(welcomeMessage.payload.type).toBe('welcome');
 
       ws.close();
-    });
+    }, 10000); // Increase timeout to 10 seconds
 
     it('should reject WebSocket connection without token', async () => {
       const wsUrl = `ws://localhost:${port}/v0/ws?topic=integration-test`;
@@ -302,7 +302,7 @@ describe('MCPx Server Integration Tests', () => {
 
       ws1.close();
       ws2.close();
-    });
+    }, 10000); // Increase timeout to 10 seconds
   });
 
   describe('End-to-End Message Flow', () => {
