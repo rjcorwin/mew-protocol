@@ -73,3 +73,7 @@ lerna-debug.log
 
 # Runtime configuration files with tokens
 examples/documents-agent/bridge-config.json
+
+# Supporting docs
+modelcontextprotocol
+TODO.md
