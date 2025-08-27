@@ -77,7 +77,7 @@ All data flowing over a topic MUST be a single top-level JSON envelope:
 
 ```json
 {
-  "protocol": "mcp-x/v0.1",
+  "protocol": "mcpx/v0.1",
   "id": "2f6b6e70-7b36-4b8b-9ad8-7c4f7d0e2d0b",
   "ts": "2025-08-26T14:00:00Z",
   "from": "robot-alpha",
@@ -89,7 +89,7 @@ All data flowing over a topic MUST be a single top-level JSON envelope:
 ```
 
 Field semantics:
-- `protocol`: MUST be `"mcp-x/v0.1"` for this version
+- `protocol`: MUST be `"mcpx/v0.1"` for this version
 - `id`: globally unique message id (e.g., UUIDv4)
 - `ts`: RFC3339 timestamp
 - `from`: stable participant id within the topic
@@ -108,7 +108,7 @@ Participants with full privilege can make direct MCP tool calls:
 
 ```json
 {
-  "protocol": "mcp-x/v0.1",
+  "protocol": "mcpx/v0.1",
   "id": "env-call-1",
   "from": "trusted-agent",
   "to": ["target-agent"],
@@ -133,7 +133,7 @@ Participants with restricted privilege MUST use the `mcp/proposal` kind instead 
 
 ```json
 {
-  "protocol": "mcp-x/v0.1",
+  "protocol": "mcpx/v0.1",
   "id": "env-req-1",
   "from": "untrusted-agent",
   "to": ["target-agent"],
@@ -160,7 +160,7 @@ A full-privilege participant can fulfill the proposal by making a real MCP call:
 
 ```json
 {
-  "protocol": "mcp-x/v0.1",
+  "protocol": "mcpx/v0.1",
   "id": "env-fulfill-1",
   "from": "human-user",
   "to": ["target-agent"],
@@ -181,7 +181,7 @@ Note: The fulfillment is a standard MCP tool call. The target agent MAY include 
 
 ```json
 {
-  "protocol": "mcp-x/v0.1",
+  "protocol": "mcpx/v0.1",
   "id": "env-fulfill-resp-1",
   "from": "target-agent",
   "to": ["human-user", "untrusted-agent"],
@@ -206,7 +206,7 @@ Chat messages are MCPx-specific and do not pollute the MCP namespace:
 
 ```json
 {
-  "protocol": "mcp-x/v0.1",
+  "protocol": "mcpx/v0.1",
   "id": "env-chat-1",
   "from": "user-alice",
   "kind": "chat",
@@ -229,7 +229,7 @@ When a participant connects, the gateway sends a welcome message including their
 
 ```json
 {
-  "protocol": "mcp-x/v0.1",
+  "protocol": "mcpx/v0.1",
   "id": "env-welcome-1",
   "from": "system:gateway",
   "to": ["new-participant"],
@@ -241,7 +241,7 @@ When a participant connects, the gateway sends a welcome message including their
       "privilege": "restricted"
     },
     "participants": [...],
-    "protocol": "mcp-x/v0.1"
+    "protocol": "mcpx/v0.1"
   }
 }
 ```
@@ -252,7 +252,7 @@ When a restricted participant attempts a forbidden operation:
 
 ```json
 {
-  "protocol": "mcp-x/v0.1",
+  "protocol": "mcpx/v0.1",
   "id": "env-violation-1",
   "from": "system:gateway",
   "to": ["violator"],
@@ -330,8 +330,8 @@ Gateways SHOULD support mixed environments:
 
 ### 6.3 Protocol Version Negotiation
 
-- Clients supporting v0.1 SHOULD send `protocol: "mcp-x/v0.1"`
-- Gateways MUST accept both `"mcp-x/v0"` and `"mcp-x/v0.1"`
+- Clients supporting v0.1 SHOULD send `protocol: "mcpx/v0.1"`
+- Gateways MUST accept both `"mcp-x/v0"` and `"mcpx/v0.1"`
 - v0 clients in v0.1 gateways operate based on gateway policy
 
 ---
