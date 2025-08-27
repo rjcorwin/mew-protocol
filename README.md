@@ -1,14 +1,43 @@
 # MCPx Protocol
 
-**Multi-agent coordination through shared topics** - MCPx extends the Model Context Protocol (MCP) to enable real-time collaboration between AI agents, humans, and tools in shared communication spaces.
+**Collaborative AI Governance Through Multi-Agent Orchestration** 
+
+MCPx extends the Model Context Protocol (MCP) to enable secure, supervised collaboration between AI agents, humans, and tools - transforming isolated AI systems into collaborative intelligence networks.
+
+## Beyond Simple Agent Communication
+
+MCPx isn't just about connecting agents - it's a framework for **collaborative AI governance** where multiple intelligent participants work together to safely orchestrate complex operations at scale.
+
+### 🤝 Collaborative Governance
+Not just one human supervisor, but potentially:
+- Multiple humans reviewing different aspects
+- AI safety classifiers checking for harmful operations
+- Compliance agents verifying regulatory requirements
+- Security scanners analyzing for vulnerabilities
+
+### 🧠 Emergent Intelligence
+Orchestrator agents learn from:
+- Multiple teachers with different expertise
+- Statistical patterns across many decisions
+- AI-powered policy recommendations
+- Consensus mechanisms for critical operations
+
+### 📈 Scalable Oversight
+As systems grow:
+- Specialized reviewers focus on their domains
+- AI handles routine approvals
+- Humans focus on policy and exceptions
+- The system becomes more intelligent over time
 
 ## What is MCPx?
 
-MCPx allows multiple MCP servers to connect and interact in shared "topics" (rooms). Every participant can:
-- 💬 Send and receive chat messages
-- 🔧 Discover and call each other's tools
-- 🤝 Coordinate complex multi-agent workflows
-- 🌉 Bridge any existing MCP server into the network
+At its core, MCPx enables multiple MCP servers to connect in shared "topics" (rooms) with capability-based security. This creates an environment where:
+
+- 🔒 **Untrusted agents** can safely propose operations without executing them
+- 👥 **Multiple supervisors** collaborate on what to approve
+- 🤖 **Orchestrators** progressively learn which operations are safe
+- 🔧 **Worker agents** execute approved operations with appropriate tools
+- 📝 **Every action** is auditable and reversible
 
 ## Quick Start: TODO App Demo (2 minutes)
 
@@ -51,6 +80,60 @@ cat ~/Desktop/Notes/TODO.md
 ```
 
 That's it! You've just created a multi-agent system where an AI can manage your TODO list. The OpenAI agent discovered the filesystem tools from the Notes agent and used them to update your file.
+
+## Advanced Demo: Orchestrated AI with Human Oversight (Coming Soon)
+
+This demo showcases the full power of MCPx's collaborative governance model, where an AI proposes operations that an orchestrator reviews and executes based on human-defined policies.
+
+```bash
+# 1. Start the gateway with capability-based security
+mcpx-gateway --secure
+
+# 2. Bridge your Notes folder (Terminal 2)
+mcpx-bridge run -t orchestrated -i notes-agent -n "Notes" \
+  --capabilities "mcp/request:*" \
+  -- npx @modelcontextprotocol/server-filesystem ~/Desktop/Notes
+
+# 3. Start the OpenAI agent with proposal-only capabilities (Terminal 3)
+OPENAI_API_KEY=your-key \
+OPENAI_MODEL=gpt-4o \
+MCPX_TOPIC=orchestrated \
+MCPX_CAPABILITIES="mcp/proposal:*,chat" \
+OPENAI_SYSTEM_PROMPT="You are a helpful assistant. You can propose operations but cannot execute them directly. Always explain what you want to do and why." \
+mcpx-openai-agent
+
+# 4. Start the Orchestrator agent (Terminal 4)
+# The orchestrator reviews proposals and decides what to execute
+mcpx-orchestrator \
+  --topic orchestrated \
+  --id orchestrator \
+  --capabilities "mcp/request:*" \
+  --auto-approve "read_*" \
+  --require-human "write_*,delete_*"
+
+# 5. Connect as a human supervisor (Terminal 5)
+mcpx-chat ws://localhost:3000 orchestrated human --capabilities "mcp/*"
+
+# Now when you ask the AI to modify files:
+# Type: @openai-agent please add "buy groceries" to my TODO list
+# 
+# The AI will PROPOSE the operation
+# The Orchestrator will see it needs human approval for writes
+# You'll be prompted to approve/deny
+# If approved, the Orchestrator executes the operation
+
+# Over time, you can teach the orchestrator patterns:
+# Type: @orchestrator always approve TODO.md updates from openai-agent
+# Now future TODO updates will be automatic!
+```
+
+This demonstrates:
+- 🔒 **Capability-based security**: AI can only propose, not execute
+- 👤 **Human-in-the-loop**: Critical operations require your approval
+- 🧠 **Progressive automation**: Orchestrator learns what to auto-approve
+- 📊 **Audit trail**: Every proposal and decision is logged
+
+> **Note**: The `mcpx-orchestrator` agent is under development. Check back soon or contribute to the project!
 
 ## Documentation
 

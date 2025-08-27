@@ -15,24 +15,27 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted 
 
 ## 1. Abstract
 
-MCPx defines a minimal, topic-based meta-message format and a realtime gateway API that allows multiple MCP servers (agents/humans/robots) to interoperate in shared "rooms" with built-in security through capability-based access control.
+MCPx defines a minimal, topic-based meta-message format and a realtime gateway API that enables collaborative AI governance through secure multi-agent orchestration.
 
-- Every participant behaves like an MCP server
-- Messages are published to a topic and are visible to all participants
-- A gateway-enforced capability system prevents unauthorized operations
-- MCP (JSON-RPC 2.0) requests/responses are encapsulated inside a simple envelope
+The protocol allows multiple MCP servers (agents/humans/robots) to interoperate in shared "rooms" where:
+- Untrusted agents can safely propose operations through capability-based access control
+- Multiple supervisors (human and AI) collaborate on policy decisions
+- Orchestrator agents progressively learn which operations to approve
+- Every participant maintains the MCP server model for maximum interoperability
 
-This v0.1 extends v0.0 with security mechanisms through capability-based access control.
+This architecture transforms isolated AI agents into collaborative systems where humans and AI work together to safely orchestrate complex operations at scale.
 
 ---
 
 ## 2. Goals and Non-Goals
 
 ### 2.1 Goals
-- **Security**: Prevent rogue agents from executing unauthorized operations through capability-based access control
+- **Collaborative Governance**: Enable multiple humans and AI systems to jointly supervise agent operations
+- **Progressive Automation**: Allow orchestrators to learn from collective decisions over time
+- **Security Through Isolation**: Untrusted agents propose rather than execute, maintaining safety
+- **Scalable Oversight**: Support consensus mechanisms and specialized reviewers for complex decisions
 - **Simplicity**: Gateway remains tool-agnostic, tracking only connection capabilities
-- **Human oversight**: Enable human-in-the-loop patterns for untrusted agents
-- **Interop**: Maintain MCP server model for all participants
+- **Interoperability**: Every participant maintains the MCP server model
 
 ### 2.2 Non-Goals
 - End-to-end encryption or private DMs (use separate topics or higher-layer crypto)
@@ -384,9 +387,88 @@ This lazy enforcement model keeps gateways fast while maintaining security throu
 
 ---
 
-## 5. Realtime Gateway API
+## 5. Multi-Agent Orchestration
 
-### 5.1 Authentication and Capability Assignment
+The capability-based security model enables sophisticated multi-agent collaboration patterns. The primary pattern that motivates this architecture is **delegated fulfillment**, where untrusted agents can propose operations that are reviewed and executed by trusted intermediaries.
+
+### 5.1 Delegated Fulfillment Pattern
+
+This pattern involves multiple types of participants:
+
+1. **Proposer Agents** (`mcp/proposal:*`) - Can only propose operations, cannot execute
+2. **Orchestrator Agents** (`mcp/request:*`) - Review proposals and coordinate execution
+3. **Worker Agents** (tool/resource providers) - Execute actual operations
+4. **Supervisors** (humans or AI) - Set policies and teach orchestrators
+5. **Reviewers** (optional) - Analyze proposals for safety and compliance
+
+**Workflow:**
+
+```
+Proposers → [proposals] → Orchestrator → [review] → Workers
+                              ↑
+                    Supervisors & Reviewers
+                    (collaborate on policies)
+```
+
+This architecture provides:
+- **Security isolation**: Untrusted code can't directly execute operations
+- **Collaborative oversight**: Multiple humans and AI systems can participate in governance
+- **Progressive automation**: Orchestrators learn which proposals to auto-approve
+- **Consensus building**: Critical operations can require multiple approvals
+- **Audit trail**: All proposals, reviews, and fulfillments are observable
+
+### 5.2 Capability Progression
+
+As trust is established, participants can be granted expanded capabilities:
+
+```
+Untrusted → Proposer → Limited Executor → Full Executor
+   ∅       mcp/proposal:*   mcp/request:resources/*   mcp/*
+```
+
+Each level represents increased trust and autonomy:
+- **Untrusted**: No capabilities, read-only observer
+- **Proposer**: Can suggest operations for others to execute
+- **Limited Executor**: Can perform specific safe operations
+- **Full Executor**: Unrestricted access to all operations
+
+### 5.3 Example Scenario
+
+Consider an AI coding assistant helping with a project:
+
+1. **Initial State**: AI assistant has `mcp/proposal:*` capabilities
+2. **Operation**: Assistant proposes `write_file("config.json", {...})`
+3. **Human Review**: Human sees proposal, deems it safe
+4. **Delegation**: Human tells orchestrator to fulfill this proposal
+5. **Execution**: Orchestrator sends request to filesystem agent
+6. **Learning**: Human teaches orchestrator "always approve config file updates"
+7. **Automation**: Future config proposals are auto-fulfilled
+
+This pattern scales to complex multi-agent systems where:
+- Multiple proposers suggest operations
+- **Multiple supervisors** (humans or AI) collaborate on policy decisions
+- **Intelligent reviewers** use classifiers and analysis tools to evaluate proposals
+- Orchestrators route requests based on collectively learned policies
+- Specialized workers handle different operation types
+- **Consensus mechanisms** can require multiple approvals for sensitive operations
+
+### 5.4 Implementation Considerations
+
+When implementing multi-agent orchestration:
+
+1. **Proposal Correlation**: Use `correlation_id` to link proposals to fulfillments
+2. **Timeout Management**: Proposals should expire if not fulfilled
+3. **Policy Storage**: Orchestrators need persistent rule storage
+4. **Audit Logging**: Track all proposals, decisions, and executions
+5. **Failure Handling**: Clear feedback when proposals are rejected
+
+The capability system provides the security foundation, while orchestration patterns provide the workflow for safe, supervised multi-agent collaboration.
+
+---
+
+## 6. Realtime Gateway API
+
+### 6.1 Authentication and Capability Assignment
 
 The gateway determines capabilities during authentication. Implementation-specific policies may include:
 
@@ -396,7 +478,7 @@ The gateway determines capabilities during authentication. Implementation-specif
 3. **Topic access control**: Topics may be public, private, or restricted
 4. **Dynamic capabilities**: Capabilities may be modified during a session
 
-### 5.2 WebSocket Connection
+### 6.2 WebSocket Connection
 
 Connect: `GET /v0/ws?topic=<name>` with Authorization header
 
@@ -408,7 +490,7 @@ The gateway:
 
 The capabilities in the welcome message constitute the authoritative list of what operations the participant can perform. Participants SHOULD use this list to understand their allowed operations.
 
-### 5.3 Message Filtering
+### 6.3 Message Filtering
 
 For each incoming message from a participant:
 
@@ -422,16 +504,16 @@ send_to_topic(message)
 
 ---
 
-## 6. Version Compatibility
+## 7. Version Compatibility
 
-### 6.1 Breaking Changes
+### 7.1 Breaking Changes
 
 This is a v0.x release. Breaking changes are expected between minor versions until v1.0:
 - v0.1 is NOT backward compatible with v0.0
 - Clients and gateways MUST use matching protocol versions
 - No compatibility guarantees until v1.0 release
 
-### 6.2 Migration from v0.0
+### 7.2 Migration from v0.0
 
 Key breaking changes from v0.0:
 - Protocol identifier changed from `mcp-x/v0` to `mcpx/v0.1`
@@ -439,7 +521,7 @@ Key breaking changes from v0.0:
 - Capabilities replace privilege levels
 - Chat moved to dedicated `chat` kind
 
-### 6.3 Future Compatibility
+### 7.3 Future Compatibility
 
 - v0.x series is experimental and subject to breaking changes
 - v1.0 will establish stable protocol with compatibility guarantees
@@ -447,9 +529,9 @@ Key breaking changes from v0.0:
 
 ---
 
-## 7. Security Considerations
+## 8. Security Considerations
 
-### 7.1 Lazy Enforcement Model
+### 8.1 Lazy Enforcement Model
 
 The gateway uses lazy enforcement (validating `kind` but not payload) for efficiency:
 
@@ -471,7 +553,7 @@ The gateway uses lazy enforcement (validating `kind` but not payload) for effici
 - Gateway can revoke capabilities for bad actors
 - Optional strict mode for high-security deployments
 
-### 7.2 Capability-Based Security Benefits
+### 8.2 Capability-Based Security Benefits
 
 1. **No token theft**: Capabilities tied to connection, not transferable
 2. **Fine-grained control**: Can limit access to specific MCP methods
@@ -479,13 +561,13 @@ The gateway uses lazy enforcement (validating `kind` but not payload) for effici
 4. **Human oversight**: Natural pattern for reviewing proposals
 5. **Audit trail**: All proposals and fulfillments are observable
 
-### 7.3 Limitations
+### 8.3 Limitations
 
 1. **Gateway trust**: Security depends on proper gateway implementation
 2. **Lazy validation**: Malformed messages reach agents before being dropped
 3. **Visibility**: All participants see all messages in topic (privacy consideration)
 
-### 7.4 Best Practices
+### 8.4 Best Practices
 
 1. **Start restricted**: New agents should begin with minimal capabilities
 2. **Promote carefully**: Only expand capabilities after establishing trust
@@ -495,21 +577,21 @@ The gateway uses lazy enforcement (validating `kind` but not payload) for effici
 
 ---
 
-## 8. Implementation Guidance
+## 9. Implementation Guidance
 
-### 8.1 Gateway Implementation
+### 9.1 Gateway Implementation
 1. Pattern matching engine for capability wildcards
 2. Connection-to-capability mapping
 3. Lazy enforcement (no payload validation)
 4. Configuration for default capability sets
 
-### 8.2 Agent Implementation
+### 9.2 Agent Implementation
 1. Validate `payload.method` matches `kind` declaration
 2. Handle `mcp/proposal:*` messages from restricted agents
 3. Support for fulfilling proposals on behalf of others
 4. Report malformed messages for reputation tracking
 
-### 8.3 Example Deployment Patterns
+### 9.3 Example Deployment Patterns
 
 Gateways may implement different security profiles based on environment:
 
@@ -520,9 +602,9 @@ Gateways may implement different security profiles based on environment:
 
 ---
 
-## 9. Examples
+## 10. Examples
 
-### 9.1 Proposal-Based Workflow Example
+### 10.1 Proposal-Based Workflow Example
 
 In this example, an agent with limited capabilities uses proposals:
 
@@ -533,7 +615,7 @@ In this example, an agent with limited capabilities uses proposals:
 5. Fulfiller sends real `mcp/request:METHOD` message to target
 6. Target executes and returns result to fulfiller (and optionally to proposer)
 
-### 9.2 Capability Expansion Example
+### 10.2 Capability Expansion Example
 
 One possible administrative workflow:
 
@@ -542,7 +624,7 @@ One possible administrative workflow:
 3. Administrator expands agent capabilities
 4. Agent gains access to additional operations
 
-### 9.3 Mixed Environment Example
+### 10.3 Mixed Environment Example
 
 A gateway might assign different capability profiles:
 
@@ -553,11 +635,24 @@ A gateway might assign different capability profiles:
 
 All participants operate in the same topic with their assigned capabilities.
 
+### 10.4 Delegated Fulfillment Example
+
+A human supervises an untrusted agent through intermediary agents:
+
+1. **Proposer Agent** (`mcp/proposal:*`) proposes writing a file
+2. **Human** reviews the proposal and decides to approve it by directing the **Orchestrator Agent** (`mcp/request:*`) to fulfill the proposal
+4. **Orchestrator Agent** sends the MCP request to **Worker Agent**
+5. **Worker Agent** executes the actual file write operation and responds
+6. Over time, **Human** teaches **Orchestrator Agent** rules about which proposals to auto-approve
+7. **Orchestrator Agent** begins autonomously fulfilling certain proposals without human intervention
+
+This pattern enables progressive automation while maintaining human oversight through a trusted orchestration layer.
+
 ---
 
-## 10. Appendix: Implementation Notes
+## 11. Appendix: Implementation Notes
 
-### 10.1 Gateway State
+### 11.1 Gateway State
 
 Minimal state required per connection:
 ```json
@@ -569,7 +664,7 @@ Minimal state required per connection:
 }
 ```
 
-### 10.2 Proposal Tracking
+### 11.2 Proposal Tracking
 
 Optional proposal tracking for fulfillment (maintained by agents, not gateway):
 ```json
@@ -585,7 +680,7 @@ Optional proposal tracking for fulfillment (maintained by agents, not gateway):
 }
 ```
 
-### 10.3 Capability Promotion API
+### 11.3 Capability Promotion API
 
 Optional admin endpoint:
 ```
