@@ -22,7 +22,7 @@ MCPx defines a minimal, topic-based meta-message format and a realtime gateway A
 - A gateway-enforced capability system prevents unauthorized operations
 - MCP (JSON-RPC 2.0) requests/responses are encapsulated inside a simple envelope
 
-This v0.1 extends v0 with security mechanisms while maintaining backward compatibility for trusted environments.
+This v0.1 extends v0.0 with security mechanisms through capability-based access control.
 
 ---
 
@@ -42,82 +42,7 @@ This v0.1 extends v0 with security mechanisms while maintaining backward compati
 
 ---
 
-## 3. Security Model
-
-### 3.1 Capability-Based Access Control
-
-The gateway assigns capabilities to each connection, determining which message kinds they can send. Capabilities support wildcards for flexible access control:
-
-**Wildcard Patterns:**
-- `mcp:*` - All MCP requests/notifications
-- `mcp:tools/*` - All tool operations (call, list)
-- `mcp:resources/*` - All resource operations (read, list, subscribe)
-- `mcp/response:*` - Can respond to any MCP request
-- `mcp/proposal:*` - Can propose any MCP operation
-
-**Common Capability Sets:**
-
-1. **Full Capabilities** (trusted agents/humans):
-   - `["mcp:*", "mcp/response:*", "mcp/proposal:*", "chat", "presence"]`
-   - Can initiate any MCP operations and fulfill proposals
-
-2. **Restricted Capabilities** (untrusted agents):
-   - `["mcp/proposal:*", "mcp/response:*", "chat", "presence"]`
-   - Cannot send direct MCP operations, must use proposals
-   - Can respond when their proposals are fulfilled
-
-3. **Response-Only Capabilities** (service agents):
-   - `["mcp/response:*", "chat", "presence"]`
-   - Can only respond to MCP requests, cannot initiate
-
-4. **Read-Only Capabilities** (monitor agents):
-   - `["mcp:resources/read", "mcp:*/list", "mcp/response:*", "chat"]`
-   - Can read resources and list anything, but cannot modify
-
-5. **Tool-Only Capabilities** (action agents):
-   - `["mcp:tools/*", "mcp/response:tools/*", "chat"]`
-   - Can use tools but not access resources
-
-**Progressive Trust Example:**
-
-Participants can be granted additional capabilities as trust increases:
-1. Initial: `["mcp/proposal:*", "chat"]` - Proposals only
-2. Basic: Add `["mcp:resources/read"]` - Can read resources
-3. Trusted: Add `["mcp:tools/*"]` - Can use tools
-4. Full: Replace with `["mcp:*"]` - Unrestricted access
-
-### 3.2 Gateway Enforcement (Lazy)
-
-The gateway uses lazy enforcement for efficiency, only checking capabilities against the `kind` field:
-
-**What the Gateway Does:**
-- Pattern matches `kind` against participant's capabilities
-- Blocks messages if no capability matches
-- Returns error responses for capability violations
-- **Does NOT validate that payload matches the kind**
-
-**What the Gateway Does NOT Do:**
-- Parse or validate JSON-RPC payloads
-- Check if `payload.method` matches the method in `kind`
-- Understand MCP semantics
-
-**Pattern Matching Examples:**
-- Kind `mcp:tools/call` matches capabilities: `mcp:*`, `mcp:tools/*`, `mcp:tools/call`
-- Kind `mcp/response:tools/call` matches: `mcp/response:*`, `mcp/response:tools/*`
-- Kind `chat` only matches exact: `chat`
-
-### 3.3 Agent Validation (Strict)
-
-Receiving agents MUST validate that messages are well-formed:
-- Verify `payload.method` matches the method declared in `kind`
-- Drop or report malformed messages
-- MAY track misbehaving participants for reputation scoring
-
-This lazy enforcement model keeps gateways fast while maintaining security through edge validation.
-
----
-
-## 4. Message Envelope
+## 3. Message Envelope
 
 All data flowing over a topic MUST be a single top-level JSON envelope:
 
@@ -128,7 +53,7 @@ All data flowing over a topic MUST be a single top-level JSON envelope:
   "ts": "2025-08-26T14:00:00Z",
   "from": "robot-alpha",
   "to": ["coordinator"],
-  "kind": "mcp",
+  "kind": "mcp/request:tools/call",
   "correlation_id": "env-1",
   "payload": { /* kind-specific body */ }
 }
@@ -141,7 +66,7 @@ Field semantics:
 - `from`: stable participant id within the topic
 - `to`: array of participant ids (empty/omitted = broadcast)
 - `kind`: Message type with format:
-  - `mcp:METHOD` - MCP request/notification (e.g., `mcp:tools/call`)
+  - `mcp/request:METHOD` - MCP request/notification (e.g., `mcp/request:tools/call`)
   - `mcp/response:METHOD` - MCP response (e.g., `mcp/response:tools/call`)
   - `mcp/proposal:METHOD` - MCP proposal (e.g., `mcp/proposal:tools/call`)
   - `chat` - Chat messages
@@ -150,11 +75,11 @@ Field semantics:
 - `correlation_id`: references the envelope being responded to
 - `payload`: object; structure depends on `kind`
 
-### 4.1 MCP Messages (kind = "mcp:METHOD")
+### 3.1 MCP Messages (kind = "mcp/request:METHOD")
 
-MCP requests and notifications use the format `mcp:METHOD` where METHOD is the MCP method name.
+MCP requests and notifications use the format `mcp/request:METHOD` where METHOD is the MCP method name.
 
-#### 4.1.1 MCP Requests
+#### 3.1.1 MCP Requests
 
 Example tool call request:
 
@@ -164,7 +89,7 @@ Example tool call request:
   "id": "env-call-1",
   "from": "trusted-agent",
   "to": ["target-agent"],
-  "kind": "mcp:tools/call",
+  "kind": "mcp/request:tools/call",
   "payload": {
     "jsonrpc": "2.0",
     "id": 42,
@@ -177,7 +102,7 @@ Example tool call request:
 }
 ```
 
-#### 4.1.2 MCP Responses (kind = "mcp/response:METHOD")
+#### 3.1.2 MCP Responses (kind = "mcp/response:METHOD")
 
 Response to the above tool call:
 
@@ -202,7 +127,7 @@ Response to the above tool call:
 }
 ```
 
-### 4.2 MCP Proposals (kind = "mcp/proposal:METHOD")
+### 3.2 MCP Proposals (kind = "mcp/proposal:METHOD")
 
 Participants with restricted capabilities MUST use proposals instead of direct MCP operations:
 
@@ -225,7 +150,7 @@ Participants with restricted capabilities MUST use proposals instead of direct M
 
 This is an MCPx-specific protocol extension that proposes an MCP operation requiring fulfillment by a participant with appropriate capabilities.
 
-#### 4.2.1 Proposal Fulfillment
+#### 3.2.1 Proposal Fulfillment
 
 A participant with appropriate capabilities fulfills the proposal by making the real MCP call:
 
@@ -272,7 +197,7 @@ The response goes to both the fulfiller and the original proposer:
 }
 ```
 
-### 4.3 Chat Messages (kind = "chat")
+### 3.3 Chat Messages (kind = "chat")
 
 Chat messages are MCPx-specific and do not pollute the MCP namespace:
 
@@ -293,11 +218,38 @@ Chat messages are MCPx-specific and do not pollute the MCP namespace:
 - `format` (optional): "plain" or "markdown", defaults to "plain"
 - Chat messages are typically broadcast (empty/omitted `to` array)
 
-### 4.4 System Messages (kind = "system")
+### 3.4 Presence Messages (kind = "presence")
 
-#### 4.4.1 Welcome with Capabilities
+Presence messages are broadcast to notify all participants about join/leave events:
 
-When a participant connects, the gateway sends a welcome message including their capabilities:
+```json
+{
+  "protocol": "mcpx/v0.1",
+  "id": "env-presence-1",
+  "from": "system:gateway",
+  "kind": "presence",
+  "payload": {
+    "event": "join",
+    "participant": {
+      "id": "new-agent",
+      "capabilities": ["mcp/proposal:*", "chat", "presence"]
+    }
+  }
+}
+```
+
+- `event` (required): Either `"join"` or `"leave"`
+- `participant` (required): Information about the participant
+  - `id`: The participant's identifier
+  - `capabilities`: The participant's capabilities (for `join` events)
+
+Note: Presence messages are broadcast to all participants. The joining participant also receives a private welcome message with their authoritative capabilities and the current participant list.
+
+### 3.5 System Messages (kind = "system")
+
+#### 3.5.1 Welcome Message
+
+When a participant connects, the gateway MUST send a private welcome message to that participant only:
 
 ```json
 {
@@ -308,17 +260,29 @@ When a participant connects, the gateway sends a welcome message including their
   "kind": "system",
   "payload": {
     "event": "welcome",
-    "participant": {
+    "you": {
       "id": "new-participant",
-      "capabilities": ["mcp/proposal", "chat", "presence"]
+      "capabilities": ["mcp/proposal:*", "chat", "presence"]
     },
-    "participants": [...],
-    "protocol": "mcpx/v0.1"
+    "participants": [
+      {
+        "id": "agent-1",
+        "capabilities": ["mcp/*", "chat", "presence"]
+      },
+      {
+        "id": "agent-2",
+        "capabilities": ["mcp/response:*", "chat", "presence"]
+      }
+    ]
   }
 }
 ```
 
-#### 4.4.2 Capability Violation
+- `you`: The joining participant's own information and authoritative capabilities
+- `participants`: Current list of other participants in the topic and their capabilities
+- Other participants can safely ignore this message (it's addressed specifically to the new participant)
+
+#### 3.5.2 Capability Violation
 
 When a participant attempts an operation they lack capability for:
 
@@ -335,45 +299,124 @@ When a participant attempts an operation they lack capability for:
     "error": "capability_violation",
     "message": "You lack capability for 'mcp/request:tools/call'",
     "attempted_kind": "mcp/request:tools/call",
-    "your_capabilities": ["mcp/proposal", "chat", "presence"]
+    "your_capabilities": ["mcp/proposal:*", "chat", "presence"]
   }
 }
 ```
 
 ---
 
+## 4. Security Model
+
+### 4.1 Capability-Based Access Control
+
+The gateway assigns capabilities to each connection, determining which message kinds they can send. Capabilities support wildcards for flexible access control:
+
+**Wildcard Patterns:**
+- `mcp/*` - All MCP-related messages (requests, responses, proposals)
+- `mcp/request:*` - All MCP requests/notifications
+- `mcp/request:tools/*` - All tool operations (call, list)
+- `mcp/request:resources/*` - All resource operations (read, list, subscribe)
+- `mcp/response:*` - Can respond to any MCP request
+- `mcp/proposal:*` - Can propose any MCP operation
+
+**Example Capability Sets:**
+
+Gateways may implement various capability profiles based on their security requirements:
+
+1. **Full Access** example:
+   - `["mcp/*", "chat", "presence"]`
+   - Can initiate any MCP operations, respond, and fulfill proposals
+
+2. **Proposal-Only** example:
+   - `["mcp/proposal:*", "mcp/response:*", "chat", "presence"]`
+   - Cannot send direct MCP requests, must use proposals
+   - Can respond when their proposals are fulfilled
+
+3. **Response-Only** example:
+   - `["mcp/response:*", "chat", "presence"]`
+   - Can only respond to MCP requests, cannot initiate
+
+4. **Read-Only** example:
+   - `["mcp/request:resources/read", "mcp/request:*/list", "mcp/response:*", "chat"]`
+   - Can read resources and list anything, but cannot modify
+
+5. **Tool-Only** example:
+   - `["mcp/request:tools/*", "mcp/response:tools/*", "chat"]`
+   - Can use tools but not access resources
+
+**Progressive Trust Example:**
+
+One possible pattern is to expand capabilities as trust increases:
+1. Initial: `["mcp/proposal:*", "chat"]` - Proposals only
+2. Basic: Add `["mcp/request:resources/read"]` - Can read resources
+3. Trusted: Add `["mcp/request:tools/*"]` - Can use tools
+4. Full: Replace with `["mcp/*"]` - Unrestricted access
+
+### 4.2 Gateway Enforcement (Lazy)
+
+The gateway uses lazy enforcement for efficiency, only checking capabilities against the `kind` field:
+
+**What the Gateway Does:**
+- Pattern matches `kind` against participant's capabilities
+- Blocks messages if no capability matches
+- Returns error responses for capability violations
+- **Does NOT validate that payload matches the kind**
+
+**What the Gateway Does NOT Do:**
+- Parse or validate JSON-RPC payloads
+- Check if `payload.method` matches the method in `kind`
+- Understand MCP semantics
+
+**Pattern Matching Examples:**
+- Kind `mcp/request:tools/call` matches capabilities: `mcp/*`, `mcp/request:*`, `mcp/request:tools/*`, `mcp/request:tools/call`
+- Kind `mcp/response:tools/call` matches: `mcp/*`, `mcp/response:*`, `mcp/response:tools/*`
+- Kind `chat` only matches exact: `chat`
+
+### 4.3 Agent Validation (Strict)
+
+Receiving agents MUST validate that messages are well-formed:
+- Verify `payload.method` matches the method declared in `kind`
+- Drop or report malformed messages
+- MAY track misbehaving participants for reputation scoring
+
+This lazy enforcement model keeps gateways fast while maintaining security through edge validation.
+
+---
+
 ## 5. Realtime Gateway API
 
-### 5.1 Authentication and Privilege Assignment
+### 5.1 Authentication and Capability Assignment
 
-The gateway determines privilege level during authentication:
+The gateway determines capabilities during authentication. Implementation-specific policies may include:
 
-1. **Token-based**: Different token types grant different privileges
-   - Implementations may issue topic-specific tokens with varying privilege levels
-2. **Identity-based**: Known/verified identities get full privilege
-3. **Default restricted**: New/unknown participants start restricted
-4. **Promotion**: Admins can promote participants from restricted to full
+1. **Token-based**: Tokens map to specific capability sets
+   - Implementations may encode capabilities in tokens or map tokens to capability profiles
+2. **Identity-based**: Map authenticated identities to capability sets
+3. **Topic access control**: Topics may be public, private, or restricted
+4. **Dynamic capabilities**: Capabilities may be modified during a session
 
 ### 5.2 WebSocket Connection
 
 Connect: `GET /v0/ws?topic=<name>` with Authorization header
 
 The gateway:
-1. Validates the bearer token
-2. Assigns privilege level based on token/identity
-3. Sends welcome message with privilege level
-4. Enforces privilege rules on all messages
+1. Validates the bearer token (if provided)
+2. Determines capabilities based on implementation policy
+3. **MUST** send welcome message with accurate capabilities
+4. **MUST** enforce capability rules on all subsequent messages
+
+The capabilities in the welcome message constitute the authoritative list of what operations the participant can perform. Participants SHOULD use this list to understand their allowed operations.
 
 ### 5.3 Message Filtering
 
 For each incoming message from a participant:
 
 ```python
-if message.kind == "mcp":
-    if participant.privilege == "restricted":
-        send_error("Privilege violation: use mcp/proposal instead")
-        broadcast_violation_notice()  # optional
-        return
+if not matches_any_capability(message.kind, participant.capabilities):
+    send_error(f"Capability violation: you lack capability for '{message.kind}'")
+    broadcast_violation_notice()  # optional
+    return
 send_to_topic(message)
 ```
 
@@ -392,7 +435,7 @@ This is a v0.x release. Breaking changes are expected between minor versions unt
 
 Key breaking changes from v0.0:
 - Protocol identifier changed from `mcp-x/v0` to `mcpx/v0.1`
-- Message kinds now use namespacing (e.g., `mcp:tools/call`)
+- Message kinds now use hierarchical namespacing (e.g., `mcp/request:tools/call`)
 - Capabilities replace privilege levels
 - Chat moved to dedicated `chat` kind
 
@@ -442,7 +485,7 @@ The gateway uses lazy enforcement (validating `kind` but not payload) for effici
 2. **Lazy validation**: Malformed messages reach agents before being dropped
 3. **Visibility**: All participants see all messages in topic (privacy consideration)
 
-### 7.3 Best Practices
+### 7.4 Best Practices
 
 1. **Start restricted**: New agents should begin with minimal capabilities
 2. **Promote carefully**: Only expand capabilities after establishing trust
@@ -466,40 +509,49 @@ The gateway uses lazy enforcement (validating `kind` but not payload) for effici
 3. Support for fulfilling proposals on behalf of others
 4. Report malformed messages for reputation tracking
 
-### 8.3 Deployment Patterns
-1. **Development**: All agents get `mcp:*` capabilities
+### 8.3 Example Deployment Patterns
+
+Gateways may implement different security profiles based on environment:
+
+1. **Development**: All agents get `mcp/*` capabilities
 2. **Staging**: Mixed capabilities for testing
-3. **Production**: Strict capabilities with proposals for untrusted agents
+3. **Production**: Strict capabilities with proposal-based workflows
 4. **High Security**: Response-only capabilities for most agents
 
 ---
 
 ## 9. Examples
 
-### 9.1 Restricted Agent Workflow
+### 9.1 Proposal-Based Workflow Example
 
-1. Untrusted agent connects → receives restricted privilege
-2. Agent attempts MCP operation → gateway blocks, returns error
-3. Agent sends `mcp/proposal` → visible to all participants
-4. Human user sees the proposal and decides to fulfill it
-5. Human sends real `mcp` message to target
-6. Target executes and returns result to human (and optionally to proposer)
+In this example, an agent with limited capabilities uses proposals:
 
-### 9.2 Trust Promotion
+1. Agent connects → receives proposal-only capabilities
+2. Agent attempts MCP request → gateway blocks, returns error
+3. Agent sends `mcp/proposal:METHOD` → visible to all participants
+4. Another participant with appropriate capabilities fulfills it
+5. Fulfiller sends real `mcp/request:METHOD` message to target
+6. Target executes and returns result to fulfiller (and optionally to proposer)
 
-1. Restricted agent operates successfully over time
-2. Human admin observes good behavior
-3. Admin promotes agent to full privilege
-4. Agent can now make direct tool calls
+### 9.2 Capability Expansion Example
 
-### 9.3 Mixed Environment
+One possible administrative workflow:
 
-- Human users: full privilege
-- Established agents: full privilege
-- New AI agents: restricted privilege
-- External integrations: restricted privilege
+1. Agent operates successfully over time
+2. Administrator observes behavior patterns
+3. Administrator expands agent capabilities
+4. Agent gains access to additional operations
 
-All operate in same topic with appropriate access controls.
+### 9.3 Mixed Environment Example
+
+A gateway might assign different capability profiles:
+
+- Administrative users: `mcp/*` (full access)
+- Service agents: `mcp/response:*` (response-only)
+- New agents: `mcp/proposal:*` (proposal-only)
+- Monitoring tools: `mcp/request:*/list` (read-only)
+
+All participants operate in the same topic with their assigned capabilities.
 
 ---
 
@@ -512,7 +564,7 @@ Minimal state required per connection:
 {
   "connectionId": "ws-123",
   "participantId": "agent-a",
-  "privilege": "restricted",
+  "capabilities": ["mcp/proposal:*", "chat", "presence"],
   "connectedAt": "2025-08-26T14:00:00Z"
 }
 ```
@@ -533,20 +585,26 @@ Optional proposal tracking for fulfillment (maintained by agents, not gateway):
 }
 ```
 
-### 10.3 Privilege Promotion API
+### 10.3 Capability Promotion API
 
 Optional admin endpoint:
 ```
-POST /admin/participants/{id}/promote
+POST /admin/participants/{id}/capabilities
 Authorization: Bearer <admin-token>
+
+Request:
+{
+  "add": ["mcp/request:tools/*"],
+  "remove": []
+}
 
 Response:
 {
   "participantId": "agent-a",
-  "oldPrivilege": "restricted",
-  "newPrivilege": "full",
-  "promotedBy": "admin-user",
-  "promotedAt": "2025-08-26T14:30:00Z"
+  "oldCapabilities": ["mcp/proposal:*", "chat", "presence"],
+  "newCapabilities": ["mcp/proposal:*", "mcp/request:tools/*", "chat", "presence"],
+  "modifiedBy": "admin-user",
+  "modifiedAt": "2025-08-26T14:30:00Z"
 }
 ```
 
@@ -555,6 +613,6 @@ Response:
 ## References
 
 - MCP Specification 2025-06-18
-- MCPx v0 Specification
+- MCPx v0.0 Specification
 - ADR-003: Tool Access Control
 - OAuth 2.0 RFC 6749 (for token patterns)
