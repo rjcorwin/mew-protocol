@@ -81,6 +81,48 @@ cat ~/Desktop/Notes/TODO.md
 
 That's it! You've just created a multi-agent system where an AI can manage your TODO list. The OpenAI agent discovered the filesystem tools from the Notes agent and used them to update your file.
 
+## Intermediate Demo: Human-Supervised AI Proposals
+
+Before full orchestration, you can run MCPx with human-in-the-loop supervision where you manually review and fulfill AI proposals:
+
+```bash
+# 1. Start the gateway with security enabled
+mcpx-gateway --secure
+
+# 2. Bridge your Notes folder with full capabilities (Terminal 2)
+mcpx-bridge run -t supervised -i notes-agent -n "Notes" \
+  -- npx @modelcontextprotocol/server-filesystem ~/Desktop/Notes
+
+# 3. Start OpenAI agent with PROPOSAL-ONLY capabilities (Terminal 3)
+OPENAI_API_KEY=your-key \
+OPENAI_MODEL=gpt-4o \
+MCPX_TOPIC=supervised \
+MCPX_CAPABILITIES="mcp/proposal:*,chat" \
+OPENAI_SYSTEM_PROMPT="You are a helpful assistant. You can only propose operations - you cannot execute them directly. Explain what you want to do." \
+mcpx-openai-agent
+
+# 4. Connect as human with FULL capabilities (Terminal 4)
+mcpx-chat ws://localhost:3000 supervised human --capabilities "mcp/*"
+
+# Now the workflow is:
+# Type: @openai-agent please add "buy milk" to my TODO list
+# 
+# AI responds: "I'll propose adding that item to your TODO list"
+# AI sends: [PROPOSAL] write_file to TODO.md
+# 
+# You review the proposal and if it looks good:
+# Type: /fulfill <proposal-id>
+# OR manually execute: @notes-agent write_file TODO.md "updated content..."
+# 
+# The file is updated only after YOUR approval!
+```
+
+This intermediate pattern gives you:
+- 🔍 **Full visibility**: See exactly what the AI wants to do
+- ✅ **Explicit approval**: Nothing happens without your action  
+- 📝 **Audit trail**: All proposals and decisions are logged
+- 🎓 **Learning opportunity**: Understand what the AI is doing
+
 ## Advanced Demo: Orchestrated AI with Human Oversight (Coming Soon)
 
 This demo showcases the full power of MCPx's collaborative governance model, where an AI proposes operations that an orchestrator reviews and executes based on human-defined policies.
