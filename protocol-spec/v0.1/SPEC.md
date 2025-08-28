@@ -75,7 +75,11 @@ Field semantics:
   - `chat` - Chat messages
   - `presence` - Join/leave events
   - `system` - Gateway system messages
-- `correlation_id`: references the envelope being responded to
+- `correlation_id`: links related envelopes in a conversation chain
+  - Response → Request: `mcp/response:METHOD` MUST reference the originating `mcp/request:METHOD`
+  - Fulfillment → Proposal: `mcp/request:METHOD` MAY reference a `mcp/proposal:METHOD` when fulfilling it
+  - Error → Trigger: `system` error messages SHOULD reference the envelope that caused the error
+  - Reply → Message: Any envelope MAY reference another for threading/context
 - `payload`: object; structure depends on `kind`
 
 ### 3.1 MCP Messages (kind = "mcp/request:METHOD")
