@@ -511,7 +511,19 @@ The gateway:
 
 The capabilities in the welcome message constitute the authoritative list of what operations the participant can perform. Participants SHOULD use this list to understand their allowed operations.
 
-### 6.3 Message Filtering
+### 6.3 Message Routing
+
+Participants can configure their message routing preference (implementation-specific):
+
+**Routing Modes:**
+- **All**: Receive every message in the topic (default)
+- **Directed**: Only receive messages where:
+  - `to` field includes their participant ID, OR
+  - `to` field is empty/omitted (broadcast)
+
+This allows participants to reduce noise while still receiving broadcasts and messages directed to them. The gateway MUST respect these preferences when routing messages.
+
+### 6.4 Message Filtering
 
 For each incoming message from a participant:
 
@@ -594,6 +606,7 @@ Implementers MUST pay particular attention to the participant validation require
   
 - [ ] **Message Routing**
   - [ ] Route messages based on `to` field (broadcast if empty/omitted)
+  - [ ] Support participant routing preferences (All vs Directed mode)
   - [ ] Preserve envelope structure without modification
   - [ ] NO payload parsing or validation (lazy enforcement)
 
