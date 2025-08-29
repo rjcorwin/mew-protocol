@@ -1,5 +1,9 @@
 # MCPx Protocol
 
+Key concepts:
+1. MCP, but in a chat and everyone is an MCP server: MCPx defines an envelope types that wraps around MCP with `mcp/request`/`mcp/response`  addressed to particular participants in the chat 📩.
+2. A capabilities based security model where some participants can write `mcp/request` envelopes but others can only write `mcp/propose` envelopes, that higher capability participants may choose to "accept" by writing the `mcp/request` for them.
+
 **Collaborative AI Governance Through Multi-Agent Orchestration** 
 
 MCPx extends the Model Context Protocol (MCP) to enable secure, supervised collaboration between AI agents, humans, and tools - transforming isolated AI systems into collaborative intelligence networks.
