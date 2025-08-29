@@ -231,7 +231,7 @@ Chat messages are MCPx-specific and do not pollute the MCP namespace:
 - `format` (optional): "plain" or "markdown", defaults to "plain"
 - Chat messages are typically broadcast (empty/omitted `to` array)
 
-### 3.4 Presence Messages (kind = "presence")
+### 3.4 Presence Messages (kind = "system/presence")
 
 Presence messages are broadcast to notify all participants about join/leave events:
 
@@ -240,12 +240,12 @@ Presence messages are broadcast to notify all participants about join/leave even
   "protocol": "mcpx/v0.1",
   "id": "env-presence-1",
   "from": "system:gateway",
-  "kind": "presence",
+  "kind": "system/presence",
   "payload": {
     "event": "join",
     "participant": {
       "id": "new-agent",
-      "capabilities": ["mcp/proposal:*", "chat", "presence"]
+      "capabilities": ["mcp/proposal:*", "chat"]
     }
   }
 }
@@ -258,9 +258,9 @@ Presence messages are broadcast to notify all participants about join/leave even
 
 Note: Presence messages are broadcast to all participants. The joining participant also receives a welcome message addressed specifically to them (via the `to` field) with their authoritative capabilities and the current participant list.
 
-### 3.5 System Messages (kind = "system")
+### 3.5 System Messages (kind = "system/*")
 
-#### 3.5.1 Welcome Message
+#### 3.5.1 Welcome Message (kind = "system/welcome")
 
 When a participant connects, the gateway MUST send a welcome message addressed specifically to that participant (using the `to` field):
 
@@ -270,21 +270,20 @@ When a participant connects, the gateway MUST send a welcome message addressed s
   "id": "env-welcome-1",
   "from": "system:gateway",
   "to": ["new-participant"],
-  "kind": "system",
+  "kind": "system/welcome",
   "payload": {
-    "event": "welcome",
     "you": {
       "id": "new-participant",
-      "capabilities": ["mcp/proposal:*", "chat", "presence"]
+      "capabilities": ["mcp/proposal:*", "chat"]
     },
     "participants": [
       {
         "id": "agent-1",
-        "capabilities": ["mcp/*", "chat", "presence"]
+        "capabilities": ["mcp/*", "chat"]
       },
       {
         "id": "agent-2",
-        "capabilities": ["mcp/response:*", "chat", "presence"]
+        "capabilities": ["mcp/response:*", "chat"]
       }
     ]
   }
@@ -295,7 +294,7 @@ When a participant connects, the gateway MUST send a welcome message addressed s
 - `participants`: Current list of other participants in the topic and their capabilities
 - Other participants can safely ignore this message (it's addressed specifically to the new participant)
 
-#### 3.5.2 Capability Violation
+#### 3.5.2 Capability Violation (kind = "system/error")
 
 When a participant attempts an operation they lack capability for:
 
@@ -305,14 +304,13 @@ When a participant attempts an operation they lack capability for:
   "id": "env-violation-1",
   "from": "system:gateway",
   "to": ["violator"],
-  "kind": "system",
+  "kind": "system/error",
   "correlation_id": "env-bad-call",
   "payload": {
-    "type": "error",
     "error": "capability_violation",
     "message": "You lack capability for 'mcp/request:tools/call'",
     "attempted_kind": "mcp/request:tools/call",
-    "your_capabilities": ["mcp/proposal:*", "chat", "presence"]
+    "your_capabilities": ["mcp/proposal:*", "chat"]
   }
 }
 ```
@@ -323,7 +321,7 @@ When a participant attempts an operation they lack capability for:
 
 ### 4.1 Capability-Based Access Control
 
-The gateway assigns capabilities to each connection, determining which message kinds they can send. Capabilities support wildcards for flexible access control:
+The gateway assigns capabilities to each connection, determining which message kinds they can send. Capabilities support wildcards for flexible access control.
 
 **Wildcard Patterns:**
 - `mcp/*` - All MCP-related messages (requests, responses, proposals)
@@ -333,21 +331,24 @@ The gateway assigns capabilities to each connection, determining which message k
 - `mcp/response:*` - Can respond to any MCP request
 - `mcp/proposal:*` - Can propose any MCP operation
 
+**Reserved Namespace:**
+The `system/*` namespace is reserved exclusively for the gateway. Participants MUST NOT send messages with `kind` starting with `system/`. The gateway MUST reject any such attempts. Only the gateway can generate system messages (`system/welcome`, `system/presence`, `system/error`).
+
 **Example Capability Sets:**
 
 Gateways may implement various capability profiles based on their security requirements:
 
 1. **Full Access** example:
-   - `["mcp/*", "chat", "presence"]`
+   - `["mcp/*", "chat"]`
    - Can initiate any MCP operations, respond, and fulfill proposals
 
 2. **Proposal-Only** example:
-   - `["mcp/proposal:*", "mcp/response:*", "chat", "presence"]`
+   - `["mcp/proposal:*", "mcp/response:*", "chat"]`
    - Cannot send direct MCP requests, must use proposals
    - Can respond when their proposals are fulfilled
 
 3. **Response-Only** example:
-   - `["mcp/response:*", "chat", "presence"]`
+   - `["mcp/response:*", "chat"]`
    - Can only respond to MCP requests, cannot initiate
 
 4. **Read-Only** example:
@@ -378,8 +379,10 @@ The gateway uses lazy enforcement for efficiency, only checking capabilities aga
 
 **What the Gateway Does NOT Do:**
 - Parse or validate JSON-RPC payloads
-- Check if `payload.method` matches the method in `kind`
 - Understand MCP semantics
+- Detect spoofing (where `kind` doesn't match payload content)
+
+**Security Model:** The gateway relies on receiving clients to detect and reject spoofed messages where the envelope `kind` doesn't match the actual payload. This division of responsibility keeps the gateway lightweight while maintaining security.
 
 **Pattern Matching Examples:**
 - Kind `mcp/request:tools/call` matches capabilities: `mcp/*`, `mcp/request:*`, `mcp/request:tools/*`, `mcp/request:tools/call`
@@ -389,9 +392,14 @@ The gateway uses lazy enforcement for efficiency, only checking capabilities aga
 ### 4.3 Agent Validation (Strict)
 
 Receiving agents MUST validate that messages are well-formed:
-- Verify `payload.method` matches the method declared in `kind`
+- **CRITICAL**: Verify both METHOD and CONTEXT from `kind` match the payload
+  - For `kind: "mcp/request:tools/call:read_file"`, validate:
+    - `payload.method` is `"tools/call"`
+    - `payload.params.name` is `"read_file"`
 - Drop or report malformed messages
 - MAY track misbehaving participants for reputation scoring
+
+**Security Note:** Clients MUST validate that the envelope `kind` (including both METHOD and CONTEXT) matches the payload content before accepting any message. Without this validation, malicious participants could spoof operations by using a `kind` they have capabilities for while sending a payload for operations they don't have permission to perform (e.g., using `kind: "mcp/request:tools/call:safe_tool"` while `payload.params.name` is actually `"dangerous_tool"`).
 
 This lazy enforcement model keeps gateways fast while maintaining security through edge validation.
 
@@ -669,7 +677,7 @@ Minimal state required per connection:
 {
   "connectionId": "ws-123",
   "participantId": "agent-a",
-  "capabilities": ["mcp/proposal:*", "chat", "presence"],
+  "capabilities": ["mcp/proposal:*", "chat"],
   "connectedAt": "2025-08-26T14:00:00Z"
 }
 ```
@@ -706,8 +714,8 @@ Request:
 Response:
 {
   "participantId": "agent-a",
-  "oldCapabilities": ["mcp/proposal:*", "chat", "presence"],
-  "newCapabilities": ["mcp/proposal:*", "mcp/request:tools/*", "chat", "presence"],
+  "oldCapabilities": ["mcp/proposal:*", "chat"],
+  "newCapabilities": ["mcp/proposal:*", "mcp/request:tools/*", "chat"],
   "modifiedBy": "admin-user",
   "modifiedAt": "2025-08-26T14:30:00Z"
 }
