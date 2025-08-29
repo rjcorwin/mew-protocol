@@ -17,9 +17,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted 
 
 MCPx enables untrusted AI agents to safely participate in complex workflows under human and orchestrator supervision.
 
-The protocol extends the Model Context Protocol (MCP) by wrapping its messages in routing envelopes that add multi-agent coordination capabilities. While MCP defines client-server interactions with tools, MCPx transforms this into a multi-party system where any participant can offer services and call others' tools. The key innovation is capability-based security: agents can propose operations they lack permission to execute, enabling safe collaboration between components with different trust levels.
-
-Messages use an extended kind format (e.g., `mcp/response:tools/call:read_file`) that embeds operation context directly in the envelope, making them self-documenting even when correlation history is lost. This pure wrapper approach - never modifying MCP payloads - ensures complete interoperability while enabling fine-grained access control, audit trails, and progressive automation where orchestrators learn which proposals to auto-approve over time.
+The protocol wraps Model Context Protocol (MCP) messages in envelopes that transform MCP's client-server model into a broadcast system where every participant observes every operation. The extended kind format (`mcp/response:tools/call:read_file`) makes operations self-describing, enabling participants to learn patterns without parsing payloads. Over time, frequently-approved proposals become automated policies, turning human oversight into machine-learned orchestration. The result isn't just safer AI systems - it's a new way to program where the boundary between human judgment and automated execution continuously evolves based on observed behavior.
 
 ---
 
@@ -258,13 +256,13 @@ Presence messages are broadcast to notify all participants about join/leave even
   - `id`: The participant's identifier
   - `capabilities`: The participant's capabilities (for `join` events)
 
-Note: Presence messages are broadcast to all participants. The joining participant also receives a private welcome message with their authoritative capabilities and the current participant list.
+Note: Presence messages are broadcast to all participants. The joining participant also receives a welcome message addressed specifically to them (via the `to` field) with their authoritative capabilities and the current participant list.
 
 ### 3.5 System Messages (kind = "system")
 
 #### 3.5.1 Welcome Message
 
-When a participant connects, the gateway MUST send a private welcome message to that participant only:
+When a participant connects, the gateway MUST send a welcome message addressed specifically to that participant (using the `to` field):
 
 ```json
 {
