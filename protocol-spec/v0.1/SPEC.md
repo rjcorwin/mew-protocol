@@ -401,6 +401,12 @@ Receiving participants MUST validate that messages are well-formed:
 
 **Security Note:** Participants MUST validate that the envelope `kind` (including both METHOD and CONTEXT) matches the payload content before accepting any message. Without this validation, malicious participants could spoof operations by using a `kind` they have capabilities for while sending a payload for operations they don't have permission to perform (e.g., using `kind: "mcp/request:tools/call:safe_tool"` while `payload.params.name` is actually `"dangerous_tool"`).
 
+**Schema Mismatch Warning:** Participants may observe messages with schemas that differ from what was advertised:
+- Other participants might advertise one tool schema in their capabilities but send different parameters
+- Participants joining mid-conversation may see responses to requests they never observed
+- The gateway doesn't validate payload contents, only the `kind` field
+- Always parse messages defensively and validate `kind` matches payload structure before processing
+
 This lazy enforcement model keeps gateways fast while maintaining security through edge validation.
 
 ---
