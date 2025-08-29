@@ -382,16 +382,16 @@ The gateway uses lazy enforcement for efficiency, only checking capabilities aga
 - Understand MCP semantics
 - Detect spoofing (where `kind` doesn't match payload content)
 
-**Security Model:** The gateway relies on receiving clients to detect and reject spoofed messages where the envelope `kind` doesn't match the actual payload. This division of responsibility keeps the gateway lightweight while maintaining security.
+**Security Model:** The gateway relies on receiving participants to detect and reject spoofed messages where the envelope `kind` doesn't match the actual payload. This division of responsibility keeps the gateway lightweight while maintaining security.
 
 **Pattern Matching Examples:**
 - Kind `mcp/request:tools/call` matches capabilities: `mcp/*`, `mcp/request:*`, `mcp/request:tools/*`, `mcp/request:tools/call`
 - Kind `mcp/response:tools/call` matches: `mcp/*`, `mcp/response:*`, `mcp/response:tools/*`
 - Kind `chat` only matches exact: `chat`
 
-### 4.3 Agent Validation (Strict)
+### 4.3 Participant Validation (Strict)
 
-Receiving agents MUST validate that messages are well-formed:
+Receiving participants MUST validate that messages are well-formed:
 - **CRITICAL**: Verify both METHOD and CONTEXT from `kind` match the payload
   - For `kind: "mcp/request:tools/call:read_file"`, validate:
     - `payload.method` is `"tools/call"`
@@ -399,7 +399,7 @@ Receiving agents MUST validate that messages are well-formed:
 - Drop or report malformed messages
 - MAY track misbehaving participants for reputation scoring
 
-**Security Note:** Clients MUST validate that the envelope `kind` (including both METHOD and CONTEXT) matches the payload content before accepting any message. Without this validation, malicious participants could spoof operations by using a `kind` they have capabilities for while sending a payload for operations they don't have permission to perform (e.g., using `kind: "mcp/request:tools/call:safe_tool"` while `payload.params.name` is actually `"dangerous_tool"`).
+**Security Note:** Participants MUST validate that the envelope `kind` (including both METHOD and CONTEXT) matches the payload content before accepting any message. Without this validation, malicious participants could spoof operations by using a `kind` they have capabilities for while sending a payload for operations they don't have permission to perform (e.g., using `kind: "mcp/request:tools/call:safe_tool"` while `payload.params.name` is actually `"dangerous_tool"`).
 
 This lazy enforcement model keeps gateways fast while maintaining security through edge validation.
 
