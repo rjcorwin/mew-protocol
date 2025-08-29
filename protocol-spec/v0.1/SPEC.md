@@ -82,9 +82,11 @@ Field semantics:
   - Reply → Message: Any envelope MAY reference another for threading/context
 - `payload`: object; structure depends on `kind`
 
-### 3.1 MCP Messages (kind = "mcp/request:METHOD")
+### 3.1 MCP Messages (kind = "mcp/request:METHOD[:CONTEXT]")
 
-MCP requests and notifications use the format `mcp/request:METHOD` where METHOD is the MCP method name.
+MCP requests and notifications use the format `mcp/request:METHOD[:CONTEXT]` where:
+- METHOD is the MCP method name (e.g., `tools/call`, `resources/read`)
+- CONTEXT is the specific operation (e.g., tool name, resource URI)
 
 #### 3.1.1 MCP Requests
 
@@ -96,7 +98,7 @@ Example tool call request:
   "id": "env-call-1",
   "from": "trusted-agent",
   "to": ["target-agent"],
-  "kind": "mcp/request:tools/call",
+  "kind": "mcp/request:tools/call:dangerous_operation",
   "payload": {
     "jsonrpc": "2.0",
     "id": 42,
@@ -109,9 +111,9 @@ Example tool call request:
 }
 ```
 
-#### 3.1.2 MCP Responses (kind = "mcp/response:METHOD")
+#### 3.1.2 MCP Responses (kind = "mcp/response:METHOD[:CONTEXT]")
 
-Response to the above tool call:
+Response to the above tool call. The response SHOULD include the operation context in the kind:
 
 ```json
 {
@@ -119,7 +121,7 @@ Response to the above tool call:
   "id": "env-resp-1",
   "from": "target-agent",
   "to": ["trusted-agent"],
-  "kind": "mcp/response:tools/call",
+  "kind": "mcp/response:tools/call:dangerous_operation",
   "correlation_id": "env-call-1",
   "payload": {
     "jsonrpc": "2.0",
@@ -134,7 +136,9 @@ Response to the above tool call:
 }
 ```
 
-### 3.2 MCP Proposals (kind = "mcp/proposal:METHOD")
+Note: The extended kind format (`METHOD:CONTEXT`) makes responses self-contained and enables fine-grained capability control. The MCP payload remains unchanged.
+
+### 3.2 MCP Proposals (kind = "mcp/proposal:METHOD[:CONTEXT]")
 
 Participants with restricted capabilities MUST use proposals instead of direct MCP operations:
 
@@ -144,7 +148,7 @@ Participants with restricted capabilities MUST use proposals instead of direct M
   "id": "env-req-1",
   "from": "untrusted-agent",
   "to": ["target-agent"],
-  "kind": "mcp/proposal:tools/call",
+  "kind": "mcp/proposal:tools/call:dangerous_operation",
   "payload": {
     "method": "tools/call",
     "params": {
@@ -167,7 +171,7 @@ A participant with appropriate capabilities fulfills the proposal by making the 
   "id": "env-fulfill-1",
   "from": "human-user",
   "to": ["target-agent"],
-  "kind": "mcp/request:tools/call",
+  "kind": "mcp/request:tools/call:dangerous_operation",
   "correlation_id": "env-req-1",
   "payload": {
     "jsonrpc": "2.0",
@@ -189,7 +193,7 @@ The response goes to both the fulfiller and the original proposer:
   "id": "env-fulfill-resp-1",
   "from": "target-agent",
   "to": ["human-user", "untrusted-agent"],
-  "kind": "mcp/response:tools/call",
+  "kind": "mcp/response:tools/call:dangerous_operation",
   "correlation_id": "env-fulfill-1",
   "payload": {
     "jsonrpc": "2.0",
