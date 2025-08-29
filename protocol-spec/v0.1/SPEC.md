@@ -405,88 +405,9 @@ This lazy enforcement model keeps gateways fast while maintaining security throu
 
 ---
 
-## 5. Multi-Agent Orchestration
+## 5. Realtime Gateway API
 
-The capability-based security model enables sophisticated multi-agent collaboration patterns. The primary pattern that motivates this architecture is **delegated fulfillment**, where untrusted agents can propose operations that are reviewed and executed by trusted intermediaries.
-
-### 5.1 Delegated Fulfillment Pattern
-
-This pattern involves multiple types of participants:
-
-1. **Proposer Agents** (`mcp/proposal:*`) - Can only propose operations, cannot execute
-2. **Orchestrator Agents** (`mcp/request:*`) - Review proposals and coordinate execution
-3. **Worker Agents** (tool/resource providers) - Execute actual operations
-4. **Supervisors** (humans or AI) - Set policies and teach orchestrators
-5. **Reviewers** (optional) - Analyze proposals for safety and compliance
-
-**Workflow:**
-
-```
-Proposers → [proposals] → Orchestrator → [review] → Workers
-                              ↑
-                    Supervisors & Reviewers
-                    (collaborate on policies)
-```
-
-This architecture provides:
-- **Security isolation**: Untrusted code can't directly execute operations
-- **Collaborative oversight**: Multiple humans and AI systems can participate in governance
-- **Progressive automation**: Orchestrators learn which proposals to auto-approve
-- **Consensus building**: Critical operations can require multiple approvals
-- **Audit trail**: All proposals, reviews, and fulfillments are observable
-
-### 5.2 Capability Progression
-
-As trust is established, participants can be granted expanded capabilities:
-
-```
-Untrusted → Proposer → Limited Executor → Full Executor
-   ∅       mcp/proposal:*   mcp/request:resources/*   mcp/*
-```
-
-Each level represents increased trust and autonomy:
-- **Untrusted**: No capabilities, read-only observer
-- **Proposer**: Can suggest operations for others to execute
-- **Limited Executor**: Can perform specific safe operations
-- **Full Executor**: Unrestricted access to all operations
-
-### 5.3 Example Scenario
-
-Consider an AI coding assistant helping with a project:
-
-1. **Initial State**: AI assistant has `mcp/proposal:*` capabilities
-2. **Operation**: Assistant proposes `write_file("config.json", {...})`
-3. **Human Review**: Human sees proposal, deems it safe
-4. **Delegation**: Human tells orchestrator to fulfill this proposal
-5. **Execution**: Orchestrator sends request to filesystem agent
-6. **Learning**: Human teaches orchestrator "always approve config file updates"
-7. **Automation**: Future config proposals are auto-fulfilled
-
-This pattern scales to complex multi-agent systems where:
-- Multiple proposers suggest operations
-- **Multiple supervisors** (humans or AI) collaborate on policy decisions
-- **Intelligent reviewers** use classifiers and analysis tools to evaluate proposals
-- Orchestrators route requests based on collectively learned policies
-- Specialized workers handle different operation types
-- **Consensus mechanisms** can require multiple approvals for sensitive operations
-
-### 5.4 Implementation Considerations
-
-When implementing multi-agent orchestration:
-
-1. **Proposal Correlation**: Use `correlation_id` to link proposals to fulfillments
-2. **Timeout Management**: Proposals should expire if not fulfilled
-3. **Policy Storage**: Orchestrators need persistent rule storage
-4. **Audit Logging**: Track all proposals, decisions, and executions
-5. **Failure Handling**: Clear feedback when proposals are rejected
-
-The capability system provides the security foundation, while orchestration patterns provide the workflow for safe, supervised multi-agent collaboration.
-
----
-
-## 6. Realtime Gateway API
-
-### 6.1 Authentication and Capability Assignment
+### 5.1 Authentication and Capability Assignment
 
 The gateway determines capabilities during authentication. Implementation-specific policies may include:
 
@@ -537,16 +458,16 @@ send_to_topic(message)
 
 ---
 
-## 7. Version Compatibility
+## 6. Version Compatibility
 
-### 7.1 Breaking Changes
+### 6.1 Breaking Changes
 
 This is a v0.x release. Breaking changes are expected between minor versions until v1.0:
 - v0.1 is NOT backward compatible with v0.0
 - Clients and gateways MUST use matching protocol versions
 - No compatibility guarantees until v1.0 release
 
-### 7.2 Migration from v0.0
+### 6.2 Migration from v0.0
 
 Key breaking changes from v0.0:
 - Protocol identifier changed from `mcp-x/v0` to `mcpx/v0.1`
@@ -554,7 +475,7 @@ Key breaking changes from v0.0:
 - Capabilities replace privilege levels
 - Chat moved to dedicated `chat` kind
 
-### 7.3 Future Compatibility
+### 6.3 Future Compatibility
 
 - v0.x series is experimental and subject to breaking changes
 - v1.0 will establish stable protocol with compatibility guarantees
@@ -562,7 +483,7 @@ Key breaking changes from v0.0:
 
 ---
 
-## 8. Security Considerations
+## 7. Security Considerations
 
 The security model for MCPx is detailed in Section 4. Key considerations include:
 
@@ -573,7 +494,7 @@ The security model for MCPx is detailed in Section 4. Key considerations include
 
 Implementers MUST pay particular attention to the participant validation requirements to prevent spoofing attacks where the envelope `kind` doesn't match the payload content.
 
-### 8.1 Best Practices
+### 7.1 Best Practices
 
 1. **Start restricted**: New agents should begin with minimal capabilities (`mcp/proposal:*`)
 2. **Validate strictly**: All participants MUST validate both METHOD and CONTEXT match payload
@@ -583,9 +504,9 @@ Implementers MUST pay particular attention to the participant validation require
 
 ---
 
-## 9. Implementation Checklist
+## 8. Implementation Checklist
 
-### 9.1 Gateway Requirements
+### 8.1 Gateway Requirements
 - [ ] **Connection Management**
   - [ ] WebSocket server at `GET /ws?topic=<name>`
   - [ ] Bearer token validation from Authorization header
@@ -610,7 +531,7 @@ Implementers MUST pay particular attention to the participant validation require
   - [ ] Preserve envelope structure without modification
   - [ ] NO payload parsing or validation (lazy enforcement)
 
-### 9.2 Participant Requirements
+### 8.2 Participant Requirements
 - [ ] **Message Validation**
   - [ ] Verify envelope structure before processing
   - [ ] Validate `kind` METHOD matches `payload.method`
@@ -636,9 +557,11 @@ Implementers MUST pay particular attention to the participant validation require
 
 ---
 
-## 10. Examples
+## 9. Examples
 
-### 10.1 Proposal-Based Workflow Example
+The following examples demonstrate multi-agent orchestration patterns enabled by MCPx's capability-based security model. The core pattern is **delegated fulfillment**, where untrusted agents propose operations that are reviewed and executed by trusted participants.
+
+### 9.1 Proposal-Based Workflow Example
 
 In this example, an agent with limited capabilities uses proposals:
 
@@ -649,7 +572,7 @@ In this example, an agent with limited capabilities uses proposals:
 5. Fulfiller sends real `mcp/request:METHOD` message to target
 6. Target executes and returns result to fulfiller (and optionally to proposer)
 
-### 10.2 Capability Expansion Example
+### 9.2 Capability Expansion Example
 
 One possible administrative workflow:
 
@@ -658,7 +581,7 @@ One possible administrative workflow:
 3. Administrator expands agent capabilities
 4. Agent gains access to additional operations
 
-### 10.3 Mixed Environment Example
+### 9.3 Mixed Environment Example
 
 A gateway might assign different capability profiles:
 
@@ -669,7 +592,7 @@ A gateway might assign different capability profiles:
 
 All participants operate in the same topic with their assigned capabilities.
 
-### 10.4 Delegated Fulfillment Example
+### 9.4 Delegated Fulfillment Example
 
 A human supervises an untrusted agent through intermediary agents:
 
@@ -680,13 +603,13 @@ A human supervises an untrusted agent through intermediary agents:
 6. Over time, **Human** teaches **Orchestrator Agent** rules about which proposals to auto-approve
 7. **Orchestrator Agent** begins autonomously fulfilling certain proposals without human intervention
 
-This pattern enables progressive automation while maintaining human oversight through a trusted orchestration layer.
+This pattern demonstrates **progressive automation** - a key goal of MCPx. As the orchestrator observes human decisions over time, it learns which types of proposals can be safely auto-approved. This transforms human judgment into automated policies, creating a system that becomes more autonomous while maintaining safety through learned boundaries.
 
 ---
 
-## 11. Appendix: Implementation Notes
+## 10. Appendix: Implementation Notes
 
-### 11.1 Gateway State
+### 10.1 Gateway State
 
 Minimal state required per connection:
 ```json
@@ -698,7 +621,7 @@ Minimal state required per connection:
 }
 ```
 
-### 11.2 Proposal Tracking
+### 10.2 Proposal Tracking
 
 Optional proposal tracking for fulfillment (maintained by agents, not gateway):
 ```json
