@@ -1,8 +1,52 @@
 # Release Process
 
-This document outlines the process for releasing MCPx protocol packages to npm.
+This document outlines the process for releasing MCPx protocol specifications and npm packages.
 
-## Prerequisites
+## Protocol Specification Releases
+
+### Version Numbering
+Protocol specifications follow semantic versioning:
+- `v0.x` - Experimental releases with breaking changes allowed
+- `v1.x` - Stable releases with backward compatibility
+
+### Release Process
+
+1. **Update Specification Header**
+   ```markdown
+   Status: v0.1  
+   Date: YYYY-MM-DD
+   ```
+
+2. **Commit Changes**
+   ```bash
+   git add protocol-spec/v0.1/SPEC.md
+   git commit -m "Finalize MCPx v0.1 protocol specification"
+   ```
+
+3. **Tag the Release**
+   ```bash
+   git tag mcpx-protocol-spec-v0.1
+   git push origin mcpx-protocol-spec-v0.1
+   ```
+
+### Tag Format
+Protocol specification tags follow the pattern: `mcpx-protocol-spec-vMAJOR.MINOR`
+
+Examples:
+- `mcpx-protocol-spec-v0.1` - First experimental release  
+- `mcpx-protocol-spec-v0.2` - Second experimental release
+- `mcpx-protocol-spec-v1.0` - First stable release
+
+### Release Notes
+When creating a GitHub release:
+1. Use the tag as the release name
+2. Mark pre-v1.0 releases as "Pre-release"
+3. Include summary of changes from previous version
+4. Link to the specification file
+
+## NPM Package Releases
+
+### Prerequisites
 
 1. **npm Authentication**: Ensure you're logged in to npm with publish rights
    ```bash
@@ -16,11 +60,11 @@ This document outlines the process for releasing MCPx protocol packages to npm.
    git status
    ```
 
-## Release Process
+### Release Process
 
-### 1. Pre-Release Checks
+#### 1. Pre-Release Checks
 
-#### Update Version Numbers
+##### Update Version Numbers
 Update the version in the package.json files for packages being released:
 ```bash
 # Example: Update client package to 0.2.0
@@ -28,11 +72,11 @@ cd packages/client
 npm version patch|minor|major
 ```
 
-#### Verify Package Dependencies
+##### Verify Package Dependencies
 - Ensure internal dependencies use version numbers, not `file:` references
 - Update dependency versions if releasing dependent packages
 
-#### Verify Package Metadata
+##### Verify Package Metadata
 Each package.json should have:
 - `name`: @mcpx-protocol/[package-name]
 - `version`: Semantic version
@@ -43,7 +87,7 @@ Each package.json should have:
 - `homepage`: Link to repo README
 - `bugs`: Link to issues
 
-### 2. Build and Test
+#### 2. Build and Test
 
 ```bash
 # Build all packages
@@ -56,7 +100,7 @@ npm test
 ls -la packages/*/dist/
 ```
 
-### 3. Publish Packages
+#### 3. Publish Packages
 
 **IMPORTANT**: Publish in dependency order!
 
@@ -79,7 +123,7 @@ ls -la packages/*/dist/
    npm publish -w @mcpx-protocol/gateway --access public --otp=XXXXXX
    ```
 
-### 4. Git Tagging
+#### 4. Git Tagging
 
 Create package-specific tags for each released package:
 
@@ -93,7 +137,7 @@ git tag -a "@mcpx-protocol/agent@0.1.0" -m "Release @mcpx-protocol/agent@0.1.0"
 git push origin --tags
 ```
 
-### 5. Post-Release
+#### 5. Post-Release
 
 1. **Verify npm packages**:
    ```bash
