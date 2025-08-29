@@ -15,9 +15,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted 
 
 ## 1. Abstract
 
-MCPx enables untrusted AI agents to safely participate in complex workflows under human and orchestrator supervision.
-
-The protocol wraps Model Context Protocol (MCP) messages in envelopes that transform MCP's client-server model into a broadcast system where every participant observes every operation. The extended kind format (`mcp/response:tools/call:read_file`) makes operations self-describing, enabling participants to learn patterns without parsing payloads. Over time, frequently-approved proposals become automated policies, turning human oversight into machine-learned orchestration. The result isn't just safer AI systems - it's a new way to program where the boundary between human judgment and automated execution continuously evolves based on observed behavior.
+MCPx enables real-time collaboration between multiple AI agents and humans by extending the Model Context Protocol with broadcast messaging and capability-based security. The protocol wraps MCP messages in envelopes that include routing and permission metadata, allowing gateways to enforce access control without parsing payloads. Untrusted agents use proposals to suggest operations that trusted participants can review and execute, enabling progressive automation as orchestrators learn from human decisions over time.
 
 ---
 
