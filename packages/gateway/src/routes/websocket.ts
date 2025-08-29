@@ -45,14 +45,12 @@ export function setupWebSocketRoutes(
         return;
       }
 
-      // Create participant info - in a real system this would come from the token or user database
+      // Create participant info with capabilities (v0.1)
+      const capabilities = authToken.capabilities || authService.getDefaultCapabilities(authToken.participantId);
+      
       const participant: Participant = {
         id: authToken.participantId,
-        name: authToken.participantId, // Could be enhanced with display name
-        kind: 'agent', // Could be determined from token claims
-        mcp: {
-          version: '2025-06-18'
-        }
+        capabilities
       };
 
       // Join topic
@@ -75,6 +73,18 @@ export function setupWebSocketRoutes(
           // Verify the message is from the authenticated participant
           if (envelope.from !== participant.id) {
             console.warn(`Message from ${envelope.from} but authenticated as ${participant.id}`);
+            ws.send(JSON.stringify({
+              protocol: 'mcpx/v0.1',
+              id: Date.now().toString(),
+              ts: new Date().toISOString(),
+              from: 'system:gateway',
+              to: [participant.id],
+              kind: 'system/error',
+              payload: {
+                error: 'auth_violation',
+                message: `Message 'from' field must match your participant ID (${participant.id})`
+              }
+            }));
             return;
           }
 

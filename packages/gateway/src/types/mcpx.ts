@@ -1,25 +1,32 @@
 import { z } from 'zod';
 import * as crypto from 'crypto';
 
-// MCPx v0 Protocol Types
+// MCPx v0.1 Protocol Types
 
-export const MCPxProtocolSchema = z.literal('mcp-x/v0');
+export const MCPxProtocolSchema = z.literal('mcpx/v0.1');
 export type MCPxProtocol = z.infer<typeof MCPxProtocolSchema>;
 
-export const ParticipantKindSchema = z.enum(['human', 'agent', 'robot']);
-export type ParticipantKind = z.infer<typeof ParticipantKindSchema>;
+// Capabilities replace participant kinds in v0.1
+export const CapabilitySchema = z.string(); // e.g., "mcp/*", "mcp/request:*", "chat"
+export type Capability = z.infer<typeof CapabilitySchema>;
 
-export const ParticipantSchema = z.object({
+export const ParticipantInfoSchema = z.object({
   id: z.string(),
-  name: z.string(),
-  kind: ParticipantKindSchema,
-  mcp: z.object({
-    version: z.string()
-  })
+  capabilities: z.array(CapabilitySchema)
 });
-export type Participant = z.infer<typeof ParticipantSchema>;
+export type ParticipantInfo = z.infer<typeof ParticipantInfoSchema>;
 
-export const MessageKindSchema = z.enum(['mcp', 'presence', 'system']);
+// For backward compat, keeping minimal Participant type
+export interface Participant {
+  id: string;
+  capabilities: string[];
+}
+
+// v0.1 uses hierarchical kind format
+// mcp/request:METHOD[:CONTEXT], mcp/response:METHOD[:CONTEXT], mcp/proposal:METHOD[:CONTEXT]
+// system/welcome, system/presence, system/error
+// chat
+export const MessageKindSchema = z.string();
 export type MessageKind = z.infer<typeof MessageKindSchema>;
 
 // Base envelope schema
@@ -66,23 +73,28 @@ export type MCPNotification = z.infer<typeof MCPNotificationSchema>;
 export const MCPPayloadSchema = z.union([MCPRequestSchema, MCPResponseSchema, MCPNotificationSchema]);
 export type MCPPayload = z.infer<typeof MCPPayloadSchema>;
 
-// Presence payload schema
-export const PresenceEventSchema = z.enum(['join', 'leave', 'heartbeat']);
+// Presence payload schema (v0.1)
+export const PresenceEventSchema = z.enum(['join', 'leave']);
 export const PresencePayloadSchema = z.object({
   event: PresenceEventSchema,
-  participant: ParticipantSchema
+  participant: ParticipantInfoSchema
 });
 export type PresencePayload = z.infer<typeof PresencePayloadSchema>;
 
-// System payload schema
+// System payload schemas (v0.1)
 export const SystemWelcomePayloadSchema = z.object({
-  type: z.literal('welcome'),
-  participant_id: z.string(),
-  topic: z.string(),
-  participants: z.array(ParticipantSchema),
-  history: z.array(EnvelopeSchema).optional()
+  you: ParticipantInfoSchema,  // The joining participant's info
+  participants: z.array(ParticipantInfoSchema)  // Other participants
 });
 export type SystemWelcomePayload = z.infer<typeof SystemWelcomePayloadSchema>;
+
+export const SystemErrorPayloadSchema = z.object({
+  error: z.string(),
+  message: z.string(),
+  attempted_kind: z.string().optional(),
+  your_capabilities: z.array(z.string()).optional()
+});
+export type SystemErrorPayload = z.infer<typeof SystemErrorPayloadSchema>;
 
 // Envelope validation functions
 export function validateEnvelope(data: unknown): Envelope {
@@ -97,7 +109,7 @@ export function createEnvelope(
   correlationId?: string
 ): Envelope {
   return {
-    protocol: 'mcp-x/v0',
+    protocol: 'mcpx/v0.1',
     id: generateMessageId(),
     ts: new Date().toISOString(),
     from,
@@ -113,19 +125,49 @@ export function generateMessageId(): string {
   return crypto.randomUUID();
 }
 
-// Chat message helpers
-export interface ChatMessage {
+// Chat message helpers (v0.1)
+export interface ChatPayload {
   text: string;
   format?: 'plain' | 'markdown';
 }
 
-export function createChatNotification(from: string, message: ChatMessage): Envelope {
-  return createEnvelope(from, 'mcp', {
-    jsonrpc: '2.0',
-    method: 'notifications/chat/message',
-    params: {
-      text: message.text,
-      format: message.format || 'plain'
-    }
+export function createChatMessage(from: string, message: ChatPayload): Envelope {
+  return createEnvelope(from, 'chat', {
+    text: message.text,
+    format: message.format || 'plain'
   });
+}
+
+// Helper to parse kind format
+export function parseKind(kind: string): { base: string; method?: string; context?: string } {
+  const parts = kind.split(':');
+  if (parts.length === 1) {
+    return { base: parts[0] };
+  }
+  const [base, methodAndContext] = [parts[0], parts.slice(1).join(':')];
+  const contextParts = methodAndContext.split(':');
+  return {
+    base,
+    method: contextParts[0],
+    context: contextParts.length > 1 ? contextParts.slice(1).join(':') : undefined
+  };
+}
+
+// Check if a capability matches a kind
+export function matchesCapability(kind: string, capability: string): boolean {
+  // Exact match
+  if (kind === capability) return true;
+  
+  // Wildcard matching
+  if (capability.endsWith('*')) {
+    const prefix = capability.slice(0, -1);
+    return kind.startsWith(prefix);
+  }
+  
+  return false;
+}
+
+// Check if any capability matches the kind
+export function hasCapability(kind: string, capabilities: string[]): boolean {
+  return capabilities.some(cap => matchesCapability(kind, cap));
 }

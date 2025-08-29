@@ -66,7 +66,7 @@ export class ConfigManager {
 export function generateAuthToken(serverUrl: string, participantId: string, topic: string): Promise<string> {
   // Convert WebSocket URL to HTTP URL for auth endpoint
   const httpUrl = serverUrl.replace(/^ws:/, 'http:').replace(/^wss:/, 'https:');
-  return fetch(`${httpUrl}/v0/auth/token`, {
+  return fetch(`${httpUrl}/v0.1/auth/token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

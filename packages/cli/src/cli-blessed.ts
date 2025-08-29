@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import blessed from 'blessed';
 import { MCPxClient } from '@mcpx-protocol/client';
-import { SystemWelcomePayload, ChatMessage, Peer, Envelope } from '@mcpx-protocol/client';
+import { SystemWelcomePayload, ChatPayload, Peer, Envelope } from '@mcpx-protocol/client';
 
 class BlessedCLI {
   private screen: blessed.Widgets.Screen;
@@ -175,7 +175,7 @@ class BlessedCLI {
     const gatewayUrl = this.gateway.replace('ws://', 'http://').replace('wss://', 'https://');
     
     try {
-      const response = await fetch(`${gatewayUrl}/v0/auth/token`, {
+      const response = await fetch(`${gatewayUrl}/v0.1/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,8 +206,9 @@ class BlessedCLI {
       this.isConnected = true;
       this.updateStatus();
       
-      this.addMessage('System', `Welcome to ${data.topic}!`, 'success');
-      this.addMessage('System', `Your ID: ${data.participant_id}`, 'info');
+      this.addMessage('System', `Welcome!`, 'success');
+      this.addMessage('System', `Your ID: ${data.you.id}`, 'info');
+      this.addMessage('System', `Your capabilities: ${data.you.capabilities.join(', ')}`, 'info');
       
       // Update peers
       this.peers.clear();
@@ -229,8 +230,8 @@ class BlessedCLI {
       }
     });
 
-    this.client.onChat((message: ChatMessage, from: string) => {
-      const text = message.params?.text || '';
+    this.client.onChat((message: ChatPayload, from: string) => {
+      const text = message.text || '';
       // In debug mode, show all messages (including your own)
       // In normal mode, only show messages from others
       if (this.debugMode || from !== this.participantId) {
@@ -241,7 +242,7 @@ class BlessedCLI {
 
     this.client.onPeerJoined((peer: Peer) => {
       this.peers.set(peer.id, peer);
-      this.addMessage('System', `→ ${peer.id} joined`, 'join');
+      this.addMessage('System', `→ ${peer.id} joined (${peer.capabilities.join(', ')})`, 'join');
       this.updateStatus();
     });
 
@@ -259,7 +260,7 @@ class BlessedCLI {
       if (this.debugMode) {
         // Add header with visual separator
         this.addMessage('System', '', 'info');
-        this.addMessage('System', `=== DEBUG: ${envelope.kind} envelope from ${envelope.from}${envelope.to ? ` to ${envelope.to.join(',')}` : ' (broadcast)'} ===`, 'info');
+        this.addMessage('System', `=== DEBUG: ${envelope.kind} envelope from ${envelope.from}${envelope.to ? ` to ${envelope.to.join(',')}` : ' (broadcast)'}${envelope.correlation_id ? ` [corr: ${envelope.correlation_id}]` : ''} ===`, 'info');
         
         // Format the JSON with proper indentation
         const formatted = this.formatJsonForDisplay(envelope);

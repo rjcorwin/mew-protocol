@@ -1,16 +1,11 @@
-// MCPx protocol types (shared with server/frontend)
+// MCPx protocol types (v0.1)
 
-export type MCPxProtocol = 'mcp-x/v0';
-export type MessageKind = 'mcp' | 'presence' | 'system';
-export type ParticipantKind = 'human' | 'agent' | 'robot';
+export type MCPxProtocol = 'mcpx/v0.1';
+export type MessageKind = string; // v0.1 uses hierarchical kinds
 
 export interface Participant {
   id: string;
-  name: string;
-  kind: ParticipantKind;
-  mcp: {
-    version: string;
-  };
+  capabilities: string[]; // v0.1 uses capabilities instead of kind
 }
 
 export interface Envelope {
@@ -49,19 +44,13 @@ export interface MCPNotification {
 }
 
 export interface PresencePayload {
-  event: 'join' | 'leave' | 'heartbeat';
+  event: 'join' | 'leave'; // v0.1 removed heartbeat
   participant: Participant;
 }
 
 export interface SystemWelcomePayload {
-  event: 'welcome';
-  participant: { id: string };
-  participants: Participant[];
-  history: {
-    enabled: boolean;
-    limit: number;
-  };
-  protocol: MCPxProtocol;
+  you: Participant; // v0.1: Your own info with capabilities
+  participants: Participant[]; // Other participants
 }
 
 // Helper functions
@@ -73,7 +62,7 @@ export function createEnvelope(
   correlationId?: string
 ): Envelope {
   return {
-    protocol: 'mcp-x/v0',
+    protocol: 'mcpx/v0.1',
     id: generateUUID(),
     ts: new Date().toISOString(),
     from,

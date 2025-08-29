@@ -50,7 +50,7 @@ export class MCPxClient extends EventEmitter {
     this.isConnecting = true;
 
     try {
-      const wsUrl = `${this.config.server.replace(/^http/, 'ws')}/v0/ws?topic=${encodeURIComponent(this.config.topic)}`;
+      const wsUrl = `${this.config.server.replace(/^http/, 'ws')}/ws?topic=${encodeURIComponent(this.config.topic)}`; // v0.1: /ws endpoint
       
       this.ws = new WebSocket(wsUrl, {
         headers: {
@@ -95,9 +95,23 @@ export class MCPxClient extends EventEmitter {
   }
 
   sendMCPMessage(payload: any, to?: string[], correlationId?: string): void {
+    // v0.1: Determine kind based on payload
+    let kind = 'mcp/request:unknown';
+    if (payload.method) {
+      const method = payload.method.split('/').slice(0, 2).join('/');
+      if ('id' in payload) {
+        kind = `mcp/request:${method}`;
+      } else {
+        kind = `mcp/request:${method}`; // notifications also use request format
+      }
+    } else if ('result' in payload || 'error' in payload) {
+      // This is a response - need to extract method from context
+      kind = 'mcp/response:unknown';
+    }
+    
     const envelope = createEnvelope(
       this.config.participant.id,
-      'mcp',
+      kind,
       payload,
       to,
       correlationId
@@ -149,15 +163,11 @@ export class MCPxClient extends EventEmitter {
   private handleMessage(envelope: Envelope): void {
     this.emit('message', envelope);
 
-    switch (envelope.kind) {
-      case 'system':
-        if (envelope.payload.event === 'welcome') {
-          this.emit('welcome', envelope.payload as SystemWelcomePayload);
-        }
-        break;
-      case 'presence':
-        this.emit('presence', envelope.payload as PresencePayload);
-        break;
+    // v0.1: Handle hierarchical kinds
+    if (envelope.kind === 'system/welcome') {
+      this.emit('welcome', envelope.payload as SystemWelcomePayload);
+    } else if (envelope.kind === 'system/presence') {
+      this.emit('presence', envelope.payload as PresencePayload);
     }
   }
 

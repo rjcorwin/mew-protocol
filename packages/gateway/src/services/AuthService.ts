@@ -8,15 +8,29 @@ export class AuthService {
     this.config = config;
   }
 
-  generateToken(participantId: string, topic: string): string {
+  generateToken(participantId: string, topic: string, capabilities?: string[]): string {
     const payload = {
       participantId,
-      topic
+      topic,
+      capabilities
     };
 
     return jwt.sign(payload, this.config.secret, {
       expiresIn: this.config.tokenExpiry
     } as SignOptions);
+  }
+
+  // Get default capabilities based on participant ID or other logic
+  getDefaultCapabilities(participantId: string): string[] {
+    // Default: proposal-only for safety, can be customized
+    // In production, this might check a database or config
+    if (participantId.startsWith('human-') || participantId.startsWith('admin-')) {
+      return ['mcp/*', 'chat'];  // Full access for humans/admins
+    }
+    // TEMPORARY: Give agents full access for testing
+    // TODO: Revert to proposal-only for production
+    return ['mcp/*', 'chat'];  // Full access for testing
+    // Original: return ['mcp/proposal:*', 'mcp/response:*', 'chat'];
   }
 
   verifyToken(token: string): AuthToken | null {

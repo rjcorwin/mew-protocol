@@ -5,12 +5,12 @@ import {
   PartialEnvelope,
   Peer,
   PresencePayload,
-  SystemPayload,
   SystemWelcomePayload,
+  SystemErrorPayload,
   JsonRpcRequest,
   JsonRpcNotification,
   JsonRpcMessage,
-  ChatMessage,
+  ChatPayload,
   ConnectionOptions,
   PendingRequest,
   HistoryOptions,
@@ -45,7 +45,7 @@ export const ClientEvents = {
   /** Emitted when a peer leaves the topic */
   PEER_LEFT: 'peer-left',
   
-  /** Emitted when a chat message is received (kind='mcp' with method='notifications/message/chat') */
+  /** Emitted when a chat message is received (kind='chat' in v0.1) */
   CHAT: 'chat',
 } as const;
 
@@ -70,13 +70,13 @@ export type ClientEventParams = {
   [ClientEvents.ERROR]: [error: Error];
   [ClientEvents.PEER_JOINED]: [peer: Peer];
   [ClientEvents.PEER_LEFT]: [peer: Peer];
-  [ClientEvents.CHAT]: [message: ChatMessage, from: string];
+  [ClientEvents.CHAT]: [message: ChatPayload, from: string];
 };
 
 /**
  * Type definitions for event handlers
  */
-export type ChatHandler = (message: ChatMessage, from: string) => void;
+export type ChatHandler = (message: ChatPayload, from: string) => void;
 export type ErrorHandler = (error: Error) => void;
 export type WelcomeHandler = (data: SystemWelcomePayload) => void;
 export type PeerHandler = (peer: Peer) => void;
@@ -172,7 +172,7 @@ export class MCPxClient {
    * Internal event emission methods
    */
   
-  private emitChat(message: ChatMessage, from: string): void {
+  private emitChat(message: ChatPayload, from: string): void {
     this.handlers.chat.forEach(handler => handler(message, from));
   }
 
@@ -233,7 +233,7 @@ export class MCPxClient {
 
   private async doConnect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const url = `${this.options.gateway}/v0/ws?topic=${encodeURIComponent(this.options.topic)}`;
+      const url = `${this.options.gateway}/ws?topic=${encodeURIComponent(this.options.topic)}`;
       
       this.ws = new WebSocket(url, {
         headers: {
@@ -257,12 +257,9 @@ export class MCPxClient {
           const envelope = JSON.parse(data.toString()) as Envelope;
           this.handleEnvelope(envelope);
           
-          // Resolve on welcome message
-          if (envelope.kind === 'system') {
-            const payload = envelope.payload as SystemPayload;
-            if (payload.type === 'welcome') {
-              resolve();
-            }
+          // Resolve on welcome message (v0.1)
+          if (envelope.kind === 'system/welcome') {
+            resolve();
           }
         } catch (error) {
           this.emitError(error as Error);
@@ -408,7 +405,7 @@ export class MCPxClient {
     }
 
     // Special case: always process system messages (includes welcome)
-    if (envelope.kind === 'system') {
+    if (envelope.kind.startsWith('system/')) {
       this.emitMessage(envelope);
       this.handleSystemMessage(envelope);
       return;
@@ -422,23 +419,20 @@ export class MCPxClient {
 
     this.emitMessage(envelope);
 
-    switch (envelope.kind) {
-      case 'presence':
-        this.handlePresenceMessage(envelope);
-        break;
-      
-      case 'mcp':
-        this.handleMCPMessage(envelope);
-        break;
+    // Handle different message kinds (v0.1)
+    if (envelope.kind === 'system/presence') {
+      this.handlePresenceMessage(envelope);
+    } else if (envelope.kind.startsWith('mcp/')) {
+      this.handleMCPMessage(envelope);
+    } else if (envelope.kind === 'chat') {
+      this.handleChatMessage(envelope);
     }
   }
 
   private handleSystemMessage(envelope: Envelope): void {
-    const payload = envelope.payload as SystemPayload;
-    
-    if (payload.type === 'welcome') {
-      const welcome = payload as SystemWelcomePayload;
-      this.participantId = welcome.participant_id;
+    if (envelope.kind === 'system/welcome') {
+      const welcome = envelope.payload as SystemWelcomePayload;
+      this.participantId = welcome.you.id;
       
       // Update peer registry
       this.peers.clear();
@@ -447,8 +441,9 @@ export class MCPxClient {
       }
       
       this.emitWelcome(welcome);
-    } else if (payload.type === 'error') {
-      this.emitError(new Error(payload.message));
+    } else if (envelope.kind === 'system/error') {
+      const error = envelope.payload as SystemErrorPayload;
+      this.emitError(new Error(error.message));
     }
   }
 
@@ -466,12 +461,7 @@ export class MCPxClient {
         this.emitPeerLeft(payload.participant);
         break;
       
-      case 'heartbeat':
-        // Update peer last seen
-        if (this.peers.has(payload.participant.id)) {
-          this.peers.set(payload.participant.id, payload.participant);
-        }
-        break;
+      // v0.1 removed heartbeat from presence events
     }
   }
 
@@ -481,15 +471,6 @@ export class MCPxClient {
     // Debug log all MCP messages
     if (envelope.correlation_id) {
       // Debug: Received MCP response with correlation_id
-    }
-    
-    // Check for chat messages
-    if ('method' in message && !('id' in message)) {
-      const notification = message as JsonRpcNotification;
-      if (notification.method === 'notifications/chat/message') {
-        this.emitChat(message as ChatMessage, envelope.from);
-        return;
-      }
     }
     
     // Handle response to our request
@@ -505,6 +486,11 @@ export class MCPxClient {
         pending.resolve(message.result);
       }
     }
+  }
+
+  private handleChatMessage(envelope: Envelope): void {
+    const payload = envelope.payload as ChatPayload;
+    this.emitChat(payload, envelope.from);
   }
 
   /**
@@ -527,8 +513,8 @@ export class MCPxClient {
       ...envelope,
     };
 
-    // Debug logging for MCP responses
-    if (envelope.kind === 'mcp' && envelope.correlation_id) {
+    // Debug logging for MCP responses (v0.1)
+    if (envelope.kind.startsWith('mcp/response:') && envelope.correlation_id) {
       // Debug: Sending MCP response with correlation_id
     }
 
@@ -544,9 +530,19 @@ export class MCPxClient {
     }
 
     const jsonRpcId = Math.floor(Math.random() * 1000000);
+    
+    // Build kind with method (v0.1)
+    // For v0.1, the kind should be mcp/request:METHOD where METHOD is the full method name
+    let kind = `mcp/request:${method}`;
+    
+    // Add context for tool calls if available
+    if (method === 'tools/call' && params?.name) {
+      kind = `mcp/request:${method}:${params.name}`;
+    }
+    
     const envelope: PartialEnvelope = {
       to: [to],
-      kind: 'mcp',
+      kind,
       payload: {
         jsonrpc: '2.0',
         id: jsonRpcId,
@@ -598,9 +594,13 @@ export class MCPxClient {
    * Send an MCP notification
    */
   notify(to: string | string[] | null, method: string, params?: any): void {
+    // Build kind with method (v0.1) 
+    // For v0.1, the kind should be mcp/request:METHOD where METHOD is the full method name
+    const kind = `mcp/request:${method}`;
+    
     const envelope: PartialEnvelope = {
       to: to === null ? undefined : Array.isArray(to) ? to : [to],
-      kind: 'mcp',
+      kind,
       payload: {
         jsonrpc: '2.0',
         method,
@@ -614,9 +614,46 @@ export class MCPxClient {
   }
 
   /**
+   * Send an MCP response (v0.1 - must include correlation_id)
+   */
+  respond(to: string, correlationId: string, method: string, result?: any, error?: any): void {
+    // Build kind with method (v0.1)
+    // For v0.1, the kind should be mcp/response:METHOD where METHOD is the full method name
+    let kind = `mcp/response:${method}`;
+    
+    // Add context for tool calls if available
+    if (method === 'tools/call' && result?.name) {
+      kind = `mcp/response:${method}:${result.name}`;
+    }
+    
+    const envelope: PartialEnvelope = {
+      to: [to],
+      kind,
+      correlation_id: correlationId,
+      payload: error ? {
+        jsonrpc: '2.0',
+        id: 0, // Response ID should match request
+        error: {
+          code: -32603,
+          message: error.message || 'Internal error',
+          data: error
+        }
+      } : {
+        jsonrpc: '2.0',
+        id: 0, // Response ID should match request
+        result
+      },
+    };
+
+    this.send(envelope).catch((err) => {
+      this.emitError(err);
+    });
+  }
+
+  /**
    * Broadcast a message to all participants
    */
-  broadcast(kind: 'mcp' | 'presence' | 'system', payload: any): void {
+  broadcast(kind: string, payload: any): void {
     const envelope: PartialEnvelope = {
       kind,
       payload,
@@ -628,10 +665,17 @@ export class MCPxClient {
   }
 
   /**
-   * Send a chat message
+   * Send a chat message (v0.1 - chat is now a separate kind)
    */
   chat(text: string, format: 'plain' | 'markdown' = 'plain'): void {
-    this.notify(null, 'notifications/chat/message', { text, format });
+    const envelope: PartialEnvelope = {
+      kind: 'chat',
+      payload: { text, format } as ChatPayload,
+    };
+    
+    this.send(envelope).catch((error) => {
+      this.emitError(error);
+    });
   }
 
   /**
@@ -659,7 +703,7 @@ export class MCPxClient {
    * REST API: Get available topics
    */
   async getTopics(): Promise<string[]> {
-    const response = await fetch(`${this.options.gateway}/v0/topics`, {
+    const response = await fetch(`${this.options.gateway}/v0.1/topics`, {
       headers: {
         Authorization: `Bearer ${this.options.token}`,
       },
@@ -679,7 +723,7 @@ export class MCPxClient {
   async getParticipants(topic?: string): Promise<Peer[]> {
     const targetTopic = topic || this.options.topic;
     const response = await fetch(
-      `${this.options.gateway}/v0/topics/${encodeURIComponent(targetTopic)}/participants`,
+      `${this.options.gateway}/v0.1/topics/${encodeURIComponent(targetTopic)}/participants`,
       {
         headers: {
           Authorization: `Bearer ${this.options.token}`,
@@ -703,7 +747,7 @@ export class MCPxClient {
     if (options?.limit) params.set('limit', options.limit.toString());
     if (options?.before) params.set('before', options.before);
 
-    const url = `${this.options.gateway}/v0/topics/${encodeURIComponent(this.options.topic)}/history${
+    const url = `${this.options.gateway}/v0.1/topics/${encodeURIComponent(this.options.topic)}/history${
       params.toString() ? `?${params}` : ''
     }`;
 

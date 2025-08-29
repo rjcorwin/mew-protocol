@@ -42,12 +42,12 @@ async function main() {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      protocol: 'mcp-x/v0'
+      protocol: 'mcpx/v0.1'
     });
   });
 
   // API routes
-  app.use('/v0', createApiRoutes(topicService, authService));
+  app.use('/v0.1', createApiRoutes(topicService, authService));
 
   // Create HTTP server
   const server = createServer(app);
@@ -55,7 +55,7 @@ async function main() {
   // Create WebSocket server
   const wss = new WebSocketServer({ 
     server,
-    path: '/v0/ws'
+    path: '/ws'
   });
 
   // Setup WebSocket routes
@@ -87,9 +87,9 @@ async function main() {
   // Start server
   server.listen(config.port, () => {
     console.log(`MCPx Server running on port ${config.port}`);
-    console.log(`WebSocket endpoint: ws://localhost:${config.port}/v0/ws`);
+    console.log(`WebSocket endpoint: ws://localhost:${config.port}/ws`);
     console.log(`Health check: http://localhost:${config.port}/health`);
-    console.log(`API: http://localhost:${config.port}/v0/`);
+    console.log(`API: http://localhost:${config.port}/v0.1/`);
   });
 }
 

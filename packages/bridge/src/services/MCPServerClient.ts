@@ -92,9 +92,12 @@ export class MCPServerClient extends EventEmitter {
         case 'initialize':
           // Return bridge capabilities when another client initializes
           return {
-            protocolVersion: '2024-11-05',
+            protocolVersion: '2025-06-18',
             capabilities: {
-              tools: {}
+              tools: {
+                list: true,
+                call: true
+              }
             },
             serverInfo: {
               name: 'MCPx Bridge',

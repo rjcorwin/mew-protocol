@@ -1,11 +1,14 @@
 import { WebSocket } from 'ws';
 import { 
   Envelope, 
-  Participant, 
+  Participant,
+  ParticipantInfo,
   createEnvelope, 
   PresencePayload,
   SystemWelcomePayload,
-  validateEnvelope 
+  SystemErrorPayload,
+  validateEnvelope,
+  hasCapability
 } from '../types/mcpx';
 import { ConnectedClient, TopicState, ServerConfig, RateLimitInfo } from '../types/server';
 
@@ -111,9 +114,24 @@ export class TopicService {
       return;
     }
 
-    // Check rate limits
     const client = topic.participants.get(fromParticipantId);
-    if (client && !this.checkRateLimit(client, envelope)) {
+    if (!client) return;
+
+    // Check capabilities (v0.1)
+    // System messages can only come from the gateway
+    if (envelope.kind.startsWith('system/')) {
+      this.sendCapabilityError(client, envelope.kind, 'Only the gateway can send system messages');
+      return;
+    }
+
+    // Check if participant has capability for this kind
+    if (!hasCapability(envelope.kind, client.participant.capabilities)) {
+      this.sendCapabilityError(client, envelope.kind);
+      return;
+    }
+
+    // Check rate limits
+    if (!this.checkRateLimit(client, envelope)) {
       console.warn(`Rate limit exceeded for participant ${fromParticipantId}`);
       return;
     }
@@ -168,17 +186,24 @@ export class TopicService {
   }
 
   private sendWelcomeMessage(client: ConnectedClient, topic: TopicState): void {
-    const welcomePayload: SystemWelcomePayload = {
-      type: 'welcome',
-      participant_id: client.participant.id,
-      topic: client.topic,
-      participants: Array.from(topic.participants.values())
-        .filter(c => c.participant.id !== client.participant.id)
-        .map(c => c.participant),
-      history: topic.messageHistory.slice(-this.config.topics.historyLimit)
+    const you: ParticipantInfo = {
+      id: client.participant.id,
+      capabilities: client.participant.capabilities
     };
 
-    const envelope = createEnvelope('system:gateway', 'system', welcomePayload, [client.participant.id]);
+    const participants: ParticipantInfo[] = Array.from(topic.participants.values())
+      .filter(c => c.participant.id !== client.participant.id)
+      .map(c => ({
+        id: c.participant.id,
+        capabilities: c.participant.capabilities
+      }));
+
+    const welcomePayload: SystemWelcomePayload = {
+      you,
+      participants
+    };
+
+    const envelope = createEnvelope('system:gateway', 'system/welcome', welcomePayload, [client.participant.id]);
 
     // Send welcome message with a small delay to ensure client is ready
     setImmediate(() => {
@@ -190,15 +215,20 @@ export class TopicService {
 
   private broadcastPresence(
     topicName: string, 
-    event: 'join' | 'leave' | 'heartbeat', 
+    event: 'join' | 'leave', 
     participant: Participant
   ): void {
-    const payload: PresencePayload = {
-      event,
-      participant
+    const participantInfo: ParticipantInfo = {
+      id: participant.id,
+      capabilities: participant.capabilities
     };
 
-    const envelope = createEnvelope('system:gateway', 'presence', payload);
+    const payload: PresencePayload = {
+      event,
+      participant: participantInfo
+    };
+
+    const envelope = createEnvelope('system:gateway', 'system/presence', payload);
     
     const topic = this.getTopic(topicName);
     if (topic) {
@@ -239,9 +269,8 @@ export class TopicService {
       return false;
     }
 
-    // Check chat message rate limit
-    if (envelope.kind === 'mcp' && 
-        envelope.payload.method === 'notifications/chat/message') {
+    // Check chat message rate limit (v0.1 - chat is now a separate kind)
+    if (envelope.kind === 'chat') {
       client.chatMessageCount++;
       if (client.chatMessageCount > this.config.rateLimit.chatMessagesPerMinute) {
         return false;
@@ -263,5 +292,25 @@ export class TopicService {
       chatMessages: client.chatMessageCount,
       resetTime: client.rateLimitReset
     };
+  }
+
+  private sendCapabilityError(client: ConnectedClient, attemptedKind: string, customMessage?: string): void {
+    const errorPayload: SystemErrorPayload = {
+      error: 'capability_violation',
+      message: customMessage || `You lack capability for '${attemptedKind}'`,
+      attempted_kind: attemptedKind,
+      your_capabilities: client.participant.capabilities
+    };
+
+    const envelope = createEnvelope(
+      'system:gateway', 
+      'system/error', 
+      errorPayload, 
+      [client.participant.id]
+    );
+
+    if (client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(JSON.stringify(envelope));
+    }
   }
 }

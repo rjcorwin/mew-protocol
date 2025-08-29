@@ -186,7 +186,7 @@ program
     const displayName = options.name || `${commandName} Bridge`;
     
     console.log(chalk.blue('MCPx Bridge - Quick Start'));
-    console.log(chalk.gray(`MCP Server: ${command} ${args.join(' ')}`));
+    console.log(chalk.gray(`MCP Server: ${mcpCommand.join(' ')}`));
     console.log(chalk.gray(`MCPx Server: ${options.server}`));
     console.log(chalk.gray(`Topic: ${options.topic}`));
     console.log(chalk.gray(`Participant: ${displayName} (${participantId})\n`));

@@ -50,7 +50,12 @@ class OpenAIAgent extends MCPxAgent {
     this.maxTokens = parseInt(process.env.OPENAI_MAX_TOKENS || '500');
     this.temperature = parseFloat(process.env.OPENAI_TEMPERATURE || '0.7');
     this.systemPrompt = process.env.OPENAI_SYSTEM_PROMPT || 
-      'You are a helpful AI assistant in an MCPx multi-agent chat room. Be concise and helpful.';
+      'You are a helpful AI assistant in an MCPx multi-agent chat room. ' +
+      'You can use tools to accomplish tasks. When given a task that requires multiple steps, ' +
+      'break it down and use tools iteratively. Think step-by-step: ' +
+      '1) Understand what needs to be done, 2) Use tools to gather information or perform actions, ' +
+      '3) Based on the results, decide if more actions are needed, 4) Continue until the task is complete. ' +
+      'Be concise but thorough in completing tasks.';
 
     // Define MCP tools
     this.tools = [
@@ -142,19 +147,21 @@ class OpenAIAgent extends MCPxAgent {
     if (peerId === this.getParticipantId()) return;
     
     try {
+      console.log(`[TOOL DISCOVERY] Attempting to discover tools from ${peerId}...`);
       const tools = await this.listPeerTools(peerId);
-      console.log(`Tools from ${peerId}:`, tools);
+      console.log(`[TOOL DISCOVERY] Tools from ${peerId}:`, JSON.stringify(tools, null, 2));
       
       tools.forEach(tool => {
         const toolKey = `${peerId}.${tool.name}`;
         this.availableTools.set(toolKey, { participantId: peerId, tool });
+        console.log(`[TOOL DISCOVERY] Registered tool: ${toolKey}`);
       });
       
       if (tools.length > 0) {
-        console.log(`Discovered ${tools.length} tools from ${peerId}`);
+        console.log(`[TOOL DISCOVERY] Successfully discovered ${tools.length} tools from ${peerId}`);
       }
     } catch (error) {
-      console.log(`Could not get tools from ${peerId}:`, error);
+      console.log(`[TOOL DISCOVERY] Could not get tools from ${peerId}:`, error);
     }
   }
 
@@ -192,7 +199,7 @@ class OpenAIAgent extends MCPxAgent {
   }
 
   /**
-   * Generate a response using OpenAI
+   * Generate a response using OpenAI with ReAct-style iteration
    */
   private async generateResponse(message: string, from: string): Promise<string> {
     // Add user message to history
@@ -219,102 +226,115 @@ class OpenAIAgent extends MCPxAgent {
         },
       });
     });
+    
+    console.log(`[ReAct] Available tools for OpenAI: ${tools.length}`);
+    if (tools.length > 0) {
+      console.log(`[ReAct] Tool names:`, tools.map(t => t.function.name));
+    }
+
+    // ReAct loop - continue until we get a final response without tool calls
+    const maxIterations = 10; // Prevent infinite loops
+    let iterations = 0;
+    let finalResponse = '';
 
     try {
-      // Call OpenAI
-      const completion = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: this.conversationHistory,
-        max_tokens: this.maxTokens,
-        temperature: this.temperature,
-        tools: tools.length > 0 ? tools : undefined,
-      });
+      while (iterations < maxIterations) {
+        iterations++;
+        console.log(`[ReAct iteration ${iterations}]`);
 
-      const responseMessage = completion.choices[0]?.message;
-      if (!responseMessage) {
-        return '🤖 I couldn\'t generate a response.';
-      }
-
-      // Handle tool calls if any
-      if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-        // First, add the assistant message with tool calls to history
-        this.conversationHistory.push({
-          role: 'assistant',
-          content: responseMessage.content || '',
-          tool_calls: responseMessage.tool_calls,
+        // Call OpenAI
+        const completion = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: this.conversationHistory,
+          max_tokens: this.maxTokens,
+          temperature: this.temperature,
+          tools: tools.length > 0 ? tools : undefined,
         });
 
-        // Process each tool call and create individual tool response messages
-        const toolResponses: any[] = [];
-        
-        for (const toolCall of responseMessage.tool_calls) {
-          const functionName = toolCall.function.name.replace('_', '.');
-          const toolInfo = this.availableTools.get(functionName);
+        const responseMessage = completion.choices[0]?.message;
+        if (!responseMessage) {
+          return '🤖 I couldn\'t generate a response.';
+        }
+
+        // If there are tool calls, execute them and continue the loop
+        if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+          console.log(`[ReAct] Assistant wants to call ${responseMessage.tool_calls.length} tools`);
           
-          let toolResult: string;
-          if (toolInfo) {
-            try {
-              const args = JSON.parse(toolCall.function.arguments);
-              console.log(`Calling tool ${functionName} with args:`, args);
-              
-              const result = await this.callTool(
-                toolInfo.participantId,
-                functionName.split('.')[1],
-                args
-              );
-              
-              toolResult = JSON.stringify(result);
-            } catch (error) {
-              console.error(`Error calling tool ${functionName}:`, error);
-              toolResult = `Error: ${error}`;
+          // Add the assistant message with tool calls to history
+          this.conversationHistory.push({
+            role: 'assistant',
+            content: responseMessage.content || '',
+            tool_calls: responseMessage.tool_calls,
+          });
+
+          // Process each tool call
+          const toolResponses: any[] = [];
+          
+          for (const toolCall of responseMessage.tool_calls) {
+            const functionName = toolCall.function.name.replace('_', '.');
+            const toolInfo = this.availableTools.get(functionName);
+            
+            let toolResult: string;
+            if (toolInfo) {
+              try {
+                const args = JSON.parse(toolCall.function.arguments);
+                console.log(`[ReAct] Calling tool ${functionName} with args:`, args);
+                
+                const result = await this.callTool(
+                  toolInfo.participantId,
+                  functionName.split('.')[1],
+                  args
+                );
+                
+                toolResult = typeof result === 'string' ? result : JSON.stringify(result);
+                console.log(`[ReAct] Tool ${functionName} returned:`, toolResult.substring(0, 100) + '...');
+              } catch (error) {
+                console.error(`[ReAct] Error calling tool ${functionName}:`, error);
+                toolResult = `Error: ${error}`;
+              }
+            } else {
+              toolResult = 'Tool not available';
             }
-          } else {
-            toolResult = 'Tool not available';
+
+            // Add tool response
+            toolResponses.push({
+              role: 'tool',
+              content: toolResult,
+              tool_call_id: toolCall.id,
+            });
           }
 
-          // Add a tool response message for each tool call
-          toolResponses.push({
-            role: 'tool',
-            content: toolResult,
-            tool_call_id: toolCall.id,
-          });
+          // Add all tool responses to conversation history
+          this.conversationHistory.push(...toolResponses);
+
+          // Continue loop to let the model decide what to do next
+          console.log(`[ReAct] Continuing to next iteration after tool calls`);
+          continue;
         }
 
-        // Add all tool responses to conversation history
-        this.conversationHistory.push(...toolResponses);
-
-        // Get final response after tool execution
-        if (toolResponses.length > 0) {
-          const finalCompletion = await this.openai.chat.completions.create({
-            model: this.model,
-            messages: this.conversationHistory,
-            max_tokens: this.maxTokens,
-            temperature: this.temperature,
+        // No tool calls - we have a final response
+        if (responseMessage.content) {
+          console.log(`[ReAct] Got final response after ${iterations} iterations`);
+          this.conversationHistory.push({
+            role: 'assistant',
+            content: responseMessage.content,
           });
-
-          const finalMessage = finalCompletion.choices[0]?.message?.content;
-          if (finalMessage) {
-            this.conversationHistory.push({
-              role: 'assistant',
-              content: finalMessage,
-            });
-            this.trimHistory();
-            return `🤖 ${finalMessage}`;
-          }
+          finalResponse = responseMessage.content;
+          break;
         }
       }
 
-      // Regular response without tool calls
-      if (responseMessage.content) {
+      if (iterations >= maxIterations) {
+        console.warn(`[ReAct] Reached maximum iterations (${maxIterations})`);
+        finalResponse = 'I\'ve completed the maximum number of steps. The task may require further action.';
         this.conversationHistory.push({
           role: 'assistant',
-          content: responseMessage.content,
+          content: finalResponse,
         });
-        this.trimHistory();
-        return `🤖 ${responseMessage.content}`;
       }
 
-      return '🤖 I couldn\'t generate a response.';
+      this.trimHistory();
+      return `🤖 ${finalResponse || 'I couldn\'t generate a response.'}`;
     } catch (error: any) {
       console.error('OpenAI API error:', error);
       
@@ -535,7 +555,7 @@ class OpenAIAgent extends MCPxAgent {
 async function getToken(participantId: string, topic: string): Promise<string> {
   const gateway = process.env.MCPX_GATEWAY?.replace('ws://', 'http://').replace('wss://', 'https://') || 'http://localhost:3000';
   
-  const response = await fetch(`${gateway}/v0/auth/token`, {
+  const response = await fetch(`${gateway}/v0.1/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ participantId, topic }),

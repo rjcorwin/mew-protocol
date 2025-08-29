@@ -1,4 +1,4 @@
-import { MCPxClient, ConnectionOptions, Envelope, JsonRpcRequest, JsonRpcNotification, JsonRpcMessage, MCP_VERSION } from '@mcpx-protocol/client';
+import { MCPxClient, ConnectionOptions, Envelope, JsonRpcRequest, JsonRpcNotification, JsonRpcMessage, ChatPayload, MCP_VERSION } from '@mcpx-protocol/client';
 import {
   AgentStatus,
   ServerCapabilities,
@@ -79,10 +79,11 @@ export abstract class MCPxAgent {
    * Setup event handlers
    */
   private setupEventHandlers(): void {
-    // Handle incoming MCP messages
+    // Handle incoming MCP messages (v0.1 - hierarchical kinds)
     this.client.onMessage((envelope) => {
       console.log(`[${this.config.name}] Received envelope: kind=${envelope.kind}, from=${envelope.from}, to=${envelope.to?.join(',') || 'broadcast'}`);
-      if (envelope.kind === 'mcp') {
+      // v0.1: MCP messages have kinds starting with 'mcp/'
+      if (envelope.kind.startsWith('mcp/')) {
         this.handleMCPMessage(envelope);
       }
     });
@@ -99,12 +100,9 @@ export abstract class MCPxAgent {
       this.peerStates.delete(peer.id);
     });
 
-    // Handle chat messages
-    // Note: Chat messages are a special case in MCPx envelopes. They arrive 
-    // in envelopes with kind='mcp' containing a JSON-RPC notification with 
-    // method='notifications/message/chat' and the text in params.text
-    this.client.onChat((message, from) => {
-      this.onChatMessage(message.params.text, from);
+    // Handle chat messages (v0.1 - chat is now a separate kind)
+    this.client.onChat((message: ChatPayload, from: string) => {
+      this.onChatMessage(message.text, from);
     });
   }
 
@@ -124,10 +122,10 @@ export abstract class MCPxAgent {
         const result = await this.handleMCPRequest(envelope.from, request);
         console.log(`[${this.config.name}] Sending response:`, JSON.stringify(result));
         
-        // Send response
+        // Send response (v0.1 - use hierarchical kind with full method)
         const responseEnvelope = {
           to: [envelope.from],
-          kind: 'mcp' as const,
+          kind: `mcp/response:${request.method}` as const,
           correlation_id: envelope.id,
           payload: {
             jsonrpc: '2.0',
@@ -143,10 +141,11 @@ export abstract class MCPxAgent {
           console.error(`[${this.config.name}] Failed to send response:`, sendError);
         }
       } catch (error: any) {
-        // Send error response
+        // Send error response (v0.1)
+        const request = message as JsonRpcRequest;
         await this.client.send({
           to: [envelope.from],
-          kind: 'mcp',
+          kind: `mcp/response:${request.method}`,
           correlation_id: envelope.id,
           payload: {
             jsonrpc: '2.0',
@@ -427,7 +426,7 @@ export abstract class MCPxAgent {
   protected sendProgress(to: string, params: ProgressParams, correlationId?: string): void {
     const envelope = {
       to: [to],
-      kind: 'mcp' as const,
+      kind: 'mcp/request:notifications/progress' as const, // v0.1 hierarchical kind
       correlation_id: correlationId,
       payload: {
         jsonrpc: '2.0',

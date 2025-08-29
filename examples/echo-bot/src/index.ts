@@ -52,7 +52,7 @@ class EchoBot extends MCPxAgent {
 async function getToken(participantId: string, topic: string): Promise<string> {
   const gateway = process.env.MCPX_GATEWAY?.replace('ws://', 'http://').replace('wss://', 'https://') || 'http://localhost:3000';
   
-  const response = await fetch(`${gateway}/v0/auth/token`, {
+  const response = await fetch(`${gateway}/v0.1/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ participantId, topic }),

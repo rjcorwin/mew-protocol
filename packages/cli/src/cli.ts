@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import ora from 'ora';
-import { MCPxClient, Envelope, Peer, SystemWelcomePayload, ChatMessage } from '@mcpx-protocol/client';
+import { MCPxClient, Envelope, Peer, SystemWelcomePayload, ChatPayload } from '@mcpx-protocol/client';
 import readline from 'readline';
 import fs from 'fs/promises';
 import path from 'path';
@@ -318,7 +318,7 @@ class MCPxChatClient {
 
     try {
       const gatewayUrl = config.gateway.replace('ws://', 'http://').replace('wss://', 'https://');
-      const response = await fetch(`${gatewayUrl}/v0/auth/token`, {
+      const response = await fetch(`${gatewayUrl}/v0.1/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -346,32 +346,27 @@ class MCPxChatClient {
     if (!this.client) return;
 
     this.client.onWelcome((data: SystemWelcomePayload) => {
-      console.log(chalk.green(`\n✓ Welcome to ${data.topic}`));
-      console.log(chalk.gray(`Your ID: ${data.participant_id}`));
-      console.log(chalk.gray(`Participants: ${data.participants.length}`));
+      console.log(chalk.green(`\n✓ Welcome!`));
+      console.log(chalk.gray(`Your ID: ${data.you.id}`));
+      console.log(chalk.gray(`Your capabilities: ${data.you.capabilities.join(', ')}`));
+      console.log(chalk.gray(`Other participants: ${data.participants.length}`));
       
       // Update peer list
       this.peers.clear();
       data.participants.forEach(p => this.peers.set(p.id, p));
-      
-      if (data.history && data.history.length > 0) {
-        console.log(chalk.gray(`\n--- Recent History (${data.history.length} messages) ---`));
-        data.history.forEach(env => this.displayEnvelope(env));
-        console.log(chalk.gray('--- End History ---\n'));
-      }
     });
 
-    this.client.onChat((message: ChatMessage, from: string) => {
+    this.client.onChat((message: ChatPayload, from: string) => {
       // Don't show our own messages twice
       if (from !== this.currentConfig?.participantId) {
-        const text = message.params?.text || '';
+        const text = message.text || '';
         this.displayMessage(from, text, 'chat');
       }
     });
 
     this.client.onPeerJoined((peer: Peer) => {
       this.peers.set(peer.id, peer);
-      console.log(chalk.green(`→ ${peer.id} joined the topic`));
+      console.log(chalk.green(`→ ${peer.id} joined (capabilities: ${peer.capabilities.join(', ')})`));
     });
 
     this.client.onPeerLeft((peer: Peer) => {
@@ -384,11 +379,19 @@ class MCPxChatClient {
       if (this.debugMode) {
         console.log(chalk.gray('--- Debug: Raw Envelope ---'));
         console.log(chalk.gray(JSON.stringify(envelope, null, 2)));
+        // Show parsed kind information for v0.1
+        if (envelope.kind.includes(':')) {
+          const parts = envelope.kind.split(':');
+          console.log(chalk.gray(`Kind breakdown: base='${parts[0]}', method='${parts.slice(1).join(':')}'`));
+        }
+        if (envelope.correlation_id) {
+          console.log(chalk.gray(`Correlation ID: ${envelope.correlation_id}`));
+        }
         console.log(chalk.gray('--------------------------'));
       }
       
-      // Handle non-chat MCP messages
-      if (envelope.kind === 'mcp' && envelope.payload.method !== 'notifications/chat/message') {
+      // Handle non-chat MCP messages (v0.1)
+      if (envelope.kind.startsWith('mcp/')) {
         this.displayEnvelope(envelope);
       }
     });
@@ -461,9 +464,8 @@ class MCPxChatClient {
       output += chalk.gray('No other participants') + '\n';
     } else {
       this.peers.forEach((peer, id) => {
-        const kind = peer.kind ? chalk.gray(`(${peer.kind})`) : '';
-        const mcp = peer.mcp ? chalk.green(' [MCP]') : '';
-        output += `  ${id} ${kind}${mcp}\n`;
+        const caps = peer.capabilities ? chalk.gray(`[${peer.capabilities.join(', ')}]`) : '';
+        output += `  ${id} ${caps}\n`;
       });
     }
     output += '\n';

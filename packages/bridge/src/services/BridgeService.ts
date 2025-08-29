@@ -126,7 +126,8 @@ export class BridgeService extends EventEmitter {
 
     this.mcpxClient.on('welcome', (payload) => {
       console.log(`Welcomed to MCPx topic ${this.config.mcpx.topic}`);
-      console.log(`Other participants: ${payload.participants.map(p => p.name).join(', ')}`);
+      console.log(`Your capabilities: ${payload.you.capabilities.join(', ')}`);
+      console.log(`Other participants: ${payload.participants.map(p => p.id).join(', ')}`);
       
       // Broadcast tool availability
       this.broadcastToolsAvailability();
@@ -158,15 +159,20 @@ export class BridgeService extends EventEmitter {
   private async handleMCPxMessage(envelope: Envelope): Promise<void> {
     this.emit('mcpxMessage', envelope);
 
-    // Only handle MCP messages addressed to us
-    if (envelope.kind !== 'mcp') {
+    // Only handle MCP messages addressed to us (v0.1 uses hierarchical kinds)
+    if (!envelope.kind.startsWith('mcp/')) {
       return;
     }
 
+    console.log(`[BRIDGE] Received MCP message: kind=${envelope.kind}, from=${envelope.from}, to=${envelope.to}`);
+
     const isAddressedToUs = !envelope.to || envelope.to.includes(this.config.participant.id);
     if (!isAddressedToUs) {
+      console.log(`[BRIDGE] Message not for us (our id: ${this.config.participant.id})`);
       return;
     }
+
+    console.log(`[BRIDGE] Processing MCP message for us`);
 
     try {
       if (isMCPRequest(envelope.payload)) {
@@ -252,32 +258,42 @@ export class BridgeService extends EventEmitter {
   }
 
   private sendMCPResponse(originalEnvelope: Envelope, response: MCPResponse): void {
+    // Extract the method from the original request to build the response kind
+    const originalRequest = originalEnvelope.payload as MCPRequest;
+    const responseKind = `mcp/response:${originalRequest.method}`;
+    
     const envelope = createEnvelope(
       this.config.participant.id,
-      'mcp',
+      responseKind,
       response,
       [originalEnvelope.from],
       originalEnvelope.id
     );
 
+    console.log(`[BRIDGE] Sending MCP response: kind=${responseKind}, to=${originalEnvelope.from}`);
     this.mcpxClient.sendMessage(envelope);
   }
 
   private sendMCPError(originalEnvelope: Envelope, error: any): void {
+    const originalRequest = originalEnvelope.payload as MCPRequest;
     const response: MCPResponse = {
       jsonrpc: '2.0',
-      id: (originalEnvelope.payload as MCPRequest).id,
+      id: originalRequest.id,
       error
     };
 
+    // Build error response kind
+    const responseKind = `mcp/response:${originalRequest.method}`;
+    
     const envelope = createEnvelope(
       this.config.participant.id,
-      'mcp',
+      responseKind,
       response,
       [originalEnvelope.from],
       originalEnvelope.id
     );
 
+    console.log(`[BRIDGE] Sending MCP error response: kind=${responseKind}, to=${originalEnvelope.from}`);
     this.mcpxClient.sendMessage(envelope);
   }
 

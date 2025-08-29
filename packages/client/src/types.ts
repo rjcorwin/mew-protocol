@@ -1,20 +1,20 @@
 /**
- * Core MCPx protocol types matching v0 specification
+ * Core MCPx protocol types matching v0.1 specification
  */
 
-export const PROTOCOL_VERSION = 'mcp-x/v0';
+export const PROTOCOL_VERSION = 'mcpx/v0.1';
 export const MCP_VERSION = '2025-06-18';
 
 /**
  * MCPx envelope - the top-level wrapper for all messages
  */
 export interface Envelope {
-  protocol: 'mcp-x/v0';
+  protocol: 'mcpx/v0.1';
   id: string;
   ts: string;
   from: string;
   to?: string[];
-  kind: 'mcp' | 'presence' | 'system';
+  kind: string; // v0.1 uses hierarchical kinds like 'mcp/request:METHOD', 'system/welcome', 'chat'
   correlation_id?: string;
   payload: any;
 }
@@ -24,21 +24,17 @@ export interface Envelope {
  */
 export interface PartialEnvelope {
   to?: string[];
-  kind: 'mcp' | 'presence' | 'system';
+  kind: string; // v0.1 uses hierarchical kinds
   correlation_id?: string;
   payload: any;
 }
 
 /**
- * Participant in a topic
+ * Participant in a topic (v0.1 uses capabilities instead of kind)
  */
 export interface Peer {
   id: string;
-  name?: string;
-  kind: 'human' | 'agent' | 'robot';
-  mcp?: {
-    version: string;
-  };
+  capabilities: string[];
 }
 
 /**
@@ -50,21 +46,18 @@ export interface PresencePayload {
 }
 
 /**
- * System message payloads
+ * System message payloads (v0.1)
  */
 export interface SystemWelcomePayload {
-  type: 'welcome';
-  participant_id: string;
-  topic: string;
-  participants: Peer[];
-  history?: Envelope[];
+  you: Peer;  // Your own participant info with capabilities
+  participants: Peer[];  // Other participants
 }
 
 export interface SystemErrorPayload {
-  type: 'error';
-  code: string;
+  error: string;
   message: string;
-  details?: any;
+  attempted_kind?: string;
+  your_capabilities?: string[];
 }
 
 export type SystemPayload = SystemWelcomePayload | SystemErrorPayload;
@@ -101,15 +94,11 @@ export interface JsonRpcError {
 export type JsonRpcMessage = JsonRpcRequest | JsonRpcResponse | JsonRpcNotification;
 
 /**
- * Chat notification format
+ * Chat message format (v0.1 - chat is now a separate kind)
  */
-export interface ChatMessage {
-  jsonrpc: '2.0';
-  method: 'notifications/chat/message';
-  params: {
-    text: string;
-    format?: 'plain' | 'markdown';
-  };
+export interface ChatPayload {
+  text: string;
+  format?: 'plain' | 'markdown';
 }
 
 /**
@@ -143,7 +132,7 @@ export interface PendingRequest {
 export type ClientEventMap = {
   welcome: (data: SystemWelcomePayload) => void;
   message: (envelope: Envelope) => void;
-  chat: (message: ChatMessage, from: string) => void;
+  chat: (message: ChatPayload, from: string) => void;
   'peer-joined': (peer: Peer) => void;
   'peer-left': (peer: Peer) => void;
   error: (error: Error) => void;

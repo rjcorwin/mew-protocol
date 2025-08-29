@@ -20,6 +20,7 @@ export interface ServerConfig {
 export interface AuthToken {
   participantId: string;
   topic: string;
+  capabilities?: string[];  // Optional, defaults will be applied if not present
   exp: number;
   iat: number;
 }

@@ -26,7 +26,7 @@ export function createApiRoutes(
     next();
   };
 
-  // GET /v0/topics - List visible topics
+  // GET /v0.1/topics - List visible topics
   router.get('/topics', authenticate, (req: Request, res: Response) => {
     try {
       const topics = topicService.getTopics();
@@ -37,7 +37,7 @@ export function createApiRoutes(
     }
   });
 
-  // GET /v0/topics/{topic}/participants - Get topic participants
+  // GET /v0.1/topics/{topic}/participants - Get topic participants
   router.get('/topics/:topic/participants', authenticate, (req: Request, res: Response) => {
     try {
       const { topic } = req.params;
@@ -56,7 +56,7 @@ export function createApiRoutes(
     }
   });
 
-  // GET /v0/topics/{topic}/history - Get topic message history
+  // GET /v0.1/topics/{topic}/history - Get topic message history
   router.get('/topics/:topic/history', authenticate, (req: Request, res: Response) => {
     try {
       const { topic } = req.params;
@@ -82,7 +82,7 @@ export function createApiRoutes(
     }
   });
 
-  // GET /v0/topics/{topic}/rate-limit - Get current rate limit info
+  // GET /v0.1/topics/{topic}/rate-limit - Get current rate limit info
   router.get('/topics/:topic/rate-limit', authenticate, (req: Request, res: Response) => {
     try {
       const { topic } = req.params;
@@ -105,10 +105,10 @@ export function createApiRoutes(
     }
   });
 
-  // POST /v0/auth/token - Generate auth token (for development/testing)
+  // POST /v0.1/auth/token - Generate auth token (for development/testing)
   router.post('/auth/token', (req: Request, res: Response) => {
     try {
-      const { participantId, topic } = req.body;
+      const { participantId, topic, capabilities } = req.body;
       
       if (!participantId || !topic) {
         return res.status(400).json({ 
@@ -116,8 +116,13 @@ export function createApiRoutes(
         });
       }
 
-      const token = authService.generateToken(participantId, topic);
-      return res.json({ token });
+      // Use provided capabilities or defaults
+      const finalCapabilities = capabilities || authService.getDefaultCapabilities(participantId);
+      const token = authService.generateToken(participantId, topic, finalCapabilities);
+      return res.json({ 
+        token,
+        capabilities: finalCapabilities 
+      });
     } catch (error) {
       console.error('Error generating token:', error);
       return res.status(500).json({ error: 'Internal server error' });
