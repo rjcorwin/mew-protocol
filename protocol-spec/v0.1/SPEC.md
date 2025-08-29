@@ -552,49 +552,22 @@ Key breaking changes from v0.0:
 
 ## 8. Security Considerations
 
-### 8.1 Lazy Enforcement Model
+The security model for MCPx is detailed in Section 4. Key considerations include:
 
-The gateway uses lazy enforcement (validating `kind` but not payload) for efficiency:
+- **Capability-based access control** enforced by the gateway (Section 4.1)
+- **Lazy enforcement** at the gateway level for performance (Section 4.2)
+- **Strict validation** requirements for all participants (Section 4.3)
+- **Reserved namespaces** preventing participant spoofing of system messages (Section 4.1)
 
-**Benefits:**
-- Gateway remains fast and scalable
-- No deep packet inspection overhead
-- Simple pattern matching instead of protocol parsing
-- Follows industry patterns (HTTP routers, CDNs, load balancers)
+Implementers MUST pay particular attention to the participant validation requirements to prevent spoofing attacks where the envelope `kind` doesn't match the payload content.
 
-**Security Implications:**
-- Malicious agents could send mismatched kind/payload
-- Receiving agents MUST validate messages
-- Bad actors identified through behavior, not prevention
-- Trust established through reputation over time
+### 8.1 Best Practices
 
-**Mitigation:**
-- Agents drop invalid messages immediately
-- Report persistent misbehavior to gateway
-- Gateway can revoke capabilities for bad actors
-- Optional strict mode for high-security deployments
-
-### 8.2 Capability-Based Security Benefits
-
-1. **No token theft**: Capabilities tied to connection, not transferable
-2. **Fine-grained control**: Can limit access to specific MCP methods
-3. **Progressive trust**: Capabilities can be expanded as trust grows
-4. **Human oversight**: Natural pattern for reviewing proposals
-5. **Audit trail**: All proposals and fulfillments are observable
-
-### 8.3 Limitations
-
-1. **Gateway trust**: Security depends on proper gateway implementation
-2. **Lazy validation**: Malformed messages reach agents before being dropped
-3. **Visibility**: All participants see all messages in topic (privacy consideration)
-
-### 8.4 Best Practices
-
-1. **Start restricted**: New agents should begin with minimal capabilities
-2. **Promote carefully**: Only expand capabilities after establishing trust
-3. **Monitor proposals**: Log and audit MCP proposal patterns
-4. **Rate limiting**: Apply limits to prevent proposal spam
-5. **Timeout proposals**: Unfulfilled proposals should expire
+1. **Start restricted**: New agents should begin with minimal capabilities (`mcp/proposal:*`)
+2. **Validate strictly**: All participants MUST validate both METHOD and CONTEXT match payload
+3. **Monitor proposals**: Log and audit proposal/fulfillment patterns
+4. **Progressive trust**: Expand capabilities only after establishing trust through observed behavior
+5. **Report misbehavior**: Track and report participants sending malformed messages
 
 ---
 
