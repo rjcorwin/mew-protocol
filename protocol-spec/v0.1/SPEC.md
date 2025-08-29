@@ -571,28 +571,55 @@ Implementers MUST pay particular attention to the participant validation require
 
 ---
 
-## 9. Implementation Guidance
+## 9. Implementation Checklist
 
-### 9.1 Gateway Implementation
-1. Pattern matching engine for capability wildcards
-2. Connection-to-capability mapping
-3. Lazy enforcement (no payload validation)
-4. Configuration for default capability sets
+### 9.1 Gateway Requirements
+- [ ] **Connection Management**
+  - [ ] WebSocket server at `GET /ws?topic=<name>`
+  - [ ] Bearer token validation from Authorization header
+  - [ ] Token-to-participant-ID mapping (implementation-specific)
+  - [ ] Connection state tracking per participant
+  
+- [ ] **Capability Enforcement**
+  - [ ] Pattern matching engine for wildcard capabilities
+  - [ ] Validate message `kind` against sender's capabilities
+  - [ ] Block messages that don't match capabilities
+  - [ ] Return `system/error` for capability violations
+  
+- [ ] **System Messages**
+  - [ ] Send `system/welcome` with participant ID and capabilities on connect
+  - [ ] Broadcast `system/presence` for join/leave events
+  - [ ] Generate `system/error` for protocol violations
+  - [ ] Ensure only gateway can send `system/*` messages
+  
+- [ ] **Message Routing**
+  - [ ] Route messages based on `to` field (broadcast if empty/omitted)
+  - [ ] Preserve envelope structure without modification
+  - [ ] NO payload parsing or validation (lazy enforcement)
 
-### 9.2 Agent Implementation
-1. Validate `payload.method` matches `kind` declaration
-2. Handle `mcp/proposal:*` messages from restricted agents
-3. Support for fulfilling proposals on behalf of others
-4. Report malformed messages for reputation tracking
-
-### 9.3 Example Deployment Patterns
-
-Gateways may implement different security profiles based on environment:
-
-1. **Development**: All agents get `mcp/*` capabilities
-2. **Staging**: Mixed capabilities for testing
-3. **Production**: Strict capabilities with proposal-based workflows
-4. **High Security**: Response-only capabilities for most agents
+### 9.2 Participant Requirements
+- [ ] **Message Validation**
+  - [ ] Verify envelope structure before processing
+  - [ ] Validate `kind` METHOD matches `payload.method`
+  - [ ] Validate `kind` CONTEXT matches payload content (e.g., tool name)
+  - [ ] Drop messages that fail validation
+  - [ ] Track/report misbehaving participants
+  
+- [ ] **MCP Integration**
+  - [ ] Implement MCP server capabilities
+  - [ ] Handle incoming MCP requests/responses
+  - [ ] Generate proper correlation IDs for responses
+  - [ ] Include correlation ID in all response messages
+  
+- [ ] **Proposal Handling** (if applicable)
+  - [ ] Recognize `mcp/proposal:*` messages
+  - [ ] Implement fulfillment logic for approved proposals
+  - [ ] Include proposal ID as correlation_id when fulfilling
+  
+- [ ] **Connection Behavior**
+  - [ ] Process `system/welcome` to learn own ID and capabilities
+  - [ ] Handle `system/presence` to track other participants
+  - [ ] Respect capability restrictions from welcome message
 
 ---
 
