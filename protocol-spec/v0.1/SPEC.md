@@ -498,13 +498,16 @@ The gateway determines capabilities during authentication. Implementation-specif
 
 ### 6.2 WebSocket Connection
 
-Connect: `GET /v0/ws?topic=<name>` with Authorization header
+Connect: `GET /ws?topic=<name>` with Authorization header
 
 The gateway:
 1. Validates the bearer token (if provided)
-2. Determines capabilities based on implementation policy
-3. **MUST** send welcome message with accurate capabilities
-4. **MUST** enforce capability rules on all subsequent messages
+2. Maps the token to a participant ID (implementation-specific)
+3. Determines capabilities based on implementation policy
+4. **MUST** send welcome message with the assigned participant ID and accurate capabilities
+5. **MUST** enforce capability rules on all subsequent messages
+
+**Note:** Participants only provide their bearer token. The gateway is responsible for mapping tokens to participant IDs through its own implementation-specific mechanism.
 
 The capabilities in the welcome message constitute the authoritative list of what operations the participant can perform. Participants SHOULD use this list to understand their allowed operations.
 
