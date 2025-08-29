@@ -109,6 +109,8 @@ Example tool call request:
 
 #### 3.1.2 MCP Responses (kind = "mcp/response:METHOD[:CONTEXT]")
 
+Responses MUST include the `correlation_id` field referencing the original request's `id`. This is critical for translating MCP's client-server request/response model to MCPx's multi-participant broadcast paradigm, allowing all participants to match responses to their corresponding requests.
+
 Response to the above tool call. The response SHOULD include the operation context in the kind:
 
 ```json
@@ -159,7 +161,13 @@ This is an MCPx-specific protocol extension that proposes an MCP operation requi
 
 #### 3.2.1 Proposal Fulfillment
 
-A participant with appropriate capabilities fulfills the proposal by making the real MCP call:
+A participant with appropriate capabilities fulfills the proposal by making the real MCP call. The `correlation_id` field is critical for matching approvals to their original proposals:
+- Proposals MUST NOT include a `correlation_id` (they originate new workflows)
+- Fulfillment messages MUST include `correlation_id` referencing the proposal's `id`
+- This allows participants to track which fulfillment corresponds to which proposal
+- The correlation chain enables audit trails and multi-step approval workflows
+
+Example fulfillment:
 
 ```json
 {
@@ -181,7 +189,7 @@ A participant with appropriate capabilities fulfills the proposal by making the 
 }
 ```
 
-The response goes to both the fulfiller and the original proposer:
+The response goes to both the fulfiller and the original proposer. Note that the response's `correlation_id` references the fulfillment message (`env-fulfill-1`), NOT the original proposal (`env-req-1`). This maintains the standard request/response pairing while the proposer can still receive the outcome:
 
 ```json
 {
