@@ -1,9 +1,9 @@
 # MCPx v0.1 Protocol Specification
 
 Status: v0.1  
-Date: 2025-08-26  
+Date: 2025-08-29
 Intended Status: Experimental  
-Editors: MCPx Working Group
+Editors: RJ Corwin (https://github.com/rjcorwin)
 
 ---
 
