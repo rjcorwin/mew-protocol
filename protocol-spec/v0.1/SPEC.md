@@ -25,15 +25,17 @@ MCPx enables real-time collaboration between multiple AI agents and humans by ex
 - **Collaborative Governance**: Enable multiple humans and AI systems to jointly supervise agent operations
 - **Progressive Automation**: Allow orchestrators to learn from collective decisions over time
 - **Security Through Isolation**: Untrusted agents propose rather than execute, maintaining safety
-- **Scalable Oversight**: Support consensus mechanisms and specialized reviewers for complex decisions
-- **Simplicity**: Gateway remains tool-agnostic, tracking only connection capabilities
-- **Interoperability**: Every participant maintains the MCP server model
+- **Observable Operations**: All messages broadcast by default, enabling auditing and pattern learning
+- **Stateless Gateway**: Minimal gateway state for scalability, with lazy enforcement
+- **MCP Compatibility**: Every participant implements standard MCP server interfaces
 
 ### 2.2 Non-Goals
-- End-to-end encryption or private DMs (use separate topics or higher-layer crypto)
-- Fine-grained per-tool permissions at gateway level (gateway remains tool-agnostic)
-- Schema registries or complex ACL systems
-- Topic lifecycle management
+- End-to-end encryption or private channels (all messages visible within topic)
+- Payload validation at gateway (only validates `kind` field, not message contents)
+- Message persistence or replay (topics are ephemeral)
+- Cross-topic routing or participant discovery
+- Guaranteed delivery (WebSocket best-effort)
+- Application-layer semantics or business logic
 
 ---
 
