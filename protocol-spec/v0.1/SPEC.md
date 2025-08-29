@@ -15,15 +15,11 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted 
 
 ## 1. Abstract
 
-MCPx defines a minimal, topic-based meta-message format and a realtime gateway API that enables collaborative AI governance through secure multi-agent orchestration.
+MCPx enables untrusted AI agents to safely participate in complex workflows under human and orchestrator supervision.
 
-The protocol allows multiple MCP servers (agents/humans/robots) to interoperate in shared "rooms" where:
-- Untrusted agents can safely propose operations through capability-based access control
-- Multiple supervisors (human and AI) collaborate on policy decisions
-- Orchestrator agents progressively learn which operations to approve
-- Every participant maintains the MCP server model for maximum interoperability
+The protocol extends the Model Context Protocol (MCP) by wrapping its messages in routing envelopes that add multi-agent coordination capabilities. While MCP defines client-server interactions with tools, MCPx transforms this into a multi-party system where any participant can offer services and call others' tools. The key innovation is capability-based security: agents can propose operations they lack permission to execute, enabling safe collaboration between components with different trust levels.
 
-This architecture transforms isolated AI agents into collaborative systems where humans and AI work together to safely orchestrate complex operations at scale.
+Messages use an extended kind format (e.g., `mcp/response:tools/call:read_file`) that embeds operation context directly in the envelope, making them self-documenting even when correlation history is lost. This pure wrapper approach - never modifying MCP payloads - ensures complete interoperability while enabling fine-grained access control, audit trails, and progressive automation where orchestrators learn which proposals to auto-approve over time.
 
 ---
 
