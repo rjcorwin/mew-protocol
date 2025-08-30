@@ -411,12 +411,11 @@ export class MCPxClient {
       return;
     }
     
-    // Check if message is for us (skip check if participantId not set yet)
-    if (envelope.to && envelope.to.length > 0 && this.participantId && !envelope.to.includes(this.participantId)) {
-      // Not for us, ignore
-      return;
-    }
-
+    // IMPORTANT: In MCPx v0.1, the gateway broadcasts ALL messages to ALL participants
+    // This is essential for the protocol to work correctly - participants need to see
+    // all interactions to understand the conversation context.
+    // We no longer filter messages based on the 'to' field.
+    
     this.emitMessage(envelope);
 
     // Handle different message kinds (v0.1)

@@ -139,20 +139,18 @@ export class TopicService {
     // Store in history
     this.addToHistory(topic, envelope);
 
-    // Determine recipients
-    const recipients = envelope.to && envelope.to.length > 0 
-      ? envelope.to 
-      : Array.from(topic.participants.keys());
-
-    // Send to recipients
-    recipients.forEach(recipientId => {
-      const recipient = topic.participants.get(recipientId);
-      if (recipient && recipient.ws.readyState === WebSocket.OPEN) {
+    // IMPORTANT: In MCPx, all participants in a topic see all messages
+    // This is essential for the protocol to work correctly:
+    // - Proposals are broadcast, but responses might be targeted
+    // - All participants need to see responses to understand the conversation
+    // - This enables proper multi-agent collaboration
+    topic.participants.forEach((participant, participantId) => {
+      if (participant.ws.readyState === WebSocket.OPEN) {
         try {
-          recipient.ws.send(JSON.stringify(envelope));
-          recipient.lastActivity = new Date();
+          participant.ws.send(JSON.stringify(envelope));
+          participant.lastActivity = new Date();
         } catch (error) {
-          console.error(`Failed to send message to ${recipientId}:`, error);
+          console.error(`Failed to send message to ${participantId}:`, error);
         }
       }
     });

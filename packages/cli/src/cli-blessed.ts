@@ -232,12 +232,11 @@ class BlessedCLI {
 
     this.client.onChat((message: ChatPayload, from: string) => {
       const text = message.text || '';
-      // In debug mode, show all messages (including your own)
-      // In normal mode, only show messages from others
-      if (this.debugMode || from !== this.participantId) {
-        const displayFrom = from === this.participantId ? 'You' : from;
-        this.addMessage(displayFrom, text, 'chat');
-      }
+      // Always show chat messages in the main view
+      // Now that the gateway broadcasts all messages to all participants,
+      // we receive our own messages back, which provides confirmation they were sent
+      const displayFrom = from === this.participantId ? 'You' : from;
+      this.addMessage(displayFrom, text, 'chat');
     });
 
     this.client.onPeerJoined((peer: Peer) => {
@@ -256,7 +255,7 @@ class BlessedCLI {
       // Log all protocol messages to console
       this.logToConsole(envelope);
       
-      // In debug mode, show all envelopes in main view
+      // In debug mode, show ALL envelopes in main view
       if (this.debugMode) {
         // Add header with visual separator
         this.addMessage('System', '', 'info');
@@ -292,9 +291,13 @@ class BlessedCLI {
         this.addMessage('System', '------', 'info');
       }
       
-      // Display MCP messages (non-chat) in main view
-      if (envelope.kind === 'mcp' && envelope.payload.method !== 'notifications/chat/message') {
-        this.displayEnvelope(envelope);
+      // Display non-chat messages in main view when not in debug mode
+      // (Chat messages are handled by onChat handler)
+      if (!this.debugMode && envelope.kind !== 'chat') {
+        // For MCP and system messages, show a formatted view
+        if (envelope.kind.startsWith('mcp/') || envelope.kind === 'mcp' || envelope.kind.startsWith('system/')) {
+          this.displayEnvelope(envelope);
+        }
       }
     });
 
@@ -517,19 +520,42 @@ Examples:
     const timestamp = new Date().toLocaleTimeString();
     const payload = envelope.payload;
     
-    // Format based on the type of MCP message
+    // Format based on the envelope kind (v0.1 hierarchical kinds)
     let description = '';
-    if (payload.method) {
-      // Request or notification
-      description = payload.method.replace('notifications/', '').replace('tools/', '');
-    } else if (payload.result) {
-      // Response
-      description = 'response';
-    } else if (payload.error) {
-      // Error response
-      description = `error: ${payload.error.message}`;
+    
+    // Handle v0.1 hierarchical kinds
+    if (envelope.kind.startsWith('mcp/request:')) {
+      const method = envelope.kind.substring('mcp/request:'.length);
+      description = `→ ${method}`;
+    } else if (envelope.kind.startsWith('mcp/response:')) {
+      const method = envelope.kind.substring('mcp/response:'.length);
+      if (payload.error) {
+        description = `← ${method} error: ${payload.error.message}`;
+      } else {
+        description = `← ${method} response`;
+      }
+    } else if (envelope.kind.startsWith('mcp/proposal:')) {
+      const method = envelope.kind.substring('mcp/proposal:'.length);
+      description = `? ${method} proposal`;
+    } else if (envelope.kind.startsWith('system/')) {
+      const event = envelope.kind.substring('system/'.length);
+      description = `[${event}]`;
+    } else if (envelope.kind === 'mcp') {
+      // Legacy v0 format
+      if (payload.method) {
+        description = payload.method.replace('notifications/', '').replace('tools/', '');
+      } else if (payload.result) {
+        description = 'response';
+      } else if (payload.error) {
+        description = `error: ${payload.error.message}`;
+      }
     } else {
-      description = 'unknown';
+      description = envelope.kind;
+    }
+    
+    // Add recipient info if targeted
+    if (envelope.to && envelope.to.length > 0) {
+      description += ` → ${envelope.to.join(',')}`;
     }
     
     this.addMessage(envelope.from, description, 'mcp');
