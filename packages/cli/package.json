@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "bin": {
     "mcpx-chat": "dist/cli-blessed.js",
-    "mcpx-chat-simple": "dist/cli.js"
+    "mcpx-chat-simple": "dist/cli.js",
+    "mcpx-chat-terminal": "dist/cli-terminal.js"
   },
   "scripts": {
     "build": "tsup",

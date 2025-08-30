@@ -33,6 +33,7 @@
     "example:all": "npm run example:echo & npm run example:calculator & npm run example:coordinator & npm run example:documents & wait",
     "cli": "npm run cli -w @mcpx-protocol/cli",
     "cli:simple": "npm run cli:simple -w @mcpx-protocol/cli",
+    "cli:terminal": "node packages/cli/dist/cli-terminal.js ws://localhost:3000 test-room test-user",
     "cli:test": "npm run cli -w @mcpx-protocol/cli ws://localhost:3000 test-room test-user"
   },
   "devDependencies": {

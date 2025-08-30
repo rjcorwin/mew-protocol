@@ -5,7 +5,7 @@ import { SystemWelcomePayload, ChatPayload, Peer, Envelope } from '@mcpx-protoco
 
 class BlessedCLI {
   private screen: blessed.Widgets.Screen;
-  private messages: blessed.Widgets.Log;
+  private messages: blessed.Widgets.BoxElement;
   private console: blessed.Widgets.Log;
   private input: blessed.Widgets.Textbox;
   private statusBar: blessed.Widgets.BoxElement;
@@ -20,6 +20,7 @@ class BlessedCLI {
   private debugMode = false;
   private pendingRequests: Map<string, { method: string; to: string; timestamp: Date }> = new Map();
   private consoleMessages: Array<{ timestamp: string; summary: string; fullEnvelope: any }> = [];
+  private messageContent: string[] = [];
 
   constructor(gateway: string, topic: string, participantId: string) {
     this.gateway = gateway;
@@ -37,7 +38,8 @@ class BlessedCLI {
     });
 
     // Create message log (left pane when console is shown)
-    this.messages = blessed.log({
+    // Using box with native scrolling
+    this.messages = blessed.box({
       parent: this.screen,
       top: 0,
       left: 0,
@@ -49,15 +51,28 @@ class BlessedCLI {
       label: ' Messages ',
       scrollable: true,
       alwaysScroll: true,
-      mouse: true,
+      scrollbar: {
+        ch: ' ',
+        track: {
+          bg: 'cyan'
+        },
+        style: {
+          inverse: true
+        }
+      },
+      mouse: true,  // Enable native mouse scrolling
       keys: true,
       vi: true,
+      tags: true,  // Enable tags for formatting
       style: {
         border: {
           fg: 'cyan',
         },
+        scrollbar: {
+          bg: 'white'
+        }
       },
-    });
+    }) as any;
 
     // Create console log (right pane for protocol debugging)
     this.console = blessed.log({
@@ -259,7 +274,7 @@ class BlessedCLI {
       if (this.debugMode) {
         // Add header with visual separator
         this.addMessage('System', '', 'info');
-        this.addMessage('System', `=== DEBUG: ${envelope.kind} envelope from ${envelope.from}${envelope.to ? ` to ${envelope.to.join(',')}` : ' (broadcast)'}${envelope.correlation_id ? ` [corr: ${envelope.correlation_id}]` : ''} ===`, 'info');
+        this.addMessage('System', `=== DEBUG: {bold}${envelope.kind}{/bold} envelope from ${envelope.from}${envelope.to ? ` to ${envelope.to.join(',')}` : ' (broadcast)'}${envelope.correlation_id ? ` [corr: ${envelope.correlation_id}]` : ''} ===`, 'info');
         
         // Format the JSON with proper indentation
         const formatted = this.formatJsonForDisplay(envelope);
@@ -373,6 +388,7 @@ class BlessedCLI {
         break;
 
       case 'clear':
+        this.messageContent = [];
         this.messages.setContent('');
         this.screen.render();
         break;
@@ -442,6 +458,13 @@ Key Bindings:
   F2                 - Toggle protocol console
   F3 (or fn+F3)      - Show last message detail
   Ctrl+C             - Exit
+  
+Scrolling:
+  Mouse wheel        - Scroll up/down
+  Arrow keys         - Scroll line by line
+  Page Up/Down       - Scroll page by page
+  Home/End           - Jump to top/bottom
+  j/k                - Vi-style scrolling (down/up)
 
 Console Features:
   - View all protocol messages in real-time
@@ -564,8 +587,8 @@ Examples:
   private addMessage(from: string, text: string, type: 'chat' | 'error' | 'success' | 'info' | 'mcp' | 'join' | 'leave' | 'debug') {
     const timestamp = new Date().toLocaleTimeString();
     
-    // Strip any control characters from the text
-    const cleanText = text.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    // Strip any control characters from the text except for blessed tags
+    const cleanText = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '').trim();
     const cleanFrom = from.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
     
     // Build the formatted message with better visual separation
@@ -616,9 +639,26 @@ Examples:
     const lines = messageText.split('\n');
     lines.forEach((line, index) => {
       if (line.trim() || index === 0) {  // Always show first line even if empty (for spacing)
-        this.messages.log(line);
+        this.messageContent.push(line);
       }
     });
+    
+    // Keep only the last 1000 lines to prevent memory issues
+    if (this.messageContent.length > 1000) {
+      this.messageContent = this.messageContent.slice(-1000);
+    }
+    
+    // Update the box content
+    this.messages.setContent(this.messageContent.join('\n'));
+    
+    // Only scroll to bottom if we're already at the bottom (auto-scroll)
+    // This allows users to scroll up and read history without being interrupted
+    const scrollHeight = this.messages.getScrollHeight() as number;
+    const scrollPerc = this.messages.getScrollPerc();
+    if (scrollPerc >= 90 || scrollHeight <= this.messages.height) {
+      // We're near the bottom or content fits in view, so auto-scroll
+      this.messages.setScrollPerc(100);
+    }
     
     this.screen.render();
   }
@@ -766,6 +806,7 @@ Examples:
     if (index < 0 || index >= this.consoleMessages.length) return;
     
     // Clear messages first to avoid overflow
+    this.messageContent = [];
     this.messages.setContent('');
     
     const message = this.consoleMessages[index];

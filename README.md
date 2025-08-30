@@ -72,10 +72,10 @@ OPENAI_API_KEY=your-key \
 OPENAI_MODEL=gpt-4o \
 MCPX_TOPIC=quickstart \
 OPENAI_SYSTEM_PROMPT="You are a helpful TODO list manager. You have access to a TODO.md file located at /Users/$USER/Desktop/Notes/TODO.md. When asked about TODO items, ALWAYS: 1) First use notes-agent.read_text_file tool to read the file, 2) Then immediately use notes-agent.write_file tool with the full path /Users/$USER/Desktop/Notes/TODO.md to save changes. Never just show changes without saving. Always maintain markdown format with '# TODO List' as the header and items as bullet points." \
-mcpx-openai-agent
+npm run example:openai
 
 # 6. Connect and interact (Terminal 4)
-mcpx-chat ws://localhost:3000 quickstart user
+mcpx-chat-terminal ws://localhost:3000 quickstart user
 # Type: @openai-agent please add "pick up milk" to my TODO list
 # The AI understands TODO context and manages your file!
 
@@ -106,7 +106,7 @@ OPENAI_SYSTEM_PROMPT="You are a helpful assistant. You can only propose operatio
 mcpx-openai-agent
 
 # 4. Connect as human with FULL capabilities (Terminal 4)
-mcpx-chat ws://localhost:3000 supervised human --capabilities "mcp/*"
+mcpx-chat-terminal ws://localhost:3000 supervised human
 
 # Now the workflow is:
 # Type: @openai-agent please add "buy milk" to my TODO list
@@ -158,7 +158,7 @@ mcpx-orchestrator \
   --require-human "write_*,delete_*"
 
 # 5. Connect as a human supervisor (Terminal 5)
-mcpx-chat ws://localhost:3000 orchestrated human --capabilities "mcp/*"
+mcpx-chat-terminal ws://localhost:3000 orchestrated human
 
 # Now when you ask the AI to modify files:
 # Type: @openai-agent please add "buy groceries" to my TODO list
@@ -203,7 +203,9 @@ npm run example:echo        # Echoes messages
 npm run example:calculator  # Provides math tools
 
 # Terminal 3: Connect and interact
-npm run cli:test
+npm run cli:terminal
+# Or if installed globally:
+# mcpx-chat-terminal ws://localhost:3000 test-room user
 ```
 
 ### 🧠 AI-Powered Assistant
