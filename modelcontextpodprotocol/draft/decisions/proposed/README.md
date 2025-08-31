@@ -16,6 +16,9 @@ This folder contains ADRs (Architecture Decision Records) that are currently und
 - `002-m3p-namespace-pattern.md` - Message kind namespace patterns
 - `003-h9j-pod-discovery-and-hub-architecture.md` - Hub discovery architecture
 - `004-v2c-proposal-lifecycle-management.md` - Proposal lifecycle extensions
+- `005-0-t8k-agent-reasoning-transparency.md` - Agent reasoning transparency through sub-contexts
+  - `005-1-k9j-sub-context-protocol-mechanics.md` - Protocol mechanics for implementing sub-contexts
+  - `005-2-p4m-context-field-structure.md` - Context field structure and patterns
 
 ## Process
 
