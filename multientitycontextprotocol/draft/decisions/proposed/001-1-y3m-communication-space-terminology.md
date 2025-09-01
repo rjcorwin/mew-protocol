@@ -316,7 +316,7 @@ None - this is purely a terminology change.
 ## Migration Path
 
 Since this is v0.x (experimental):
-1. Update all documentation to use "pod"
+1. Update all documentation to use "space"
 2. Change API endpoints
 3. Update environment variable names
 4. Update SDK method names
@@ -324,7 +324,7 @@ Since this is v0.x (experimental):
 
 ## Future Considerations
 
-- Pod discovery mechanisms
-- Pod lifecycle management
-- Pod templates for common scenarios
-- Pod federation (connecting pods)
+- Space discovery mechanisms
+- Space lifecycle management
+- Space templates for common scenarios
+- Space federation (connecting spaces)

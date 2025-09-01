@@ -1,4 +1,4 @@
-# ADR-d4n: Pod Configuration Specification
+# ADR-d4n: Space Configuration Specification
 
 **Status:** Proposed  
 **Date:** 2025-08-31  
@@ -8,27 +8,27 @@
 
 ## Context
 
-Currently, the protocol assumes loose authorization where tokens work across any pod. This lacks explicit configuration for pod participants, their capabilities, and connection methods. We need a declarative way to configure pods that:
+Currently, the protocol assumes loose authorization where tokens work across any space. This lacks explicit configuration for space participants, their capabilities, and connection methods. We need a declarative way to configure spaces that:
 - Defines who can participate
 - Specifies participant capabilities
 - Supports different connection types (local processes, remote endpoints, access keys)
 - Handles protocol bridging for non-MEUP participants
-- Provides reproducible pod environments
+- Provides reproducible space environments
 
-Similar to how Docker Compose defines multi-container applications, or how MCP servers are configured in coding agents, pods need explicit configuration files.
+Similar to how Docker Compose defines multi-container applications, or how MCP servers are configured in coding agents, spaces need explicit configuration files.
 
 ### Decision Drivers
-- Need for explicit, reproducible pod configurations
+- Need for explicit, reproducible space configurations
 - Support for heterogeneous participant types
 - Security through explicit capability assignment
-- Ease of pod deployment and management
+- Ease of space deployment and management
 - Support for protocol bridging (MCP, A2A, MEUP)
 
 ## Decision
 
-**Adopt YAML-based pod configuration files**
+**Adopt YAML-based space configuration files**
 
-Pods are configured through a `pod.yaml` file (or similar) that declaratively specifies participants, their capabilities, connection methods, and protocols. This provides explicit, version-controlled pod definitions.
+Spaces are configured through a `space.yaml` file (or similar) that declaratively specifies participants, their capabilities, connection methods, and protocols. This provides explicit, version-controlled space definitions.
 
 ## Options Considered
 
@@ -43,13 +43,13 @@ Continue with dynamic, token-based authorization without explicit configuration.
 
 **Cons:**
 - No reproducibility
-- Unclear pod boundaries
+- Unclear space boundaries
 - Hard to audit/review
 - No explicit capability management
 
 ### Option 2: YAML Configuration Files (Recommended)
 
-Use YAML files similar to docker-compose.yml for pod configuration.
+Use YAML files similar to docker-compose.yml for space configuration.
 
 **Pros:**
 - Declarative and version-controllable
@@ -65,7 +65,7 @@ Use YAML files similar to docker-compose.yml for pod configuration.
 
 ### Option 3: JSON Configuration
 
-Use JSON for pod configuration.
+Use JSON for space configuration.
 
 **Pros:**
 - Native to JavaScript/TypeScript
@@ -93,15 +93,15 @@ Use programming language (TypeScript/Python) for configuration.
 
 ## Implementation Details
 
-### Pod Configuration Structure
+### Space Configuration Structure
 
 ```yaml
-# pod.yaml
+# space.yaml
 version: "1.0"
-name: "code-review-pod"
-description: "Pod for collaborative code review with security scanning"
+name: "code-review-space"
+description: "Space for collaborative code review with security scanning"
 
-# Pod-level settings
+# Space-level settings
 settings:
   max_participants: 10
   message_retention: "24h"
@@ -241,23 +241,23 @@ capability_mapping:
   "meup/proposal:*": null  # MCP doesn't support proposals
 ```
 
-### Pod Lifecycle
+### Space Lifecycle
 
 ```bash
-# Start pod from configuration
-meup pod start ./pod.yaml
+# Start space from configuration
+meup space start ./space.yaml
 
-# List running pods
-meup pod list
+# List running spaces
+meup space list
 
-# Show pod participants and status
-meup pod status code-review-pod
+# Show space participants and status
+meup space status code-review-space
 
-# Stop pod
-meup pod stop code-review-pod
+# Stop space
+meup space stop code-review-space
 
 # Validate configuration
-meup pod validate ./pod.yaml
+meup space validate ./space.yaml
 ```
 
 ### Environment Variable Substitution
@@ -275,12 +275,12 @@ participant:
 ## Consequences
 
 ### Positive
-- **Explicit Configuration**: Clear, auditable pod definitions
-- **Reproducibility**: Pods can be recreated exactly
+- **Explicit Configuration**: Clear, auditable space definitions
+- **Reproducibility**: Spaces can be recreated exactly
 - **Protocol Agnostic**: Supports MCP, A2A, MEUP participants
 - **Version Control**: Configuration files can be tracked
 - **Security**: Explicit capability assignment
-- **Automation**: Pods can be programmatically deployed
+- **Automation**: Spaces can be programmatically deployed
 
 ### Negative
 - **Less Dynamic**: Requires configuration before use
@@ -300,12 +300,12 @@ participant:
 
 1. Start with optional configuration (fallback to current behavior)
 2. Provide configuration generators from existing setups
-3. Gradually require configuration for new pods
-4. Deprecate unconfigured pods in future version
+3. Gradually require configuration for new spaces
+4. Deprecate unconfigured spaces in future version
 
 ## Future Enhancements
 
-- Pod templates for common scenarios
+- Space templates for common scenarios
 - Configuration inheritance/composition
 - Dynamic participant addition with approval
 - Hot-reload of configuration changes

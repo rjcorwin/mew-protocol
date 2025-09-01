@@ -25,7 +25,7 @@ The protocol needs a clear, memorable name that accurately represents its purpos
 
 **Adopt MEUP (Multi-Entity Unified-Context Protocol) as the protocol name**
 
-MEUP captures the protocol's core purpose of unifying context for multiple entities (humans, AI agents, robots, services). The name works as both protocol and CLI command ("meup into pod"), making it memorable and action-oriented. While we use the full "Multi-Entity Unified-Context Protocol" expansion, the acronym intentionally drops the "C" to create the pronounceable "MEUP" rather than "MEUCP".
+MEUP captures the protocol's core purpose of unifying context for multiple entities (humans, AI agents, robots, services). The name works as both protocol and CLI command ("meup into space"), making it memorable and action-oriented. While we use the full "Multi-Entity Unified-Context Protocol" expansion, the acronym intentionally drops the "C" to create the pronounceable "MEUP" rather than "MEUCP".
 
 ## Options Considered
 
@@ -72,11 +72,11 @@ Keep the current MCPx name.
 - "Participant" is less distinctive than "Entity"
 - Longer acronym (4 letters)
 
-### Option 4: MCPP - Model Context Pod Protocol
+### Option 4: MCPP - Model Context Space Protocol
 
 **Pros:**
 - Maintains MCP prefix
-- Includes "pod" terminology
+- Includes "space" terminology
 - Clear lineage from MCP
 
 **Cons:**
@@ -126,7 +126,7 @@ Keep the current MCPx name.
 Simple, clean expansion without "Context" in the name.
 
 **Pros:**
-- Natural command line usage ("meup into pod")
+- Natural command line usage ("meup into space")
 - Playful "beam me up" connotation
 - "Unified Context" precisely describes the shared space
 - Memorable and pronounceable
@@ -201,7 +201,7 @@ Various "POD" acronym expansions were considered (Participant Orchestration & De
 
 **Pros:**
 - Memorable acronym
-- Could align with pod terminology
+- Could align with space terminology
 
 **Cons:**
 - "POD Protocol" name already exists
@@ -443,10 +443,10 @@ Reinterprets MECP with "Commons" instead of "Context".
 npm install -g meup
 
 # Natural command flow
-meup ./pod.yaml          # Start and join a pod
-meup into workspace      # Join existing pod
+meup ./space.yaml        # Start and join a space
+meup into workspace      # Join existing space
 meup status             # Check status
-meup down               # Leave pod
+meup down               # Leave space
 ```
 
 ### Documentation Updates

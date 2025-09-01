@@ -7,7 +7,7 @@
 
 ## Context
 
-Currently, capabilities in MEUP are statically assigned when participants join a pod. However, during collaboration, situations arise where a participant fulfilling proposals wants to grant temporary or scoped capabilities to the proposing participant. This enables progressive trust without requiring administrative intervention.
+Currently, capabilities in MEUP are statically assigned when participants join a space. However, during collaboration, situations arise where a participant fulfilling proposals wants to grant temporary or scoped capabilities to the proposing participant. This enables progressive trust without requiring administrative intervention.
 
 ### Current Limitations
 - Capabilities are fixed at join time
@@ -77,7 +77,7 @@ External admin API for capability changes.
 
 **Cons:**
 - Requires external intervention
-- Breaks pod autonomy
+- Breaks space autonomy
 - Slower response times
 - Additional infrastructure
 
@@ -88,7 +88,7 @@ Participants can grant capabilities through protocol messages.
 **Pros:**
 - In-band capability management
 - Immediate effect
-- Full audit trail in pod
+- Full audit trail in space
 - Supports automation
 - Enables delegation chains
 
@@ -186,7 +186,7 @@ capabilities:
 ### Capability Resolution
 
 When checking capabilities:
-1. Start with base capabilities from pod configuration
+1. Start with base capabilities from space configuration
 2. Add granted capabilities that are still valid
 3. Remove revoked capabilities
 4. Apply scope restrictions (context, resources, etc.)
@@ -335,8 +335,8 @@ The gateway:
 - **Progressive Trust**: Capabilities can grow based on behavior
 - **Reduced Proposals**: Trusted operations become direct
 - **Flexible Security**: Fine-grained, scoped permissions
-- **Autonomy**: Pods self-manage without external admin
-- **Audit Trail**: All changes tracked in pod messages
+- **Autonomy**: Spaces self-manage without external admin
+- **Audit Trail**: All changes tracked in space messages
 - **Automation**: Orchestrators can implement trust policies
 
 ### Negative
@@ -370,6 +370,6 @@ The gateway:
 - Delegation templates for common patterns
 - Machine learning for trust scoring
 - Automatic revocation on anomaly detection
-- Capability marketplace for pod templates
-- Federation of trust across pods
+- Capability marketplace for space templates
+- Federation of trust across spaces
 - Zero-trust progressive capability systems

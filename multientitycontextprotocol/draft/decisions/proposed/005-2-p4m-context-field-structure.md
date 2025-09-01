@@ -509,6 +509,6 @@ A message can have both:
 - Context templates for common patterns
 - Context-aware capabilities (e.g., can filter by context prefix)
 - Context summarization for long chains
-- Cross-pod context correlation
+- Cross-space context correlation
 - Context visualization standards
 - Optional type prefixes in path segments

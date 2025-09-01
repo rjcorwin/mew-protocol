@@ -379,6 +379,6 @@ const contextMessages = messages.filter(m =>
 - Context templates for common patterns
 - Context compression for transmission
 - Context search and replay capabilities
-- Cross-pod context correlation
+- Cross-space context correlation
 - Automatic context summarization
 - Context-based capability rules

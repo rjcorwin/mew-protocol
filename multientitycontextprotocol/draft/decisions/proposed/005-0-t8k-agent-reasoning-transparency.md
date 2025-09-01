@@ -7,7 +7,7 @@
 
 ## Context
 
-Currently, agents in MEUP pods operate as black boxes - they receive inputs and produce outputs without revealing their internal reasoning process. This lack of transparency creates several challenges:
+Currently, agents in MEUP spaces operate as black boxes - they receive inputs and produce outputs without revealing their internal reasoning process. This lack of transparency creates several challenges:
 
 - **Debugging Difficulty**: When agents produce unexpected results, it's hard to understand why
 - **Trust Issues**: Humans and other agents can't see the reasoning behind decisions
@@ -47,7 +47,7 @@ Keep agents as black boxes that only share final outputs.
 
 **Pros:**
 - Simpler protocol (no new message types)
-- Less message traffic in pods
+- Less message traffic in spaces
 - Cleaner conversation flow
 - No risk of exposing sensitive reasoning
 
@@ -92,7 +92,7 @@ Create a special message kind for reasoning that encapsulates the thinking proce
 
 ### Option 4: Separate Reasoning Channel
 
-Create entirely separate pods/topics for agent reasoning.
+Create entirely separate spaces for agent reasoning.
 
 **Pros:**
 - Complete separation of concerns
@@ -210,7 +210,7 @@ Create entirely separate pods/topics for agent reasoning.
 - SHOULD emit `reasoning/start` before complex decisions
 - MAY share any number of `reasoning/step` messages
 - SHOULD conclude with `reasoning/end` before taking action
-- MUST ensure reasoning_id is unique within the pod session
+- MUST ensure reasoning_id is unique within the space session
 
 **For Observing Participants:**
 - MAY choose to ignore all `reasoning/*` messages
@@ -246,7 +246,7 @@ This allows fine-grained control over which agents can share reasoning.
 
 ### Negative
 - **Increased Complexity**: New message kinds to handle
-- **Message Volume**: Potential for significant increase in pod traffic
+- **Message Volume**: Potential for significant increase in space traffic
 - **Performance Impact**: Processing and storing reasoning chains
 - **Privacy Concerns**: Reasoning might expose proprietary algorithms
 - **Context Management**: Participants need strategies for handling reasoning noise
@@ -254,7 +254,7 @@ This allows fine-grained control over which agents can share reasoning.
 ## Security Considerations
 
 - Reasoning messages could expose internal agent logic or training patterns
-- Malicious agents could flood pods with excessive reasoning messages
+- Malicious agents could flood spaces with excessive reasoning messages
 - Sensitive data might be inadvertently included in reasoning steps
 - Rate limiting on reasoning messages may be necessary
 - Consider capability restrictions on who can emit reasoning messages
@@ -272,6 +272,6 @@ Since this is an optional feature:
 
 - Structured reasoning templates for common patterns
 - Reasoning compression for high-volume scenarios
-- Cross-pod reasoning correlation
+- Cross-space reasoning correlation
 - Reasoning replay for training new agents
 - Standardized confidence and uncertainty metrics
