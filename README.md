@@ -1,19 +1,36 @@
-# Model Context Pod Protocol (MCPP)
+# MECP - Multi-Entity Context Protocol
 
-An MCPP Pod is a shared context for Services, Agents, and Humans to collaborate as a unit with individual capability controls to facilitate progressive trust systems.
+MECP enables humans to participate directly inside shared contexts with AI agents, maintaining control through capability-based permissions and progressive trust.
 
-When keeping humans in the loop is critical:
+## The Evolution
+
+```
 MCP:  human <--> context(agent <--> mcp server)
 A2A:  human <--> context(agent <--> agent)
-MECP: context( human <--> agent <--> mcp server <--> agent)
+MECP: context(human <--> agent <--> mcp server <--> agent)
+```
 
-## Core Concepts
+In MECP, humans move from **observing** to **participating** - joining agents inside shared contexts called "pods" where all operations are visible and controllable.
 
-1. **Multi-entity collaboration**: Humans, AI agents, robots, and services communicate through both structured MCP operations and unstructured chat messages
-2. **Peer-to-peer capabilities**: Every participant is an MCP server, creating a network of shared tools and resources
-3. **Capability-based control**: Participants have different permission levels - some can only propose operations (`mcp/proposal/*`) while others can execute them
-4. **Shared observable context**: All operations within a pod are visible to all participants, enabling audit trails and pattern learning
-5. **Progressive automation**: Orchestrators learn from approval patterns, gradually automating routine decisions while maintaining safety
+## Key Features
+
+- **Humans as peers**: Direct participation, not just supervision
+- **Capability control**: Participants can only propose operations until granted execution rights
+- **Progressive trust**: Capabilities expand based on observed behavior
+- **Full visibility**: All participants see all operations in real-time
+- **Protocol bridging**: MCP and A2A agents can join via automatic translation
+
+## How It Works
+
+1. Participants join a pod with specific capabilities
+2. Untrusted participants propose operations
+3. Trusted participants (human or AI) approve and execute
+4. Over time, safe patterns earn direct execution rights
+5. Humans maintain ultimate control while automation grows
+
+## Status
+
+Draft specification in active development. See `/modelcontextpodprotocol/draft/` for details.
 
 ## Protocol Evolution
 
