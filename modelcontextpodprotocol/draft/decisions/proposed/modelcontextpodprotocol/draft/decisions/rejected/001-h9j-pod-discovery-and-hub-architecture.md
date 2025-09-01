@@ -1,9 +1,11 @@
 # ADR-h9j: Pod Discovery and Hub Architecture
 
-**Status:** Proposed  
+**Status:** Rejected  
 **Date:** 2025-08-30  
-**Context:** MCPx/MCPP Protocol Draft Specification
+**Context:** MECP Protocol Draft Specification
 **Incorporation:** Not Incorporated
+**Rejection Date:** 2025-08-31
+**Rejection Reason:** Out of scope for initial version. Pod configuration (ADR-d4n) provides a different approach that needs to mature first. Some aspects may be addressed by reasoning transparency (ADR-t8k).
 
 ## Context
 
