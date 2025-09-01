@@ -195,6 +195,40 @@ participants:
       - "create_pr"
       - "comment"
       - "get_pr_status"
+  
+  # Workflow engine with arbitrary configuration
+  workflow-orchestrator:
+    type: local
+    command: "@meup/workflow-engine"
+    protocol: meup
+    capabilities:
+      - kind: "*"  # Full capabilities to orchestrate
+    # Arbitrary configuration passed to the participant
+    config:
+      engine: "dagster"
+      workflow:
+        name: "code-review-pipeline"
+        steps:
+          - id: "security-scan"
+            type: "parallel"
+            agents: ["security-scanner"]
+            timeout: 300
+          - id: "style-check"
+            type: "sequential"
+            agents: ["linter", "formatter"]
+          - id: "approval"
+            type: "human-in-loop"
+            require_all: false
+        triggers:
+          - type: "on_message"
+            pattern: "pr:opened"
+        error_handling:
+          retry_count: 3
+          fallback: "manual-review"
+      runtime:
+        max_parallel_tasks: 5
+        checkpoint_interval: "10m"
+        state_backend: "redis://localhost:6379"
 
 # Access keys for external participants
 access_keys:
@@ -231,16 +265,76 @@ bridges:
 - Spawned as subprocess
 - Can be MEUP native or use bridge
 - Supports command, args, environment variables
+- Accepts arbitrary `config` object passed to participant
 
 #### 2. Remote Endpoint (`type: remote`)
 - Connects to external service
 - Requires protocol specification
 - Bridge automatically configured if non-MEUP
+- Accepts arbitrary `config` object for service configuration
 
 #### 3. Access Key (`type: key`)
 - Generates joinable access tokens
 - Can be distributed to users/systems
 - Supports expiration and capability limits
+
+### Arbitrary Participant Configuration
+
+Any participant can include a `config` field containing arbitrary YAML/JSON that is passed directly to the participant at startup. This enables:
+
+1. **Workflow Engines**: Complete workflow DAG definitions
+2. **AI Agents**: Model parameters, prompts, temperature settings
+3. **Tool Servers**: Database connections, API keys, feature flags
+4. **Custom Services**: Any domain-specific configuration
+
+Example configurations:
+
+```yaml
+# AI Agent with model configuration
+ai-assistant:
+  type: local
+  command: "ai-agent"
+  config:
+    model: "gpt-4"
+    temperature: 0.7
+    system_prompt: "You are a helpful code reviewer"
+    tools_enabled: ["search", "explain", "suggest"]
+    max_tokens: 4000
+
+# Database bridge with connection config
+database-bridge:
+  type: local
+  command: "@meup/sql-bridge"
+  config:
+    connection:
+      host: "${DB_HOST}"
+      port: 5432
+      database: "code_review"
+      credentials_secret: "db-creds"
+    query_timeout: 30000
+    allowed_operations: ["SELECT", "INSERT"]
+
+# Custom analytics engine
+analytics-engine:
+  type: remote
+  url: "https://analytics.internal"
+  config:
+    metrics:
+      - type: "code_complexity"
+        threshold: 10
+      - type: "test_coverage"
+        minimum: 80
+    reporting:
+      format: "json"
+      destination: "s3://reports/bucket"
+```
+
+The `config` field is:
+- Passed as-is to the participant on startup
+- Can be any valid YAML structure
+- Supports environment variable substitution
+- Participant-specific (gateway doesn't interpret it)
+- Enables "participant as a service" pattern
 
 ### Protocol Bridging
 
