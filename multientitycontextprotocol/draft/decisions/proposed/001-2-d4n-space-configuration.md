@@ -4,7 +4,7 @@
 **Date:** 2025-08-31  
 **Context:** MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
-**Parent ADR:** 001-1-y3m (Pod Terminology)
+**Parent ADR:** 001-1-y3m (Communication Space Terminology)
 
 ## Context
 
