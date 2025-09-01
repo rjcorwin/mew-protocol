@@ -31,7 +31,20 @@ Currently, capabilities in MEUP are statically assigned when participants join a
 
 ## Decision
 
-**To be determined** - Evaluating options for dynamic capability delegation in MEUP spaces.
+**Implement Option 6: Delegation with MEUP Namespace**
+
+We will use dedicated kinds in the MEUP namespace for capability delegation and space management operations:
+- `meup.grant` - Grant capabilities to participants
+- `meup.revoke` - Revoke previously granted capabilities
+- `meup.grant-ack` - Acknowledge capability grants
+- `meup.invite` - Invite new participants to the space
+- `meup.kick` - Remove participants from the space
+
+This decision establishes a clear architectural separation:
+- **MCP namespace**: Core protocol operations (request, proposal, withdraw, reject)
+- **MEUP namespace**: Space management operations (grant, revoke, invite, kick)
+
+Capability delegation is not fundamental to the MCP protocol itself - it's a space management feature that MEUP adds on top of MCP. This layering keeps the MCP protocol focused and allows MEUP to extend it with collaboration features.
 
 ## Options Considered
 
@@ -106,9 +119,9 @@ Use a generic `meup.lifecycle` kind with operation field in payload.
 - Risk of privilege escalation
 - Need careful permission design
 
-### Option 5: Delegation Messages with Dedicated Kinds
+### Option 5: Delegation with MCP Namespace
 
-Use dedicated MCP kinds for each delegation operation.
+Use dedicated kinds in the MCP namespace for delegation.
 
 ```json
 {
@@ -121,17 +134,41 @@ Use dedicated MCP kinds for each delegation operation.
 ```
 
 **Pros:**
-- Clear intent from kind alone
-- Consistent with ADR-v2c pattern
+- Consistent with ADR-v2c pattern (mcp.withdraw, mcp.reject)
+- Suggests delegation is core to MCP protocol
 - Simple routing without payload inspection
-- Explicit capability requirements
 
 **Cons:**
-- More kinds to track
-- Less flexible for future operations
-- Proliferation of kinds
+- Mixes MCP operations with MEUP extensions
+- MCP namespace getting crowded
+- Delegation might not be MCP-specific
 
-### Option 6: Smart Contracts
+### Option 6: Delegation with MEUP Namespace
+
+Use dedicated kinds in the MEUP namespace for delegation.
+
+```json
+{
+  "kind": "meup.grant",
+  "payload": {
+    "recipient": "agent",
+    "capabilities": [...]
+  }
+}
+```
+
+**Pros:**
+- Clear separation: MCP for core protocol, MEUP for space management
+- Delegation is MEUP-specific feature
+- Leaves MCP namespace clean
+- Clear intent from kind alone
+
+**Cons:**
+- Inconsistent with mcp.withdraw/reject pattern
+- Two namespaces to consider
+- More kinds to track
+
+### Option 7: Smart Contracts
 
 Capability changes through programmable rules.
 
@@ -146,11 +183,7 @@ Capability changes through programmable rules.
 - Hard to debug
 - Over-engineered for most uses
 
-## Implementation Details
-
-*To be determined based on selected option*
-
-### Option 7: Proposal-Based Delegation
+### Option 8: Proposal-Based Delegation
 
 Instead of direct grants, use proposals for capability requests.
 
@@ -188,7 +221,7 @@ Instead of direct grants, use proposals for capability requests.
 - Requires proposal capability
 - Less intuitive
 
-### Option 8: Hybrid Approach
+### Option 9: Hybrid Approach
 
 Combine static base capabilities with dynamic adjustments.
 
@@ -204,16 +237,17 @@ Combine static base capabilities with dynamic adjustments.
 
 ## Comparison Matrix
 
-| Option | Complexity | Security | Flexibility | Audit | Performance |
-|--------|------------|----------|-------------|-------|-------------|
-| 1. No Delegation | Very Low | High | None | Simple | Fast |
-| 2. Automatic | High | Low | High | Hard | Medium |
-| 3. Admin API | Medium | High | Medium | Good | Slow |
-| 4. Generic Lifecycle | Medium | Medium | High | Good | Fast |
-| 5. Dedicated Kinds | Low | Medium | Medium | Good | Fast |
-| 6. Smart Contracts | Very High | High | Very High | Excellent | Slow |
-| 7. Proposal-Based | Low | High | Medium | Excellent | Medium |
-| 8. Hybrid | High | Medium | High | Good | Medium |
+| Option | Complexity | Security | Flexibility | Audit | Performance | Namespace |
+|--------|------------|----------|-------------|-------|-------------|----------|
+| 1. No Delegation | Very Low | High | None | Simple | Fast | N/A |
+| 2. Automatic | High | Low | High | Hard | Medium | N/A |
+| 3. Admin API | Medium | High | Medium | Good | Slow | External |
+| 4. Generic Lifecycle | Medium | Medium | High | Good | Fast | meup |
+| 5. MCP Namespace | Low | Medium | Medium | Good | Fast | mcp |
+| 6. MEUP Namespace | Low | Medium | Medium | Good | Fast | meup |
+| 7. Smart Contracts | Very High | High | Very High | Excellent | Slow | Various |
+| 8. Proposal-Based | Low | High | Medium | Excellent | Medium | mcp |
+| 9. Hybrid | High | Medium | High | Good | Medium | Mixed |
 
 ## Consequences
 
@@ -259,3 +293,145 @@ Combine static base capabilities with dynamic adjustments.
 - Capability marketplace for space templates
 - Federation of trust across spaces
 - Zero-trust progressive capability systems
+
+## Implementation Details
+
+### Message Kinds for Space Management
+
+#### Capability Delegation
+
+**Grant Message:**
+```json
+{
+  "kind": "meup.grant",
+  "from": "trusted-orchestrator",
+  "to": ["untrusted-agent"],
+  "payload": {
+    "recipient": "untrusted-agent",
+    "capabilities": [
+      {
+        "kind": "mcp.request",
+        "payload": {
+          "method": "tools/call",
+          "params": {
+            "name": "read_file"
+          }
+        }
+      }
+    ],
+    "scope": {
+      "duration": "1h",
+      "context": "task-123",
+      "resources": ["*.md"]
+    },
+    "reason": "Demonstrated safe file handling"
+  }
+}
+```
+
+**Revoke Message:**
+```json
+{
+  "kind": "meup.revoke",
+  "from": "orchestrator",
+  "payload": {
+    "recipient": "agent",
+    "grant_id": "grant-123",
+    "reason": "Task completed"
+  }
+}
+```
+
+**Grant Acknowledgment:**
+```json
+{
+  "kind": "meup.grant-ack",
+  "from": "agent",
+  "correlationId": "grant-msg-456",
+  "payload": {
+    "grant_id": "grant-123",
+    "status": "accepted"
+  }
+}
+```
+
+#### Space Membership Management
+
+**Invite Message:**
+```json
+{
+  "kind": "meup.invite",
+  "from": "space-admin",
+  "payload": {
+    "participant_id": "new-agent",
+    "capabilities": [
+      {
+        "kind": "mcp.proposal"
+      },
+      {
+        "kind": "chat"
+      }
+    ],
+    "role": "contributor",
+    "reason": "Joining development team"
+  }
+}
+```
+
+**Kick Message:**
+```json
+{
+  "kind": "meup.kick",
+  "from": "space-admin",
+  "payload": {
+    "participant_id": "misbehaving-agent",
+    "reason": "Violating space policies",
+    "ban_duration": "24h"  // Optional: temporary ban
+  }
+}
+```
+
+### Capability Requirements
+
+Using JSON pattern matching from ADR-q8f:
+
+```json
+// Can grant any capability
+{"kind": "meup.grant"}
+
+// Can revoke capabilities
+{"kind": "meup.revoke"}
+
+// Can invite participants
+{"kind": "meup.invite"}
+
+// Can remove participants
+{"kind": "meup.kick"}
+
+// Can acknowledge grants (implicit for all participants)
+{"kind": "meup.grant-ack"}
+```
+
+### Gateway Behavior
+
+1. **For capability operations (grant/revoke):**
+   - Track active grants per participant
+   - Validate capability checks include grants
+   - Enforce scope restrictions
+   - Remove expired grants
+   - Audit all changes
+
+2. **For membership operations (invite/kick):**
+   - Update participant roster
+   - Assign initial capabilities from invite
+   - Disconnect kicked participants
+   - Enforce ban durations
+   - Notify other participants of membership changes
+
+### Security Rules
+
+1. **No Self-Operations**: Can't grant to yourself, can't kick yourself
+2. **Delegation Limits**: Can only grant capabilities you possess
+3. **Hierarchy Respect**: Can't kick participants with higher privileges
+4. **Audit Trail**: All operations must be logged
+5. **Revocation Rights**: Grantor can always revoke their grants
