@@ -21,7 +21,8 @@ This folder contains ADRs (Architecture Decision Records) that are currently und
 - `004-0-t8k-agent-reasoning-transparency.md` - Agent reasoning transparency through sub-contexts
   - `004-1-k9j-sub-context-protocol-mechanics.md` - Protocol mechanics for implementing sub-contexts
   - `004-2-p4m-context-field-structure.md` - Context field structure and patterns
-- `005-g7r-capability-delegation.md` - Dynamic capability delegation and grants
+- `005-g7r-capability-delegation.md` - Dynamic capability delegation and grants (chose Option 6: MEUP namespace)
+- `006-h2n-correlation-id-structure.md` - Correlation ID as array of strings (chose Option 2: Always Array)
 
 ## Process
 
