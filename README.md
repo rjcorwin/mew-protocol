@@ -2,6 +2,11 @@
 
 An MCPP Pod is a shared context for Services, Agents, and Humans to collaborate as a unit with individual capability controls to facilitate progressive trust systems.
 
+When keeping humans in the loop is critical:
+MCP:  human <--> context(agent <--> mcp server)
+A2A:  human <--> context(agent <--> agent)
+MECP: context( human <--> agent <--> mcp server <--> agent)
+
 ## Core Concepts
 
 1. **Multi-entity collaboration**: Humans, AI agents, robots, and services communicate through both structured MCP operations and unstructured chat messages
