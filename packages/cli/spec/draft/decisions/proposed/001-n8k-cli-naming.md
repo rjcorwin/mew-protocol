@@ -2,12 +2,12 @@
 
 **Status:** Proposed  
 **Date:** 2025-08-31  
-**Context:** MECP CLI Specification
+**Context:** MEUP CLI Specification
 **Incorporation:** Not Incorporated
 
 ## Context
 
-MECP needs a command-line interface that allows humans to start pods and participate directly in the shared context. The CLI name should:
+MEUP (Multi-Entity Unified-Context Protocol) needs a command-line interface that allows humans to start pods and participate directly in the shared context. The CLI name should:
 - Be memorable and easy to type
 - Reflect the key innovation of humans being "inside" the context
 - Work well with common command patterns (start, join, status, etc.)
@@ -16,20 +16,22 @@ MECP needs a command-line interface that allows humans to start pods and partici
 
 ### Decision Drivers
 - Ease of use and memorability
-- Conceptual alignment with MECP's core value
+- Conceptual alignment with MEUP's core value
 - Avoiding naming conflicts
 - Professional yet approachable
 - Command line ergonomics
 
 ## Decision
 
-**To be determined** - This ADR presents options for consideration.
+**Recommended: Option 2 - `meup`** 
+
+Based on the protocol naming decision (ADR-x7k), MEUP (Multi-Entity Unified-Context Protocol) naturally suggests `meup` as the CLI command. This creates perfect alignment between protocol and tooling, with the added benefit that "meup into pod" reads naturally as an action phrase.
 
 ## Options Considered
 
 ### Option 1: `pod`
 
-Simple, direct use of the core MECP concept.
+Simple, direct use of the core MEUP concept.
 
 **Usage:**
 ```bash
@@ -41,7 +43,7 @@ pod down
 
 **Pros:**
 - Simple and obvious
-- Directly references MECP pods
+- Directly references MEUP pods
 - Short and easy to type
 - Natural command patterns
 - Memorable
@@ -51,28 +53,29 @@ pod down
 - Might conflict with other tools
 - Doesn't emphasize the human aspect
 
-### Option 2: `mecp`
+### Option 2: `meup` (RECOMMENDED)
 
-Use the protocol name directly.
+Use the protocol name directly, which works naturally as both noun and verb.
 
 **Usage:**
 ```bash
-mecp start ./pod.yaml
-mecp join workspace
-mecp status
-mecp stop
+meup ./pod.yaml          # Start and join a pod
+meup into workspace      # Natural phrasing: "meup into workspace"
+meup status             # Check status
+meup down               # Leave pod
 ```
 
 **Pros:**
-- Clear connection to protocol
-- No ambiguity about purpose
-- Establishes brand identity
+- Perfect alignment with MEUP protocol name
+- Works as action verb ("meup into context")
+- Memorable and playful ("beam me up" connotation)
+- Clear brand identity
 - Unlikely to conflict
+- Short and easy to type
 
 **Cons:**
-- Less intuitive for new users
-- Sounds technical/intimidating
-- Doesn't convey the action
+- New term users need to learn
+- Playful tone might not suit all contexts
 
 ### Option 3: `inside`
 
@@ -163,7 +166,7 @@ enter --exit
 **Cons:**
 - Very generic
 - Might conflict with shell commands
-- Doesn't reference pods or MECP
+- Doesn't reference pods or MEUP
 
 ### Option 7: `chorus`
 
@@ -258,16 +261,16 @@ podme out
 - Might not age well
 - Could seem unprofessional
 
-### Option 11: `podmecp`
+### Option 11: `podmeup`
 
-Combination of pod + MECP.
+Combination of pod + MEUP (variant spelling).
 
 **Usage:**
 ```bash
-podmecp start ./pod.yaml
-podmecp join workspace
-podmecp status
-podmecp leave
+podmeup start ./pod.yaml
+podmeup join workspace
+podmeup status
+podmeup leave
 ```
 
 **Pros:**
@@ -280,16 +283,16 @@ podmecp leave
 - Too many consonants
 - Feels like concatenation
 
-### Option 12: `podmeup`
+### Option 12: `meupme`
 
-Playful action phrase - "pod me up!"
+Playful variant - "MEUP me into the context!"
 
 **Usage:**
 ```bash
-podmeup ./pod.yaml
-podmeup to workspace
-podmeup status
-podmeup down
+meupme ./pod.yaml
+meupme to workspace
+meupme status
+meupme down
 ```
 
 **Pros:**
@@ -479,7 +482,7 @@ Regardless of name chosen, basic commands should include:
 
 Should be installable via:
 ```bash
-npm install -g @mecp/<cli-name>
+npm install -g @meup/<cli-name>
 # or
 brew install <cli-name>
 # or  
