@@ -30,23 +30,25 @@ The current MEUP specification (SPEC.md Section 3.2) defines proposals as a way 
 
 ## Decision
 
-Implement **Option 5: Progressive Lifecycle** with modifications:
+Implement **Option 9: Dedicated MCP Lifecycle Kinds**:
 1. **Optional targeting** via envelope's `to` field (already supported)
-2. **Withdrawal messages** for proposers to cancel
-3. **Rejection for ANY proposal** (not just targeted) to provide quick feedback
+2. **`mcp.withdraw`** messages for proposers to cancel proposals
+3. **`mcp.reject`** messages to provide quick feedback on proposals
 
 ### Message Kind Design
 
-Per ADR-m3p, we use minimal `kind` fields with payload inspection. Lifecycle messages use:
-- `meup.lifecycle` - For MEUP-specific lifecycle operations
+While ADR-m3p advocates for minimal `kind` fields with payload inspection, proposal lifecycle operations warrant dedicated kinds because:
+- **Clear intent** - `mcp.withdraw` and `mcp.reject` immediately convey purpose
+- **Proposal-specific semantics** - These operations are inherently tied to the proposal pattern
+- **Simpler routing** - No payload inspection needed for basic message routing
+- **Minimal payloads** - Just a `reason` field, with context from `correlationId`
 
-The actual operation (withdraw, reject) is specified in the payload, consistent with the minimal kind pattern.
+The dedicated kinds are:
+- `mcp.proposal` - Existing proposal message
+- `mcp.withdraw` - Withdraw a proposal (proposer only)
+- `mcp.reject` - Reject a proposal (any participant)
 
-**Note:** Option 9 presents a viable alternative using dedicated `mcp.withdraw` and `mcp.reject` kinds. This trades consistency with the minimal kind pattern for clearer message intent without payload inspection. The choice between Option 5 and Option 9 depends on whether we prioritize:
-- **Option 5**: Consistency with minimal kind pattern (fewer kinds, more payload inspection)
-- **Option 9**: Clarity of intent from kind alone (more kinds, less payload inspection)
-
-This provides practical lifecycle management while maintaining protocol simplicity.
+This provides practical lifecycle management with clear, specific message types.
 
 ## Options Considered
 
@@ -274,10 +276,9 @@ Use specific MCP kinds for lifecycle operations instead of generic `meup.lifecyc
   "protocol": "meup/v0.1",
   "id": "withdraw-456",
   "from": "untrusted-agent",
-  "correlationId": "prop-123",
+  "correlationId": "prop-123",  // Points to the proposal being withdrawn
   "kind": "mcp.withdraw",
   "payload": {
-    "target": "proposal",  // What we're withdrawing
     "reason": "No longer needed"
   }
 }
@@ -288,11 +289,23 @@ Use specific MCP kinds for lifecycle operations instead of generic `meup.lifecyc
   "id": "reject-789",
   "from": "filesystem-agent",
   "to": ["untrusted-agent"],
-  "correlationId": "prop-123",
+  "correlationId": "prop-123",  // Points to the proposal being rejected
   "kind": "mcp.reject",
   "payload": {
-    "target": "proposal",  // What we're rejecting
     "reason": "busy"
+  }
+}
+
+// Follow-up explanation via chat (optional)
+{
+  "protocol": "meup/v0.1",
+  "id": "chat-790",
+  "from": "filesystem-agent",
+  "to": ["untrusted-agent"],
+  "correlationId": "reject-789",  // References the rejection
+  "kind": "chat",
+  "payload": {
+    "message": "I'm currently processing a large batch operation that requires exclusive file access. Please retry in about 5 minutes."
   }
 }
 ```
@@ -302,11 +315,16 @@ Use specific MCP kinds for lifecycle operations instead of generic `meup.lifecyc
 - Follows MCP namespace for MCP-related operations
 - Simple to understand intent from `kind` alone
 - No payload inspection needed for basic routing
+- Minimal payload - just reason field
+- Context clear from correlationId
+- **Non-blocking**: Lifecycle decisions can be made quickly without waiting for explanation generation
+- **Async reasoning**: Detailed explanations can be generated and sent later via chat
 
 **Cons**:
 - More `kind` values to track
 - Less consistent with minimal kind pattern from ADR-m3p
 - Could proliferate into many specific kinds (mcp.withdraw, mcp.reject, mcp.status, etc.)
+- These kinds are implicitly proposal-specific (not obvious from the name alone)
 
 ---
 
@@ -318,11 +336,11 @@ Use specific MCP kinds for lifecycle operations instead of generic `meup.lifecyc
 | 2. Ack-Based | Medium | Good | No | Good | Too complex |
 | 3. Claim-Based | Medium | Good | Via release | Good | Too coordinated |
 | 4. Bid-Based | High | Excellent | Before award | Excellent | Overkill |
-| **5. Progressive** | **Low** | **Good** | **Yes** | **Yes (reject)** | **✓ Recommended** |
+| 5. Progressive | Low | Good | Yes | Yes (reject) | Good alternative |
 | 6. Two-Phase | Very High | Good | Yes | Excellent | Way too complex |
 | 7. TTL | Low | Fair | No | None | Future addition? |
 | 8. Status Updates | Low | Good | No | Good | Consider adding? |
-| 9. Dedicated Kinds | Low | Good | Yes | Yes (reject) | Alternative to #5 |
+| **9. Dedicated Kinds** | **Low** | **Good** | **Yes** | **Yes (reject)** | **✓ Selected** |
 
 ## Implementation Requirements
 
@@ -331,36 +349,47 @@ Use specific MCP kinds for lifecycle operations instead of generic `meup.lifecyc
 Using the JSON pattern matching from ADR-q8f:
 
 ```yaml
-# Can withdraw own proposals
-- kind: "meup.lifecycle"
-  payload:
-    operation: "withdraw"
-    target: "proposal"
+# Can withdraw proposals (typically own proposals)
+- kind: "mcp.withdraw"
 
 # Can reject proposals
-- kind: "meup.lifecycle"
-  payload:
-    operation: "reject"
-    target: "proposal"
+- kind: "mcp.reject"
 ```
 
-### Behavior Rules
-1. **Withdrawal**:
-   - Only original proposer can withdraw
-   - Fire-and-forget (no confirmation)
-   - Uses `correlationId` to reference proposal
+Note: Since these are dedicated kinds, no payload inspection is needed for basic capability checking.
 
-2. **Rejection** (Updated):
-   - Can reject ANY proposal (not just targeted ones)
-   - Particularly useful when explicitly targeted
+### Behavior Rules
+1. **Withdrawal (`mcp.withdraw`)**:
+   - Only original proposer can withdraw their own proposals
    - Fire-and-forget (no confirmation)
-   - Should include reason ("busy", "incapable", "policy", etc.)
+   - Uses `correlationId` to reference the proposal being withdrawn
+   - Payload contains only `reason` field
+
+2. **Rejection (`mcp.reject`)**:
+   - Any participant with capability can reject proposals
+   - Particularly useful when explicitly targeted in a proposal
+   - Fire-and-forget (no confirmation)
+   - Payload contains only `reason` field
+   - Common reason codes:
+     - `"disagree"` - Don't agree with the proposed action
+     - `"inappropriate"` - Not suitable for the current context
+     - `"unsafe"` - Could cause harm or unintended consequences
+     - `"busy"` - Currently handling other work
+     - `"incapable"` - Don't have the required tools/access
+     - `"policy"` - Violates security or operational policy
+     - `"duplicate"` - Already being handled by another participant
+     - `"invalid"` - Proposal is malformed or impossible
+     - `"timeout"` - Too old or expired
+     - `"resource_limit"` - Would exceed resource constraints
+     - `"other"` - Reason not covered above
    - Helps prevent unnecessary waiting
+   - Detailed explanations can be sent as follow-up `chat` messages with `correlationId`
+   - **Non-blocking pattern**: Participants can reject/withdraw immediately with a reason code, then asynchronously generate and send detailed explanations via chat when ready
 
 3. **Gateway**:
-   - Validates message structure per ADR-m3p
-   - Routes based on minimal `kind` field
-   - Inspects payload for capability matching per ADR-q8f
+   - Validates message structure
+   - Routes based on `kind` field (no payload inspection needed for these)
+   - Checks capabilities using simple kind matching
    - Remains stateless
 
 ## Security Considerations
@@ -388,6 +417,8 @@ These are additive changes:
 1. Should system emit notifications when proposals expire?
 2. Should rejection be required for targeted proposals?
 3. How do orchestrators learn from rejection patterns?
+4. Should we standardize reason codes vs allow freeform text? (Answer: standardized codes)
+5. ~~Alternative: Should detailed explanations be sent as follow-up `chat` messages for human readability?~~ (Answer: Yes, using correlationId)
 
 ## References
 
