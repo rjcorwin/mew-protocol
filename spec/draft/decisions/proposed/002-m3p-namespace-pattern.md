@@ -17,6 +17,7 @@ The current spec uses various patterns for the `kind` field, leading to confusio
 - Unclear when to use `/` vs `:` separators
 - Confusion about whether `mcp/proposal:withdraw` means MCP method "withdraw"
 - No clear mental model for developers
+- **Mixed abstraction levels**: The `kind` field tries to serve both as an envelope-level message type and a payload-level operation descriptor, violating separation of concerns
 
 ## Decision
 
@@ -48,6 +49,7 @@ The `kind` field is kept minimal, containing only the high-level message type. T
 - **Truth in payload**: Payload is authoritative source
 - **Natural for MCP**: MCP already has all details in payload
 - **Future-proof**: Can add complex permission rules without protocol changes
+- **Clean separation of concerns**: The envelope (`kind`) handles routing/type, while the payload handles operation details - no mixing of abstraction levels
 
 ### Implementation Requirements:
 
