@@ -23,9 +23,9 @@ The protocol needs a clear, memorable name that accurately represents its purpos
 
 ## Decision
 
-**Adopt MECP (Multi-Entity Context Protocol) as the protocol name**
+**Adopt MEUP (Multi-Entity Unified Protocol) as the protocol name**
 
-MECP accurately describes the protocol's core purpose: enabling multiple entities (humans, AI agents, robots, services) to collaborate through a shared context. It maintains the MCP naming pattern while clearly indicating the multi-entity and context-sharing aspects.
+MEUP captures the protocol's core purpose of unifying multiple entities (humans, AI agents, robots, services) in shared contexts. The name works brilliantly as both protocol and CLI command ("meup into pod"), making it memorable and action-oriented. While less formal than other options, its playful nature aligns with making human-AI collaboration more approachable and engaging.
 
 ## Options Considered
 
@@ -43,7 +43,7 @@ Keep the current MCPx name.
 - Sounds like a placeholder
 - Doesn't describe functionality
 
-### Option 2: MECP - Multi-Entity Context Protocol (Recommended)
+### Option 2: MECP - Multi-Entity Context Protocol
 
 **Pros:**
 - Clearly indicates multiple entities (not just models)
@@ -121,11 +121,9 @@ Keep the current MCPx name.
 - Could seem gimmicky or trendy
 - Less descriptive than spelled-out names
 
-### Option 8: MEUP - Multi-Entity Unified Protocol
+### Option 8: MEUP - Multi-Entity Unified Protocol (Recommended)
 
-Multiple expansions possible:
-- **Multi-Entity Unified Protocol**
-- **Multi-Entity Unified-Context Protocol** (more precise)
+Simple, clean expansion without "Context" in the name.
 
 **Pros:**
 - Natural command line usage ("meup into pod")
@@ -142,7 +140,62 @@ Multiple expansions possible:
 - Doesn't maintain MCP pattern as clearly
 - "Me up" phrasing might not translate well internationally
 
-### Option 9: POD Protocol Variants
+### Option 9: MEUCP - Multi-Entity Unified-Context Protocol
+
+Full acronym with all components represented.
+
+**Pros:**
+- Accurate acronym - every word is represented
+- "Unified-Context" is precisely descriptive
+- Maintains technical credibility
+- No ambiguity about what each letter means
+- Still pronounceable ("mew-cp" or "me-you-cp")
+- Professional and precise
+
+**Cons:**
+- Loses the playful "me up" sound
+- 5 letters is getting long
+- Less memorable than MEUP
+- Harder to type quickly
+- "Mew-cp" pronunciation less intuitive
+- Doesn't work as naturally for CLI naming
+
+### Option 10: MEUP - Multi-Entity Unified-Context Protocol (with selective acronym)
+
+Same full name as Option 9 but using MEUP as the acronym (dropping the C).
+
+**Pros:**
+- Gets the "me up" playful sound
+- Full name is technically accurate
+- Marketing-friendly acronym
+- Natural CLI usage
+- Precedent exists (like SOAP not being SOARP)
+
+**Cons:**
+- Acronym doesn't match the full name exactly
+- Could seem contrived or forced
+- Might confuse technical audiences
+- Appears to prioritize branding over accuracy
+
+### Option 11: UCP - Unified-Context Protocol
+
+Drops "Multi-Entity" for simplicity.
+
+**Pros:**
+- Short and clean (3 letters)
+- Focus on the key innovation (unified context)
+- Easy to pronounce and remember
+- Professional sounding
+- No acronym gymnastics
+
+**Cons:**
+- Loses the multi-entity emphasis
+- Very generic sounding
+- Might conflict with existing protocols
+- Doesn't indicate who/what is being unified
+- Less descriptive than other options
+
+### Option 12: POD Protocol Variants
 
 Various "POD" acronym expansions were considered (Participant Orchestration & Delegation, etc.)
 
@@ -155,28 +208,178 @@ Various "POD" acronym expansions were considered (Participant Orchestration & De
 - Focuses on container metaphor rather than functionality
 - Longer full names
 
+### Option 13: MEUC - Multi-Entity Unified-Context Protocol
+
+Same as MEUCP but with a 4-letter acronym dropping the P.
+
+**Pros:**
+- Shorter than MEUCP (4 letters vs 5)
+- Still includes all key concepts
+- Easier to type than MEUCP
+- Pronounceable ("mew-k" or "myook")
+- Maintains technical accuracy
+
+**Cons:**
+- Dropping "Protocol" from acronym is unconventional
+- Pronunciation might vary
+- Less clear that it's a protocol without the P
+- Could be confused with other acronyms
+
+### Option 14: UECP - Unified Entity Context Protocol
+
+Puts "Unified" first, emphasizing the unification aspect.
+
+**Pros:**
+- Emphasizes unification as the primary feature
+- Clear and descriptive
+- Professional sounding
+- All components represented in acronym
+- Good flow: unified -> entities -> context -> protocol
+
+**Cons:**
+- 4 letters might be harder to remember
+- Less distinctive than shorter options
+- "Unified Entity" could be misread as single entity
+- Doesn't maintain MCP pattern
+
+### Option 15: UEP - Unified Entity Protocol
+
+Simplified version focusing on unified entities.
+
+**Pros:**
+- Short and clean (3 letters)
+- Easy to pronounce ("you-ep" or "yoop")
+- Emphasizes the key innovation (unified entities)
+- Simple and memorable
+- Professional sounding
+
+**Cons:**
+- Loses "context" which is central to the protocol
+- Very generic sounding
+- Could conflict with existing protocols
+- Less descriptive than other options
+
+### Option 16: UCEP - Unified Context for Entities Protocol
+
+Emphasizes that the context is what's unified, not the entities.
+
+**Pros:**
+- Grammatically clearer ("unified context" not "unified entities")
+- Accurately describes the architecture
+- Makes it clear entities remain independent
+- Good technical accuracy
+
+**Cons:**
+- Longer name with "for" in the middle
+- 4-letter acronym
+- Less catchy than shorter options
+- More complex to explain
+
+### Option 17: UXP - Unified X Protocol (where X = Entity Context)
+
+Uses X as a variable representing the entity-context combination.
+
+**Pros:**
+- Very short (3 letters)
+- X as variable is elegant and flexible
+- Easy to pronounce ("you-ex-pee" or "yux-p")
+- Memorable and distinctive
+- X can represent the intersection/crossing of entities and context
+- Mathematical/technical appeal
+- Future-proof - X can evolve in meaning
+
+**Cons:**
+- X might be too abstract without explanation
+- Loses explicit mention of entities and context
+- Could seem gimmicky
+- Harder to understand purpose from name alone
+- "Unified X" sounds like placeholder text
+
+### Option 18: CCP - Collaborative Context Protocol
+
+Direct emphasis on collaboration between entities.
+
+**Pros:**
+- Short and memorable (3 letters)
+- "Collaborative" perfectly captures the spirit
+- Clear purpose from the name
+- Easy to pronounce
+- Professional sounding
+
+**Cons:**
+- High likelihood of naming conflicts (CCP is common)
+- Doesn't explicitly mention entities
+- Very generic combination of words
+- SEO challenges due to conflicts
+
+### Option 19: COCP - Collaborative Context Protocol
+
+Adds an O to avoid conflicts while keeping "Collaborative".
+
+**Pros:**
+- Avoids direct CCP conflicts
+- Still emphasizes collaboration
+- Reasonably short (4 letters)
+- Clear descriptive name
+- "Co" prefix reinforces collaboration
+
+**Cons:**
+- Pronunciation unclear ("co-cp"? "cock-p"?)
+- Extra letter makes it less elegant
+- Still might conflict with other protocols
+- The O seems arbitrary
+
+### Option 20: COLP - Collaborative Protocol
+
+Simplified version focusing on collaboration.
+
+**Pros:**
+- Short (4 letters)
+- Unique combination unlikely to conflict
+- "Collaborative" is the key differentiator
+- Clean acronym
+- Could pronounce as "collab-p"
+
+**Cons:**
+- Loses both "context" and "entity" concepts
+- Too generic without those key terms
+- Less descriptive of actual functionality
+- COLP is less intuitive as an acronym
+
 ## Implementation Details
 
 ### Protocol Identifier
 ```json
 {
-  "protocol": "mecp/v0.1"
+  "protocol": "meup/v0.1"
 }
 ```
 
 ### Package Naming
-- NPM organization: `@mecp`
-- Repository: `mecp-protocol` or similar
+- NPM organization: `@meup`
+- Repository: `meup-protocol` or similar
 - Package structure:
-  - `@mecp/sdk` - Core SDK
-  - `@mecp/gateway` - Gateway server
-  - `@mecp/bridge` - MCP-to-MECP bridge
-  - `@mecp/cli` - Command-line tools
+  - `@meup/sdk` - Core SDK
+  - `@meup/gateway` - Gateway server
+  - `@meup/bridge` - MCP-to-MEUP bridge
+  - `meup` - CLI tool (note: no @meup prefix for easier typing)
+
+### CLI Usage
+```bash
+# Install globally
+npm install -g meup
+
+# Natural command flow
+meup ./pod.yaml          # Start and join a pod
+meup into workspace      # Join existing pod
+meup status             # Check status
+meup down               # Leave pod
+```
 
 ### Documentation Updates
-- Replace all instances of "MCPx" with "MECP"
-- Update protocol description to emphasize multi-entity context sharing
-- Maintain clear connection to MCP in documentation
+- Replace all instances of "MCPx" and "MECP" with "MEUP"
+- Update protocol description to emphasize unified context
+- Embrace the playful nature in examples and tutorials
 
 ## Consequences
 
@@ -195,8 +398,8 @@ Various "POD" acronym expansions were considered (Participant Orchestration & De
 ## Migration Path
 
 Since this is v0.x (experimental):
-1. Direct cutover to MECP naming
-2. Update all documentation
-3. Rename packages and repositories
-4. Clear communication about the name change
+1. Direct cutover to MEUP naming
+2. Update all documentation and folder structures
+3. Create new packages under @meup organization
+4. Emphasize the "meup into context" concept in messaging
 5. No backward compatibility needed in v0.x
