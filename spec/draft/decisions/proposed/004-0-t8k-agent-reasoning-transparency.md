@@ -27,15 +27,29 @@ Many modern AI systems show "thinking" or "reasoning" steps (like chain-of-thoug
 
 ## Decision
 
-**To be determined** - Evaluating options for reasoning transparency using the context field.
+**Implement Option 5: Simplified Reasoning Kinds with context-based grouping**
 
-With the adoption of the path-based context field (ADR-p4m), we can now implement reasoning transparency by using context paths to group reasoning messages.
+We will add three simple reasoning message kinds that use the context field for grouping:
+- `reasoning.start` - Signals beginning of reasoning (creates context)
+- `reasoning.thought` - Shares thoughts during reasoning (monologue)
+- `reasoning.conclusion` - Concludes reasoning sequence
 
-Other participants can choose to:
-- Monitor the full reasoning process for debugging
-- Filter sub-context messages for cleaner display (but MUST still process any MCP requests/proposals within them)
-- Selectively include reasoning steps when relevant
-- Learn from reasoning patterns for automation
+These kinds use the same simple payload structure as `chat`: `{"message": "..."}`
+
+The key pattern:
+1. Agent sends `reasoning.start` at top level with `correlationId` to the triggering message
+2. The `reasoning.start` message ID becomes the context for subsequent reasoning
+3. Agent uses `reasoning.thought` for thinking out loud (no expectation of reply)
+4. Agent can use `chat` within reasoning context for dialogue (expecting replies)
+5. Agent sends `reasoning.conclusion` to end the reasoning sequence
+6. Agent sends final response at top level with `correlationId` to original request
+
+This approach provides:
+- **Transparency** without overwhelming complexity
+- **Clear boundaries** for reasoning sequences
+- **Semantic distinction** between monologue (`reasoning.thought`) and dialogue (`chat`)
+- **Parallel reasoning** support for multiple agents
+- **Easy filtering** by context while preserving protocol message processing
 
 **Important:** While sub-contexts can be visually collapsed or filtered in UIs, participants MUST still process any MCP protocol messages (requests, proposals, responses) that appear within sub-contexts, as these require action regardless of their context level.
 
@@ -339,24 +353,50 @@ Allow reasoning to reference other messages or data:
 }}
 ```
 
-**3. Collaborative Reasoning**
-Multiple agents can contribute to the same reasoning context:
+**3. Collaborative Reasoning (Maybe Not?)**
+Multiple agents contributing to the same reasoning context might blur the line between reasoning and discussion:
 ```json
-// Agent A starts reasoning
-{"id": "msg-501", "kind": "reasoning.start", "from": "agent-a", "correlationId": "msg-500"}
+// If agents want to discuss, they should use chat, not reasoning
+{"id": "msg-501", "kind": "chat", "from": "agent-b", "payload": {"message": "Have you considered the cache impact?"}}
+{"id": "msg-502", "kind": "chat", "from": "agent-a", "correlationId": "msg-501", "payload": {"message": "Good point, let me check..."}}
 
-// Agent A shares a thought
-{"id": "msg-502", "context": "msg-501", "kind": "reasoning.thought", "from": "agent-a", "payload": {"message": "I think we should check performance first"}}
-
-// Agent B responds to A's thought with a question
-{"id": "msg-503", "context": "msg-501", "kind": "reasoning.thought", "from": "agent-b", "correlationId": "msg-502", "payload": {"message": "Have you considered the cache impact?"}}
-
-// Agent A replies to B's question
-{"id": "msg-504", "context": "msg-501", "kind": "reasoning.thought", "from": "agent-a", "correlationId": "msg-503", "payload": {"message": "Good point, let me check cache..."}}
-
-// Agent A shares findings
-{"id": "msg-505", "context": "msg-501", "kind": "reasoning.thought", "from": "agent-a", "payload": {"message": "Cache impact is minimal, proceeding with performance check"}}
+// Reasoning should probably be individual agent's internal process
+{"id": "msg-503", "kind": "reasoning.start", "from": "agent-a", "correlationId": "msg-502"}
+{"context": "msg-503", "kind": "reasoning.thought", "from": "agent-a", "payload": {"message": "Checking cache impact based on agent-b's suggestion..."}}
+{"context": "msg-503", "kind": "reasoning.conclusion", "from": "agent-a", "payload": {"message": "Cache impact is minimal"}}
+{"id": "msg-506", "kind": "chat", "from": "agent-a", "correlationId": "msg-501", "payload": {"message": "I checked - cache impact is minimal"}}
 ```
+
+**Key Insight - Intent Matters**: 
+- **`reasoning.thought`** = Thinking out loud, no expectation of reply (monologue)
+- **`chat`** = Communication intended for others, open to replies (dialogue)
+- Both can exist in sub-contexts, but serve different purposes
+
+The difference isn't WHERE they happen (context) but WHY:
+- An agent uses `reasoning.thought` to externalize its thinking process
+- An agent uses `chat` to communicate with others
+- Even in a reasoning context, agents might use `chat` to ask for clarification
+
+**Example of the distinction**:
+```json
+// Agent starts reasoning
+{"id": "msg-601", "kind": "reasoning.start", "from": "agent-a", "correlationId": "msg-600"}
+
+// Agent thinking out loud (not expecting reply)
+{"context": "msg-601", "kind": "reasoning.thought", "from": "agent-a", "payload": {"message": "The auth system has three components to check..."}}
+{"context": "msg-601", "kind": "reasoning.thought", "from": "agent-a", "payload": {"message": "Starting with OAuth2 validation..."}}
+
+// Agent needs clarification (expecting reply)
+{"context": "msg-601", "kind": "chat", "from": "agent-a", "payload": {"message": "@agent-b What version of OAuth2 are we using?"}}
+
+// Agent B replies with info
+{"context": "msg-601", "kind": "chat", "from": "agent-b", "correlationId": "msg-604", "payload": {"message": "We're on OAuth 2.1"}}
+
+// Agent A continues thinking (monologue resumes)
+{"context": "msg-601", "kind": "reasoning.thought", "from": "agent-a", "payload": {"message": "OAuth 2.1 has stricter PKCE requirements..."}}
+```
+
+This preserves the semantic difference while allowing flexible interaction patterns.
 
 **4. Reasoning Metadata (Optional Extension)**
 While keeping the simple message format, could add optional metadata:
@@ -421,70 +461,106 @@ Create entirely separate spaces for agent reasoning.
 | 6. Hierarchical | None | Path hierarchy | By path | Medium | Medium |
 | 7. Separate Channel | Maybe | Separate | By channel | High | Medium |
 
-## Recommendation
-
-**Option 5 (Simplified Reasoning Kinds)** strikes the best balance:
-
-- **Just 3 new kinds** that mirror chat structure
-- **Non-blocking** - Can signal reasoning start immediately
-- **Clear boundaries** - Explicit start/end of reasoning
-- **Simple payload** - Reuses familiar chat message format
-- **Clean correlation** - Clear relationships between messages
-- **Supports all use cases** - Debugging, learning, audit trails
-
-This provides structured reasoning transparency without the complexity of Option 4 or the ambiguity of Option 3.
 
 ## Implementation Details
 
-*To be determined based on selected option*
+### Message Kinds
 
-### Example Reasoning Flows
+Three new message kinds in the `reasoning` namespace:
 
-#### Option 3: Context + Regular Messages
-```json
-// User request
-{"kind": "chat", "from": "user", "payload": {"message": "Can you check if this file write is safe?"}}
-
-// Agent reasoning (in context)
-{"context": "reason-789", "kind": "chat", "from": "agent", "payload": {"message": "Let me check the file permissions..."}}
-{"context": "reason-789", "kind": "mcp.request", "from": "agent", "payload": {"method": "tools/call", "params": {"name": "check_permissions"}}}
-{"context": "reason-789", "kind": "chat", "from": "agent", "payload": {"message": "The location requires elevated permissions, this could be risky"}}
-
-// Agent conclusion (back to main context)
-{"kind": "chat", "from": "agent", "payload": {"message": "This file write is not safe due to permission requirements"}}
+```typescript
+type ReasoningKind = 
+  | "reasoning.start"      // Begin reasoning sequence
+  | "reasoning.thought"     // Share internal thought (monologue)
+  | "reasoning.conclusion"  // End reasoning sequence
 ```
 
-#### Option 4: Context + Reasoning Kinds
-```json
-// User request
-{"kind": "chat", "from": "user", "payload": {"message": "Can you check if this file write is safe?"}}
-
-// Agent reasoning (structured)
-{"context": "reason-789", "kind": "reasoning.start", "from": "agent", "payload": {"goal": "Evaluate file write safety"}}
-{"context": "reason-789", "kind": "reasoning.thought", "from": "agent", "payload": {"content": "Need to check permissions"}}
-{"context": "reason-789", "kind": "mcp.request", "from": "agent", "payload": {"method": "tools/call", "params": {"name": "check_permissions"}}}
-{"context": "reason-789", "kind": "reasoning.observation", "from": "agent", "payload": {"content": "Elevated permissions required"}}
-{"context": "reason-789", "kind": "reasoning.conclusion", "from": "agent", "payload": {"decision": "Unsafe", "confidence": 0.92}}
-
-// Agent response
-{"kind": "chat", "from": "agent", "correlationId": "reason-789", "payload": {"message": "This file write is not safe"}}
+All use the same payload structure as `chat`:
+```typescript
+interface ReasoningPayload {
+  message: string;  // The reasoning content
+}
 ```
 
-#### Option 5: Hierarchical Paths
+### Single Agent Reasoning Example
+
 ```json
 // User request
-{"kind": "chat", "from": "user", "payload": {"message": "Can you check if this file write is safe?"}}
+{"id": "msg-100", "kind": "chat", "from": "user", "payload": {"message": "Can you check if this file write is safe?"}}
 
-// Agent reasoning (hierarchical)
-{"context": "reason-789", "kind": "chat", "from": "agent", "payload": {"message": "Starting safety analysis"}}
-{"context": "reason-789/permissions", "kind": "chat", "from": "agent", "payload": {"message": "Checking permissions"}}
-{"context": "reason-789/permissions", "kind": "mcp.request", "from": "agent", "payload": {"method": "tools/call"}}
-{"context": "reason-789/permissions/result", "kind": "chat", "from": "agent", "payload": {"message": "Requires elevated access"}}
-{"context": "reason-789/risk-assessment", "kind": "chat", "from": "agent", "payload": {"message": "Evaluating risk level"}}
-{"context": "reason-789", "kind": "chat", "from": "agent", "payload": {"message": "Analysis complete: unsafe"}}
+// Agent starts reasoning (at top level, creates context)
+{"id": "msg-101", "kind": "reasoning.start", "from": "agent", "correlationId": "msg-100", "payload": {"message": "Analyzing file write safety..."}}
 
-// Agent response
-{"kind": "chat", "from": "agent", "payload": {"message": "This file write is not safe"}}
+// Agent shares thoughts (in reasoning context)
+{"context": "msg-101", "kind": "reasoning.thought", "from": "agent", "payload": {"message": "Need to check file permissions and location"}}
+
+// Agent makes tool call within reasoning
+{"context": "msg-101", "kind": "mcp.request", "from": "agent", "payload": {"method": "tools/call", "params": {"name": "check_permissions", "path": "/etc/passwd"}}}
+
+// More reasoning
+{"context": "msg-101", "kind": "reasoning.thought", "from": "agent", "payload": {"message": "This is a system file with elevated permissions - definitely unsafe"}}
+
+// Agent concludes reasoning
+{"context": "msg-101", "kind": "reasoning.conclusion", "from": "agent", "payload": {"message": "File write is unsafe due to system file permissions"}}
+
+// Agent provides final response (at top level)
+{"id": "msg-106", "kind": "chat", "from": "agent", "correlationId": "msg-100", "payload": {"message": "This file write is not safe. You're trying to write to /etc/passwd which is a critical system file."}}
+```
+
+### Multiple Agents Reasoning in Parallel
+
+```json
+// User asks for analysis
+{"id": "msg-200", "kind": "chat", "from": "user", "payload": {"message": "Should we deploy this auth change?"}}
+
+// Security agent starts reasoning
+{"id": "msg-201", "kind": "reasoning.start", "from": "security-agent", "correlationId": "msg-200", "payload": {"message": "Checking security implications..."}}
+
+// Performance agent starts reasoning (parallel)
+{"id": "msg-202", "kind": "reasoning.start", "from": "perf-agent", "correlationId": "msg-200", "payload": {"message": "Analyzing performance impact..."}}
+
+// Security agent's reasoning
+{"context": "msg-201", "kind": "reasoning.thought", "from": "security-agent", "payload": {"message": "Need to scan for vulnerabilities"}}
+{"context": "msg-201", "kind": "mcp.request", "from": "security-agent", "payload": {"method": "tools/call", "params": {"name": "security_scan"}}}
+{"context": "msg-201", "kind": "reasoning.thought", "from": "security-agent", "payload": {"message": "Found critical vulnerability in token handling"}}
+{"context": "msg-201", "kind": "reasoning.conclusion", "from": "security-agent", "payload": {"message": "Security risk is too high to deploy"}}
+
+// Performance agent's reasoning (parallel)
+{"context": "msg-202", "kind": "reasoning.thought", "from": "perf-agent", "payload": {"message": "Running load tests"}}
+{"context": "msg-202", "kind": "mcp.request", "from": "perf-agent", "payload": {"method": "tools/call", "params": {"name": "load_test"}}}
+{"context": "msg-202", "kind": "reasoning.thought", "from": "perf-agent", "payload": {"message": "Latency increased by only 2ms"}}
+{"context": "msg-202", "kind": "reasoning.conclusion", "from": "perf-agent", "payload": {"message": "Performance impact is acceptable"}}
+
+// Agents provide their responses
+{"id": "msg-210", "kind": "chat", "from": "security-agent", "correlationId": "msg-200", "payload": {"message": "Security: Do not deploy. Critical token handling vulnerability detected."}}
+{"id": "msg-211", "kind": "chat", "from": "perf-agent", "correlationId": "msg-200", "payload": {"message": "Performance: Safe to deploy. Only 2ms latency increase."}}
+```
+
+### Mixed Reasoning and Dialogue
+
+```json
+// User request
+{"id": "msg-300", "kind": "chat", "from": "user", "payload": {"message": "Analyze the OAuth configuration"}}
+
+// Agent starts reasoning
+{"id": "msg-301", "kind": "reasoning.start", "from": "agent-a", "correlationId": "msg-300", "payload": {"message": "Checking OAuth setup..."}}
+
+// Agent thinking (monologue - not expecting reply)
+{"context": "msg-301", "kind": "reasoning.thought", "from": "agent-a", "payload": {"message": "Need to verify OAuth version first"}}
+
+// Agent needs clarification (dialogue - expecting reply)
+{"context": "msg-301", "id": "msg-303", "kind": "chat", "from": "agent-a", "to": ["agent-b"], "payload": {"message": "What OAuth version are we using?"}}
+
+// Another agent replies
+{"context": "msg-301", "kind": "chat", "from": "agent-b", "correlationId": "msg-303", "payload": {"message": "We're on OAuth 2.1"}}
+
+// Agent continues reasoning (back to monologue)
+{"context": "msg-301", "kind": "reasoning.thought", "from": "agent-a", "payload": {"message": "OAuth 2.1 has stricter PKCE requirements, need to verify implementation"}}
+{"context": "msg-301", "kind": "mcp.request", "from": "agent-a", "payload": {"method": "tools/call", "params": {"name": "check_pkce_config"}}}
+{"context": "msg-301", "kind": "reasoning.conclusion", "from": "agent-a", "payload": {"message": "OAuth configuration is compliant with 2.1 standards"}}
+
+// Final response
+{"id": "msg-308", "kind": "chat", "from": "agent-a", "correlationId": "msg-300", "payload": {"message": "OAuth configuration is properly set up for version 2.1 with required PKCE implementation."}}
 ```
 
 
