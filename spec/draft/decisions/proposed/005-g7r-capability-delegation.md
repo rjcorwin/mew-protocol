@@ -31,9 +31,7 @@ Currently, capabilities in MEUP are statically assigned when participants join a
 
 ## Decision
 
-**Implement capability delegation through grant/revoke messages**
-
-Participants with delegation rights can grant scoped capabilities to other participants. Grants are explicit, auditable, and revocable.
+**To be determined** - Evaluating options for dynamic capability delegation in MEUP spaces.
 
 ## Options Considered
 
@@ -81,9 +79,20 @@ External admin API for capability changes.
 - Slower response times
 - Additional infrastructure
 
-### Option 4: Delegation Messages (Recommended)
+### Option 4: Delegation Messages with Generic Lifecycle Kind
 
-Participants can grant capabilities through protocol messages.
+Use a generic `meup.lifecycle` kind with operation field in payload.
+
+```json
+{
+  "kind": "meup.lifecycle",
+  "payload": {
+    "operation": "grant",
+    "recipient": "agent",
+    "capabilities": [...]
+  }
+}
+```
 
 **Pros:**
 - In-band capability management
@@ -97,7 +106,32 @@ Participants can grant capabilities through protocol messages.
 - Risk of privilege escalation
 - Need careful permission design
 
-### Option 5: Smart Contracts
+### Option 5: Delegation Messages with Dedicated Kinds
+
+Use dedicated MCP kinds for each delegation operation.
+
+```json
+{
+  "kind": "mcp.grant",
+  "payload": {
+    "recipient": "agent",
+    "capabilities": [...]
+  }
+}
+```
+
+**Pros:**
+- Clear intent from kind alone
+- Consistent with ADR-v2c pattern
+- Simple routing without payload inspection
+- Explicit capability requirements
+
+**Cons:**
+- More kinds to track
+- Less flexible for future operations
+- Proliferation of kinds
+
+### Option 6: Smart Contracts
 
 Capability changes through programmable rules.
 
@@ -114,220 +148,72 @@ Capability changes through programmable rules.
 
 ## Implementation Details
 
-### New Capability for Delegation
+*To be determined based on selected option*
 
-```yaml
-# Capability to grant capabilities
-capabilities:
-  - "meup/delegate:*"  # Can delegate any capability
-  - "meup/delegate:meup/request:*"  # Can only delegate request capabilities
-  - "meup/delegate:meup/proposal:*"  # Can only delegate proposal capabilities
-```
+### Option 7: Proposal-Based Delegation
 
-### Grant Message
+Instead of direct grants, use proposals for capability requests.
 
 ```json
+// Agent proposes to get capability
 {
-  "kind": "meup/grant",
-  "from": "trusted-orchestrator",
-  "to": ["untrusted-agent"],
+  "kind": "mcp.proposal",
   "payload": {
-    "recipient": "untrusted-agent",
-    "capabilities": [
-      "meup/request:tools/read_file",
-      "meup/request:tools/list"
-    ],
-    "scope": {
-      "duration": "1h",  // Optional: Time-based expiry
-      "usage_count": 100,  // Optional: Number of uses
-      "context": "reason-789",  // Optional: Limited to context
-      "resources": ["*.txt", "*.md"],  // Optional: Resource patterns
-      "until_event": "task_complete"  // Optional: Event-based expiry
-    },
-    "reason": "Demonstrated safe file handling over 50 proposals"
+    "method": "capability/request",
+    "params": {
+      "capabilities": [...],
+      "justification": "..."
+    }
+  }
+}
+
+// Admin fulfills by granting
+{
+  "kind": "mcp.request",
+  "correlationId": "proposal-123",
+  "payload": {
+    "method": "capability/grant",
+    "params": {...}
   }
 }
 ```
 
-### Revoke Message
+**Pros:**
+- Uses existing proposal pattern
+- No new top-level mechanisms
+- Natural audit trail
 
-```json
-{
-  "kind": "meup/revoke",
-  "from": "trusted-orchestrator",
-  "to": ["untrusted-agent"],
-  "payload": {
-    "recipient": "untrusted-agent",
-    "grant_id": "grant-123",  // Revoke specific grant
-    "capabilities": ["meup/request:tools/write_file"],  // Or specific capabilities
-    "reason": "Task completed"
-  }
-}
-```
+**Cons:**
+- Indirect and slower
+- Requires proposal capability
+- Less intuitive
 
-### Grant Acknowledgment
+### Option 8: Hybrid Approach
 
-```json
-{
-  "kind": "meup/grant-ack",
-  "from": "untrusted-agent",
-  "correlation_id": "grant-msg-456",
-  "payload": {
-    "grant_id": "grant-123",
-    "status": "accepted",
-    "effective_capabilities": [
-      "meup/request:tools/read_file",
-      "meup/request:tools/list"
-    ]
-  }
-}
-```
+Combine static base capabilities with dynamic adjustments.
 
-### Capability Resolution
+**Pros:**
+- Best of both worlds
+- Gradual migration path
+- Fallback to static model
 
-When checking capabilities:
-1. Start with base capabilities from space configuration
-2. Add granted capabilities that are still valid
-3. Remove revoked capabilities
-4. Apply scope restrictions (context, resources, etc.)
+**Cons:**
+- Two systems to manage
+- Potential confusion
+- Complex capability resolution
 
-### Delegation Chain Example
+## Comparison Matrix
 
-```json
-// Admin delegates to orchestrator
-{
-  "kind": "meup/grant",
-  "from": "admin",
-  "payload": {
-    "recipient": "orchestrator",
-    "capabilities": ["meup/delegate:meup/request:*"],
-    "scope": {"allow_sub_delegation": true}
-  }
-}
-
-// Orchestrator sub-delegates to agent
-{
-  "kind": "meup/grant",
-  "from": "orchestrator",
-  "payload": {
-    "recipient": "agent",
-    "capabilities": ["meup/request:tools/read_file"],
-    "scope": {"allow_sub_delegation": false}  // Cannot delegate further
-  }
-}
-```
-
-### Gateway Behavior
-
-The gateway:
-- Tracks active grants per participant
-- Validates capability checks include grants
-- Enforces scope restrictions
-- Removes expired grants
-- Broadcasts grant/revoke messages for audit
-
-### Scope Types
-
-#### Duration-Based
-```json
-"scope": {
-  "duration": "30m",  // ISO 8601 duration
-  "expires_at": "2025-09-01T12:00:00Z"  // Absolute time
-}
-```
-
-#### Usage-Based
-```json
-"scope": {
-  "usage_count": 10,  // Number of times capability can be used
-  "usage_tracking": "per_capability"  // or "total"
-}
-```
-
-#### Context-Based
-```json
-"scope": {
-  "context": "task-abc",  // Only within this context
-  "context_pattern": "task-*"  // Pattern matching
-}
-```
-
-#### Resource-Based
-```json
-"scope": {
-  "resources": [
-    "/tmp/*.txt",  // File patterns
-    "table:users:read",  // Database access
-    "api.example.com/public/*"  // API endpoints
-  ]
-}
-```
-
-### Security Rules
-
-1. **No Self-Granting**: Participants cannot grant capabilities to themselves
-2. **Delegation Limits**: Can only grant capabilities you possess
-3. **Sub-Delegation Control**: Grants can prohibit further delegation
-4. **Audit Required**: All grants/revokes must be logged
-5. **Revocation Rights**: Grantor can always revoke their grants
-
-### Example Workflow
-
-```json
-// 1. Agent has been making proposals
-{
-  "kind": "meup/proposal:tools/read_file",
-  "from": "new-agent",
-  "payload": {...}
-}
-
-// 2. Orchestrator recognizes pattern of safe usage
-// Decides to grant temporary direct access
-{
-  "kind": "meup/grant",
-  "from": "orchestrator",
-  "payload": {
-    "recipient": "new-agent",
-    "capabilities": ["meup/request:tools/read_file"],
-    "scope": {
-      "duration": "1h",
-      "resources": ["/project/docs/*.md"]
-    },
-    "reason": "20 successful file reads via proposals"
-  }
-}
-
-// 3. Agent acknowledges grant
-{
-  "kind": "meup/grant-ack",
-  "from": "new-agent",
-  "payload": {
-    "grant_id": "grant-789",
-    "status": "accepted"
-  }
-}
-
-// 4. Agent can now directly request (no proposal needed)
-{
-  "kind": "meup/request:tools/read_file",
-  "from": "new-agent",
-  "payload": {
-    "path": "/project/docs/README.md"
-  }
-}
-
-// 5. After 1 hour, capability automatically expires
-// Or orchestrator can explicitly revoke
-{
-  "kind": "meup/revoke",
-  "from": "orchestrator",
-  "payload": {
-    "recipient": "new-agent",
-    "grant_id": "grant-789",
-    "reason": "Session ended"
-  }
-}
-```
+| Option | Complexity | Security | Flexibility | Audit | Performance |
+|--------|------------|----------|-------------|-------|-------------|
+| 1. No Delegation | Very Low | High | None | Simple | Fast |
+| 2. Automatic | High | Low | High | Hard | Medium |
+| 3. Admin API | Medium | High | Medium | Good | Slow |
+| 4. Generic Lifecycle | Medium | Medium | High | Good | Fast |
+| 5. Dedicated Kinds | Low | Medium | Medium | Good | Fast |
+| 6. Smart Contracts | Very High | High | Very High | Excellent | Slow |
+| 7. Proposal-Based | Low | High | Medium | Excellent | Medium |
+| 8. Hybrid | High | Medium | High | Good | Medium |
 
 ## Consequences
 
