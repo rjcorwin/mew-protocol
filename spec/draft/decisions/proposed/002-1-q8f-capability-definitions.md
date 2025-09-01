@@ -4,7 +4,7 @@
 **Date:** 2025-09-01  
 **Context:** MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
-**Parent ADR:** 002-m3p (Message Kind Namespace Pattern)
+**Parent ADR:** 002-0-m3p (Message Kind Namespace Pattern)
 
 ## Context
 
