@@ -19,11 +19,11 @@ With the adoption of minimal `kind` fields (Option 7 from ADR-m3p), the gateway 
 
 ## Decision
 
-**To be determined** - Evaluating options for capability definition conventions.
+**Option 1 (JSON Pattern Matching)** has been selected as the capability definition convention for the MEUP protocol.
 
 ## Options Considered
 
-### Option 1: JSON Pattern Matching (Recommended)
+### Option 1: JSON Pattern Matching (Selected)
 
 Capabilities are defined as JSON objects with pattern matching for both `kind` and payload fields.
 
@@ -186,17 +186,31 @@ Use simple strings for common cases, JSON objects for complex patterns.
 | Debugging | Medium | Hard | Easy | Medium | Hard |
 | Backward Compat | No | No | Yes | No | Partial |
 
-## Recommendation
+## Implementation
 
-**Option 1 (JSON Pattern Matching)** is recommended for the following reasons:
+The decision to use JSON Pattern Matching was validated through a prototype implementation (see `/packages/capability-matcher`) that successfully demonstrates:
 
-1. **Maximum flexibility** - Can express any permission pattern
-2. **Familiar syntax** - JSON is well-understood
-3. **Tooling support** - JSON schema validation available
-4. **Future-proof** - Can add new pattern types without breaking changes
-5. **Consistent** - Single format for all capabilities
+1. **Proven feasibility** - All pattern types work as specified using existing libraries
+2. **Performance** - Built-in caching provides acceptable performance
+3. **Simplicity** - Clean API with a simple `hasCapability(participant, message)` function
+4. **Library support** - Leverages battle-tested libraries rather than custom implementations
 
-While more verbose than strings, the expressiveness gained is worth the complexity for a security-critical system.
+### Implementation Libraries
+
+The prototype successfully uses these existing libraries:
+
+#### JavaScript/TypeScript (Validated)
+- **micromatch** - Fast glob pattern matching for wildcard patterns (`*`, `**`)
+- **jsonpath-plus** - JSONPath expressions for deep object querying
+- **lodash** - Utility functions for object comparison and traversal
+
+#### Other Languages (Recommended)
+- **Java**: Jayway JsonPath for JSONPath expressions
+- **Python**: jsonpath-ng for JSONPath support
+- **Go**: doublestar for glob patterns, gjson for JSON path queries
+- **Rust**: glob for pattern matching, jsonpath for JSONPath expressions
+
+The implementation combines glob pattern matching (for wildcards) with JSONPath expressions (for deep queries) to provide comprehensive pattern matching capabilities.
 
 ## Examples with Recommended Option
 
@@ -400,10 +414,12 @@ Gateways MAY support both formats during transition:
 - **Granularity**: Fine-grained control over operations
 - **Extensibility**: Easy to add new pattern types
 - **Performance**: Caching mitigates inspection overhead
+- **Library ecosystem**: Can leverage existing, well-tested pattern matching libraries
+- **Proven implementation**: Prototype validates the approach works as designed
 
 ### Negative
 - **Complexity**: More complex than simple string matching
-- **Performance**: Payload inspection adds latency
+- **Performance**: Payload inspection adds latency (mitigated by caching)
 - **Debugging**: Harder to understand why permission was granted/denied
 - **Configuration**: More verbose capability definitions
 
