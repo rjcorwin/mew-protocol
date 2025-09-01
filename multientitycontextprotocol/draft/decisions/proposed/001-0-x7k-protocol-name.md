@@ -56,7 +56,23 @@ Keep the current MCPx name.
 - New acronym to learn
 - Requires documentation updates
 
-### Option 3: MCPP - Model Context Pod Protocol
+### Option 3: MPCP - Multi-Participant Context Protocol
+
+**Pros:**
+- "Participant" is inclusive of all entity types
+- Maintains MCP prefix and pattern
+- Clear functional description
+- Natural language - everyone understands "participant"
+- Avoids technical jargon
+- Accurate terminology for the protocol's purpose
+
+**Cons:**
+- Very similar to MCP (one letter difference)
+- Could be confused in speech/pronunciation
+- "Participant" is less distinctive than "Entity"
+- Longer acronym (4 letters)
+
+### Option 4: MCPP - Model Context Pod Protocol
 
 **Pros:**
 - Maintains MCP prefix
@@ -68,7 +84,7 @@ Keep the current MCPx name.
 - Ties protocol name to container metaphor
 - Less descriptive of actual functionality
 
-### Option 4: MACP - Multi-Agent Context Protocol
+### Option 5: MACP - Multi-Agent Context Protocol
 
 **Pros:**
 - Clear multi-party indication
@@ -79,7 +95,7 @@ Keep the current MCPx name.
 - "Agent" may not clearly include humans
 - Could imply AI-only system
 
-### Option 5: MCSP - Multi-Context Sharing Protocol
+### Option 6: MCSP - Multi-Context Sharing Protocol
 
 **Pros:**
 - Emphasizes context sharing
@@ -89,7 +105,23 @@ Keep the current MCPx name.
 - Loses direct MCP connection in naming
 - Less clear about multi-entity aspect
 
-### Option 6: POD Protocol Variants
+### Option 7: MXCP - Multi-X Context Protocol
+
+**Pros:**
+- X as variable represents any participant type (human, AI, robot, service)
+- Mathematically elegant - X as universal placeholder
+- Future-proof - doesn't limit participant types
+- Distinctive from MCP in pronunciation
+- Maintains MCP heritage pattern
+- Avoids entity/participant terminology debate
+- Cool technical factor
+
+**Cons:**
+- X might be unclear without explanation
+- Could seem gimmicky or trendy
+- Less descriptive than spelled-out names
+
+### Option 8: POD Protocol Variants
 
 Various "POD" acronym expansions were considered (Participant Orchestration & Delegation, etc.)
 
