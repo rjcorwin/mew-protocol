@@ -4,15 +4,16 @@
 **Date:** 2025-08-30  
 **Context:** MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
+**Related ADRs:** 002-0-m3p (Message Kind Namespace Pattern)
 
 ## Context
 
 The current MEUP specification (SPEC.md Section 3.2) defines proposals as a way for capability-restricted participants to suggest operations. However, it only defines the basic propose→fulfill pattern without any lifecycle management.
 
 ### Current Spec Capabilities
-- `mcp/proposal:METHOD[:CONTEXT]` message format
-- Fulfillment via `mcp/request:METHOD` with `correlation_id` 
-- Capability-based access control
+- `mcp.proposal` message kind with method in payload
+- Fulfillment via `mcp.request` with `correlation_id` 
+- Capability-based access control with payload inspection
 
 ### Problems with Current Design
 1. **Waiting on dead proposals**: Proposers wait for timeout even when no one will fulfill
@@ -34,21 +35,16 @@ Implement **Option 5: Progressive Lifecycle** with modifications:
 2. **Withdrawal messages** for proposers to cancel
 3. **Rejection for ANY proposal** (not just targeted) to provide quick feedback
 
-### Namespace Question: Where do lifecycle messages belong?
+### Message Kind Design
 
-**Option A: Under `meup.` (current choice)**
-- `meup.withdraw.proposal` 
-- `meup.reject.proposal`
-- Logic: These are MEUP extensions, not MCP operations
+Per ADR-m3p, we use minimal `kind` fields with payload inspection. Lifecycle messages use:
+- `meup.lifecycle` - For MEUP-specific lifecycle operations
 
-**Option B: Under `mcp.` for consistency**
-- `mcp.withdraw.proposal`
-- `mcp.reject.proposal`  
-- Logic: They operate on MCP proposals, should be in MCP namespace
+The actual operation (withdraw, reject) is specified in the payload, consistent with the minimal kind pattern.
 
-**Recommendation**: Stay with `meup.` to clearly indicate these are protocol extensions not part of core MCP.
-
-Note on namespace pattern: Per ADR-008, we use `PROTOCOL.OPERATION[.METHOD[:CONTEXT]]`
+**Note:** Option 9 presents a viable alternative using dedicated `mcp.withdraw` and `mcp.reject` kinds. This trades consistency with the minimal kind pattern for clearer message intent without payload inspection. The choice between Option 5 and Option 9 depends on whether we prioritize:
+- **Option 5**: Consistency with minimal kind pattern (fewer kinds, more payload inspection)
+- **Option 9**: Clarity of intent from kind alone (more kinds, less payload inspection)
 
 This provides practical lifecycle management while maintaining protocol simplicity.
 
@@ -59,7 +55,7 @@ This provides practical lifecycle management while maintaining protocol simplici
 Keep the current spec as-is with no lifecycle management.
 
 **Messages**: 
-- `mcp/proposal` → `mcp/request` (fulfillment)
+- `mcp.proposal` → `mcp.request` (fulfillment)
 
 **Pros**:
 - Dead simple, already implemented
@@ -78,7 +74,7 @@ Keep the current spec as-is with no lifecycle management.
 Add acknowledgment messages to indicate consideration.
 
 **Messages**:
-- `mcp/proposal` → `mcp/proposal:ack` → `mcp/request` or `mcp/proposal:decline`
+- `mcp.proposal` → `meup.lifecycle` (ack) → `mcp.request` or `meup.lifecycle` (decline)
 
 **Pros**:
 - Proposer knows someone is considering
@@ -96,7 +92,7 @@ Add acknowledgment messages to indicate consideration.
 Add exclusive claiming mechanism.
 
 **Messages**:
-- `mcp/proposal` → `mcp/proposal:claim` → `mcp/request` or `mcp/proposal:release`
+- `mcp.proposal` → `meup.lifecycle` (claim) → `mcp.request` or `meup.lifecycle` (release)
 
 **Pros**:
 - No duplicate work
@@ -114,7 +110,7 @@ Add exclusive claiming mechanism.
 Add bidding mechanism for proposals.
 
 **Messages**:
-- `mcp/proposal` → `mcp/proposal:bid` → `mcp/proposal:award` → `mcp/request`
+- `mcp.proposal` → `meup.lifecycle` (bid) → `meup.lifecycle` (award) → `mcp.request`
 
 **Pros**:
 - Best agent self-selects
@@ -139,7 +135,7 @@ Add minimal lifecycle extensions for practical needs.
   "id": "prop-123",
   "from": "untrusted-agent",
   "to": ["filesystem-agent"],  // Optional targeting
-  "kind": "mcp.proposal.tools/call",
+  "kind": "mcp.proposal",
   "payload": {
     "method": "tools/call",
     "params": { ... }
@@ -152,8 +148,10 @@ Add minimal lifecycle extensions for practical needs.
   "id": "withdraw-456",
   "from": "untrusted-agent",
   "correlationId": "prop-123",
-  "kind": "meup.withdraw.proposal",
+  "kind": "meup.lifecycle",
   "payload": {
+    "operation": "withdraw",
+    "target": "proposal",
     "reason": "No longer needed"
   }
 }
@@ -165,8 +163,10 @@ Add minimal lifecycle extensions for practical needs.
   "from": "filesystem-agent",
   "to": ["untrusted-agent"],
   "correlationId": "prop-123",
-  "kind": "meup.reject.proposal",
+  "kind": "meup.lifecycle",
   "payload": {
+    "operation": "reject",
+    "target": "proposal",
     "reason": "busy"
   }
 }
@@ -189,7 +189,7 @@ Add minimal lifecycle extensions for practical needs.
 Add two-phase commit pattern.
 
 **Messages**:
-- `mcp/proposal` → `mcp/proposal:prepare` → `mcp/proposal:commit` or `mcp/proposal:abort`
+- `mcp.proposal` → `meup.lifecycle` (prepare) → `meup.lifecycle` (commit/abort)
 
 **Pros**:
 - Strong consistency
@@ -228,9 +228,11 @@ Add optional status messages for transparency.
 ```json
 // Status update
 {
-  "kind": "meup.status.proposal",
+  "kind": "meup.lifecycle",
   "correlationId": "prop-123",
   "payload": {
+    "operation": "status",
+    "target": "proposal",
     "status": "considering" | "queued" | "processing" | "unable"
   }
 }
@@ -248,6 +250,66 @@ Add optional status messages for transparency.
 
 ---
 
+### Option 9: Dedicated MCP Lifecycle Kinds
+
+Use specific MCP kinds for lifecycle operations instead of generic `meup.lifecycle`.
+
+**Messages**:
+```json
+// Proposal with optional targeting
+{
+  "protocol": "meup/v0.1",
+  "id": "prop-123",
+  "from": "untrusted-agent",
+  "to": ["filesystem-agent"],  // Optional targeting
+  "kind": "mcp.proposal",
+  "payload": {
+    "method": "tools/call",
+    "params": { ... }
+  }
+}
+
+// Withdrawal (proposer cancels)
+{
+  "protocol": "meup/v0.1",
+  "id": "withdraw-456",
+  "from": "untrusted-agent",
+  "correlationId": "prop-123",
+  "kind": "mcp.withdraw",
+  "payload": {
+    "target": "proposal",  // What we're withdrawing
+    "reason": "No longer needed"
+  }
+}
+
+// Rejection
+{
+  "protocol": "meup/v0.1",
+  "id": "reject-789",
+  "from": "filesystem-agent",
+  "to": ["untrusted-agent"],
+  "correlationId": "prop-123",
+  "kind": "mcp.reject",
+  "payload": {
+    "target": "proposal",  // What we're rejecting
+    "reason": "busy"
+  }
+}
+```
+
+**Pros**:
+- Clear, specific message types
+- Follows MCP namespace for MCP-related operations
+- Simple to understand intent from `kind` alone
+- No payload inspection needed for basic routing
+
+**Cons**:
+- More `kind` values to track
+- Less consistent with minimal kind pattern from ADR-m3p
+- Could proliferate into many specific kinds (mcp.withdraw, mcp.reject, mcp.status, etc.)
+
+---
+
 ## Comparison Matrix
 
 | Option | Complexity | Efficiency | Cancellable | Feedback | Recommendation |
@@ -260,12 +322,27 @@ Add optional status messages for transparency.
 | 6. Two-Phase | Very High | Good | Yes | Excellent | Way too complex |
 | 7. TTL | Low | Fair | No | None | Future addition? |
 | 8. Status Updates | Low | Good | No | Good | Consider adding? |
+| 9. Dedicated Kinds | Low | Good | Yes | Yes (reject) | Alternative to #5 |
 
 ## Implementation Requirements
 
 ### New Capabilities Required
-- `meup.withdraw.proposal` - Can withdraw own proposals
-- `meup.reject.proposal` - Can reject targeted proposals
+
+Using the JSON pattern matching from ADR-q8f:
+
+```yaml
+# Can withdraw own proposals
+- kind: "meup.lifecycle"
+  payload:
+    operation: "withdraw"
+    target: "proposal"
+
+# Can reject proposals
+- kind: "meup.lifecycle"
+  payload:
+    operation: "reject"
+    target: "proposal"
+```
 
 ### Behavior Rules
 1. **Withdrawal**:
@@ -281,8 +358,9 @@ Add optional status messages for transparency.
    - Helps prevent unnecessary waiting
 
 3. **Gateway**:
-   - Validates message structure per ADR-008
-   - Routes based on `kind` and capabilities
+   - Validates message structure per ADR-m3p
+   - Routes based on minimal `kind` field
+   - Inspects payload for capability matching per ADR-q8f
    - Remains stateless
 
 ## Security Considerations
