@@ -23,9 +23,9 @@ The protocol needs a clear, memorable name that accurately represents its purpos
 
 ## Decision
 
-**Adopt MEUP (Multi-Entity Unified Protocol) as the protocol name**
+**Adopt MEUP (Multi-Entity Unified-Context Protocol) as the protocol name**
 
-MEUP captures the protocol's core purpose of unifying multiple entities (humans, AI agents, robots, services) in shared contexts. The name works brilliantly as both protocol and CLI command ("meup into pod"), making it memorable and action-oriented. While less formal than other options, its playful nature aligns with making human-AI collaboration more approachable and engaging.
+MEUP captures the protocol's core purpose of unifying context for multiple entities (humans, AI agents, robots, services). The name works as both protocol and CLI command ("meup into pod"), making it memorable and action-oriented. While we use the full "Multi-Entity Unified-Context Protocol" expansion, the acronym intentionally drops the "C" to create the pronounceable "MEUP" rather than "MEUCP".
 
 ## Options Considered
 
@@ -345,6 +345,79 @@ Simplified version focusing on collaboration.
 - Too generic without those key terms
 - Less descriptive of actual functionality
 - COLP is less intuitive as an acronym
+
+### Option 21: COPE - Commons Protocol for Entities
+
+Uses "Commons" metaphor for shared collaborative space.
+
+**Pros:**
+- "Commons" perfectly captures shared ownership concept
+- COPE is memorable and positive ("cope with complexity")
+- Clear that it's for multiple entities
+- Rich historical/cultural meaning (town commons, creative commons)
+- Implies democratic participation
+- Natural word with good connotations
+
+**Cons:**
+- "Cope" might imply dealing with problems
+- Longer full name with "for" in middle
+- Commons might sound informal to some
+- Could be seen as too metaphorical
+
+### Option 22: COMP - Commons Protocol
+
+Simplified commons-based name.
+
+**Pros:**
+- Very short (4 letters)
+- "Commons" captures the shared space concept
+- COMP is familiar from "computer", "component"
+- Clean and professional
+- Easy to type and remember
+- Could use "comp" as CLI command
+
+**Cons:**
+- Very generic sounding
+- High chance of conflicts (COMP is common abbreviation)
+- Loses explicit mention of entities
+- Might be confused with "comparison" or "computer"
+
+### Option 23: ECP - Entity Commons Protocol
+
+Entities-first naming with commons concept.
+
+**Pros:**
+- Short and clean (3 letters)
+- "Entity Commons" is descriptive
+- Emphasizes that entities share the commons
+- Professional yet approachable
+- Good flow: entities -> commons -> protocol
+- Natural abbreviation
+
+**Cons:**
+- ECP might already be taken
+- Could be confused with other protocols
+- "Entity Commons" is a new phrase to explain
+- Less distinctive than longer options
+
+### Option 24: MECP - Multi-Entity Commons Protocol
+
+Reinterprets MECP with "Commons" instead of "Context".
+
+**Pros:**
+- Keeps the MECP acronym already in use
+- "Commons" is more evocative than "Context"
+- Emphasizes shared ownership and democratic participation
+- Rich metaphor (digital commons, creative commons heritage)
+- Multiple entities sharing a commons is intuitive
+- Maintains MCP naming pattern
+- No migration needed from current MECP usage
+
+**Cons:**
+- Changes meaning of C from Context to Commons
+- Commons might sound less technical
+- Requires explaining the commons concept
+- Some might prefer the precision of "Context"
 
 ## Implementation Details
 
