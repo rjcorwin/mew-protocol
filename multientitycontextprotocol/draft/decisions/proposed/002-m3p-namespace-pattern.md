@@ -2,14 +2,14 @@
 
 **Status:** Proposed  
 **Date:** 2025-08-30  
-**Context:** MCPx Protocol Draft Specification
+**Context:** MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
 
 ## Context
 
 The current spec uses various patterns for the `kind` field, leading to confusion about the namespace structure. We need a consistent, elegant pattern that clearly indicates:
 1. What protocol/format is in the payload
-2. What MCPx operation is being performed
+2. What MEUP operation is being performed
 3. Any additional context needed for routing/capabilities
 
 ### Current Issues
@@ -32,8 +32,8 @@ The current spec uses various patterns for the `kind` field, leading to confusio
 This provides semantic clarity: dots for hierarchy, colon for context.
 
 Where:
-- **PAYLOAD_PROTOCOL**: What protocol/format is in the payload (`mcp`, `mcpx`, `system`, `chat`)
-- **MCPX_OPERATION**: The MCPx-level operation (`request`, `response`, `proposal`, `withdraw`, `reject`, `welcome`, etc.)
+- **PAYLOAD_PROTOCOL**: What protocol/format is in the payload (`mcp`, `meup`, `system`, `chat`)
+- **MCPX_OPERATION**: The MEUP-level operation (`request`, `response`, `proposal`, `withdraw`, `reject`, `welcome`, etc.)
 - **PAYLOAD_METHOD**: (Optional third level with dot) The method within the payload protocol
   - For MCP: The actual method like `tools/call`, `resources/read`
   - For non-MCP: A target or subtype like `proposal`, `participant`
@@ -61,7 +61,7 @@ Where:
 kind: mcp.request.tools/call
       ^^^  ^^^^^^^  ^^^^^^^^^^
       |    |        └─ PAYLOAD_METHOD (MCP method)
-      |    └─ MCPX_OPERATION (what MCPx is doing)
+      |    └─ MCPX_OPERATION (what MEUP is doing)
       └─ PAYLOAD_PROTOCOL (MCP protocol in payload)
 validates: payload.method === "tools/call"
 
@@ -74,12 +74,12 @@ kind: mcp.request.tools/call:read_file
 validates: payload.method === "tools/call" && 
            payload.params.name === "read_file"
 
-kind: mcpx.withdraw.proposal
+kind: meup.withdraw.proposal
       ^^^^  ^^^^^^^^  ^^^^^^^^
       |     |         └─ What we're withdrawing (not a method)
       |     └─ MCPX_OPERATION (withdraw)
-      └─ PAYLOAD_PROTOCOL (MCPx-specific)
-validates: MCPx-specific validation
+      └─ PAYLOAD_PROTOCOL (MEUP-specific)
+validates: MEUP-specific validation
 
 kind: system.welcome.participant
       ^^^^^^  ^^^^^^^  ^^^^^^^^^^^
@@ -95,8 +95,8 @@ validates: (reserved for gateway only)
 - `system/welcome` → `system.welcome` (2 levels, no method needed)
 - `system/presence` → `system.presence` (2 levels)
 - `chat` → `chat.message` (2 levels sufficient)
-- `proposal/withdraw` → `mcpx.withdraw.proposal` (3 levels)
-- `proposal/reject` → `mcpx.reject.proposal` (3 levels)
+- `proposal/withdraw` → `meup.withdraw.proposal` (3 levels)
+- `proposal/reject` → `meup.reject.proposal` (3 levels)
 
 ## Options Considered
 
@@ -142,8 +142,8 @@ Examples:
 - `mcp.request.tools/call` - MCP protocol, request op, tools/call method
 - `mcp.proposal.tools/call` - MCP protocol, proposal op, tools/call method
 - `mcp.response.tools/call` - MCP protocol, response op, tools/call method
-- `mcpx.withdraw.proposal` - MCPx protocol, withdraw op, proposal target
-- `mcpx.reject.proposal` - MCPx protocol, reject op, proposal target
+- `meup.withdraw.proposal` - MEUP protocol, withdraw op, proposal target
+- `meup.reject.proposal` - MEUP protocol, reject op, proposal target
 - `system.welcome.participant` - System protocol, welcome op, participant target
 - `system.presence.join` - System protocol, presence op, join event
 - `system.presence.leave` - System protocol, presence op, leave event
@@ -154,7 +154,7 @@ Examples:
 - `mcp.*` - All MCP operations
 - `mcp.request.*` - All MCP requests
 - `mcp.request.tools/*` - All tool requests
-- `mcpx.withdraw.*` - Can withdraw proposals
+- `meup.withdraw.*` - Can withdraw proposals
 - `system.*` - Reserved for gateway only
 - `chat.*` - All chat operations
 
@@ -213,14 +213,14 @@ Examples:
 Rules:
 - `/` separates protocol namespaces
 - `:` separates operation details
-- Never use `:` for MCPx-specific operations
+- Never use `:` for MEUP-specific operations
 
 Examples:
 - `mcp/request:tools/call` - MCP namespace, request:tools/call
 - `mcp/proposal:tools/call` - MCP namespace, proposal:tools/call
 - `mcp/response:tools/call` - MCP namespace, response:tools/call
-- `mcpx/proposal/withdraw` - MCPx namespace, proposal namespace, withdraw
-- `mcpx/proposal/reject` - MCPx namespace, proposal namespace, reject
+- `meup/proposal/withdraw` - MEUP namespace, proposal namespace, withdraw
+- `meup/proposal/reject` - MEUP namespace, proposal namespace, reject
 - `system/welcome` - System namespace, welcome
 - `system/presence` - System namespace, presence
 - `system/error` - System namespace, error
@@ -230,19 +230,19 @@ Examples:
 - `mcp/*` - All MCP operations
 - `mcp/request:*` - All MCP requests
 - `mcp/request:tools/*` - All tool requests
-- `mcpx/proposal/*` - All MCPx proposal lifecycle
+- `meup/proposal/*` - All MEUP proposal lifecycle
 - `system/*` - Reserved for gateway only
 - `chat` - Chat capability
 
 **Pros:**
 - Clear rules
-- Explicit about MCPx extensions
+- Explicit about MEUP extensions
 - Maintains most of current spec
 - Good capability patterns
 
 **Cons:**
 - Still some inconsistency (chat vs others)
-- Longer kinds for MCPx operations
+- Longer kinds for MEUP operations
 - Two different separator meanings
 
 ---
@@ -528,8 +528,8 @@ If breaking changes are acceptable for v0.x, **Option 2** is recommended for its
 | MCP Request | `mcp/request:tools/call` | `mcp.request.tools/call` | `mcp/request:tools/call` | `request:mcp/tools/call` |
 | MCP Proposal | `mcp/proposal:tools/call` | `mcp.proposal.tools/call` | `mcp/proposal:tools/call` | `propose:mcp/tools/call` |
 | MCP Response | `mcp/response:tools/call` | `mcp.response.tools/call` | `mcp/response:tools/call` | `respond:mcp/tools/call` |
-| Withdraw | `proposal/withdraw` | `mcpx.withdraw.proposal` | `mcpx/proposal/withdraw` | `withdraw:proposal` |
-| Reject | `proposal/reject` | `mcpx.reject.proposal` | `mcpx/proposal/reject` | `reject:proposal` |
+| Withdraw | `proposal/withdraw` | `meup.withdraw.proposal` | `meup/proposal/withdraw` | `withdraw:proposal` |
+| Reject | `proposal/reject` | `meup.reject.proposal` | `meup/proposal/reject` | `reject:proposal` |
 | Welcome | `system/welcome` | `system.welcome.participant` | `system/welcome` | `welcome:participant` |
 | Join | `system/presence` | `system.presence.join` | `system/presence` | `notify:presence/join` |
 | Error | `system/error` | `system.error.capability` | `system/error` | `error:capability` |
@@ -542,7 +542,7 @@ If breaking changes are acceptable for v0.x, **Option 2** is recommended for its
 | All MCP | `mcp/*` | `mcp.*` | `mcp/*` | `request:mcp/*` + `respond:mcp/*` |
 | All requests | `mcp/request:*` | `mcp.request.*` | `mcp/request:*` | `request:*` |
 | Tool requests | `mcp/request:tools/*` | `mcp.request.tools/*` | `mcp/request:tools/*` | `request:mcp/tools/*` |
-| Withdrawals | `proposal/withdraw` | `mcpx.withdraw.*` | `mcpx/proposal/withdraw` | `withdraw:*` |
+| Withdrawals | `proposal/withdraw` | `meup.withdraw.*` | `meup/proposal/withdraw` | `withdraw:*` |
 | System (gateway) | `system/*` | `system.*` | `system/*` | `welcome:*` + `notify:*` + `error:*` |
 
 ## Next Steps

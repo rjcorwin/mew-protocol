@@ -2,7 +2,7 @@
 
 **Status:** Proposed  
 **Date:** 2025-08-31  
-**Context:** MECP Protocol Draft Specification
+**Context:** MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
 **Parent ADR:** 001-1-y3m (Pod Terminology)
 
@@ -12,7 +12,7 @@ Currently, the protocol assumes loose authorization where tokens work across any
 - Defines who can participate
 - Specifies participant capabilities
 - Supports different connection types (local processes, remote endpoints, access keys)
-- Handles protocol bridging for non-MECP participants
+- Handles protocol bridging for non-MEUP participants
 - Provides reproducible pod environments
 
 Similar to how Docker Compose defines multi-container applications, or how MCP servers are configured in coding agents, pods need explicit configuration files.
@@ -22,7 +22,7 @@ Similar to how Docker Compose defines multi-container applications, or how MCP s
 - Support for heterogeneous participant types
 - Security through explicit capability assignment
 - Ease of pod deployment and management
-- Support for protocol bridging (MCP, A2A, MECP)
+- Support for protocol bridging (MCP, A2A, MEUP)
 
 ## Decision
 
@@ -114,20 +114,20 @@ participants:
     type: key
     description: "Human code reviewer"
     capabilities:
-      - "mecp/*"  # Full MECP access
+      - "meup/*"  # Full MEUP access
       - "chat"
     
-  # Local process (MECP native)
+  # Local process (MEUP native)
   security-scanner:
     type: local
     command: "./security-scanner"
     args: ["--mode", "aggressive"]
     env:
       SCAN_LEVEL: "high"
-    protocol: mecp  # Native MECP participant
+    protocol: meup  # Native MEUP participant
     capabilities:
-      - "mecp/proposal:*"
-      - "mecp/response:*"
+      - "meup/proposal:*"
+      - "meup/response:*"
       - "chat"
   
   # Remote MCP server (needs bridge)
@@ -137,12 +137,12 @@ participants:
     protocol: mcp
     bridge:
       enabled: true
-      image: "@mecp/mcp-bridge:latest"
+      image: "@meup/mcp-bridge:latest"
     # Bridge translates capabilities to MCP tools
     capabilities:
-      - "mecp/request:tools/read_file"
-      - "mecp/request:tools/write_file"
-      - "mecp/response:*"
+      - "meup/request:tools/read_file"
+      - "meup/request:tools/write_file"
+      - "meup/response:*"
     
   # Remote A2A agent (needs bridge)
   a2a-analyzer:
@@ -151,21 +151,21 @@ participants:
     protocol: a2a
     bridge:
       enabled: true
-      image: "@mecp/a2a-bridge:latest"
+      image: "@meup/a2a-bridge:latest"
     capabilities:
-      - "mecp/proposal:*"
+      - "meup/proposal:*"
       - "chat"
   
   # Embedded bridge for external connections
   github-bridge:
     type: local
-    command: "@mecp/github-bridge"
+    command: "@meup/github-bridge"
     args: ["--repo", "${GITHUB_REPO}"]
-    protocol: mecp
+    protocol: meup
     capabilities:
-      - "mecp/request:tools/create_pr"
-      - "mecp/request:tools/comment"
-      - "mecp/response:*"
+      - "meup/request:tools/create_pr"
+      - "meup/request:tools/comment"
+      - "meup/response:*"
 
 # Access keys for external participants
 access_keys:
@@ -175,19 +175,19 @@ access_keys:
   - id: "ci-system-key"
     participant: "ci-agent"
     capabilities:
-      - "mecp/request:tools/run_tests"
-      - "mecp/response:*"
+      - "meup/request:tools/run_tests"
+      - "meup/response:*"
       - "chat"
 
 # Bridge configurations
 bridges:
   mcp:
-    default_image: "@mecp/mcp-bridge:latest"
+    default_image: "@meup/mcp-bridge:latest"
     config:
       timeout: 30000
       retry_attempts: 3
   a2a:
-    default_image: "@mecp/a2a-bridge:latest"
+    default_image: "@meup/a2a-bridge:latest"
     config:
       task_timeout: 60000
 ```
@@ -196,13 +196,13 @@ bridges:
 
 #### 1. Local Process (`type: local`)
 - Spawned as subprocess
-- Can be MECP native or use bridge
+- Can be MEUP native or use bridge
 - Supports command, args, environment variables
 
 #### 2. Remote Endpoint (`type: remote`)
 - Connects to external service
 - Requires protocol specification
-- Bridge automatically configured if non-MECP
+- Bridge automatically configured if non-MEUP
 
 #### 3. Access Key (`type: key`)
 - Generates joinable access tokens
@@ -211,7 +211,7 @@ bridges:
 
 ### Protocol Bridging
 
-When `protocol` is not `mecp`, a bridge agent is automatically provisioned:
+When `protocol` is not `meup`, a bridge agent is automatically provisioned:
 
 ```yaml
 participant:
@@ -219,13 +219,13 @@ participant:
   protocol: mcp  # or 'a2a'
   bridge:
     enabled: true
-    image: "@mecp/mcp-bridge:latest"  # Bridge container/process
+    image: "@meup/mcp-bridge:latest"  # Bridge container/process
     config:
       # Bridge-specific configuration
 ```
 
 The bridge agent:
-- Translates between MECP and target protocol
+- Translates between MEUP and target protocol
 - Maintains protocol-specific connections
 - Maps capabilities to protocol-specific operations
 - Handles message transformation
@@ -234,30 +234,30 @@ The bridge agent:
 
 MCP Bridge Example:
 ```yaml
-# MECP capability -> MCP tool mapping
+# MEUP capability -> MCP tool mapping
 capability_mapping:
-  "mecp/request:tools/read_file": "mcp.tools.read_file"
-  "mecp/request:tools/write_file": "mcp.tools.write_file"
-  "mecp/proposal:*": null  # MCP doesn't support proposals
+  "meup/request:tools/read_file": "mcp.tools.read_file"
+  "meup/request:tools/write_file": "mcp.tools.write_file"
+  "meup/proposal:*": null  # MCP doesn't support proposals
 ```
 
 ### Pod Lifecycle
 
 ```bash
 # Start pod from configuration
-mecp pod start ./pod.yaml
+meup pod start ./pod.yaml
 
 # List running pods
-mecp pod list
+meup pod list
 
 # Show pod participants and status
-mecp pod status code-review-pod
+meup pod status code-review-pod
 
 # Stop pod
-mecp pod stop code-review-pod
+meup pod stop code-review-pod
 
 # Validate configuration
-mecp pod validate ./pod.yaml
+meup pod validate ./pod.yaml
 ```
 
 ### Environment Variable Substitution
@@ -277,7 +277,7 @@ participant:
 ### Positive
 - **Explicit Configuration**: Clear, auditable pod definitions
 - **Reproducibility**: Pods can be recreated exactly
-- **Protocol Agnostic**: Supports MCP, A2A, MECP participants
+- **Protocol Agnostic**: Supports MCP, A2A, MEUP participants
 - **Version Control**: Configuration files can be tracked
 - **Security**: Explicit capability assignment
 - **Automation**: Pods can be programmatically deployed
@@ -285,7 +285,7 @@ participant:
 ### Negative
 - **Less Dynamic**: Requires configuration before use
 - **Complexity**: More complex than simple token auth
-- **Bridge Overhead**: Non-MECP participants need bridges
+- **Bridge Overhead**: Non-MEUP participants need bridges
 - **Configuration Management**: Another file to maintain
 
 ## Security Considerations

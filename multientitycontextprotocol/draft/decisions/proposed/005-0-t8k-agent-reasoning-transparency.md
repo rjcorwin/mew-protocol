@@ -2,12 +2,12 @@
 
 **Status:** Proposed
 **Date:** 2025-08-31
-**Context:** MCPP/MCPx Protocol Draft Specification
+**Context:** MEUP/MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
 
 ## Context
 
-Currently, agents in MCPP pods operate as black boxes - they receive inputs and produce outputs without revealing their internal reasoning process. This lack of transparency creates several challenges:
+Currently, agents in MEUP pods operate as black boxes - they receive inputs and produce outputs without revealing their internal reasoning process. This lack of transparency creates several challenges:
 
 - **Debugging Difficulty**: When agents produce unexpected results, it's hard to understand why
 - **Trust Issues**: Humans and other agents can't see the reasoning behind decisions

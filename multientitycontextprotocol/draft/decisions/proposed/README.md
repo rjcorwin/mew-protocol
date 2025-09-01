@@ -12,7 +12,7 @@ This folder contains ADRs (Architecture Decision Records) that are currently und
 
 ## Current Proposals
 
-- `001-0-x7k-protocol-name.md` - Protocol naming (MECP)
+- `001-0-x7k-protocol-name.md` - Protocol naming (MEUP)
   - `001-1-y3m-pod-terminology.md` - Pod terminology for communication spaces
   - `001-2-d4n-pod-configuration.md` - Pod configuration specification
 - `002-m3p-namespace-pattern.md` - Message kind namespace patterns

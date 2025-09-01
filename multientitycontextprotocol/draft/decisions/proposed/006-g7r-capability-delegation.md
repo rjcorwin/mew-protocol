@@ -2,12 +2,12 @@
 
 **Status:** Proposed  
 **Date:** 2025-08-31  
-**Context:** MECP Protocol Draft Specification
+**Context:** MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
 
 ## Context
 
-Currently, capabilities in MECP are statically assigned when participants join a pod. However, during collaboration, situations arise where a participant fulfilling proposals wants to grant temporary or scoped capabilities to the proposing participant. This enables progressive trust without requiring administrative intervention.
+Currently, capabilities in MEUP are statically assigned when participants join a pod. However, during collaboration, situations arise where a participant fulfilling proposals wants to grant temporary or scoped capabilities to the proposing participant. This enables progressive trust without requiring administrative intervention.
 
 ### Current Limitations
 - Capabilities are fixed at join time
@@ -119,23 +119,23 @@ Capability changes through programmable rules.
 ```yaml
 # Capability to grant capabilities
 capabilities:
-  - "mecp/delegate:*"  # Can delegate any capability
-  - "mecp/delegate:mecp/request:*"  # Can only delegate request capabilities
-  - "mecp/delegate:mecp/proposal:*"  # Can only delegate proposal capabilities
+  - "meup/delegate:*"  # Can delegate any capability
+  - "meup/delegate:meup/request:*"  # Can only delegate request capabilities
+  - "meup/delegate:meup/proposal:*"  # Can only delegate proposal capabilities
 ```
 
 ### Grant Message
 
 ```json
 {
-  "kind": "mecp/grant",
+  "kind": "meup/grant",
   "from": "trusted-orchestrator",
   "to": ["untrusted-agent"],
   "payload": {
     "recipient": "untrusted-agent",
     "capabilities": [
-      "mecp/request:tools/read_file",
-      "mecp/request:tools/list"
+      "meup/request:tools/read_file",
+      "meup/request:tools/list"
     ],
     "scope": {
       "duration": "1h",  // Optional: Time-based expiry
@@ -153,13 +153,13 @@ capabilities:
 
 ```json
 {
-  "kind": "mecp/revoke",
+  "kind": "meup/revoke",
   "from": "trusted-orchestrator",
   "to": ["untrusted-agent"],
   "payload": {
     "recipient": "untrusted-agent",
     "grant_id": "grant-123",  // Revoke specific grant
-    "capabilities": ["mecp/request:tools/write_file"],  // Or specific capabilities
+    "capabilities": ["meup/request:tools/write_file"],  // Or specific capabilities
     "reason": "Task completed"
   }
 }
@@ -169,15 +169,15 @@ capabilities:
 
 ```json
 {
-  "kind": "mecp/grant-ack",
+  "kind": "meup/grant-ack",
   "from": "untrusted-agent",
   "correlation_id": "grant-msg-456",
   "payload": {
     "grant_id": "grant-123",
     "status": "accepted",
     "effective_capabilities": [
-      "mecp/request:tools/read_file",
-      "mecp/request:tools/list"
+      "meup/request:tools/read_file",
+      "meup/request:tools/list"
     ]
   }
 }
@@ -196,22 +196,22 @@ When checking capabilities:
 ```json
 // Admin delegates to orchestrator
 {
-  "kind": "mecp/grant",
+  "kind": "meup/grant",
   "from": "admin",
   "payload": {
     "recipient": "orchestrator",
-    "capabilities": ["mecp/delegate:mecp/request:*"],
+    "capabilities": ["meup/delegate:meup/request:*"],
     "scope": {"allow_sub_delegation": true}
   }
 }
 
 // Orchestrator sub-delegates to agent
 {
-  "kind": "mecp/grant",
+  "kind": "meup/grant",
   "from": "orchestrator",
   "payload": {
     "recipient": "agent",
-    "capabilities": ["mecp/request:tools/read_file"],
+    "capabilities": ["meup/request:tools/read_file"],
     "scope": {"allow_sub_delegation": false}  // Cannot delegate further
   }
 }
@@ -276,7 +276,7 @@ The gateway:
 ```json
 // 1. Agent has been making proposals
 {
-  "kind": "mecp/proposal:tools/read_file",
+  "kind": "meup/proposal:tools/read_file",
   "from": "new-agent",
   "payload": {...}
 }
@@ -284,11 +284,11 @@ The gateway:
 // 2. Orchestrator recognizes pattern of safe usage
 // Decides to grant temporary direct access
 {
-  "kind": "mecp/grant",
+  "kind": "meup/grant",
   "from": "orchestrator",
   "payload": {
     "recipient": "new-agent",
-    "capabilities": ["mecp/request:tools/read_file"],
+    "capabilities": ["meup/request:tools/read_file"],
     "scope": {
       "duration": "1h",
       "resources": ["/project/docs/*.md"]
@@ -299,7 +299,7 @@ The gateway:
 
 // 3. Agent acknowledges grant
 {
-  "kind": "mecp/grant-ack",
+  "kind": "meup/grant-ack",
   "from": "new-agent",
   "payload": {
     "grant_id": "grant-789",
@@ -309,7 +309,7 @@ The gateway:
 
 // 4. Agent can now directly request (no proposal needed)
 {
-  "kind": "mecp/request:tools/read_file",
+  "kind": "meup/request:tools/read_file",
   "from": "new-agent",
   "payload": {
     "path": "/project/docs/README.md"
@@ -319,7 +319,7 @@ The gateway:
 // 5. After 1 hour, capability automatically expires
 // Or orchestrator can explicitly revoke
 {
-  "kind": "mecp/revoke",
+  "kind": "meup/revoke",
   "from": "orchestrator",
   "payload": {
     "recipient": "new-agent",

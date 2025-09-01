@@ -2,12 +2,12 @@
 
 **Status:** Proposed  
 **Date:** 2025-08-30  
-**Context:** MCPx Protocol Draft Specification
+**Context:** MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
 
 ## Context
 
-The current MCPx specification (SPEC.md Section 3.2) defines proposals as a way for capability-restricted participants to suggest operations. However, it only defines the basic propose→fulfill pattern without any lifecycle management.
+The current MEUP specification (SPEC.md Section 3.2) defines proposals as a way for capability-restricted participants to suggest operations. However, it only defines the basic propose→fulfill pattern without any lifecycle management.
 
 ### Current Spec Capabilities
 - `mcp/proposal:METHOD[:CONTEXT]` message format
@@ -25,7 +25,7 @@ The current MCPx specification (SPEC.md Section 3.2) defines proposals as a way 
 - Must preserve stateless gateway design
 - Should solve the waiting problem for targeted proposals
 - Should allow proposal cancellation
-- Must use existing MCPx envelope structure
+- Must use existing MEUP envelope structure
 
 ## Decision
 
@@ -36,17 +36,17 @@ Implement **Option 5: Progressive Lifecycle** with modifications:
 
 ### Namespace Question: Where do lifecycle messages belong?
 
-**Option A: Under `mcpx.` (current choice)**
-- `mcpx.withdraw.proposal` 
-- `mcpx.reject.proposal`
-- Logic: These are MCPx extensions, not MCP operations
+**Option A: Under `meup.` (current choice)**
+- `meup.withdraw.proposal` 
+- `meup.reject.proposal`
+- Logic: These are MEUP extensions, not MCP operations
 
 **Option B: Under `mcp.` for consistency**
 - `mcp.withdraw.proposal`
 - `mcp.reject.proposal`  
 - Logic: They operate on MCP proposals, should be in MCP namespace
 
-**Recommendation**: Stay with `mcpx.` to clearly indicate these are protocol extensions not part of core MCP.
+**Recommendation**: Stay with `meup.` to clearly indicate these are protocol extensions not part of core MCP.
 
 Note on namespace pattern: Per ADR-008, we use `PROTOCOL.OPERATION[.METHOD[:CONTEXT]]`
 
@@ -135,7 +135,7 @@ Add minimal lifecycle extensions for practical needs.
 ```json
 // Proposal with optional targeting
 {
-  "protocol": "mcpx/v0.1",
+  "protocol": "meup/v0.1",
   "id": "prop-123",
   "from": "untrusted-agent",
   "to": ["filesystem-agent"],  // Optional targeting
@@ -148,11 +148,11 @@ Add minimal lifecycle extensions for practical needs.
 
 // Withdrawal (proposer cancels)
 {
-  "protocol": "mcpx/v0.1",
+  "protocol": "meup/v0.1",
   "id": "withdraw-456",
   "from": "untrusted-agent",
   "correlationId": "prop-123",
-  "kind": "mcpx.withdraw.proposal",
+  "kind": "meup.withdraw.proposal",
   "payload": {
     "reason": "No longer needed"
   }
@@ -160,12 +160,12 @@ Add minimal lifecycle extensions for practical needs.
 
 // Rejection (only for targeted proposals)
 {
-  "protocol": "mcpx/v0.1",
+  "protocol": "meup/v0.1",
   "id": "reject-789",
   "from": "filesystem-agent",
   "to": ["untrusted-agent"],
   "correlationId": "prop-123",
-  "kind": "mcpx.reject.proposal",
+  "kind": "meup.reject.proposal",
   "payload": {
     "reason": "busy"
   }
@@ -198,7 +198,7 @@ Add two-phase commit pattern.
 **Cons**:
 - Very complex
 - Multiple round trips
-- Overkill for MCPx goals
+- Overkill for MEUP goals
 
 ---
 
@@ -228,7 +228,7 @@ Add optional status messages for transparency.
 ```json
 // Status update
 {
-  "kind": "mcpx.status.proposal",
+  "kind": "meup.status.proposal",
   "correlationId": "prop-123",
   "payload": {
     "status": "considering" | "queued" | "processing" | "unable"
@@ -264,8 +264,8 @@ Add optional status messages for transparency.
 ## Implementation Requirements
 
 ### New Capabilities Required
-- `mcpx.withdraw.proposal` - Can withdraw own proposals
-- `mcpx.reject.proposal` - Can reject targeted proposals
+- `meup.withdraw.proposal` - Can withdraw own proposals
+- `meup.reject.proposal` - Can reject targeted proposals
 
 ### Behavior Rules
 1. **Withdrawal**:
@@ -313,6 +313,6 @@ These are additive changes:
 
 ## References
 
-- MCPx SPEC.md Section 3.2 (Proposals)
+- MEUP SPEC.md Section 3.2 (Proposals)
 - MCP Specification 2025-06-18 (Cancellation patterns)
 - Supersedes: ADR-004, ADR-005, ADR-007

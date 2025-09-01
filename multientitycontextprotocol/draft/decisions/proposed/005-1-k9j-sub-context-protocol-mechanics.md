@@ -2,13 +2,13 @@
 
 **Status:** Proposed
 **Date:** 2025-08-31
-**Context:** MCPP/MCPx Protocol Draft Specification
+**Context:** MEUP/MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
 **Parent ADR:** 005-0-t8k (Agent Reasoning Transparency)
 
 ## Context
 
-ADR-t8k establishes that agents should be able to share reasoning transparently through sub-contexts. This ADR focuses on the protocol-level mechanics for implementing sub-contexts in MCPP. The key challenge is how to group related messages together while maintaining the broadcast nature of the protocol and allowing participants to filter or process sub-contexts differently from main context messages.
+ADR-t8k establishes that agents should be able to share reasoning transparently through sub-contexts. This ADR focuses on the protocol-level mechanics for implementing sub-contexts in MEUP. The key challenge is how to group related messages together while maintaining the broadcast nature of the protocol and allowing participants to filter or process sub-contexts differently from main context messages.
 
 Sub-contexts are needed for:
 - Agent reasoning chains (per ADR-t8k)

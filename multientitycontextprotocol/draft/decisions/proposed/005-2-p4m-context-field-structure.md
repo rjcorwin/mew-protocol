@@ -2,7 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2025-08-31
-**Context:** MCPP/MCPx Protocol Draft Specification
+**Context:** MEUP/MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
 **Parent ADR:** 005-1-k9j (Sub-Context Protocol Mechanics)
 

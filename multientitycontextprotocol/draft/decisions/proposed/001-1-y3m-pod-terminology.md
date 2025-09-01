@@ -2,7 +2,7 @@
 
 **Status:** Proposed  
 **Date:** 2025-08-30  
-**Context:** MECP Protocol Draft Specification
+**Context:** MEUP Protocol Draft Specification
 **Incorporation:** Not Incorporated
 **Parent ADR:** 001-0-x7k (Protocol Name)
 
@@ -143,12 +143,12 @@ GET /pods/{id}/participants
 ### Environment Variables
 ```bash
 # Old
-MECP_TOPIC_NAME=my-topic
-MECP_TOPIC_ID=abc123
+MEUP_TOPIC_NAME=my-topic
+MEUP_TOPIC_ID=abc123
 
 # New
-MECP_POD_NAME=my-pod
-MECP_POD_ID=abc123
+MEUP_POD_NAME=my-pod
+MEUP_POD_ID=abc123
 ```
 
 ### Documentation Examples
