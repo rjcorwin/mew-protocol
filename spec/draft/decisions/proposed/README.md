@@ -15,7 +15,8 @@ This folder contains ADRs (Architecture Decision Records) that are currently und
 - `001-0-x7k-protocol-name.md` - Protocol naming (MEUP)
   - `001-1-y3m-communication-space-terminology.md` - Terminology for communication spaces (chose "space")
   - `001-2-d4n-space-configuration.md` - Space configuration specification
-- `002-m3p-namespace-pattern.md` - Message kind namespace patterns
+- `002-m3p-namespace-pattern.md` - Message kind namespace patterns (chose Option 7: Minimal Kind)
+  - `002-1-q8f-capability-definitions.md` - Capability definition conventions for payload inspection
 - `004-v2c-proposal-lifecycle-management.md` - Proposal lifecycle extensions
 - `005-0-t8k-agent-reasoning-transparency.md` - Agent reasoning transparency through sub-contexts
   - `005-1-k9j-sub-context-protocol-mechanics.md` - Protocol mechanics for implementing sub-contexts

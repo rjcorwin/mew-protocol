@@ -20,83 +20,88 @@ The current spec uses various patterns for the `kind` field, leading to confusio
 
 ## Decision
 
-**Accepted: Option 2 (Three-Level Hierarchy) with server-side validation**
+**Accepted: Option 7 (Minimal Kind with Payload Inspection)**
 
-**Pattern:** `PAYLOAD_PROTOCOL.MCPX_OPERATION[.PAYLOAD_METHOD[:PAYLOAD_CONTEXT]]`
+**Pattern:** `TYPE[.SUBTYPE]` with gateway payload inspection for capabilities
 
-### Separator Rationale:
-- **Dots (`.`)** separate hierarchical levels (protocol → operation → method)
-- **Colon (`:`)** adds optional context/parameters to the final level
-- **Slash (`/`)** preserved within MCP method names (e.g., `tools/call`)
+### Design Rationale:
 
-This provides semantic clarity: dots for hierarchy, colon for context.
+The `kind` field is kept minimal, containing only the high-level message type. The actual operation details live in the payload where they naturally belong. This approach:
 
-Where:
-- **PAYLOAD_PROTOCOL**: What protocol/format is in the payload (`mcp`, `meup`, `system`, `chat`)
-- **MCPX_OPERATION**: The MEUP-level operation (`request`, `response`, `proposal`, `withdraw`, `reject`, `welcome`, etc.)
-- **PAYLOAD_METHOD**: (Optional third level with dot) The method within the payload protocol
-  - For MCP: The actual method like `tools/call`, `resources/read`
-  - For non-MCP: A target or subtype like `proposal`, `participant`
-- **PAYLOAD_CONTEXT**: (Optional after colon) Additional context like specific tool or resource name
+- **Simplifies the envelope**: Kind only indicates message type
+- **Embraces payload inspection**: Gateway examines payload for fine-grained permissions
+- **Enables complex rules**: Capabilities can express sophisticated patterns
+- **Maintains MCP alignment**: MCP messages already have all details in payload
 
-### Why Option 2 Wins:
-- **Security**: Clean structure enables reliable validation
-- **Performance**: Only 10μs overhead per message (negligible)
-- **Clarity**: Unambiguous parsing with dot separators
-- **Capabilities**: Excellent pattern matching with dots
-- **Consistency**: Every message follows same structure
+### Kind Values:
+
+- `mcp.request` - Any MCP request
+- `mcp.response` - Any MCP response  
+- `mcp.proposal` - Any MCP proposal
+- `meup.lifecycle` - MEUP lifecycle operations
+- `system` - System messages
+- `chat` - Chat messages
+
+### Why Option 7 Wins:
+- **Simplicity**: Minimal `kind` field is easier to understand
+- **Flexibility**: Rich capability expressions in gateway configuration
+- **Truth in payload**: Payload is authoritative source
+- **Natural for MCP**: MCP already has all details in payload
+- **Future-proof**: Can add complex permission rules without protocol changes
 
 ### Implementation Requirements:
 
-**Gateway MUST validate:**
-1. Split `kind` on dots to get [PROTOCOL, OPERATION, METHOD]
-2. For `mcp.*` kinds:
-   - Verify `payload.method` matches METHOD part
-   - If CONTEXT present after `:`, verify `payload.params.name` matches
-3. For other protocols:
-   - Apply protocol-specific validation rules
+**Gateway MUST:**
+1. Parse the minimal `kind` field (simple string match)
+2. Inspect payload content based on capability definitions
+3. Match payload patterns against participant capabilities
+4. Cache capability decisions when possible
 
-**Examples with Clear Breakdown:**
+**Capability definitions will include payload patterns** (see child ADR 002-1):
+```javascript
+{
+  kind: "mcp.request",
+  payload: {
+    method: "tools/*",
+    params: {
+      name: "read_*"
+    }
+  }
+}
 ```
-kind: mcp.request.tools/call
-      ^^^  ^^^^^^^  ^^^^^^^^^^
-      |    |        └─ PAYLOAD_METHOD (MCP method)
-      |    └─ MCPX_OPERATION (what MEUP is doing)
-      └─ PAYLOAD_PROTOCOL (MCP protocol in payload)
-validates: payload.method === "tools/call"
 
-kind: mcp.request.tools/call:read_file  
-      ^^^  ^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^
-      |    |        |           └─ PAYLOAD_CONTEXT (specific tool)
-      |    |        └─ PAYLOAD_METHOD (MCP method)
-      |    └─ MCPX_OPERATION (request)
-      └─ PAYLOAD_PROTOCOL (MCP)
-validates: payload.method === "tools/call" && 
-           payload.params.name === "read_file"
+**Examples with Minimal Kind:**
+```
+kind: mcp.request
+payload: {
+  method: "tools/call",
+  params: { name: "read_file" }
+}
+// Gateway checks if participant has capability for this payload pattern
 
-kind: meup.withdraw.proposal
-      ^^^^  ^^^^^^^^  ^^^^^^^^
-      |     |         └─ What we're withdrawing (not a method)
-      |     └─ MCPX_OPERATION (withdraw)
-      └─ PAYLOAD_PROTOCOL (MEUP-specific)
-validates: MEUP-specific validation
+kind: meup.lifecycle  
+payload: {
+  action: "withdraw",
+  proposalId: "prop-123"
+}
+// Gateway validates lifecycle action permissions
 
-kind: system.welcome.participant
-      ^^^^^^  ^^^^^^^  ^^^^^^^^^^^
-      |       |        └─ Optional target/context
-      |       └─ MCPX_OPERATION (welcome)
-      └─ PAYLOAD_PROTOCOL (system messages)
-validates: (reserved for gateway only)
+kind: system
+payload: {
+  type: "welcome",
+  participant: {...}
+}
+// Only gateway can send system messages
 ```
 
 ### Migration from Current Spec:
-- `mcp/request:tools/call` → `mcp.request.tools/call` (3 levels)
-- `mcp/proposal:tools/call` → `mcp.proposal.tools/call` (3 levels)
-- `system/welcome` → `system.welcome` (2 levels, no method needed)
-- `system/presence` → `system.presence` (2 levels)
-- `chat` → `chat.message` (2 levels sufficient)
-- `proposal/withdraw` → `meup.withdraw.proposal` (3 levels)
-- `proposal/reject` → `meup.reject.proposal` (3 levels)
+- `mcp/request:tools/call` → `mcp.request` + payload inspection
+- `mcp/proposal:tools/call` → `mcp.proposal` + payload inspection
+- `system/welcome` → `system` + payload.type check
+- `system/presence` → `system` + payload.type check
+- `chat` → `chat` (no change needed)
+- `proposal/withdraw` → `meup.lifecycle` + payload.action check
+- `proposal/reject` → `meup.lifecycle` + payload.action check
 
 ## Options Considered
 
@@ -330,6 +335,60 @@ Examples:
 
 ---
 
+### Option 7: Minimal Kind with Payload Inspection
+
+**Pattern:** `TYPE[.SUBTYPE]` (minimal kind) + gateway inspects payload
+
+The `kind` field only indicates the message type at a high level. The gateway inspects the actual payload content to determine capabilities.
+
+Examples:
+- `mcp.request` - Any MCP request (gateway checks payload.method)
+- `mcp.response` - Any MCP response  
+- `mcp.proposal` - Any MCP proposal
+- `meup.lifecycle` - MEUP lifecycle operations (withdraw, reject, etc.)
+- `system` - System messages (gateway checks payload.type)
+- `chat` - Chat messages
+
+**Capability Examples:**
+- `mcp.request` + payload inspection for `method: "tools/call"`
+- `mcp.request` + payload inspection for `params.name: "read_file"`
+- `meup.lifecycle` + payload inspection for `action: "withdraw"`
+
+**Gateway Capability Matching:**
+```javascript
+// Capability definition includes payload patterns
+capability: {
+  kind: "mcp.request",
+  payload: {
+    method: "tools/*",
+    params: {
+      name: "read_*"
+    }
+  }
+}
+```
+
+**Pros:**
+- Minimal `kind` field complexity
+- Flexible capability definitions
+- Payload is source of truth
+- Can express complex permissions
+- Natural for MCP compatibility
+
+**Cons:**
+- **Performance hit**: Must parse payload for every message
+- **Complexity**: Gateway needs payload schema knowledge
+- **Security risk**: Deep inspection increases attack surface
+- **Debugging**: Harder to see permissions from `kind` alone
+- **Caching**: Can't cache capability checks based on `kind` alone
+
+**Performance Impact:**
+- Additional ~50-100μs per message for payload parsing
+- Memory overhead for payload schemas
+- Can't use simple string matching for capabilities
+
+---
+
 ## Security & Parsing Analysis
 
 ### Spoofing Risks
@@ -344,6 +403,7 @@ Examples:
 | 4. Hybrid Rules | **High** | Mixed separators confuse validation | Complex rules for different namespaces |
 | 5. Semantic Prefix | **Low** | Prefix makes operation explicit | Prefix must match payload operation type |
 | 6. Verb-Based | **Low** | Verb explicitly states operation | Verb must match payload action |
+| 7. Minimal Kind | **Medium** | Generic `mcp.request` could hide actual operation | Gateway must deeply inspect payload |
 
 ### Parsing Complexity
 
@@ -355,6 +415,7 @@ Examples:
 | 4. Hybrid Rules | **Complex** | Multiple patterns needed | Different rules per namespace |
 | 5. Semantic Prefix | **Simple** | `/^([><!@]?)([^:]+):(.+)$/` | Prefix is optional but clear |
 | 6. Verb-Based | **Simple** | `/^([^:]+):(.+)$/` | Always verb:target pattern |
+| 7. Minimal Kind | **Very Simple** | `/^([^.]+)(\.([^.]+))?$/` | But requires JSON parsing for payload |
 
 ### Validation Requirements
 
@@ -366,6 +427,7 @@ Examples:
 | 4. Hybrid Rules | Complex namespace rules | Different validation per namespace |
 | 5. Semantic Prefix | Prefix determines validation | Prefix must match operation |
 | 6. Verb-Based | Verb permission check | Verb must match payload action |
+| 7. Minimal Kind | Deep payload inspection required | Simpler - payload is truth |
 
 ## Comparison Matrix
 
@@ -377,6 +439,7 @@ Examples:
 | 4. Hybrid Rules | Medium | High | Low | Good | Complex | **Weak** | Medium |
 | 5. Semantic Prefix | Medium | High | High | Unique | **Simple** | **Strong** | High? |
 | 6. Verb-Based | High | High | High | Good | **Simple** | **Strong** | Medium |
+| 7. Minimal Kind | High | Low | Medium | Complex | **Simple** | Medium | High |
 
 ## Gateway Validation Performance Analysis
 
@@ -497,9 +560,13 @@ Based on security and parsing analysis, **Option 2 (Three-Level Hierarchy)** or 
 - **Option 2**: Cleanest structure, easiest parsing, strongest validation
 - **Option 6**: Clear operation semantics, simple parsing, good validation
 
+**Option 7 (Minimal Kind)** is interesting but trades simplicity for performance:
+- Pros: Minimal `kind` field, flexible capabilities, payload as source of truth
+- Cons: Performance hit from payload inspection, increased complexity, harder debugging
+
 **Option 1/4** (current patterns) have significant spoofing risks due to mixed separators and unclear validation boundaries.
 
-If breaking changes are acceptable for v0.x, **Option 2** is recommended for its simplicity and security.
+If breaking changes are acceptable for v0.x, **Option 2** is recommended for its simplicity and security. If you prefer minimal `kind` fields and can accept the performance trade-off, **Option 7** provides the most flexibility.
 
 ## Implementation Impact
 
@@ -523,17 +590,17 @@ If breaking changes are acceptable for v0.x, **Option 2** is recommended for its
 
 ## Examples Side-by-Side
 
-| Use Case | Current/Option 1 | Option 2 | Option 4 | Option 6 |
-|----------|-----------------|----------|----------|----------|
-| MCP Request | `mcp/request:tools/call` | `mcp.request.tools/call` | `mcp/request:tools/call` | `request:mcp/tools/call` |
-| MCP Proposal | `mcp/proposal:tools/call` | `mcp.proposal.tools/call` | `mcp/proposal:tools/call` | `propose:mcp/tools/call` |
-| MCP Response | `mcp/response:tools/call` | `mcp.response.tools/call` | `mcp/response:tools/call` | `respond:mcp/tools/call` |
-| Withdraw | `proposal/withdraw` | `meup.withdraw.proposal` | `meup/proposal/withdraw` | `withdraw:proposal` |
-| Reject | `proposal/reject` | `meup.reject.proposal` | `meup/proposal/reject` | `reject:proposal` |
-| Welcome | `system/welcome` | `system.welcome.participant` | `system/welcome` | `welcome:participant` |
-| Join | `system/presence` | `system.presence.join` | `system/presence` | `notify:presence/join` |
-| Error | `system/error` | `system.error.capability` | `system/error` | `error:capability` |
-| Chat | `chat` | `chat.message.text` | `chat` | `send:chat` |
+| Use Case | Current/Option 1 | Option 2 | Option 4 | Option 6 | Option 7 |
+|----------|-----------------|----------|----------|----------|----------|
+| MCP Request | `mcp/request:tools/call` | `mcp.request.tools/call` | `mcp/request:tools/call` | `request:mcp/tools/call` | `mcp.request` |
+| MCP Proposal | `mcp/proposal:tools/call` | `mcp.proposal.tools/call` | `mcp/proposal:tools/call` | `propose:mcp/tools/call` | `mcp.proposal` |
+| MCP Response | `mcp/response:tools/call` | `mcp.response.tools/call` | `mcp/response:tools/call` | `respond:mcp/tools/call` | `mcp.response` |
+| Withdraw | `proposal/withdraw` | `meup.withdraw.proposal` | `meup/proposal/withdraw` | `withdraw:proposal` | `meup.lifecycle` |
+| Reject | `proposal/reject` | `meup.reject.proposal` | `meup/proposal/reject` | `reject:proposal` | `meup.lifecycle` |
+| Welcome | `system/welcome` | `system.welcome.participant` | `system/welcome` | `welcome:participant` | `system` |
+| Join | `system/presence` | `system.presence.join` | `system/presence` | `notify:presence/join` | `system` |
+| Error | `system/error` | `system.error.capability` | `system/error` | `error:capability` | `system` |
+| Chat | `chat` | `chat.message.text` | `chat` | `send:chat` | `chat` |
 
 ### Capability Pattern Examples
 
