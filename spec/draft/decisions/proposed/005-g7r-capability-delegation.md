@@ -7,7 +7,7 @@
 
 ## Context
 
-Currently, capabilities in MEUP are statically assigned when participants join a space. However, during collaboration, situations arise where a participant fulfilling proposals wants to grant temporary or scoped capabilities to the proposing participant. This enables progressive trust without requiring administrative intervention.
+Currently, capabilities in MEUP are statically assigned when participants join a space. However, during collaboration, situations arise where a participant fulfilling proposals wants to grant capabilities to the proposing participant. This enables progressive trust without requiring administrative intervention.
 
 ### Current Limitations
 - Capabilities are fixed at join time
@@ -18,8 +18,8 @@ Currently, capabilities in MEUP are statically assigned when participants join a
 
 ### Use Cases
 1. **Progressive Trust**: After successfully fulfilling many proposals, grant direct execution rights
-2. **Temporary Elevation**: Grant capabilities for a specific task/duration
-3. **Scoped Permissions**: Grant capabilities limited to specific resources
+2. **Temporary Elevation**: Grant capabilities until explicitly revoked
+3. **Delegated Trust**: Allow trusted participants to grant capabilities
 4. **Delegation Chain**: Allow trusted participants to sub-delegate capabilities
 
 ### Requirements
@@ -254,7 +254,7 @@ Combine static base capabilities with dynamic adjustments.
 ### Positive
 - **Progressive Trust**: Capabilities can grow based on behavior
 - **Reduced Proposals**: Trusted operations become direct
-- **Flexible Security**: Fine-grained, scoped permissions
+- **Flexible Security**: Fine-grained permission control
 - **Autonomy**: Spaces self-manage without external admin
 - **Audit Trail**: All changes tracked in space messages
 - **Automation**: Orchestrators can implement trust policies
@@ -270,7 +270,7 @@ Combine static base capabilities with dynamic adjustments.
 
 - **Privilege Escalation**: Carefully limit delegation capabilities
 - **Grant Flooding**: Rate limit grant messages
-- **Scope Bypass**: Validate all scope restrictions
+- **Grant Abuse**: Monitor for excessive capability grants
 - **Delegation Chains**: Limit depth to prevent abuse
 - **Revocation Timing**: Ensure immediate revocation
 - **Audit Requirements**: All grants must be logged
@@ -280,8 +280,8 @@ Combine static base capabilities with dynamic adjustments.
 
 1. Initial implementation without delegation (current state)
 2. Add grant/revoke messages as experimental
-3. Implement basic duration and usage scopes
-4. Add resource and context scopes
+3. Implement grant/revoke tracking
+4. Add audit logging
 5. Enable sub-delegation with controls
 6. Deprecate unlimited static capabilities
 
@@ -303,6 +303,7 @@ Combine static base capabilities with dynamic adjustments.
 **Grant Message:**
 ```json
 {
+  "id": "grant-789",  // This message ID becomes the grant_id
   "kind": "meup.grant",
   "from": "trusted-orchestrator",
   "to": ["untrusted-agent"],
@@ -319,11 +320,6 @@ Combine static base capabilities with dynamic adjustments.
         }
       }
     ],
-    "scope": {
-      "duration": "1h",
-      "context": "task-123",
-      "resources": ["*.md"]
-    },
     "reason": "Demonstrated safe file handling"
   }
 }
@@ -331,26 +327,60 @@ Combine static base capabilities with dynamic adjustments.
 
 **Revoke Message:**
 ```json
+// Option A: Revoke entire grant by ID
 {
   "kind": "meup.revoke",
   "from": "orchestrator",
   "payload": {
     "recipient": "agent",
-    "grant_id": "grant-123",
+    "grant_id": "grant-789",  // Revokes all capabilities from this grant
     "reason": "Task completed"
   }
 }
+
+// Option B: Revoke by capability descriptor (pattern matching)
+{
+  "kind": "meup.revoke",
+  "from": "orchestrator",
+  "payload": {
+    "recipient": "agent",
+    "capabilities": [
+      {
+        "kind": "mcp.request",
+        "payload": {
+          "method": "tools/call",
+          "params": {
+            "name": "read_*"  // Removes ALL matching capabilities
+          }
+        }
+      }
+    ],
+    "reason": "No longer needed"
+  }
+}
 ```
+
+Note: When revoking by capability descriptor, the system removes ALL matching capabilities regardless of which grant(s) provided them. Uses pattern matching from ADR-q8f.
 
 **Grant Acknowledgment:**
 ```json
 {
   "kind": "meup.grant-ack",
   "from": "agent",
-  "correlationId": "grant-msg-456",
+  "correlationId": "grant-789",  // References the grant message ID
   "payload": {
-    "grant_id": "grant-123",
-    "status": "accepted"
+    "status": "accepted",
+    "effective_capabilities": [  // Optional: confirms what was granted
+      {
+        "kind": "mcp.request",
+        "payload": {
+          "method": "tools/call",
+          "params": {
+            "name": "read_file"
+          }
+        }
+      }
+    ]
   }
 }
 ```
@@ -415,11 +445,11 @@ Using JSON pattern matching from ADR-q8f:
 ### Gateway Behavior
 
 1. **For capability operations (grant/revoke):**
-   - Track active grants per participant
-   - Validate capability checks include grants
-   - Enforce scope restrictions
-   - Remove expired grants
-   - Audit all changes
+   - Track active grants per participant with their IDs
+   - Validate capability checks include granted capabilities
+   - Support revocation by grant ID or specific capabilities
+   - Maintain grant-to-capability mappings
+   - Audit all changes with grant IDs
 
 2. **For membership operations (invite/kick):**
    - Update participant roster
