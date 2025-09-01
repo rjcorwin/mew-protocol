@@ -3,8 +3,9 @@
 **Status:** Proposed  
 **Date:** 2025-08-31  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Not Incorporated (Should be incorporated last after other ADRs stabilize)
 **Parent ADR:** 001-1-y3m (Communication Space Terminology)
+**Related ADRs:** 002-1-q8f (Capability Definition Conventions)
 
 ## Context
 
@@ -29,6 +30,13 @@ Similar to how Docker Compose defines multi-container applications, or how MCP s
 **Adopt YAML-based space configuration files**
 
 Spaces are configured through a `space.yaml` file (or similar) that declaratively specifies participants, their capabilities, connection methods, and protocols. This provides explicit, version-controlled space definitions.
+
+**Note:** The exact configuration structure and field names shown in this ADR are illustrative examples. This ADR should be incorporated last, after other foundational ADRs have stabilized. The final design will be refined during incorporation into the specification, with particular attention to:
+- Consistency with the capability format from ADR-q8f
+- Clear distinction between native and bridged participants
+- Proper separation of protocol-specific details
+- Validation and error handling requirements
+- Integration with decisions from other ADRs (namespace patterns, lifecycle management, etc.)
 
 ## Options Considered
 
@@ -93,7 +101,22 @@ Use programming language (TypeScript/Python) for configuration.
 
 ## Implementation Details
 
-### Space Configuration Structure
+**Important:** The configuration examples below are illustrative and will be refined during specification incorporation. The goal is to establish the pattern of declarative YAML configuration; exact field names, structure, and semantics will be finalized based on implementation experience and community feedback.
+
+### Capability Format
+
+Capabilities use the JSON pattern matching format defined in ADR-q8f. They can be:
+- Simple strings for basic message types: `kind: "chat"`
+- Complex patterns with payload inspection:
+  ```yaml
+  kind: "mcp.request"
+  payload:
+    method: "tools/*"
+    params:
+      name: "read_*"
+  ```
+
+### Space Configuration Structure (Illustrative Example)
 
 ```yaml
 # space.yaml
@@ -108,14 +131,15 @@ settings:
   context_depth_limit: 5
 
 # Participant definitions
+# Note: Participants that provide tools/resources typically have response capabilities,
+# while those that use tools have request capabilities
 participants:
   # Human user with access key
   human-reviewer:
     type: key
     description: "Human code reviewer"
     capabilities:
-      - "meup/*"  # Full MEUP access
-      - "chat"
+      - kind: "*"  # Full access to all message types (can request and respond)
     
   # Local process (MEUP native)
   security-scanner:
@@ -126,9 +150,9 @@ participants:
       SCAN_LEVEL: "high"
     protocol: meup  # Native MEUP participant
     capabilities:
-      - "meup/proposal:*"
-      - "meup/response:*"
-      - "chat"
+      - kind: "meup.proposal"
+      - kind: "meup.response"
+      - kind: "chat"
   
   # Remote MCP server (needs bridge)
   mcp-file-editor:
@@ -138,11 +162,13 @@ participants:
     bridge:
       enabled: true
       image: "@meup/mcp-bridge:latest"
-    # Bridge translates capabilities to MCP tools
+    # These are the MEUP capabilities this MCP server provides via bridge
     capabilities:
-      - "meup/request:tools/read_file"
-      - "meup/request:tools/write_file"
-      - "meup/response:*"
+      - kind: "mcp.response"  # Can respond to requests
+    # MCP tools this server exposes (bridge handles translation)
+    mcp_tools:
+      - "read_file"
+      - "write_file"
     
   # Remote A2A agent (needs bridge)
   a2a-analyzer:
@@ -153,19 +179,22 @@ participants:
       enabled: true
       image: "@meup/a2a-bridge:latest"
     capabilities:
-      - "meup/proposal:*"
-      - "chat"
+      - kind: "meup.proposal"
+      - kind: "chat"
   
-  # Embedded bridge for external connections
-  github-bridge:
+  # GitHub integration (native MEUP bridge)
+  github-integration:
     type: local
     command: "@meup/github-bridge"
     args: ["--repo", "${GITHUB_REPO}"]
-    protocol: meup
+    protocol: meup  # Bridge speaks native MEUP
     capabilities:
-      - "meup/request:tools/create_pr"
-      - "meup/request:tools/comment"
-      - "meup/response:*"
+      - kind: "meup.response"  # Can respond to requests
+    # This bridge provides these tools to the space
+    provides_tools:
+      - "create_pr"
+      - "comment"
+      - "get_pr_status"
 
 # Access keys for external participants
 access_keys:
@@ -175,9 +204,13 @@ access_keys:
   - id: "ci-system-key"
     participant: "ci-agent"
     capabilities:
-      - "meup/request:tools/run_tests"
-      - "meup/response:*"
-      - "chat"
+      - kind: "mcp.request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "run_tests"
+      - kind: "meup.response"  # Can respond in MEUP protocol
+      - kind: "chat"
 
 # Bridge configurations
 bridges:
@@ -232,13 +265,21 @@ The bridge agent:
 
 ### Capability Mapping for Bridges
 
+Bridge agents translate MEUP JSON pattern capabilities to protocol-specific operations. The bridge inspects the capability patterns and maps them accordingly.
+
 MCP Bridge Example:
 ```yaml
-# MEUP capability -> MCP tool mapping
-capability_mapping:
-  "meup/request:tools/read_file": "mcp.tools.read_file"
-  "meup/request:tools/write_file": "mcp.tools.write_file"
-  "meup/proposal:*": null  # MCP doesn't support proposals
+# Bridge automatically translates JSON patterns to MCP operations
+# For example, this MEUP capability:
+meup_capability:
+  kind: "mcp.request"
+  payload:
+    method: "tools/call"
+    params:
+      name: "read_*"
+
+# Maps to MCP tools matching the pattern
+mcp_operations: ["read_file", "read_config", "read_logs"]
 ```
 
 ### Space Lifecycle
