@@ -1,8 +1,8 @@
-# MEUP Draft Protocol Specification
+# Multi-Entity Unified-context Protocol (MEUP) Specification v0.2
 
-Status: draft  
-Date: 2025-01-03
-Intended Status: Experimental  
+Status: Experimental  
+Date: 2025-09-03
+Version: v0.2
 Editors: RJ Corwin (https://github.com/rjcorwin)
 
 ---
