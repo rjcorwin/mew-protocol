@@ -1,9 +1,9 @@
 # ADR-p4m: Context Field Structure and Patterns
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-08-31
 **Context:** MEUP/MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 **Parent ADR:** 005-1-k9j (Sub-Context Protocol Mechanics)
 
 ## Context

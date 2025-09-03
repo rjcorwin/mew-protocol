@@ -1,9 +1,9 @@
 # ADR-v2c: Proposal Lifecycle Extensions
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-08-30  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 **Related ADRs:** 002-0-m3p (Message Kind Namespace Pattern)
 
 ## Context

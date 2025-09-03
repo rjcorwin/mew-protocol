@@ -1,9 +1,9 @@
 # ADR-q8f: Capability Definition Conventions
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-09-01  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 **Parent ADR:** 002-0-m3p (Message Kind Namespace Pattern)
 
 ## Context

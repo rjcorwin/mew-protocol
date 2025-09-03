@@ -1,9 +1,9 @@
 # ADR-m3p: Message Kind Namespace Pattern
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-08-30  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

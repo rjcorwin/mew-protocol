@@ -1,9 +1,9 @@
 # ADR-y3m: Terminology for Communication Spaces
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-08-30  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 **Parent ADR:** 001-0-x7k (Protocol Name)
 
 ## Context

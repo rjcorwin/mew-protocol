@@ -1,9 +1,9 @@
 # ADR-n5r: Protocol-Kind Separator Convention
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-09-03  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 **Related ADRs:** 002-0-m3p (Namespace Pattern)
 
 ## Context

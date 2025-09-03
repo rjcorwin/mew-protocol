@@ -1,9 +1,9 @@
 # ADR-h2n: Correlation ID Structure
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-09-01  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

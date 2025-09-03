@@ -1,9 +1,10 @@
 # ADR-d4n: Space Configuration Specification
 
-**Status:** Proposed  
+**Status:** Rejected  
 **Date:** 2025-08-31  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated (Should be incorporated last after other ADRs stabilize)
+**Incorporation:** Not Incorporated
+**Rejection Rationale:** Configuration format is implementation-specific, not part of the wire protocol. This ADR will be applied to future CLI implementation rather than the protocol specification itself.
 **Parent ADR:** 001-1-y3m (Communication Space Terminology)
 **Related ADRs:** 002-1-q8f (Capability Definition Conventions)
 

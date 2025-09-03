@@ -1,9 +1,9 @@
 # ADR-x7k: Protocol Name
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-08-30  
 **Context:** MCPx Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

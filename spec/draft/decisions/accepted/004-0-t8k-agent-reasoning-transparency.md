@@ -1,9 +1,9 @@
 # ADR-t8k: Agent Reasoning Transparency
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-08-31
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 **Related ADRs:** 004-2-p4m (Context Field Structure)
 
 ## Context

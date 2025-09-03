@@ -1,9 +1,9 @@
 # ADR-j3k: Property Naming Convention
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-09-01  
 **Context:** MEUP Protocol Draft Specification
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 
