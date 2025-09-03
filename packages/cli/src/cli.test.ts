@@ -3,22 +3,23 @@ import { MCPxClient } from '@mcpx-protocol/client';
 
 // Mock the MCPxClient module
 vi.mock('@mcpx-protocol/client', () => {
+  const MockedMCPxClient = vi.fn();
+  MockedMCPxClient.prototype.onWelcome = vi.fn();
+  MockedMCPxClient.prototype.onChat = vi.fn();
+  MockedMCPxClient.prototype.onPeerJoined = vi.fn();
+  MockedMCPxClient.prototype.onPeerLeft = vi.fn();
+  MockedMCPxClient.prototype.onMessage = vi.fn();
+  MockedMCPxClient.prototype.onError = vi.fn();
+  MockedMCPxClient.prototype.onDisconnected = vi.fn();
+  MockedMCPxClient.prototype.onReconnected = vi.fn();
+  MockedMCPxClient.prototype.connect = vi.fn(() => Promise.resolve(undefined));
+  MockedMCPxClient.prototype.disconnect = vi.fn();
+  MockedMCPxClient.prototype.chat = vi.fn();
+  MockedMCPxClient.prototype.sendRequest = vi.fn();
+  MockedMCPxClient.prototype.isConnected = vi.fn(() => false);
+  
   return {
-    MCPxClient: vi.fn().mockImplementation(() => ({
-      onWelcome: vi.fn(),
-      onChat: vi.fn(),
-      onPeerJoined: vi.fn(),
-      onPeerLeft: vi.fn(),
-      onMessage: vi.fn(),
-      onError: vi.fn(),
-      onDisconnected: vi.fn(),
-      onReconnected: vi.fn(),
-      connect: vi.fn().mockResolvedValue(undefined),
-      disconnect: vi.fn(),
-      chat: vi.fn(),
-      sendRequest: vi.fn(),
-      isConnected: vi.fn().mockReturnValue(false),
-    })),
+    MCPxClient: MockedMCPxClient,
     Envelope: {},
     Peer: {},
     SystemWelcomePayload: {},
