@@ -1,152 +1,211 @@
-# @mcpx-protocol/client
+# @meup/client
 
-Protocol layer implementation for MCPx - handles wire format, transport, and message correlation with type-safe event handling.
+TypeScript client SDK for MEUP (Multi-Entity Unified-context Protocol) v0.2.
+
+MEUP provides a unified context where all agent-to-agent and agent-to-tool interactions are visible and controllable at the protocol layer. Unlike traditional systems where AI coordination happens in hidden contexts, MEUP broadcasts all messages within a shared space.
 
 ## Installation
 
 ```bash
-npm install @mcpx-protocol/client
+npm install @meup/client
 ```
 
-## Usage
+## Quick Start
 
 ```typescript
-import { MCPxClient } from '@mcpx-protocol/client';
+import { MEUPClient } from '@meup/client';
 
-const client = new MCPxClient({
-  gateway: 'ws://localhost:8080',
-  topic: 'my-topic',
-  token: 'my-token'
+// Create client
+const client = new MEUPClient({
+  gateway: 'wss://gateway.example.com',
+  space: 'my-space',
+  token: 'your-auth-token',
+  participant_id: 'my-agent',
+  capabilities: [
+    {
+      id: 'tools-execute',
+      kind: 'mcp/request',
+      payload: { method: 'tools/*' }
+    }
+  ]
 });
 
-// Connect to gateway
+// Connect to space
 await client.connect();
 
-// Type-safe event handlers
-const unsubscribe = client.onChat((message, from) => {
-  // message is typed as ChatMessage
-  // from is typed as string
-  console.log(`${from}: ${message.params.text}`);
+// Listen for events
+client.on('welcome', (data) => {
+  console.log('Connected as:', data.you.id);
+  console.log('Participants:', data.participants);
 });
 
-// Handle errors
-client.onError((error) => {
-  console.error('Error:', error);
+client.on('chat', (message, from) => {
+  console.log(`${from}: ${message.text}`);
 });
 
-// Track peers
-client.onPeerJoined((peer) => {
-  console.log('Peer joined:', peer.id);
+client.on('proposal', (proposal, from) => {
+  console.log(`Proposal from ${from}:`, proposal);
+  // Trusted participants can accept/reject
+  if (shouldAccept(proposal)) {
+    await client.acceptProposal(proposal.correlation_id);
+  }
 });
 
-// Send chat message
-client.chat('Hello everyone!');
+// Send messages
+await client.sendChat('Hello, space!');
 
-// Call a peer's tool
-const result = await client.request('peer-id', 'tools/call', {
-  name: 'my-tool',
-  arguments: { param: 'value' }
+// Make MCP requests
+const result = await client.request('tools/list');
+
+// Propose actions (for untrusted agents)
+const envelope = await client.propose('tools-execute', {
+  kind: 'mcp/request',
+  payload: {
+    jsonrpc: '2.0',
+    method: 'tools/call',
+    params: { name: 'search', arguments: { query: 'MEUP protocol' } }
+  }
 });
-
-// Cleanup - unsubscribe handlers
-unsubscribe();
-
-// Disconnect
-client.disconnect();
 ```
 
-## Features
+## Key Features
 
-- **Type-safe event handlers** with full TypeScript support
-- WebSocket connection management with auto-reconnection
-- Envelope creation and validation (MCPx v0 spec)
-- Correlation tracking for request/response matching
-- Peer registry management
-- Chat support
-- REST API integration for topics/participants/history
-- TypeScript support with full type definitions
+### Unified Context
+All participants share the same visible stream of interactions. No hidden agent-to-agent or agent-to-tool communications.
 
-## Event Handlers
-
-All event handlers are type-safe and return an unsubscribe function:
+### Capability-Based Access Control
+Participants have capabilities that define what operations they can perform:
 
 ```typescript
-// Chat messages
-const unsubChat = client.onChat((message, from) => {
-  console.log(`${from}: ${message.params.text}`);
-});
+// Grant capabilities to another participant
+await client.grantCapabilities('untrusted-agent', [
+  {
+    id: 'read-only',
+    kind: 'mcp/request',
+    payload: { method: 'resources/read' }
+  }
+]);
 
-// Error handling
-const unsubError = client.onError((error) => {
-  console.error(error);
-});
-
-// Welcome message from gateway
-const unsubWelcome = client.onWelcome((data) => {
-  console.log('Connected as:', data.participant.id);
-});
-
-// Peer tracking
-client.onPeerJoined((peer) => {
-  console.log('Peer joined:', peer.id);
-});
-
-client.onPeerLeft((peer) => {
-  console.log('Peer left:', peer.id);
-});
-
-// Connection lifecycle
-client.onConnected(() => {
-  console.log('Connected to gateway');
-});
-
-client.onDisconnected(() => {
-  console.log('Disconnected from gateway');
-});
-
-client.onReconnected(() => {
-  console.log('Reconnected to gateway');
-});
-
-// Raw envelope messages
-client.onMessage((envelope) => {
-  console.log('Received envelope:', envelope);
-});
-
-// Cleanup when done
-unsubChat();
-unsubError();
-unsubWelcome();
+// Check if we have a capability
+if (client.hasCapability('mcp/request', 'coordinator')) {
+  await client.request('tools/call', params, 'coordinator');
+}
 ```
 
-## API
+### Proposal-Execute Pattern
+Untrusted agents propose operations that trusted participants execute:
 
-### Connection Methods
-- `connect(): Promise<void>` - Connect to the gateway
-- `disconnect(): void` - Disconnect from the gateway
-- `getParticipantId(): string` - Get current participant ID
-- `getPeers(): Peer[]` - Get list of connected peers
+```typescript
+// Untrusted agent proposes
+const result = await client.propose('tools-execute', {
+  kind: 'mcp/request',
+  payload: { /* ... */ }
+});
 
-### Communication Methods
-- `chat(text: string, format?: 'plain' | 'markdown'): void` - Send chat message
-- `request(to: string, method: string, params: any): Promise<any>` - Call a peer's MCP method
-- `notify(to: string[], method: string, params: any): void` - Send notification to peers
+// Trusted participant handles proposals
+client.on('proposal', async (proposal, from) => {
+  if (isAllowed(proposal)) {
+    await client.acceptProposal(proposal.correlation_id);
+  } else {
+    await client.rejectProposal(proposal.correlation_id, 'Not allowed');
+  }
+});
+```
+
+### Sub-Context Protocol
+Manage conversation scope with push/pop/resume operations:
+
+```typescript
+// Start a sub-task
+await client.pushContext('research-task');
+
+// Work within the context
+await client.sendChat('Let me search for information...');
+
+// Return to main context
+await client.popContext();
+
+// Resume a previous context
+await client.resumeContext(correlationId);
+```
+
+## API Reference
+
+### Constructor
+
+```typescript
+new MEUPClient(options: ConnectionOptions)
+```
+
+Options:
+- `gateway`: WebSocket gateway URL
+- `space`: Space name to join
+- `token`: Authentication token
+- `participant_id`: Optional participant identifier
+- `capabilities`: Initial capabilities array
+- `reconnect`: Enable auto-reconnect (default: true)
+- `reconnectDelay`: Initial reconnect delay in ms (default: 1000)
+- `maxReconnectDelay`: Maximum reconnect delay in ms (default: 30000)
+- `heartbeatInterval`: Heartbeat interval in ms (default: 30000)
+- `requestTimeout`: Request timeout in ms (default: 30000)
+
+### Methods
+
+#### Connection
+- `connect(): Promise<void>` - Connect to gateway
+- `disconnect(): void` - Disconnect from gateway
+- `isConnected(): boolean` - Check connection status
+
+#### Messaging
 - `send(envelope: PartialEnvelope): Promise<void>` - Send raw envelope
+- `sendChat(text: string, format?: 'plain' | 'markdown'): Promise<void>` - Send chat message
 
-### Event Registration Methods
-All return an unsubscribe function: `() => void`
+#### MCP Operations
+- `request<T>(method: string, params?: any, target?: string): Promise<T>` - Make MCP request
+- `notify(method: string, params?: any, target?: string): Promise<void>` - Send MCP notification
 
-- `onChat(handler: (message: ChatMessage, from: string) => void)`
-- `onError(handler: (error: Error) => void)`
-- `onWelcome(handler: (data: SystemWelcomePayload) => void)`
-- `onPeerJoined(handler: (peer: Peer) => void)`
-- `onPeerLeft(handler: (peer: Peer) => void)`
-- `onMessage(handler: (envelope: Envelope) => void)`
-- `onConnected(handler: () => void)`
-- `onDisconnected(handler: () => void)`
-- `onReconnected(handler: () => void)`
+#### Proposals
+- `propose(capability: string, envelope: PartialEnvelope): Promise<Envelope>` - Propose an action
+- `acceptProposal(correlationId: string): Promise<void>` - Accept a proposal
+- `rejectProposal(correlationId: string, reason?: string): Promise<void>` - Reject a proposal
 
-See the [TypeScript definitions](src/types.ts) for complete type information.
+#### Capabilities
+- `grantCapabilities(to: string, capabilities: Capability[]): Promise<void>` - Grant capabilities
+- `revokeCapabilities(to: string, capabilityIds: string[]): Promise<void>` - Revoke capabilities
+- `hasCapability(kind: string, to?: string): boolean` - Check for capability
+- `getCapabilities(): Capability[]` - Get current capabilities
+
+#### Context Management
+- `pushContext(topic: string): Promise<void>` - Push new sub-context
+- `popContext(): Promise<void>` - Pop current sub-context
+- `resumeContext(correlationId: string, topic?: string): Promise<void>` - Resume previous context
+
+#### State
+- `getParticipants(): Participant[]` - Get current participants
+- `getParticipantId(): string | null` - Get own participant ID
+
+### Events
+
+```typescript
+client.on('welcome', (data: SystemWelcomePayload) => {});
+client.on('message', (envelope: Envelope) => {});
+client.on('chat', (message: ChatPayload, from: string) => {});
+client.on('proposal', (proposal: Proposal, from: string) => {});
+client.on('proposal-accept', (data: MeupProposalAcceptPayload) => {});
+client.on('proposal-reject', (data: MeupProposalRejectPayload) => {});
+client.on('capability-grant', (grant: CapabilityGrant) => {});
+client.on('capability-revoke', (data: MeupCapabilityRevokePayload) => {});
+client.on('participant-joined', (participant: Participant) => {});
+client.on('participant-left', (participant: Participant) => {});
+client.on('error', (error: Error) => {});
+client.on('connected', () => {});
+client.on('disconnected', () => {});
+client.on('reconnected', () => {});
+```
+
+## Protocol Version
+
+This SDK implements MEUP v0.2. See the [specification](https://github.com/rjcorwin/mcpx-protocol/blob/main/spec/v0.2/SPEC.md) for protocol details.
 
 ## License
 

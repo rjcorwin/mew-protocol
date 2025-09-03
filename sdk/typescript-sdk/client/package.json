@@ -1,7 +1,7 @@
 {
-  "name": "@mcpx-protocol/client",
-  "version": "0.1.0",
-  "description": "MCPx protocol client - handles wire format, transport, and message correlation",
+  "name": "@meup/client",
+  "version": "0.2.0",
+  "description": "MEUP protocol client - Multi-Entity Unified-context Protocol client SDK",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -22,14 +22,15 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
-    "mcpx",
+    "meup",
     "mcp",
     "protocol",
     "websocket",
     "client",
-    "multi-agent"
+    "multi-entity",
+    "unified-context"
   ],
-  "author": "MCPx Working Group",
+  "author": "MEUP Working Group",
   "license": "MIT",
   "dependencies": {
     "ws": "^8.18.0",
@@ -53,7 +54,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/rjcorwin/mcpx-protocol.git",
-    "directory": "packages/client"
+    "directory": "sdk/typescript-sdk/client"
   },
   "homepage": "https://github.com/rjcorwin/mcpx-protocol#readme",
   "bugs": {

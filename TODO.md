@@ -29,8 +29,25 @@ All tasks for the v0.2 release have been completed on 2025-01-03.
 
 ## Future Work (v0.2 and beyond)
 
-- [ ] Implement reference gateway
+### SDK Implementation
+- [x] Update client SDK for v0.2 spec (@meup/client)
+- [ ] Update agent SDK for v0.2 spec (@meup/agent)
+- [ ] Implement reference gateway (@meup/gateway)
+- [ ] Create TypeScript types package (@meup/types)
+- [ ] Publish packages to npm under @meup org
+
+### CLI and Tools
 - [ ] Implement CLI with space configuration (using ADR-d4n)
 - [ ] Create example participants
+- [ ] Build proposal review UI/tool
+
+### Testing and Documentation
 - [ ] Write integration tests
+- [ ] Create migration guide from v0.1
+- [ ] Add SDK usage examples
+- [ ] Document gateway implementation requirements
+
+### Community
 - [ ] Community feedback and iteration
+- [ ] Create Discord/discussion forum
+- [ ] Gather implementation feedback for v0.3

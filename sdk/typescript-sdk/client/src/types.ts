@@ -1,21 +1,22 @@
 /**
- * Core MCPx protocol types matching v0.1 specification
+ * Core MEUP (Multi-Entity Unified-context Protocol) types matching v0.2 specification
  */
 
-export const PROTOCOL_VERSION = 'mcpx/v0.1';
+export const PROTOCOL_VERSION = 'meup/v0.2';
 export const MCP_VERSION = '2025-06-18';
 
 /**
- * MCPx envelope - the top-level wrapper for all messages
+ * MEUP envelope - the top-level wrapper for all messages
  */
 export interface Envelope {
-  protocol: 'mcpx/v0.1';
+  protocol: 'meup/v0.2';
   id: string;
   ts: string;
   from: string;
   to?: string[];
-  kind: string; // v0.1 uses hierarchical kinds like 'mcp/request:METHOD', 'system/welcome', 'chat'
+  kind: string; // v0.2 uses slash notation like 'mcp/request', 'meup/proposal'
   correlation_id?: string;
+  context?: ContextField;
   payload: any;
 }
 
@@ -24,17 +25,55 @@ export interface Envelope {
  */
 export interface PartialEnvelope {
   to?: string[];
-  kind: string; // v0.1 uses hierarchical kinds
+  kind: string;
   correlation_id?: string;
+  context?: ContextField;
   payload: any;
 }
 
 /**
- * Participant in a topic (v0.1 uses capabilities instead of kind)
+ * Context field for sub-context protocol
  */
-export interface Peer {
+export interface ContextField {
+  operation: 'push' | 'pop' | 'resume';
+  topic?: string;
+  correlation_id?: string;
+}
+
+/**
+ * Participant in a space with capabilities
+ */
+export interface Participant {
   id: string;
-  capabilities: string[];
+  capabilities: Capability[];
+}
+
+/**
+ * Capability definition with JSON pattern matching
+ */
+export interface Capability {
+  id: string;
+  kind: string;
+  to?: string | string[];
+  payload?: any;
+}
+
+/**
+ * Proposal for untrusted agents
+ */
+export interface Proposal {
+  correlation_id: string;
+  capability: string;
+  envelope: PartialEnvelope;
+}
+
+/**
+ * Capability grant
+ */
+export interface CapabilityGrant {
+  from: string;
+  to: string;
+  capabilities: Capability[];
 }
 
 /**
@@ -42,25 +81,54 @@ export interface Peer {
  */
 export interface PresencePayload {
   event: 'join' | 'leave' | 'heartbeat';
-  participant: Peer;
+  participant: Participant;
 }
 
 /**
- * System message payloads (v0.1)
+ * System message payloads (v0.2)
  */
 export interface SystemWelcomePayload {
-  you: Peer;  // Your own participant info with capabilities
-  participants: Peer[];  // Other participants
+  you: Participant;
+  participants: Participant[];
 }
 
 export interface SystemErrorPayload {
   error: string;
   message: string;
   attempted_kind?: string;
-  your_capabilities?: string[];
+  your_capabilities?: Capability[];
 }
 
 export type SystemPayload = SystemWelcomePayload | SystemErrorPayload;
+
+/**
+ * MEUP-specific payloads
+ */
+export interface MeupProposalPayload {
+  proposal: Proposal;
+}
+
+export interface MeupProposalAcceptPayload {
+  correlation_id: string;
+  accepted_by: string;
+  envelope: Envelope;
+}
+
+export interface MeupProposalRejectPayload {
+  correlation_id: string;
+  rejected_by: string;
+  reason?: string;
+}
+
+export interface MeupCapabilityGrantPayload {
+  grant: CapabilityGrant;
+}
+
+export interface MeupCapabilityRevokePayload {
+  from: string;
+  to: string;
+  capabilities: string[];
+}
 
 /**
  * MCP JSON-RPC 2.0 message types
@@ -94,7 +162,7 @@ export interface JsonRpcError {
 export type JsonRpcMessage = JsonRpcRequest | JsonRpcResponse | JsonRpcNotification;
 
 /**
- * Chat message format (v0.1 - chat is now a separate kind)
+ * Chat message format (v0.2)
  */
 export interface ChatPayload {
   text: string;
@@ -106,8 +174,10 @@ export interface ChatPayload {
  */
 export interface ConnectionOptions {
   gateway: string;
-  topic: string;
+  space: string;  // Changed from 'topic' to 'space'
   token: string;
+  participant_id?: string;
+  capabilities?: Capability[];
   reconnect?: boolean;
   reconnectDelay?: number;
   maxReconnectDelay?: number;
@@ -127,14 +197,30 @@ export interface PendingRequest {
 }
 
 /**
+ * Pending proposal tracking
+ */
+export interface PendingProposal {
+  proposal: Proposal;
+  resolve: (envelope: Envelope) => void;
+  reject: (reason: string) => void;
+  timestamp: number;
+  timeout?: NodeJS.Timeout;
+}
+
+/**
  * Client events
  */
 export type ClientEventMap = {
   welcome: (data: SystemWelcomePayload) => void;
   message: (envelope: Envelope) => void;
   chat: (message: ChatPayload, from: string) => void;
-  'peer-joined': (peer: Peer) => void;
-  'peer-left': (peer: Peer) => void;
+  proposal: (proposal: Proposal, from: string) => void;
+  'proposal-accept': (data: MeupProposalAcceptPayload) => void;
+  'proposal-reject': (data: MeupProposalRejectPayload) => void;
+  'capability-grant': (grant: CapabilityGrant) => void;
+  'capability-revoke': (data: MeupCapabilityRevokePayload) => void;
+  'participant-joined': (participant: Participant) => void;
+  'participant-left': (participant: Participant) => void;
   error: (error: Error) => void;
   reconnected: () => void;
   connected: () => void;
@@ -144,7 +230,7 @@ export type ClientEventMap = {
 /**
  * REST API types
  */
-export interface TopicInfo {
+export interface SpaceInfo {
   name: string;
   participants: number;
   created: string;
