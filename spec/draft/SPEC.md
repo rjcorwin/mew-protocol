@@ -63,6 +63,7 @@ Field semantics:
 - `from`: stable participant id within the topic
 - `to`: array of participant ids (empty/omitted = broadcast)
 - `kind`: Message type using minimal kinds:
+<<<<<<< HEAD
   - `mcp/request` - MCP request/notification
   - `mcp/response` - MCP response
   - `mcp/proposal` - MCP proposal for operations
@@ -96,16 +97,36 @@ Field semantics:
   - Context groups related messages together (e.g., all thoughts in a reasoning sequence)
   - When prompting LLMs, implementations MAY filter contexts to reduce noise
   - IMPORTANT: Messages addressed to a participant (via `to` field) MUST be handled regardless of context
+=======
+  - `mcp.request` - MCP request/notification
+  - `mcp.response` - MCP response
+  - `mcp.proposal` - MCP proposal for operations
+  - `chat` - Chat messages
+  - `system.presence` - Join/leave events
+  - `system.welcome` - Welcome message for new participants
+  - `system.error` - System error messages
+- `correlation_id`: array of message IDs this message relates to
+  - Response → Request: `mcp.response` MUST reference the originating `mcp.request`
+  - Fulfillment → Proposal: `mcp.request` MAY reference a `mcp.proposal` when fulfilling it
+  - Error → Trigger: `system.error` messages SHOULD reference the envelope that caused the error
+  - Reply → Message: Any envelope MAY reference others for threading/context
+>>>>>>> origin
 - `payload`: object; structure depends on `kind`
 
 ### 3.1 MCP Messages
 
 MCP messages use minimal kinds with method information in the payload:
+<<<<<<< HEAD
 - `kind: "mcp/request"` for requests/notifications
 - `kind: "mcp/response"` for responses
 - `kind: "mcp/proposal"` for proposals
 - `kind: "mcp/withdraw"` for withdrawing proposals
 - `kind: "mcp/reject"` for rejecting proposals
+=======
+- `kind: "mcp.request"` for requests/notifications
+- `kind: "mcp.response"` for responses
+- `kind: "mcp.proposal"` for proposals
+>>>>>>> origin
 - The specific method (e.g., `tools/call`, `resources/read`) is in `payload.method`
 
 #### 3.1.1 MCP Requests
@@ -143,7 +164,11 @@ Response to the above tool call:
   "id": "env-resp-1",
   "from": "target-agent",
   "to": ["trusted-agent"],
+<<<<<<< HEAD
   "kind": "mcp/response",
+=======
+  "kind": "mcp.response",
+>>>>>>> origin
   "correlation_id": ["env-call-1"],
   "payload": {
     "jsonrpc": "2.0",
@@ -170,7 +195,11 @@ Participants with restricted capabilities MUST use proposals instead of direct M
   "id": "env-req-1",
   "from": "untrusted-agent",
   "to": ["target-agent"],
+<<<<<<< HEAD
   "kind": "mcp/proposal",
+=======
+  "kind": "mcp.proposal",
+>>>>>>> origin
   "payload": {
     "method": "tools/call",
     "params": {
@@ -199,7 +228,11 @@ Example fulfillment:
   "id": "env-fulfill-1",
   "from": "human-user",
   "to": ["target-agent"],
+<<<<<<< HEAD
   "kind": "mcp/request",
+=======
+  "kind": "mcp.request",
+>>>>>>> origin
   "correlation_id": ["env-req-1"],
   "payload": {
     "jsonrpc": "2.0",
@@ -220,8 +253,13 @@ The response goes only to the fulfiller who made the request. The response's `co
   "protocol": "meup/v0.1",
   "id": "env-fulfill-resp-1",
   "from": "target-agent",
+<<<<<<< HEAD
   "to": ["human-user"],
   "kind": "mcp/response",
+=======
+  "to": ["human-user", "untrusted-agent"],
+  "kind": "mcp.response",
+>>>>>>> origin
   "correlation_id": ["env-fulfill-1"],
   "payload": {
     "jsonrpc": "2.0",
@@ -242,6 +280,7 @@ The proposer can follow the correlation chain to track the outcome:
 3. Target sends response with `correlation_id: ["env-fulfill-1"]` (`env-fulfill-resp-1`)
 4. Proposer observes the broadcast response and can trace back through the correlation chain
 
+<<<<<<< HEAD
 ### 3.3 Proposal Lifecycle Operations
 
 MEUP extends the proposal pattern with lifecycle operations for cancellation and feedback.
@@ -249,10 +288,14 @@ MEUP extends the proposal pattern with lifecycle operations for cancellation and
 #### 3.3.1 Withdraw Proposals (kind = "mcp/withdraw")
 
 Proposers can withdraw their own proposals that are no longer needed:
+=======
+Chat messages are MEUP-specific and do not pollute the MCP namespace:
+>>>>>>> origin
 
 ```json
 {
   "protocol": "meup/v0.1",
+<<<<<<< HEAD
   "id": "withdraw-456",
   "from": "untrusted-agent",
   "correlation_id": ["env-req-1"],
@@ -343,6 +386,8 @@ Chat messages are MEUP-specific and do not pollute the MCP namespace:
 ```json
 {
   "protocol": "meup/v0.1",
+=======
+>>>>>>> origin
   "id": "env-chat-1",
   "from": "user-alice",
   "kind": "chat",
@@ -357,6 +402,7 @@ Chat messages are MEUP-specific and do not pollute the MCP namespace:
 - `format` (optional): "plain" or "markdown", defaults to "plain"
 - Chat messages are typically broadcast (empty/omitted `to` array)
 
+<<<<<<< HEAD
 ### 3.5 Reasoning Transparency
 
 MEUP supports transparent reasoning through dedicated message kinds and the context field. This allows agents to share their thinking process while maintaining clear boundaries between reasoning sequences and regular operations.
@@ -600,6 +646,9 @@ Removes participants from the space:
 - All space management operations generate audit logs
 
 ### 3.7 Presence Messages (kind = "system/presence")
+=======
+### 3.4 Presence Messages (kind = "system.presence")
+>>>>>>> origin
 
 Presence messages are broadcast to notify all participants about join/leave events:
 
@@ -608,13 +657,17 @@ Presence messages are broadcast to notify all participants about join/leave even
   "protocol": "meup/v0.1",
   "id": "env-presence-1",
   "from": "system:gateway",
-  "kind": "system/presence",
+  "kind": "system.presence",
   "payload": {
     "event": "join",
     "participant": {
       "id": "new-agent",
       "capabilities": [
+<<<<<<< HEAD
         {"kind": "mcp/proposal"},
+=======
+        {"kind": "mcp.proposal"},
+>>>>>>> origin
         {"kind": "chat"}
       ]
     }
@@ -629,9 +682,15 @@ Presence messages are broadcast to notify all participants about join/leave even
 
 Note: Presence messages are broadcast to all participants. The joining participant also receives a welcome message addressed specifically to them (via the `to` field) with their authoritative capabilities and the current participant list.
 
+<<<<<<< HEAD
 ### 3.8 System Messages
 
 #### 3.8.1 Welcome Message (kind = "system/welcome")
+=======
+### 3.5 System Messages
+
+#### 3.5.1 Welcome Message (kind = "system.welcome")
+>>>>>>> origin
 
 When a participant connects, the gateway MUST send a welcome message addressed specifically to that participant (using the `to` field):
 
@@ -641,12 +700,16 @@ When a participant connects, the gateway MUST send a welcome message addressed s
   "id": "env-welcome-1",
   "from": "system:gateway",
   "to": ["new-participant"],
-  "kind": "system/welcome",
+  "kind": "system.welcome",
   "payload": {
     "you": {
       "id": "new-participant",
       "capabilities": [
+<<<<<<< HEAD
         {"kind": "mcp/proposal"},
+=======
+        {"kind": "mcp.proposal"},
+>>>>>>> origin
         {"kind": "chat"}
       ]
     },
@@ -654,14 +717,22 @@ When a participant connects, the gateway MUST send a welcome message addressed s
       {
         "id": "agent-1",
         "capabilities": [
+<<<<<<< HEAD
           {"kind": "mcp/*"},
+=======
+          {"kind": "mcp.*"},
+>>>>>>> origin
           {"kind": "chat"}
         ]
       },
       {
         "id": "agent-2",
         "capabilities": [
+<<<<<<< HEAD
           {"kind": "mcp/response"},
+=======
+          {"kind": "mcp.response"},
+>>>>>>> origin
           {"kind": "chat"}
         ]
       }
@@ -673,9 +744,13 @@ When a participant connects, the gateway MUST send a welcome message addressed s
 - `you`: The joining participant's own information and authoritative capabilities
 - `participants`: Current list of other participants in the topic and their capabilities
 
+<<<<<<< HEAD
 **Important:** Other participants SHOULD ignore welcome messages not addressed to them when constructing prompts, as these can cause significant bloat. The message is already targeted via the `to` field.
 
 #### 3.8.2 Capability Violation (kind = "system/error")
+=======
+#### 3.5.2 Capability Violation (kind = "system.error")
+>>>>>>> origin
 
 When a participant attempts an operation they lack capability for:
 
@@ -685,6 +760,7 @@ When a participant attempts an operation they lack capability for:
   "id": "env-violation-1",
   "from": "system:gateway",
   "to": ["violator"],
+<<<<<<< HEAD
   "kind": "system/error",
   "correlation_id": ["env-bad-call"],
   "payload": {
@@ -692,6 +768,16 @@ When a participant attempts an operation they lack capability for:
     "attempted_kind": "mcp/request",
     "your_capabilities": [
       {"kind": "mcp/proposal"},
+=======
+  "kind": "system.error",
+  "correlation_id": ["env-bad-call"],
+  "payload": {
+    "error": "capability_violation",
+    "message": "You lack capability for this operation",
+    "attempted_kind": "mcp.request",
+    "your_capabilities": [
+      {"kind": "mcp.proposal"},
+>>>>>>> origin
       {"kind": "chat"}
     ]
   }
@@ -704,12 +790,17 @@ When a participant attempts an operation they lack capability for:
 
 ### 4.1 Capability-Based Access Control
 
+<<<<<<< HEAD
 The gateway enforces security through two mechanisms:
 
 1. **Identity Validation**: The gateway MUST verify that the `from` field matches the authenticated participant's ID. Participants cannot spoof messages from other participants.
 
 2. **Capability Matching**: The gateway assigns capabilities to each connection using JSON pattern matching. Capabilities are JSON objects that match against the message structure (kind and payload).
 
+=======
+The gateway assigns capabilities to each connection using JSON pattern matching. Capabilities are JSON objects that match against the message structure (kind and payload).
+
+>>>>>>> origin
 **Capability Pattern Structure:**
 ```json
 {
@@ -721,12 +812,16 @@ The gateway enforces security through two mechanisms:
 ```
 
 **Pattern Types:**
+<<<<<<< HEAD
 - String with wildcards: `"mcp/*"` matches `mcp/request`, `mcp/response`, etc.
+=======
+- String with wildcards: `"mcp.*"` matches `mcp.request`, `mcp.response`, etc.
+>>>>>>> origin
 - Exact match: `"chat"` only matches `"chat"`
 - Nested patterns: Match specific payload fields
 
 **Reserved Namespace:**
-The `system/*` namespace is reserved exclusively for the gateway. Participants MUST NOT send messages with `kind` starting with `system/`. The gateway MUST reject any such attempts. Only the gateway can generate system messages (`system/welcome`, `system/presence`, `system/error`).
+The `system.*` namespace is reserved exclusively for the gateway. Participants MUST NOT send messages with `kind` starting with `system.`. The gateway MUST reject any such attempts. Only the gateway can generate system messages (`system.welcome`, `system.presence`, `system.error`).
 
 **Example Capability Sets:**
 
@@ -735,7 +830,11 @@ Gateways may implement various capability profiles using JSON patterns:
 1. **Full Access** example:
    ```json
    [
+<<<<<<< HEAD
      {"kind": "mcp/*"},
+=======
+     {"kind": "mcp.*"},
+>>>>>>> origin
      {"kind": "chat"}
    ]
    ```
@@ -744,8 +843,13 @@ Gateways may implement various capability profiles using JSON patterns:
 2. **Proposal-Only** example:
    ```json
    [
+<<<<<<< HEAD
      {"kind": "mcp/proposal"},
      {"kind": "mcp/response"},
+=======
+     {"kind": "mcp.proposal"},
+     {"kind": "mcp.response"},
+>>>>>>> origin
      {"kind": "chat"}
    ]
    ```
@@ -755,7 +859,11 @@ Gateways may implement various capability profiles using JSON patterns:
    ```json
    [
      {
+<<<<<<< HEAD
        "kind": "mcp/request",
+=======
+       "kind": "mcp.request",
+>>>>>>> origin
        "payload": {
          "method": "tools/call",
          "params": {
@@ -763,7 +871,11 @@ Gateways may implement various capability profiles using JSON patterns:
          }
        }
      },
+<<<<<<< HEAD
      {"kind": "mcp/response"},
+=======
+     {"kind": "mcp.response"},
+>>>>>>> origin
      {"kind": "chat"}
    ]
    ```
@@ -772,10 +884,17 @@ Gateways may implement various capability profiles using JSON patterns:
 **Progressive Trust Example:**
 
 Capabilities can be expanded as trust increases:
+<<<<<<< HEAD
 1. Initial: `[{"kind": "mcp/proposal"}, {"kind": "chat"}]` - Proposals only
 2. Basic: Add read capabilities with payload patterns
 3. Trusted: Add tool usage with specific tool patterns
 4. Full: Replace with `[{"kind": "mcp/*"}]` - Unrestricted MCP access
+=======
+1. Initial: `[{"kind": "mcp.proposal"}, {"kind": "chat"}]` - Proposals only
+2. Basic: Add read capabilities with payload patterns
+3. Trusted: Add tool usage with specific tool patterns
+4. Full: Replace with `[{"kind": "mcp.*"}]` - Unrestricted MCP access
+>>>>>>> origin
 
 ### 4.2 Gateway Enforcement
 
@@ -793,10 +912,17 @@ The gateway enforces capabilities using JSON pattern matching against the messag
 - Detect spoofing (where `kind` doesn't match payload content)
 
 **Pattern Matching Examples:**
+<<<<<<< HEAD
 - Message with `kind: "mcp/request"` and `payload.method: "tools/call"` matches:
   - `{"kind": "mcp/*"}`
   - `{"kind": "mcp/request"}`
   - `{"kind": "mcp/request", "payload": {"method": "tools/*"}}`
+=======
+- Message with `kind: "mcp.request"` and `payload.method: "tools/call"` matches:
+  - `{"kind": "mcp.*"}`
+  - `{"kind": "mcp.request"}`
+  - `{"kind": "mcp.request", "payload": {"method": "tools/*"}}`
+>>>>>>> origin
 - Message with `kind: "chat"` only matches:
   - `{"kind": "chat"}`
   - `{"kind": "*"}` (wildcard for all kinds)
@@ -882,7 +1008,11 @@ This is a v0.x release. Breaking changes are expected between minor versions unt
 
 Key breaking changes from v0.0:
 - Protocol identifier changed from `mcp-x/v0` to `meup/v0.1`
+<<<<<<< HEAD
 - Message kinds now use slash notation (e.g., `mcp/request` instead of `mcp/request:tools/call`)
+=======
+- Message kinds now use dot notation (e.g., `mcp.request` instead of `mcp/request:tools/call`)
+>>>>>>> origin
 - Method information moved to payload
 - Capabilities use JSON pattern matching instead of string wildcards
 - `correlation_id` is now always an array
