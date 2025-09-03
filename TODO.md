@@ -12,7 +12,6 @@
 
 - [x] impl-1: Implement core protocol (ADRs x7k, m3p, q8f)
 - [x] impl-1.5: Standardize property naming convention (ADR j3k)
-<<<<<<< HEAD
 - [x] impl-2: Implement basic operations (ADR v2c - proposals and lifecycle)
 - [x] impl-3: Implement correlation (ADR h2n - array correlation IDs)
 - [x] impl-4: Implement reasoning transparency and sub-context (ADRs t8k, k9j, p4m)
@@ -20,17 +19,6 @@
 - [ ] review-1: Editor review of draft spec and accept proposals
 - [ ] impl-6: Implement space management (ADRs d4n - config)
 - [ ] review-2: Editor review of draft spec and accept proposals
-=======
-- [ ] review-1: Editor review of core protocol implementation
-- [ ] impl-2: Implement basic operations (ADR v2c - proposals and lifecycle)
-- [ ] review-2: Editor review of basic operations implementation  
-- [ ] impl-3: Implement correlation (ADR h2n - array correlation IDs)
-- [ ] review-3: Editor review of correlation implementation
-- [ ] impl-4: Implement space management (ADRs d4n, g7r - config and delegation)
-- [ ] review-4: Editor review of space management implementation
-- [ ] impl-5: Implement reasoning transparency (ADRs t8k, k9j, p4m)
-- [ ] review-5: Editor review of reasoning transparency implementation
->>>>>>> origin
 
 ## Future ADR Considerations
 
