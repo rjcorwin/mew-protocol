@@ -31,20 +31,24 @@ Currently, capabilities in MEUP are statically assigned when participants join a
 
 ## Decision
 
-**Implement Option 6: Delegation with MEUP Namespace**
+**Implement Hybrid: Capability and Space Namespaces**
 
-We will use dedicated kinds in the MEUP namespace for capability delegation and space management operations:
-- `meup.grant` - Grant capabilities to participants
-- `meup.revoke` - Revoke previously granted capabilities
-- `meup.grant-ack` - Acknowledge capability grants
-- `meup.invite` - Invite new participants to the space
-- `meup.kick` - Remove participants from the space
+We will use:
+- `capability/grant` - Grant capabilities to participants
+- `capability/revoke` - Revoke previously granted capabilities
+- `capability/grant-ack` - Acknowledge capability grants
+- `space/invite` - Invite new participants to the space
+- `space/kick` - Remove participants from the space
 
-This decision establishes a clear architectural separation:
-- **MCP namespace**: Core protocol operations (request, proposal, withdraw, reject)
-- **MEUP namespace**: Space management operations (grant, revoke, invite, kick)
+This decision provides:
+- **Clear semantics**: Each namespace clearly indicates what's being operated on
+- **Logical grouping**: Capability operations together, space membership operations together
+- **No ambiguity**: `capability/` for permissions, `space/` for membership
+- **Future-proof**: Each namespace can grow independently
 
-Capability delegation is not fundamental to the MCP protocol itself - it's a space management feature that MEUP adds on top of MCP. This layering keeps the MCP protocol focused and allows MEUP to extend it with collaboration features.
+The split recognizes two distinct concerns:
+- **Capability management**: What participants can do (`capability/*`)
+- **Space membership**: Who can participate (`space/*`)
 
 ## Options Considered
 
@@ -164,11 +168,70 @@ Use dedicated kinds in the MEUP namespace for delegation.
 - Clear intent from kind alone
 
 **Cons:**
+- **Inconsistent with `chat` having no prefix**
 - Inconsistent with mcp.withdraw/reject pattern
 - Two namespaces to consider
 - More kinds to track
 
-### Option 7: Smart Contracts
+### Option 7: No Namespace (Like Chat)
+
+Use simple kinds without namespace: `grant`, `revoke`, `invite`, `kick`
+
+**Pros:**
+- **Consistent with `chat` pattern**
+- Simplest approach
+- These are MEUP-specific anyway (not MCP)
+- Clean and minimal
+
+**Cons:**
+- Could collide with future additions
+- Less clear these are space management operations
+- No grouping indication
+
+### Option 8: Space Namespace
+
+Use `space/grant`, `space/revoke`, `space/invite`, `space/kick`
+
+**Pros:**
+- Clear these are space management operations
+- Logical grouping
+- Doesn't conflate with protocol name (MEUP)
+- Future-proof for other space operations
+
+**Cons:**
+- Introduces yet another namespace
+- Still inconsistent with `chat`
+- More to remember
+
+### Option 9: Capability Namespace
+
+Use `capability/grant`, `capability/revoke`, and plain `invite`, `kick`
+
+**Pros:**
+- Clear what grant/revoke operate on
+- Invite/kick are different (participant management)
+- Semantic clarity
+
+**Cons:**
+- Splits space management across namespaces
+- Verbose
+- Inconsistent treatment
+
+### Option 10: Admin Namespace
+
+Use `admin/grant`, `admin/revoke`, `admin/invite`, `admin/kick`
+
+**Pros:**
+- Clear these are administrative operations
+- Groups privileged operations together
+- Signals elevated permissions needed
+
+**Cons:**
+- "Admin" might not fit all use cases
+- Still introduces a namespace
+- Not all grants are "admin" level
+
+### Option 11: Smart Contracts
 
 Capability changes through programmable rules.
 
@@ -183,7 +246,7 @@ Capability changes through programmable rules.
 - Hard to debug
 - Over-engineered for most uses
 
-### Option 8: Proposal-Based Delegation
+### Option 12: Proposal-Based Delegation
 
 Instead of direct grants, use proposals for capability requests.
 
@@ -221,7 +284,7 @@ Instead of direct grants, use proposals for capability requests.
 - Requires proposal capability
 - Less intuitive
 
-### Option 9: Hybrid Approach
+### Option 13: Hybrid Approach
 
 Combine static base capabilities with dynamic adjustments.
 
@@ -245,9 +308,13 @@ Combine static base capabilities with dynamic adjustments.
 | 4. Generic Lifecycle | Medium | Medium | High | Good | Fast | meup |
 | 5. MCP Namespace | Low | Medium | Medium | Good | Fast | mcp |
 | 6. MEUP Namespace | Low | Medium | Medium | Good | Fast | meup |
-| 7. Smart Contracts | Very High | High | Very High | Excellent | Slow | Various |
-| 8. Proposal-Based | Low | High | Medium | Excellent | Medium | mcp |
-| 9. Hybrid | High | Medium | High | Good | Medium | Mixed |
+| 7. No Namespace | Low | Medium | Medium | Good | Fast | none |
+| 8. Space Namespace | Low | Medium | Medium | Good | Fast | space |
+| 9. Capability NS | Medium | Medium | Medium | Good | Fast | capability |
+| 10. Admin Namespace | Low | Medium | Medium | Good | Fast | admin |
+| 11. Smart Contracts | Very High | High | Very High | Excellent | Slow | Various |
+| 12. Proposal-Based | Low | High | Medium | Excellent | Medium | mcp |
+| 13. Hybrid | High | Medium | High | Good | Medium | Mixed |
 
 ## Consequences
 

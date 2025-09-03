@@ -23,6 +23,8 @@ This folder contains ADRs (Architecture Decision Records) that are currently und
   - `004-2-p4m-context-field-structure.md` - Context field structure and patterns
 - `005-g7r-capability-delegation.md` - Dynamic capability delegation and grants (chose Option 6: MEUP namespace)
 - `006-h2n-correlation-id-structure.md` - Correlation ID as array of strings (chose Option 2: Always Array)
+- `007-j3k-property-naming-convention.md` - Property naming convention (chose Option 4: Follow MCP with snake_case)
+- `008-n5r-protocol-kind-separator.md` - Protocol-kind separator convention (slash vs dot notation)
 
 ## Process
 
