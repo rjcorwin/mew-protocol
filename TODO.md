@@ -16,7 +16,7 @@
 - [x] impl-3: Implement correlation (ADR h2n - array correlation IDs)
 - [x] impl-4: Implement reasoning transparency and sub-context (ADRs t8k, k9j, p4m)
 - [x] impl-5: Implement space management (ADRs g7r - delegation)
-- [ ] review-1: Editor review of draft spec and accept proposals
+- [x] review-1: Editor review of draft spec and accept proposals
 - [ ] impl-6: Implement space management (ADRs d4n - config)
 - [ ] review-2: Editor review of draft spec and accept proposals
 

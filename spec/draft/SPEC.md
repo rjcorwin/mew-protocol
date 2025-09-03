@@ -30,9 +30,9 @@ MEUP (Multi-Entity Unified Protocol) enables real-time collaboration between mul
 - **MCP Compatibility**: Every participant implements standard MCP server interfaces
 
 ### 2.2 Non-Goals
-- End-to-end encryption or private channels (all messages visible within topic)
+- End-to-end encryption or private channels (all messages visible within space)
 - Message persistence or replay (topics are ephemeral)
-- Cross-topic routing or participant discovery
+- Cross-space routing or participant discovery
 - Guaranteed delivery (WebSocket best-effort)
 - Application-layer semantics or business logic
 
@@ -40,7 +40,7 @@ MEUP (Multi-Entity Unified Protocol) enables real-time collaboration between mul
 
 ## 3. Message Envelope
 
-All data flowing over a topic MUST be a single top-level JSON envelope:
+All data flowing over a space MUST be a single top-level JSON envelope:
 
 ```json
 {
@@ -60,7 +60,7 @@ Field semantics:
 - `protocol`: MUST be `"meup/v0.1"` for this version
 - `id`: globally unique message id (e.g., UUIDv4)
 - `ts`: RFC3339 timestamp
-- `from`: stable participant id within the topic
+- `from`: stable participant id within the space
 - `to`: array of participant ids (empty/omitted = broadcast)
 - `kind`: Message type using minimal kinds:
   - `mcp/request` - MCP request/notification
@@ -443,7 +443,7 @@ Concludes the reasoning sequence:
 
 ### 3.6 Space Management Operations
 
-A **space** in MEUP is a communication context where participants exchange messages. It's analogous to a channel, room, or topic - a bounded environment where a specific set of participants collaborate. Each space has its own:
+A **space** in MEUP is a communication context where participants exchange messages. It's analogous to a channel or room - a bounded environment where a specific set of participants collaborate. Each space has its own:
 - Set of participants (who can send/receive messages)
 - Capability assignments (what each participant can do)
 - Message history (the stream of envelopes exchanged)
@@ -671,7 +671,7 @@ When a participant connects, the gateway MUST send a welcome message addressed s
 ```
 
 - `you`: The joining participant's own information and authoritative capabilities
-- `participants`: Current list of other participants in the topic and their capabilities
+- `participants`: Current list of other participants in the space and their capabilities
 
 **Important:** Other participants SHOULD ignore welcome messages not addressed to them when constructing prompts, as these can cause significant bloat. The message is already targeted via the `to` field.
 
@@ -825,12 +825,12 @@ The gateway determines capabilities during authentication. Implementation-specif
 1. **Token-based**: Tokens map to specific capability sets
    - Implementations may encode capabilities in tokens or map tokens to capability profiles
 2. **Identity-based**: Map authenticated identities to capability sets
-3. **Topic access control**: Topics may be public, private, or restricted
+3. **Space access control**: Spaces may be public, private, or restricted
 4. **Dynamic capabilities**: Capabilities may be modified during a session
 
-### 6.2 WebSocket Connection
+### 5.2 WebSocket Connection
 
-Connect: `GET /ws?topic=<name>` with Authorization header
+Connect: `GET /ws?space=<name>` with Authorization header
 
 The gateway:
 1. Validates the bearer token (if provided)
@@ -843,19 +843,7 @@ The gateway:
 
 The capabilities in the welcome message constitute the authoritative list of what operations the participant can perform. Participants SHOULD use this list to understand their allowed operations.
 
-### 6.3 Message Routing
-
-Participants can configure their message routing preference (implementation-specific):
-
-**Routing Modes:**
-- **All**: Receive every message in the topic (default)
-- **Directed**: Only receive messages where:
-  - `to` field includes their participant ID, OR
-  - `to` field is empty/omitted (broadcast)
-
-This allows participants to reduce noise while still receiving broadcasts and messages directed to them. The gateway MUST respect these preferences when routing messages.
-
-### 6.4 Message Filtering
+### 5.3 Message Filtering
 
 For each incoming message from a participant:
 
@@ -864,7 +852,7 @@ if not matches_any_capability(message, participant.capabilities):
     send_error(f"Capability violation: you lack capability for this operation")
     broadcast_violation_notice()  # optional
     return
-send_to_topic(message)
+send_to_space(message)
 ```
 
 ---
@@ -882,11 +870,7 @@ This is a v0.x release. Breaking changes are expected between minor versions unt
 
 Key breaking changes from v0.0:
 - Protocol identifier changed from `mcp-x/v0` to `meup/v0.1`
-<<<<<<< HEAD
 - Message kinds now use slash notation (e.g., `mcp/request` instead of `mcp/request:tools/call`)
-=======
-- Message kinds now use dot notation (e.g., `mcp.request` instead of `mcp/request:tools/call`)
->>>>>>> origin
 - Method information moved to payload
 - Capabilities use JSON pattern matching instead of string wildcards
 - `correlation_id` is now always an array
@@ -902,22 +886,37 @@ Key breaking changes from v0.0:
 
 ## 7. Security Considerations
 
-The security model for MEUP is detailed in Section 4. Key considerations include:
+MEUP's security model relies on capability-based access control enforced by the gateway, with additional validation responsibilities distributed among participants.
 
-- **Capability-based access control** enforced by the gateway (Section 4.1)
-- **Lazy enforcement** at the gateway level for performance (Section 4.2)
-- **Strict validation** requirements for all participants (Section 4.3)
-- **Reserved namespaces** preventing participant spoofing of system messages (Section 4.1)
+### 7.1 Core Security Mechanisms
 
-Implementers MUST pay particular attention to the participant validation requirements to prevent spoofing attacks where the envelope `kind` doesn't match the payload content.
+1. **Identity Validation**: Gateway MUST verify the `from` field matches the authenticated participant ID (Section 4.1)
+2. **Capability Enforcement**: Gateway enforces JSON pattern-based capabilities on all messages (Section 4.1, 4.2)
+3. **Reserved Namespaces**: Only the gateway can send `system/*` messages, preventing spoofing (Section 3.8)
+4. **Proposal Isolation**: Untrusted agents use `mcp/proposal` to suggest rather than execute operations (Section 3.3)
+5. **Lazy Gateway Enforcement**: Gateway validates message structure but not payload semantics (Section 4.2)
 
-### 7.1 Best Practices
+### 7.2 Security Boundaries
 
-1. **Start restricted**: New agents should begin with minimal capabilities (`mcp.proposal`)
-2. **Validate strictly**: All participants MUST validate both METHOD and CONTEXT match payload
-3. **Monitor proposals**: Log and audit proposal/fulfillment patterns
-4. **Progressive trust**: Expand capabilities only after establishing trust through observed behavior
-5. **Report misbehavior**: Track and report participants sending malformed messages
+**Gateway Responsibilities:**
+- Authenticate participants and assign stable IDs
+- Enforce capability patterns on message kinds and payloads
+- Prevent identity spoofing via `from` field validation
+- Block `system/*` messages from participants
+
+**Participant Responsibilities:**
+- Validate envelope `kind` matches payload content
+- Detect and report malformed or spoofed messages
+- Parse messages defensively (schemas may differ from advertised)
+- Track misbehaving participants for reputation scoring
+
+### 7.3 Best Practices
+
+1. **Start Restricted**: New agents begin with `mcp/proposal` capability only
+2. **Progressive Trust**: Expand capabilities based on observed behavior over time
+3. **Validate Strictly**: Check that `kind` matches the payload type (e.g., `mcp/request` for MCP requests)
+4. **Monitor Proposals**: Log proposal/fulfillment patterns for audit trails
+5. **Report Violations**: Track and broadcast capability violations for transparency
 
 ---
 
@@ -925,7 +924,7 @@ Implementers MUST pay particular attention to the participant validation require
 
 ### 8.1 Gateway Requirements
 - [ ] **Connection Management**
-  - [ ] WebSocket server at `GET /ws?topic=<name>`
+  - [ ] WebSocket server at `GET /ws?space=<name>`
   - [ ] Bearer token validation from Authorization header
   - [ ] Token-to-participant-ID mapping (implementation-specific)
   - [ ] Connection state tracking per participant
@@ -944,15 +943,14 @@ Implementers MUST pay particular attention to the participant validation require
   
 - [ ] **Message Routing**
   - [ ] Route messages based on `to` field (broadcast if empty/omitted)
-  - [ ] Support participant routing preferences (All vs Directed mode)
   - [ ] Preserve envelope structure without modification
   - [ ] NO payload parsing or validation (lazy enforcement)
 
 ### 8.2 Participant Requirements
 - [ ] **Message Validation**
   - [ ] Verify envelope structure before processing
-  - [ ] Validate `kind` METHOD matches `payload.method`
-  - [ ] Validate `kind` CONTEXT matches payload content (e.g., tool name)
+  - [ ] Validate `kind` matches the payload type (e.g., `mcp/request` for requests with `payload.method`)
+  - [ ] Validate payload structure matches expected schema for the `kind`
   - [ ] Drop messages that fail validation
   - [ ] Track/report misbehaving participants
   
@@ -984,10 +982,10 @@ In this example, an agent with limited capabilities uses proposals:
 
 1. Agent connects → receives proposal-only capabilities
 2. Agent attempts MCP request → gateway blocks, returns error
-3. Agent sends `mcp.proposal` → visible to all participants
+3. Agent sends `mcp/proposal` → visible to all participants
 4. Another participant with appropriate capabilities fulfills it
 5. Fulfiller sends real `mcp/request` message to target
-6. Target executes and returns result to fulfiller (and optionally to proposer)
+6. Target executes and returns result to fulfiller (proposer observes via broadcast)
 
 ### 9.2 Capability Expansion Example
 
@@ -1007,18 +1005,18 @@ A gateway might assign different capability profiles:
 - New agents: `{"kind": "mcp/proposal"}` (proposal-only)
 - Monitoring tools: `{"kind": "mcp/request", "payload": {"method": "*/list"}}` (read-only)
 
-All participants operate in the same topic with their assigned capabilities.
+All participants operate in the same space with their assigned capabilities.
 
 ### 9.4 Delegated Fulfillment Example
 
 A human supervises an untrusted agent through intermediary agents:
 
-1. **Proposer Agent** (capability: `mcp.proposal`) proposes writing a file
+1. **Proposer Agent** (capability: `mcp/proposal`) proposes writing a file
 2. **Human** reviews the proposal and decides to approve it by directing the **Orchestrator Agent** (capability: `mcp/request`) to fulfill the proposal
-4. **Orchestrator Agent** sends the MCP request to **Worker Agent**
-5. **Worker Agent** executes the actual file write operation and responds
-6. Over time, **Human** teaches **Orchestrator Agent** rules about which proposals to auto-approve
-7. **Orchestrator Agent** begins autonomously fulfilling certain proposals without human intervention
+3. **Orchestrator Agent** sends the MCP request to **Worker Agent**
+4. **Worker Agent** executes the actual file write operation and responds
+5. Over time, **Human** teaches **Orchestrator Agent** rules about which proposals to auto-approve
+6. **Orchestrator Agent** begins autonomously fulfilling certain proposals without human intervention
 
 This pattern demonstrates **progressive automation** - a key goal of MEUP. As the orchestrator observes human decisions over time, it learns which types of proposals can be safely auto-approved. This transforms human judgment into automated policies, creating a system that becomes more autonomous while maintaining safety through learned boundaries.
 
@@ -1051,33 +1049,6 @@ Optional proposal tracking for fulfillment (maintained by agents, not gateway):
   "status": "pending",
   "createdAt": "2025-08-26T14:00:00Z",
   "expiresAt": "2025-08-26T14:05:00Z"
-}
-```
-
-### 11.3 Capability Promotion API
-
-Optional admin endpoint:
-```
-POST /admin/participants/{id}/capabilities
-Authorization: Bearer <admin-token>
-
-Request:
-{
-  "add": [{"kind": "mcp/request", "payload": {"method": "tools/*"}}],
-  "remove": []
-}
-
-Response:
-{
-  "participant_id": "agent-a",
-  "old_capabilities": [{"kind": "mcp/proposal"}, {"kind": "chat"}],
-  "new_capabilities": [
-    {"kind": "mcp/proposal"},
-    {"kind": "mcp/request", "payload": {"method": "tools/*"}},
-    {"kind": "chat"}
-  ],
-  "modified_by": "admin-user",
-  "modified_at": "2025-08-26T14:30:00Z"
 }
 ```
 
