@@ -58,6 +58,12 @@ edit [component]/spec/draft/SPEC.md
 
 ### Step 3: Release a Version
 
+**Important:** Before releasing, ensure all ADRs are fully incorporated into the spec:
+1. Incorporate each ADR into SPEC.md
+2. Update ADR incorporation field to "Complete"
+3. Move ADR from `proposed/` to `accepted/` or `rejected/`
+4. Update ADR status field accordingly
+
 ```bash
 # When ready to release
 VERSION="v1.0.0"  # or "v1" or whatever scheme you chose
@@ -65,7 +71,10 @@ VERSION="v1.0.0"  # or "v1" or whatever scheme you chose
 # Copy draft to version
 cp -r [component]/spec/draft [component]/spec/$VERSION
 
-# Clean up - remove proposed folder from release
+# Update spec header to remove "Draft" status
+# Update version number throughout
+
+# Clean up - proposed folder should already be empty
 rm -rf [component]/spec/$VERSION/decisions/proposed
 
 # Tag in git (if applicable)
@@ -85,8 +94,10 @@ ADRs work the same way everywhere:
 
 1. **Create**: New ADR in `draft/decisions/proposed/`
 2. **Review**: Discuss and refine
-3. **Decide**: Move to `accepted/` or `rejected/`
-4. **Implement**: Update SPEC.md
+3. **Implement**: Incorporate into SPEC.md (must happen BEFORE accepting)
+4. **Accept/Reject**: 
+   - If accepting: Update incorporation to "Complete", then move to `accepted/`
+   - If rejecting: Add rejection rationale, then move to `rejected/`
 5. **Release**: Included in next version
 
 ### ADR Template
@@ -245,16 +256,19 @@ Mark old versions as deprecated but keep for reference
 ### DO
 - ✅ Keep draft separate from releases
 - ✅ Use consistent versioning within a component
-- ✅ Remove `proposed/` folder from releases
+- ✅ Incorporate ADRs into spec BEFORE moving to accepted
+- ✅ Ensure proposed folder is empty before release
 - ✅ Track decisions with ADRs
-- ✅ Update SPEC.md as ADRs are accepted
+- ✅ Update SPEC.md as ADRs are incorporated
 - ✅ Link to related specifications
+- ✅ Update CHANGELOG.md for each release
 
 ### DON'T
 - ❌ Edit released specifications
 - ❌ Mix versioning schemes in one component
 - ❌ Skip the draft phase
 - ❌ Have proposed ADRs in released versions
+- ❌ Move ADRs to accepted before incorporating them
 - ❌ Change specs without ADRs
 
 ## Quick Reference
@@ -267,9 +281,16 @@ mkdir -p $COMPONENT/spec/draft/decisions/{proposed,accepted,rejected}
 
 ### Version Release
 ```bash
+# Ensure all ADRs are incorporated first!
+# Proposed folder should already be empty
+
 # Release a version
 cp -r $COMPONENT/spec/draft $COMPONENT/spec/$VERSION
+
+# Verify proposed is empty (should be)
 rm -rf $COMPONENT/spec/$VERSION/decisions/proposed
+
+# Update spec header to finalize version
 ```
 
 ### ADR Creation
@@ -277,6 +298,25 @@ rm -rf $COMPONENT/spec/$VERSION/decisions/proposed
 # Create new ADR
 echo "# ADR-$ID: Title" > $COMPONENT/spec/draft/decisions/proposed/$NUM-$ID-name.md
 ```
+
+## Release Documentation
+
+Each component should maintain:
+
+### CHANGELOG.md
+Track all changes between versions:
+```markdown
+## [v2.0] - 2025-01-03
+### Added
+- New feature X
+### Changed
+- Breaking change Y
+### Fixed
+- Bug Z
+```
+
+### RELEASING.md (Optional)
+Document the release process if it differs from this guide.
 
 ## Integration
 
