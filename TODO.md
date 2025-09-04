@@ -34,7 +34,7 @@ All tasks for the v0.2 release have been completed on 2025-01-03.
 - [x] sdk-1: Update client SDK for v0.2 spec (@meup/client)
 - [x] sdk-2: Update agent SDK for v0.2 spec (@meup/agent)
 - [x] sdk-3: Implement reference gateway (@meup/gateway)
-- [ ] sdk-4: Create TypeScript types package (@meup/types)
+- [x] sdk-4: Create TypeScript types package (@meup/types)
 
 ### Test Planning and Review
 - [x] test-plan-1: Create test plan document

@@ -1,53 +1,23 @@
 /**
- * MEUP Gateway types
+ * Gateway-specific types for MEUP
  */
 
 import { WebSocket } from 'ws';
+import type {
+  Envelope,
+  Participant,
+  Capability,
+  SystemWelcomePayload,
+  SystemErrorPayload,
+  PresencePayload,
+} from '@meup/types';
 
-export const PROTOCOL_VERSION = 'meup/v0.2';
-export const MCP_VERSION = '2025-06-18';
+// Re-export core types from @meup/types
+export * from '@meup/types';
 
-/**
- * MEUP envelope - matches client/agent types
- */
-export interface Envelope {
-  protocol: 'meup/v0.2';
-  id: string;
-  ts: string;
-  from: string;
-  to?: string[];
-  kind: string;
-  correlation_id?: string;
-  context?: ContextField;
-  payload: any;
-}
-
-/**
- * Context field for sub-context protocol
- */
-export interface ContextField {
-  operation: 'push' | 'pop' | 'resume';
-  topic?: string;
-  correlation_id?: string;
-}
-
-/**
- * Capability definition with JSON pattern matching
- */
-export interface Capability {
-  id: string;
-  kind: string;
-  to?: string | string[];
-  payload?: any;
-}
-
-/**
- * Participant in a space
- */
-export interface Participant {
-  id: string;
-  capabilities: Capability[];
-}
+// ============================================================================
+// Gateway-Specific Types
+// ============================================================================
 
 /**
  * Connected client
@@ -126,26 +96,6 @@ export interface RoutingResult {
 }
 
 /**
- * System message payloads
- */
-export interface SystemWelcomePayload {
-  you: Participant;
-  participants: Participant[];
-}
-
-export interface SystemErrorPayload {
-  error: string;
-  message: string;
-  attempted_kind?: string;
-  your_capabilities?: Capability[];
-}
-
-export interface PresencePayload {
-  event: 'join' | 'leave' | 'heartbeat';
-  participant: Participant;
-}
-
-/**
  * Metrics data
  */
 export interface GatewayMetrics {
@@ -183,7 +133,7 @@ export interface CreateTokenRequest {
 }
 
 /**
- * Event emitter events
+ * Gateway event emitter events
  */
 export interface GatewayEvents {
   'space:created': (space: Space) => void;

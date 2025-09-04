@@ -33,6 +33,7 @@
   "author": "MEUP Working Group",
   "license": "MIT",
   "dependencies": {
+    "@meup/types": "^0.2.0",
     "ws": "^8.18.0",
     "eventemitter3": "^5.0.1",
     "uuid": "^10.0.0"

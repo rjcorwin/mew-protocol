@@ -1,8 +1,24 @@
 /**
- * MEUP Agent layer types
+ * Agent-specific types for MEUP SDK
  */
 
-import { Capability, Proposal } from '@meup/client';
+import type { 
+  Capability, 
+  Proposal,
+  Tool,
+  Resource,
+  Prompt,
+  ServerCapabilities,
+  ToolExecutionResult,
+  ProgressParams,
+} from '@meup/types';
+
+// Re-export types from @meup/types for convenience
+export * from '@meup/types';
+
+// ============================================================================
+// Agent-Specific Types
+// ============================================================================
 
 /**
  * Agent status
@@ -13,60 +29,6 @@ export type AgentStatus = 'idle' | 'busy' | 'error';
  * Agent role in MEUP
  */
 export type AgentRole = 'trusted' | 'untrusted' | 'coordinator';
-
-/**
- * MCP Server capabilities
- */
-export interface ServerCapabilities {
-  tools?: {
-    list?: boolean;
-  };
-  resources?: {
-    list?: boolean;
-    subscribe?: boolean;
-  };
-  prompts?: {
-    list?: boolean;
-  };
-  logging?: {};
-  experimental?: Record<string, any>;
-}
-
-/**
- * MCP Tool definition
- */
-export interface Tool {
-  name: string;
-  description?: string;
-  inputSchema?: {
-    type: 'object';
-    properties?: Record<string, any>;
-    required?: string[];
-  };
-}
-
-/**
- * MCP Resource definition
- */
-export interface Resource {
-  uri: string;
-  name: string;
-  description?: string;
-  mimeType?: string;
-}
-
-/**
- * MCP Prompt definition
- */
-export interface Prompt {
-  name: string;
-  description?: string;
-  arguments?: Array<{
-    name: string;
-    description?: string;
-    required?: boolean;
-  }>;
-}
 
 /**
  * Participant MCP state tracking
@@ -105,33 +67,6 @@ export interface ToolExecutionContext {
   requestId: string | number;
   isProposal?: boolean;
   proposalId?: string;
-}
-
-/**
- * Tool execution result
- */
-export interface ToolExecutionResult {
-  content?: Array<{
-    type: 'text' | 'image' | 'resource';
-    text?: string;
-    data?: string;
-    mimeType?: string;
-    uri?: string;
-  }>;
-  isError?: boolean;
-  error?: {
-    code: string;
-    message: string;
-  };
-}
-
-/**
- * Progress notification params
- */
-export interface ProgressParams {
-  progressToken?: string | number;
-  progress: number;
-  total?: number;
 }
 
 /**
