@@ -1,6 +1,6 @@
 # Proposed ADRs
 
-This folder contains ADRs (Architecture Decision Records) that are currently under consideration.
+This folder contains ADRs (Architecture Decision Records) that are currently under consideration for the next version of the MEUP protocol.
 
 ## Format
 
@@ -12,12 +12,12 @@ This folder contains ADRs (Architecture Decision Records) that are currently und
 
 ## Current Proposals
 
-(Currently empty - all ADRs have been accepted and incorporated into the specification)
+(Currently empty - no active proposals for the next version)
 
 ## Process
 
 1. Create new ADR with next sequential number and unique ID
 2. Status should be "Proposed"
 3. Incorporation should be "Not Incorporated"
-4. Follow the ADR template in `/protocol-spec/CLAUDE.md`
+4. Follow the ADR template in `/spec/CLAUDE.md`
 5. After review, ADR moves to either `accepted/` or `rejected/`
