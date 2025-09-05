@@ -1,4 +1,4 @@
-# MEUP CLI Specification
+# MEUP CLI Specification - Minimal Test Implementation
 
 **Version:** draft  
 **Status:** Draft  
@@ -6,224 +6,196 @@
 
 ## Overview
 
-The MEUP CLI (`@meup/cli`) provides command-line tools for interacting with the MEUP protocol ecosystem. It serves as the primary interface for developers and operators to run gateways, connect clients, launch test agents, and perform integration testing.
+The MEUP CLI (`@meup/cli`) provides minimal command-line tools needed to execute the test plan in `/tests/TEST_PLAN.md`. This is a focused implementation that prioritizes getting tests running.
 
 ## Scope
 
-This specification covers:
-- CLI command structure and interface
-- Built-in test agents (echo, calculator, fulfiller)
-- FIFO mode for programmatic control
-- Gateway server management
-- Client connection management
-- Token generation and validation
+This specification covers ONLY what's needed for testing:
+- Gateway server startup
+- Client connections with FIFO mode
+- Three built-in test agents (echo, calculator, fulfiller)
+- Basic token generation
 
 This specification does NOT cover:
-- Internal implementation details of the SDK packages
-- Gateway protocol implementation (see gateway spec)
-- Agent framework internals (see agent spec)
+- Space configuration (deferred to next version)
+- Advanced features
+- Production deployment
 
 ## Architecture
 
-### Components
-
 ```
 @meup/cli
-├── CLI Interface Layer
-│   ├── Command Parser (Commander.js)
-│   ├── Input/Output Handler
-│   └── Configuration Loader
-├── Core Commands
-│   ├── Gateway Command
-│   ├── Client Command
-│   ├── Agent Command
-│   └── Token Command
-├── Built-in Agents
-│   ├── Echo Agent
-│   ├── Calculator Agent
-│   └── Fulfiller Agent
-└── SDK Integration Layer
-    ├── @meup/gateway wrapper
-    ├── @meup/client wrapper
-    └── @meup/agent wrapper
+├── Commands
+│   ├── gateway.js    # Start gateway server
+│   ├── client.js     # Connect as client with FIFO
+│   ├── agent.js      # Start built-in agents
+│   └── token.js      # Generate test tokens
+├── Agents
+│   ├── echo.js       # Echo agent
+│   ├── calculator.js # Calculator agent  
+│   └── fulfiller.js  # Fulfiller agent
+└── SDK Dependencies
+    ├── @meup/gateway
+    ├── @meup/client
+    └── @meup/agent
 ```
 
-### Command Structure
+## Commands
 
-All commands follow the pattern:
-```
-meup <command> [subcommand] [options]
-```
+### `meup gateway start`
 
-## Interface
-
-### 1. Gateway Commands
-
-#### `meup gateway start`
-Starts a MEUP gateway server using the `@meup/gateway` library.
+Starts a gateway server for testing.
 
 ```bash
 meup gateway start [options]
 
 Options:
-  --port <port>              Port to listen on (default: 8080)
-  --host <host>              Host to bind to (default: 0.0.0.0)
-  --log-level <level>        debug|info|warn|error (default: info)
-  --config <file>            Load configuration from JSON/YAML file
-  --auth-mode <mode>         none|token|custom (default: token)
-  --auth-secret <secret>     JWT signing secret (required for token mode)
+  --port <port>          Port to listen on (default: 8080)
+  --log-level <level>    debug|info|warn|error (default: info)
 ```
 
-The gateway determines participant capabilities based on the authentication token or configuration. Per the MEUP v0.2 spec, the gateway maps tokens to participant IDs and capability sets through its implementation-specific mechanism. The participant ID and capabilities are sent in the `system/welcome` message upon connection.
-
-#### `meup gateway health`
-Checks gateway health status via REST API.
-
+**Example:**
 ```bash
-meup gateway health [options]
-
-Options:
-  --url <url>                Gateway URL (default: http://localhost:8080)
-  --format <format>          json|text (default: json)
+meup gateway start --port 8080 --log-level debug
 ```
 
-Expected response format:
-```json
-{
-  "status": "ok",
-  "spaces": 1,
-  "clients": 5,
-  "uptime": 3600
-}
-```
+### `meup client connect`
 
-### 2. Client Commands
-
-#### `meup client connect`
-Connects to a MEUP space as a client using the `@meup/client` library.
+Connects to a gateway as a client with FIFO mode for test automation.
 
 ```bash
 meup client connect [options]
 
 Options:
-  --gateway <url>            WebSocket URL (required)
-  --space <space>            Space to join (required)
-  --token <token>            Authentication token
-  --fifo-in <path>           Input FIFO for programmatic control
-  --fifo-out <path>          Output FIFO for message capture
-  --format <format>          json|pretty (default: json)
+  --gateway <url>        WebSocket URL (required)
+  --space <space>        Space to join (required)
+  --token <token>        Authentication token
+  --participant-id <id>  Participant ID
+  --fifo-in <path>       Input FIFO for receiving commands
+  --fifo-out <path>      Output FIFO for sending messages
 ```
 
-FIFO mode enables programmatic control for testing:
-- Input: Send JSON envelopes to `fifo-in`
-- Output: Receive JSON envelopes from `fifo-out`
+**FIFO Mode:**
+- Input: Send JSON messages to `fifo-in`
+- Output: Receive JSON messages from `fifo-out`
+- Essential for test automation
 
-#### `meup client send`
-Sends a single message and exits.
-
+**Example:**
 ```bash
-meup client send [options]
-
-Options:
-  --gateway <url>            WebSocket URL (required)
-  --space <space>            Space to join (required)
-  --token <token>            Authentication token
-  --message <json>           JSON message to send (required)
-```
-
-### 3. Agent Commands
-
-#### `meup agent start`
-Starts a built-in or custom agent.
-
-```bash
-meup agent start [options]
-
-Options:
-  --type <type>              Agent type (required)
-                            Built-in: echo|calculator|fulfiller
-  --gateway <url>            WebSocket URL (required)
-  --space <space>            Space to join (required)
-  --token <token>            Authentication token
-```
-
-### 4. Token Commands
-
-#### `meup token create`
-Generates a JWT token for authentication.
-
-```bash
-meup token create [options]
-
-Options:
-  --participant-id <id>      Participant ID (required)
-  --secret <secret>          JWT signing secret (required)
-  --expires-in <duration>    1h, 7d, etc (default: 24h)
-  --capabilities <json>      JSON array of capability objects (optional)
-```
-
-Note: Capabilities should be provided as JSON objects per the MEUP v0.2 spec:
-```bash
---capabilities '[{"kind":"chat"},{"kind":"mcp/request"}]'
-```
-
-## Built-in Test Agents
-
-### Echo Agent
-Automatically echoes any chat message it receives.
-
-**Behavior:**
-- Receives: `{"kind": "chat", "payload": {"text": "Hello"}}`
-- Responds: `{"kind": "chat", "payload": {"text": "Echo: Hello"}}`
-
-**Purpose:** Tests basic message flow and gateway routing.
-
-### Calculator Agent
-Provides MCP tools for mathematical operations.
-
-**Tools provided:**
-- `add(a, b)` - Addition
-- `multiply(a, b)` - Multiplication
-- `evaluate(expression)` - Evaluate math expression
-
-**Behavior:**
-- Receives: `{"kind": "mcp/request", "payload": {"method": "tools/call", "params": {"name": "add", "arguments": {"a": 5, "b": 3}}}}`
-- Responds: `{"kind": "mcp/response", "payload": {"result": {"content": [{"type": "text", "text": "8"}]}}}`
-
-**Purpose:** Tests MCP tool integration and request/response handling.
-
-### Fulfiller Agent
-Automatically fulfills any `mcp/proposal` it observes.
-
-**Behavior:**
-- Observes: `{"kind": "mcp/proposal", "id": "prop-123", "payload": {...}}`
-- Sends: `{"kind": "mcp/request", "correlation_id": ["prop-123"], "payload": {...}}`
-
-**Note:** The fulfiller copies the proposal's payload to create the actual request, adding the proposal's ID as the correlation_id. This follows the MEUP v0.2 proposal fulfillment pattern (Section 3.2.1).
-
-**Purpose:** Tests the proposal-execute pattern for untrusted agents.
-
-## FIFO Mode
-
-FIFO mode enables programmatic control for integration testing.
-
-### Setup
-```bash
-# Create named pipes
-mkfifo client-in client-out
+# Create FIFOs
+mkfifo cli-in cli-out
 
 # Connect with FIFOs
 meup client connect \
   --gateway ws://localhost:8080 \
   --space test-space \
-  --token test-token \
-  --fifo-in client-in \
-  --fifo-out client-out &
+  --participant-id test-client \
+  --fifo-in cli-in \
+  --fifo-out cli-out &
 ```
 
-### Message Format
+### `meup agent start`
 
-Input (to `fifo-in`):
+Starts a built-in test agent.
+
+```bash
+meup agent start [options]
+
+Options:
+  --type <type>          Agent type: echo|calculator|fulfiller (required)
+  --gateway <url>        WebSocket URL (required)
+  --space <space>        Space to join (required)
+  --token <token>        Authentication token
+```
+
+**Example:**
+```bash
+meup agent start --type echo --gateway ws://localhost:8080 --space test-space
+```
+
+### `meup token create`
+
+Creates a simple test token.
+
+```bash
+meup token create [options]
+
+Options:
+  --participant-id <id>  Participant ID (required)
+  --capabilities <json>  JSON array of capabilities (required)
+```
+
+**Example:**
+```bash
+meup token create \
+  --participant-id echo-agent \
+  --capabilities '[{"kind":"chat"}]'
+```
+
+## Built-in Test Agents
+
+### Echo Agent
+
+Automatically echoes any chat message with "Echo: " prefix.
+
+**Behavior:**
+```json
+// Input
+{"kind": "chat", "payload": {"text": "Hello"}}
+
+// Output  
+{"kind": "chat", "payload": {"text": "Echo: Hello"}}
+```
+
+### Calculator Agent
+
+Provides three MCP tools: add, multiply, evaluate.
+
+**Tools:**
+- `add(a, b)` - Returns a + b
+- `multiply(a, b)` - Returns a * b  
+- `evaluate(expression)` - Evaluates math expression
+
+**Example:**
+```json
+// Request
+{
+  "kind": "mcp/request",
+  "payload": {
+    "method": "tools/call",
+    "params": {
+      "name": "add",
+      "arguments": {"a": 5, "b": 3}
+    }
+  }
+}
+
+// Response
+{
+  "kind": "mcp/response",
+  "payload": {
+    "result": {
+      "content": [{"type": "text", "text": "8"}]
+    }
+  }
+}
+```
+
+### Fulfiller Agent
+
+Automatically fulfills any `mcp/proposal` it sees.
+
+**Behavior:**
+1. Observes: `{"kind": "mcp/proposal", "id": "prop-123", ...}`
+2. Sends: `{"kind": "mcp/request", "correlation_id": ["prop-123"], ...}`
+
+The fulfiller copies the proposal payload and adds the proposal ID as correlation_id.
+
+## FIFO Message Format
+
+Messages sent to/from FIFOs are MEUP v0.2 protocol envelopes.
+
+**Input (to fifo-in):**
 ```json
 {
   "kind": "chat",
@@ -233,7 +205,7 @@ Input (to `fifo-in`):
 }
 ```
 
-Output (from `fifo-out`):
+**Output (from fifo-out):**
 ```json
 {
   "protocol": "meup/v0.2",
@@ -242,204 +214,98 @@ Output (from `fifo-out`):
   "from": "other-agent",
   "kind": "chat",
   "payload": {
-    "text": "Response message"
+    "text": "Response"
   }
 }
 ```
 
-## Configuration
+## Test Execution Flow
 
-### Configuration File Format
+The test plan uses the CLI as follows:
 
-The CLI accepts JSON or YAML configuration files:
+1. **Start Gateway:**
+   ```bash
+   meup gateway start --port 8080 --log-level debug > gateway.log 2>&1 &
+   ```
 
-```json
-{
-  "gateway": {
-    "port": 8080,
-    "authMode": "token",
-    "authSecret": "your-secret-key"
-  },
-  "tokens": {
-    "echo-token": {
-      "participantId": "echo-agent",
-      "capabilities": [
-        {"kind": "chat"}
-      ]
-    },
-    "calc-token": {
-      "participantId": "calc-agent",
-      "capabilities": [
-        {"kind": "chat"},
-        {"kind": "mcp/request"},
-        {"kind": "mcp/response"}
-      ]
-    }
-  }
-}
-```
+2. **Start Test Agents:**
+   ```bash
+   meup agent start --type echo --gateway ws://localhost:8080 --space test-space &
+   meup agent start --type calculator --gateway ws://localhost:8080 --space test-space &
+   meup agent start --type fulfiller --gateway ws://localhost:8080 --space test-space &
+   ```
 
-### Environment Variables
+3. **Connect Test Clients with FIFOs:**
+   ```bash
+   mkfifo cli-in cli-out
+   meup client connect \
+     --gateway ws://localhost:8080 \
+     --space test-space \
+     --fifo-in cli-in \
+     --fifo-out cli-out &
+   ```
 
-- `MEUP_GATEWAY` - Default gateway URL
-- `MEUP_TOKEN` - Default authentication token
-- `MEUP_SPACE` - Default space name
-- `MEUP_LOG_LEVEL` - Default log level
-- `MEUP_CONFIG` - Default config file path
+4. **Send Test Messages:**
+   ```bash
+   echo '{"kind":"chat","payload":{"text":"test"}}' > cli-in
+   ```
 
-## Dependencies
+5. **Read Responses:**
+   ```bash
+   RESPONSE=$(timeout 5 cat cli-out | head -1)
+   echo "$RESPONSE" | jq '.kind'
+   ```
 
-The CLI depends on:
-- `@meup/types` - Protocol type definitions
-- `@meup/client` - Client implementation
-- `@meup/gateway` - Gateway implementation
-- `@meup/agent` - Agent framework
-- `commander` - Command-line parsing
-- `ws` - WebSocket client/server
-- `jsonwebtoken` - JWT token handling
+## Minimal Implementation Requirements
 
-## Security Considerations
+### Gateway
+- Start WebSocket server on specified port
+- Accept client connections
+- Route messages between participants in same space
+- No authentication required for initial version
 
-### Token Security
-- Tokens should be kept secret and not logged
-- Use environment variables or secure config files
-- Tokens should have appropriate expiration times
+### Client
+- Connect to gateway WebSocket
+- Join specified space
+- Read JSON from fifo-in, send to gateway
+- Write received messages to fifo-out as JSON
 
-### Gateway Security
-- Always use auth-mode in production
-- Configure TLS/SSL for WebSocket connections
-- Implement rate limiting for production deployments
+### Agents
+- **Echo**: Listen for chat, respond with "Echo: " + text
+- **Calculator**: Implement add, multiply, evaluate tools
+- **Fulfiller**: Watch for proposals, auto-fulfill them
 
-### FIFO Security
-- FIFOs should be created with appropriate permissions
-- Clean up FIFOs after use to prevent data leaks
-- Validate all input from FIFOs
-
-## Testing
-
-The CLI is designed to facilitate testing:
-
-1. **Unit Testing**: Test individual commands and agents
-2. **Integration Testing**: Use FIFO mode for automated tests
-3. **End-to-End Testing**: Full protocol testing with multiple agents
-
-### Test Execution Flow
-
-```bash
-# Start gateway
-meup gateway start --port 8080 &
-
-# Start test agents
-meup agent start --type echo --space test &
-meup agent start --type calculator --space test &
-
-# Run test client
-mkfifo test-in test-out
-meup client connect --space test --fifo-in test-in --fifo-out test-out &
-
-# Send test messages
-echo '{"kind":"chat","payload":{"text":"test"}}' > test-in
-
-# Verify responses
-cat test-out | jq '.kind'
-```
+### Token
+- Generate simple JWT or even just return the participant-id as token
+- Gateway can ignore tokens initially
 
 ## Error Handling
 
-### Exit Codes
-- `0` - Success
-- `1` - General error
-- `2` - Connection error
-- `3` - Authentication error
-- `4` - Capability violation
-- `5` - Timeout error
+Minimal error handling for test scenarios:
+- Malformed JSON: Return system/error
+- Missing fields: Return system/error
+- Capability violations: Return system/error (if implemented)
 
-### Error Messages
-Errors are output to stderr in JSON format when `--format json` is used:
-```json
-{
-  "error": "connection_failed",
-  "message": "Could not connect to gateway",
-  "details": {
-    "url": "ws://localhost:8080",
-    "code": "ECONNREFUSED"
-  }
-}
-```
+## Dependencies
 
-## Examples
+Minimal dependencies:
+- `ws` - WebSocket client/server
+- `commander` - Command parsing
+- Core SDK packages (@meup/gateway, @meup/client, @meup/agent)
 
-### Example 1: Basic Gateway and Client
-```bash
-# Terminal 1: Start gateway
-meup gateway start --port 8080 --auth-mode none
+## Next Steps
 
-# Terminal 2: Connect client
-meup client connect \
-  --gateway ws://localhost:8080 \
-  --space lobby
-```
+After tests pass with this minimal implementation:
+1. Add proper authentication
+2. Implement capability enforcement
+3. Add space configuration support
+4. Implement remaining features from `/cli/spec/next/SPEC.md`
 
-### Example 2: Testing with Agents
-```bash
-# Start gateway with token auth
-meup gateway start \
-  --port 8080 \
-  --auth-mode token \
-  --auth-secret "test-secret"
+## Success Criteria
 
-# Generate tokens
-TOKEN1=$(meup token create --participant-id alice --secret "test-secret")
-TOKEN2=$(meup token create --participant-id bob --secret "test-secret")
-
-# Start echo agent
-meup agent start \
-  --type echo \
-  --gateway ws://localhost:8080 \
-  --space test \
-  --token "$TOKEN1"
-
-# Send message
-meup client send \
-  --gateway ws://localhost:8080 \
-  --space test \
-  --token "$TOKEN2" \
-  --message '{"kind":"chat","payload":{"text":"Hello"}}'
-```
-
-### Example 3: FIFO Mode Testing
-```bash
-# Setup
-mkfifo in out
-meup client connect \
-  --gateway ws://localhost:8080 \
-  --space test \
-  --fifo-in in \
-  --fifo-out out &
-CLIENT_PID=$!
-
-# Send and receive
-echo '{"kind":"chat","payload":{"text":"Test"}}' > in
-RESPONSE=$(timeout 5 cat out | head -1)
-echo "$RESPONSE" | jq '.kind'
-
-# Cleanup
-kill $CLIENT_PID
-rm in out
-```
-
-## Migration
-
-### From Development to Production
-1. Switch from `--auth-mode none` to `--auth-mode token`
-2. Use secure token generation with proper secrets
-3. Enable TLS/SSL for WebSocket connections
-4. Configure appropriate logging levels
-5. Set up monitoring and alerting
-
-## References
-
-- [MEUP Protocol Specification v0.2](../../../spec/v0.2/SPEC.md)
-- [@meup/gateway Specification](../../../sdk/typescript-sdk/gateway/spec/draft/SPEC.md)
-- [@meup/client Documentation](../../../sdk/typescript-sdk/client/README.md)
-- [@meup/agent Documentation](../../../sdk/typescript-sdk/agent/README.md)
+This CLI successfully implements the test plan when:
+1. All test scenarios in TEST_PLAN.md can be executed
+2. Gateway starts and accepts connections
+3. Agents respond appropriately
+4. FIFO mode enables test automation
+5. Messages flow correctly between participants
