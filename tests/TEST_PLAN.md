@@ -82,17 +82,22 @@ echo "Working in test directory: $(pwd)"
 #!/bin/bash
 # Setup script that coding agent will execute
 
+# Copy space configuration to test directory
+cp /Users/rj/Git/rjcorwin/mcpx-protocol/cli/space.yaml "${TEST_RUN_DIR}/configs/space.yaml"
+
 # Configuration
 export GATEWAY_PORT=8080
 export GATEWAY_URL="ws://localhost:${GATEWAY_PORT}"
-export TEST_SPACE="test-space-$(date +%s)"
+export TEST_SPACE="test-space"  # Must match space.yaml
 export LOG_DIR="${TEST_RUN_DIR}/logs"
+export SPACE_CONFIG="${TEST_RUN_DIR}/configs/space.yaml"
 
-# Start gateway
-echo "Starting gateway on port $GATEWAY_PORT..."
+# Start gateway with space configuration
+echo "Starting gateway on port $GATEWAY_PORT with space config..."
 meup gateway start \
   --port "$GATEWAY_PORT" \
   --log-level debug \
+  --space-config "$SPACE_CONFIG" \
   > "$LOG_DIR/gateway.log" 2>&1 &
 GATEWAY_PID=$!
 
@@ -163,10 +168,13 @@ trap cleanup EXIT
 
 ## Test Scenarios
 
+**Note:** Some agents may auto-start based on space.yaml configuration with `auto_start: true`. Check the logs to see which agents started automatically.
+
 ### Scenario 1: Basic Message Flow with Echo Agent
 
 **Setup Commands:**
 ```bash
+# Note: Echo agent has auto_start: false in space.yaml, so we start it manually
 # Terminal 2: Start echo agent (real autonomous agent)
 meup agent start \
   --type echo \
