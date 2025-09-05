@@ -293,12 +293,139 @@ Minimal dependencies:
 - `commander` - Command parsing
 - Core SDK packages (@meup/gateway, @meup/client, @meup/agent)
 
+## Configuration
+
+### Space Configuration (space.yaml)
+
+The CLI manages participant capabilities through a `space.yaml` configuration file. This design separates authorization logic from the gateway implementation, allowing the gateway library to remain a pure protocol handler while the CLI manages the policy layer.
+
+#### Configuration Structure
+
+```yaml
+space:
+  id: space-identifier
+  name: "Human Readable Space Name"
+  description: "Space description"
+  
+participants:
+  participant-id:
+    tokens:
+      - token-value-1
+      - token-value-2
+    capabilities:
+      - capability-pattern-1
+      - capability-pattern-2
+
+defaults:
+  capabilities:
+    - default-capability  # Applied to unknown tokens
+```
+
+#### Capability Patterns
+
+Capabilities support wildcard pattern matching:
+- `*` - All capabilities
+- `mcp/*` - All MCP-related capabilities  
+- `context/*` - All context operations
+- `chat` - Specific capability
+
+#### Gateway Integration Architecture
+
+The gateway library provides bidirectional hooks for capability management and participant lifecycle:
+
+```javascript
+// Gateway requests capability resolution from CLI
+gateway.setCapabilityResolver(async (token, participantId, messageKind) => {
+  // CLI loads from space.yaml (may return subset of configured capabilities)
+  const config = await loadSpaceConfig();
+  const participant = findParticipantByToken(config, token);
+  
+  // CLI can choose to return only relevant capabilities for this message
+  const relevantCaps = filterCapabilitiesForMessage(
+    participant?.capabilities || config.defaults.capabilities,
+    messageKind
+  );
+  return relevantCaps;
+});
+
+// Gateway notifies CLI when participants join
+gateway.onParticipantJoined(async (participantId, token, metadata) => {
+  // CLI can update space.yaml with new participant
+  if (!knownParticipant(participantId)) {
+    await addParticipantToConfig(participantId, token, {
+      type: 'key',
+      capabilities: config.defaults.capabilities,
+      first_seen: new Date().toISOString()
+    });
+  }
+  // CLI may also spawn local agents based on space.yaml
+  await spawnLocalAgents(config);
+});
+
+// Gateway provides authorization hook
+gateway.setAuthorizationHook(async (participantId, messageKind, capabilities) => {
+  const required = getRequiredCapability(messageKind);
+  return hasCapability(capabilities, required);
+});
+```
+
+#### Participant Lifecycle Management
+
+The space.yaml can define how local participants should be started:
+
+```yaml
+participants:
+  calculator-agent:
+    type: local
+    command: "meup agent start"
+    args: ["--type", "calculator"]
+    env:
+      LOG_LEVEL: "debug"
+      CACHE_DIR: "/tmp/calculator-cache"
+    auto_start: true  # CLI spawns this when space starts
+    restart_policy: "on-failure"
+    tokens:
+      - calculator-token
+    capabilities:
+      - kind: "mcp/*"
+```
+
+The CLI handles:
+- **Process Management**: Starting/stopping local agents based on config
+- **Environment Setup**: Passing environment variables to agents
+- **Restart Policies**: Handling agent failures
+- **Dynamic Registration**: Adding new participants as they join
+
+The gateway only cares about:
+- **Token Validation**: Is this token valid?
+- **Capability Check**: Does this participant have this capability?
+- **Message Routing**: Protocol-level concerns
+
+This architecture enables:
+- **Separation of Concerns**: Gateway handles protocol, CLI handles operations
+- **Dynamic Participants**: New participants can be added at runtime
+- **Flexible Deployment**: Different environments can have different startup configs
+- **Testing**: Mock resolvers for unit tests
+- **Capability Subsetting**: CLI can return only needed capabilities per request
+
+#### Loading Configuration
+
+The CLI loads space configuration in order of precedence:
+1. Command-line flag: `--space-config path/to/space.yaml`
+2. Environment variable: `MEUP_SPACE_CONFIG`
+3. Default location: `./space.yaml`
+
+Example:
+```bash
+meup gateway start --port 8080 --space-config ./configs/production.yaml
+```
+
 ## Next Steps
 
 After tests pass with this minimal implementation:
-1. Add proper authentication
-2. Implement capability enforcement
-3. Add space configuration support
+1. ~~Add proper authentication~~ ✓ Token-based auth via space.yaml
+2. ~~Implement capability enforcement~~ ✓ Via resolver hooks
+3. ~~Add space configuration support~~ ✓ space.yaml specification
 4. Implement remaining features from `/cli/spec/next/SPEC.md`
 
 ## Success Criteria

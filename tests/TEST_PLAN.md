@@ -137,20 +137,17 @@ trap cleanup EXIT
 
 **Setup Commands:**
 ```bash
-# Terminal 2: Connect as echo agent (we'll manually echo messages)
-mkfifo echo-in echo-out
-meup client connect \
-  --space test-space \
-  --participant-id echo-agent \
+# Terminal 2: Start echo agent (real autonomous agent)
+meup agent start \
+  --type echo \
   --gateway ws://localhost:8080 \
-  --token "echo-token" \
-  --fifo-in echo-in \
-  --fifo-out echo-out &
+  --space test-space \
+  --token "echo-token" &
 ECHO_PID=$!
 
-# Terminal 3: Start CLI client in FIFO mode  
+# Terminal 3: Connect test client with FIFO mode  
 mkfifo cli-in cli-out
-meup cli connect \
+meup client connect \
   --space test-space \
   --participant-id test-client \
   --gateway ws://localhost:8080 \
@@ -193,21 +190,18 @@ rm cli-in cli-out
 
 **Setup Commands:**
 ```bash
-# Connect as calculator agent (we'll manually respond to tool calls)
-mkfifo calc-in calc-out
-meup client connect \
-  --space test-space \
-  --participant-id calc-agent \
+# Start calculator agent (real autonomous agent)
+meup agent start \
+  --type calculator \
   --gateway ws://localhost:8080 \
-  --token "calculator-token" \
-  --fifo-in calc-in \
-  --fifo-out calc-out &
+  --space test-space \
+  --token "calculator-token" &
 CALC_PID=$!
 # Note: Gateway grants MCP capabilities based on calculator-token
 
-# Start CLI client
+# Connect test client with FIFO mode
 mkfifo cli-in cli-out  
-meup cli connect \
+meup client connect \
   --space test-space \
   --participant-id test-client \
   --gateway ws://localhost:8080 \
@@ -276,15 +270,12 @@ meup client connect \
 PROP_PID=$!
 # Note: Gateway determines capabilities based on token, not CLI flags
 
-# Connect as fulfiller (trusted, can execute requests)
-mkfifo fulfill-in fulfill-out
-meup client connect \
-  --space test-space \
-  --participant-id fulfiller-agent \
+# Start fulfiller agent (real autonomous agent that auto-fulfills)
+meup agent start \
+  --type fulfiller \
   --gateway ws://localhost:8080 \
-  --token "fulfiller-token" \
-  --fifo-in fulfill-in \
-  --fifo-out fulfill-out &
+  --space test-space \
+  --token "fulfiller-token" &
 FULFILL_PID=$!
 # Note: Gateway assigns trusted capabilities based on this token
 ```
