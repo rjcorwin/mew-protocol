@@ -70,11 +70,14 @@ client
     
     // Set up input handling
     if (options.fifoIn) {
-      // Read from FIFO
+      // Read from FIFO using tail -F approach
       console.log(`Reading from FIFO: ${options.fifoIn}`);
       
+      const { spawn } = require('child_process');
+      const tail = spawn('tail', ['-F', options.fifoIn]);
+      
       const rl = readline.createInterface({
-        input: fs.createReadStream(options.fifoIn),
+        input: tail.stdout,
         crlfDelay: Infinity
       });
       
@@ -87,6 +90,10 @@ client
         } catch (error) {
           console.error('Error parsing input:', error);
         }
+      });
+      
+      tail.stderr.on('data', (data) => {
+        console.error(`tail error: ${data}`);
       });
     } else {
       // Interactive mode
