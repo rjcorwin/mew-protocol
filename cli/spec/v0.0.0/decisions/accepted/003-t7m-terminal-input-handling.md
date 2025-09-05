@@ -1,8 +1,8 @@
 # ADR-t7m: Terminal Input Handling
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-01-05  
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

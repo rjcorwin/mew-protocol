@@ -1,6 +1,6 @@
 # ADR-a1b: Agent Start Command
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-01-05  
 **Incorporation:** Complete
 

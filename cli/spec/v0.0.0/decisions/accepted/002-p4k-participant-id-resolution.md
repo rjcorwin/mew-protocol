@@ -1,8 +1,8 @@
 # ADR-p4k: Participant ID Resolution for Space Up
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-01-05  
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

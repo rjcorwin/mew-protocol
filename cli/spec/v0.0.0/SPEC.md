@@ -1,7 +1,8 @@
 # MEUP CLI Specification - Minimal Test Implementation
 
-**Version:** draft (for v0.1.0)  
-**Status:** Draft  
+**Version:** v0.0.0  
+**Status:** Alpha  
+**Release Date:** 2025-01-05  
 **Last Updated:** 2025-01-05
 
 ## Overview
@@ -446,13 +447,23 @@ space:
   
 participants:
   developer:           # Human participant (no command)
-    tokens: [...]
+    tokens: ["dev-token"]
+    capabilities:
+      - kind: "mcp/*"
+      - kind: "chat"
   echo-agent:         # Agent participant (has command)
     command: "node"
     args: ["./agents/echo.js"]
     auto_start: true
+    tokens: ["echo-token"]
+    capabilities:
+      - kind: "mcp/response"
+      - kind: "chat"
   rjcorwin:           # Matches system username
-    tokens: [...]
+    tokens: ["rj-token"]
+    capabilities:
+      - kind: "mcp/proposal"
+      - kind: "chat"
 ```
 
 ### `meup space down`
@@ -482,6 +493,13 @@ The terminal interface uses smart detection to handle both simple chat and full 
 1. **Commands** (start with `/`): Execute special actions
 2. **JSON envelopes** (valid MEUP JSON): Send as-is for full protocol access  
 3. **Plain text**: Automatically wrapped as chat messages
+
+Supported message kinds (per MEUP v0.2):
+- `chat` - Chat messages
+- `mcp/request` - MCP requests
+- `mcp/response` - MCP responses  
+- `mcp/proposal` - MCP proposals
+- Others as defined in MEUP v0.2 specification
 
 Examples:
 ```bash
