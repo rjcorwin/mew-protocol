@@ -1,227 +1,606 @@
-# MEUP v0.2 Test Plan
+# MEUP v0.2 Test Plan - Coding Agent Executable
 
 ## Testing Strategy
 
-### Objectives
-1. Validate protocol implementation correctness
-2. Ensure SDK interoperability
-3. Test security boundaries (capability enforcement)
-4. Verify real-world scenarios
+### Execution Method
+All tests will be executed by the coding agent using the MEUP CLI in FIFO mode. The CLI interface specification is documented in [CLI_INTERFACE.md](./CLI_INTERFACE.md).
 
-### Test Levels
+**Important Testing Approach:**
+- Some participants are real autonomous agents (`meup agent start`):
+  - **Echo agent**: Automatically echoes any chat message it receives
+  - **Calculator agent**: Provides MCP tools (add, multiply, evaluate)
+  - **Fulfiller agent**: Automatically fulfills any proposal it observes
+- Other participants are CLI connections (`meup client connect`) puppeted by the coding agent:
+  - **Proposer**: Coding agent manually sends proposals via CLI
+  - **Coordinator**: Coding agent controls capability grants/revokes
+  - **Test clients**: For sending test messages and observing responses
+- The gateway assigns capabilities based on tokens/configuration
+- This hybrid approach tests both agent integration and gateway enforcement
 
-#### 1. Unit Tests (SDK-level)
-- Test individual components in isolation
-- Mock dependencies
-- Focus on logic correctness
+The coding agent will:
+1. Start the gateway using the CLI
+2. Connect multiple CLI clients with different tokens (simulating different agents)
+3. Puppet these connections by sending/receiving messages through FIFO pipes
+4. Manually generate appropriate responses to simulate agent behaviors
+5. Capture and verify outputs using jq
+6. Clean up all resources after each test
 
-#### 2. Integration Tests (End-to-end)
-- Test component interactions with real gateway, agents, and clients
-- Protocol compliance verification
-- Complete scenarios with multiple agents
-- Real-world use cases
+### Prerequisites
+
+Before running tests, the coding agent will verify:
+```bash
+# Check if meup CLI is available
+which meup || echo "ERROR: meup CLI not found in PATH"
+
+# Check for required tools
+which jq || echo "ERROR: jq not found (required for JSON parsing)"
+which mkfifo || echo "ERROR: mkfifo not found (required for FIFO creation)"
+which timeout || echo "ERROR: timeout not found (required for read timeouts)"
+
+# Create test directory
+TEST_DIR="/tmp/meup-tests-$(date +%s)"
+mkdir -p "$TEST_DIR"
+cd "$TEST_DIR"
+
+# Create log directory
+mkdir -p logs
+```
+
+### Test Environment Setup
+
+```bash
+#!/bin/bash
+# Setup script that coding agent will execute
+
+# Configuration
+export GATEWAY_PORT=8080
+export GATEWAY_URL="ws://localhost:${GATEWAY_PORT}"
+export TEST_SPACE="test-space-$(date +%s)"
+export LOG_DIR="./logs"
+
+# Start gateway
+echo "Starting gateway on port $GATEWAY_PORT..."
+meup gateway start \
+  --port "$GATEWAY_PORT" \
+  --log-level debug \
+  > "$LOG_DIR/gateway.log" 2>&1 &
+GATEWAY_PID=$!
+
+# Wait for gateway to be ready (max 30 seconds)
+RETRIES=30
+while [ $RETRIES -gt 0 ]; do
+  if curl -s "http://localhost:${GATEWAY_PORT}/health" > /dev/null; then
+    echo "Gateway is ready"
+    break
+  fi
+  RETRIES=$((RETRIES - 1))
+  sleep 1
+done
+
+if [ $RETRIES -eq 0 ]; then
+  echo "ERROR: Gateway failed to start"
+  exit 1
+fi
+
+# Verify gateway health
+curl -s "http://localhost:${GATEWAY_PORT}/health" | jq '.'
+```
+
+### Test Teardown
+
+```bash
+#!/bin/bash
+# Teardown script that coding agent will execute after each test scenario
+
+# Function to cleanup all resources
+cleanup() {
+  echo "=== Starting cleanup ==="
+  
+  # Kill all agent processes
+  for pid_var in $(set | grep '_PID=' | cut -d'=' -f1); do
+    pid=${!pid_var}
+    if [ -n "$pid" ]; then
+      echo "Killing process $pid_var ($pid)"
+      kill $pid 2>/dev/null || true
+    fi
+  done
+  
+  # Kill gateway
+  if [ -n "$GATEWAY_PID" ]; then
+    echo "Stopping gateway (PID: $GATEWAY_PID)"
+    kill $GATEWAY_PID 2>/dev/null || true
+  fi
+  
+  # Remove all FIFOs
+  echo "Removing FIFOs..."
+  rm -f *-in *-out
+  
+  # Check for orphaned processes (only our user, more careful)
+  ORPHANS=$(ps -u $USER | grep -E 'meup.*(gateway|agent|client)' | grep -v grep | grep -v "$$")
+  if [ -n "$ORPHANS" ]; then
+    echo "WARNING: Found potential orphaned MEUP processes:"
+    echo "$ORPHANS"
+    echo "Note: Only killing processes we explicitly started (tracked by PID)"
+    # We only kill processes we tracked via their PIDs, not pattern matching
+  fi
+  
+  echo "=== Cleanup complete ==="
+}
+
+# Set trap to cleanup on exit
+trap cleanup EXIT
+```
 
 ## Test Scenarios
 
-### Scenario 1: Basic Message Flow
-**Agents**: Echo Agent
-**Steps**:
-1. Echo agent connects to space
-2. Client sends chat message
-3. Echo agent responds
-4. Verify message format and routing
+### Scenario 1: Basic Message Flow with Echo Agent
 
-**Verifies**:
-- Basic connectivity
-- Message envelope structure
-- Bidirectional communication
+**Setup Commands:**
+```bash
+# Terminal 2: Connect as echo agent (we'll manually echo messages)
+mkfifo echo-in echo-out
+meup client connect \
+  --space test-space \
+  --participant-id echo-agent \
+  --gateway ws://localhost:8080 \
+  --token "echo-token" \
+  --fifo-in echo-in \
+  --fifo-out echo-out &
+ECHO_PID=$!
 
-### Scenario 2: MCP Tool Execution
-**Agents**: Calculator Agent, CLI Client
-**Steps**:
-1. Calculator agent joins space
-2. Client discovers tools via `tools/list`
-3. Client calls `add(5, 3)`
-4. Calculator executes and returns result
-5. Client calls `evaluate("2 * (3 + 4)")`
+# Terminal 3: Start CLI client in FIFO mode  
+mkfifo cli-in cli-out
+meup cli connect \
+  --space test-space \
+  --participant-id test-client \
+  --gateway ws://localhost:8080 \
+  --fifo-in cli-in \
+  --fifo-out cli-out &
+CLI_PID=$!
+```
 
-**Verifies**:
-- MCP protocol implementation
-- Tool discovery
-- Tool execution
-- Error handling
+**Test Steps (executed by coding agent):**
+```bash
+# Step 1: Wait for agents to connect (check gateway log)
+tail -f gateway.log | grep -q "echo-agent connected"
+tail -f gateway.log | grep -q "test-client connected"
+
+# Step 2: Send chat message from CLI
+echo '{"kind":"chat","payload":{"text":"Hello echo"}}' > cli-in
+
+# Step 3: Read echo response from CLI output (echo agent auto-responds)
+RESPONSE=$(timeout 5 cat cli-out | grep '"from":"echo-agent"' | head -1)
+echo "$RESPONSE" | jq .
+
+# Step 4: Verify response structure
+echo "$RESPONSE" | jq -e '.protocol == "meup/v0.2"'
+echo "$RESPONSE" | jq -e '.kind == "chat"'
+echo "$RESPONSE" | jq -e '.from == "echo-agent"'
+echo "$RESPONSE" | jq -e '.payload.text == "Echo: Hello echo"'
+
+# Cleanup
+kill $ECHO_PID $CLI_PID
+rm cli-in cli-out
+```
+
+**Pass Criteria:**
+- [ ] Gateway accepts connections
+- [ ] Echo agent receives message
+- [ ] Echo agent responds with proper envelope
+- [ ] Response contains echoed text
+
+### Scenario 2: MCP Tool Execution with Calculator Agent
+
+**Setup Commands:**
+```bash
+# Connect as calculator agent (we'll manually respond to tool calls)
+mkfifo calc-in calc-out
+meup client connect \
+  --space test-space \
+  --participant-id calc-agent \
+  --gateway ws://localhost:8080 \
+  --token "calculator-token" \
+  --fifo-in calc-in \
+  --fifo-out calc-out &
+CALC_PID=$!
+# Note: Gateway grants MCP capabilities based on calculator-token
+
+# Start CLI client
+mkfifo cli-in cli-out  
+meup cli connect \
+  --space test-space \
+  --participant-id test-client \
+  --gateway ws://localhost:8080 \
+  --fifo-in cli-in \
+  --fifo-out cli-out &
+CLI_PID=$!
+```
+
+**Test Steps:**
+```bash
+# Step 1: List available tools
+echo '{"kind":"mcp/request","payload":{"method":"tools/list","params":{}}}' > cli-in
+TOOLS=$(timeout 5 cat cli-out | head -1)
+echo "$TOOLS" | jq '.payload.result.tools'
+
+# Verify calculator tools are present
+echo "$TOOLS" | jq -e '.payload.result.tools[] | select(.name == "add")'
+echo "$TOOLS" | jq -e '.payload.result.tools[] | select(.name == "multiply")'
+echo "$TOOLS" | jq -e '.payload.result.tools[] | select(.name == "evaluate")'
+
+# Step 2: Test add function
+echo '{"kind":"mcp/request","to":["calc-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > cli-in
+RESULT=$(timeout 5 cat cli-out | grep '"from":"calc-agent"' | grep '"kind":"mcp/response"' | head -1)
+echo "$RESULT" | jq -e '.payload.result.content[0].text == "8"'
+
+# Step 3: Test multiply function
+echo '{"kind":"mcp/request","to":["calc-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":6}}}}' > cli-in
+RESULT=$(timeout 5 cat cli-out | grep '"from":"calc-agent"' | grep '"kind":"mcp/response"' | head -1)
+echo "$RESULT" | jq -e '.payload.result.content[0].text == "42"'
+
+# Step 4: Test evaluate expression
+echo '{"kind":"mcp/request","to":["calc-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"2 * (3 + 4)"}}}}' > cli-in
+RESULT=$(timeout 5 cat cli-out | grep '"from":"calc-agent"' | grep '"kind":"mcp/response"' | head -1)
+echo "$RESULT" | jq -e '.payload.result.content[0].text == "14"'
+
+# Step 5: Test error handling (invalid expression)
+echo '{"kind":"mcp/request","to":["calc-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"2 * (3 +"}}}}' > cli-in
+ERROR=$(timeout 5 cat cli-out | grep '"from":"calc-agent"' | grep '"kind":"mcp/response"' | grep '"error"' | head -1)
+echo "$ERROR" | jq -e '.payload.error.message | contains("Invalid expression")'
+
+# Cleanup
+kill $CALC_PID $CLI_PID  
+rm cli-in cli-out
+```
+
+**Pass Criteria:**
+- [ ] Tool list returns calculator functions
+- [ ] add(5, 3) returns 8
+- [ ] multiply(7, 6) returns 42
+- [ ] evaluate("2 * (3 + 4)") returns 14
+- [ ] Invalid expressions return error
 
 ### Scenario 3: Untrusted Agent with Proposals
-**Agents**: Proposer Agent (untrusted), Fulfiller Agent (trusted)
-**Steps**:
-1. Both agents join space
-2. Proposer tries direct tool call (blocked)
-3. Proposer creates proposal for tool call
-4. Fulfiller reviews proposal
-5. Fulfiller accepts and executes
-6. Result returned to proposer
 
-**Verifies**:
-- Capability enforcement
-- Proposal creation
-- Proposal review process
-- Execution on behalf of another
+**Setup Commands:**
+```bash
+# Connect as proposer (untrusted, can only chat and propose)
+mkfifo prop-in prop-out
+meup client connect \
+  --space test-space \
+  --participant-id proposer-agent \
+  --gateway ws://localhost:8080 \
+  --token "proposer-token" \
+  --fifo-in prop-in \
+  --fifo-out prop-out &
+PROP_PID=$!
+# Note: Gateway determines capabilities based on token, not CLI flags
 
-### Scenario 4: Capability Granting
-**Agents**: Proposer (untrusted), Coordinator (trusted)
-**Steps**:
-1. Proposer starts with limited capabilities (chat only)
-2. Proposer requests to perform an MCP operation (blocked)
-3. Coordinator grants specific MCP capability to proposer
-4. Proposer can now execute that specific operation directly
-5. Proposer attempts different operation (still blocked)
-6. Coordinator revokes the granted capability
-7. Original operation now blocked again
+# Connect as fulfiller (trusted, can execute requests)
+mkfifo fulfill-in fulfill-out
+meup client connect \
+  --space test-space \
+  --participant-id fulfiller-agent \
+  --gateway ws://localhost:8080 \
+  --token "fulfiller-token" \
+  --fifo-in fulfill-in \
+  --fifo-out fulfill-out &
+FULFILL_PID=$!
+# Note: Gateway assigns trusted capabilities based on this token
+```
 
-**Verifies**:
-- Dynamic capability granting
-- Capability revocation
-- Fine-grained access control
+**Test Steps:**
+```bash
+# Step 1: Proposer attempts direct tool call (should be blocked)
+echo '{"kind":"mcp/request","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > prop-in
+ERROR=$(timeout 5 cat prop-out | grep '"kind":"system/error"' | head -1)
+echo "$ERROR" | jq -e '.payload.error | contains("capability")'
+
+# Step 2: Proposer creates proposal for tool call
+PROPOSAL_JSON=$(cat <<EOF
+{
+  "kind": "mcp/proposal",
+  "payload": {
+    "method": "tools/call",
+    "params": {
+      "name": "add",
+      "arguments": {"a": 5, "b": 3}
+    }
+  }
+}
+EOF
+)
+echo "$PROPOSAL_JSON" > prop-in
+
+# Step 3: Wait for fulfiller to auto-execute the proposal
+# The fulfiller agent automatically sees the proposal and executes it
+sleep 2
+
+# Note: We can observe the fulfillment request in the logs
+# The fulfiller will send an mcp/request with correlation_id pointing to the proposal
+
+# Step 5: Verify execution result (broadcast to all, proposer can observe)
+RESULT=$(timeout 5 cat prop-out | grep '"kind":"mcp/response"' | grep "$PROPOSAL_ID" | head -1)
+echo "$RESULT" | jq -e '.payload.result.content[0].text == "8"'
+
+# Cleanup
+kill $PROP_PID $FULFILL_PID
+rm prop-in prop-out
+```
+
+**Pass Criteria:**
+- [ ] Direct tool call by proposer is blocked
+- [ ] Proposal creation succeeds
+- [ ] Fulfiller receives proposal notification
+- [ ] Fulfiller can accept and execute
+- [ ] Result is returned to proposer
+
+### Scenario 4: Dynamic Capability Granting
+
+**Setup Commands:**
+```bash
+# Connect as coordinator (admin privileges via token)
+mkfifo coord-in coord-out
+meup client connect \
+  --space test-space \
+  --participant-id coordinator \
+  --gateway ws://localhost:8080 \
+  --token "admin-token" \
+  --fifo-in coord-in \
+  --fifo-out coord-out &
+COORD_PID=$!
+
+# Connect as limited agent (minimal capabilities)
+mkfifo limited-in limited-out
+meup client connect \
+  --space test-space \
+  --participant-id limited-agent \
+  --gateway ws://localhost:8080 \
+  --token "limited-token" \
+  --fifo-in limited-in \
+  --fifo-out limited-out &
+LIMITED_PID=$!
+```
+
+**Test Steps:**
+```bash
+# Step 1: Limited agent attempts MCP operation (blocked)
+echo '{"kind":"mcp/tools/list","payload":{}}' > limited-in
+ERROR=$(timeout 5 cat limited-out | grep '"kind":"system/error"' | head -1)
+echo "$ERROR" | jq -e '.payload.error | contains("capability")'
+
+# Step 2: Coordinator grants MCP capability
+GRANT_JSON=$(cat <<EOF
+{
+  "kind": "capability/grant",
+  "payload": {
+    "to": "limited-agent",
+    "capabilities": ["mcp/tools/list"]
+  }
+}
+EOF
+)
+echo "$GRANT_JSON" > coord-in
+
+# Step 3: Limited agent receives grant notification
+GRANT=$(timeout 5 cat limited-out | grep '"kind":"capability/granted"' | head -1)
+echo "$GRANT" | jq '.payload.capabilities'
+
+# Step 4: Limited agent can now list tools
+echo '{"kind":"mcp/tools/list","payload":{}}' > limited-in
+TOOLS=$(timeout 5 cat limited-out | grep '"kind":"mcp/tools/response"' | head -1)
+echo "$TOOLS" | jq -e '.payload.tools'
+
+# Step 5: But still can't call tools
+echo '{"kind":"mcp/tools/call","payload":{"tool":"add","params":{"a":1,"b":2}}}' > limited-in
+ERROR=$(timeout 5 cat limited-out | grep '"kind":"system/error"' | head -1)
+echo "$ERROR" | jq -e '.payload.error | contains("capability")'
+
+# Step 6: Coordinator revokes capability
+REVOKE_JSON=$(cat <<EOF
+{
+  "kind": "capability/revoke",
+  "payload": {
+    "from": "limited-agent",
+    "capabilities": ["mcp/tools/list"]
+  }
+}
+EOF
+)
+echo "$REVOKE_JSON" > coord-in
+
+# Step 7: Limited agent can no longer list tools
+echo '{"kind":"mcp/tools/list","payload":{}}' > limited-in
+ERROR=$(timeout 5 cat limited-out | grep '"kind":"system/error"' | head -1)
+echo "$ERROR" | jq -e '.payload.error | contains("capability")'
+
+# Cleanup
+kill $COORD_PID $LIMITED_PID
+rm coord-in coord-out limited-in limited-out
+```
+
+**Pass Criteria:**
+- [ ] Initial MCP access blocked
+- [ ] Capability grant received
+- [ ] Granted operation now works
+- [ ] Non-granted operations still blocked
+- [ ] Revoked capability is blocked again
 
 ### Scenario 5: Context Management
-**Agents**: Research Agent, Calculator Agent
-**Steps**:
-1. Research Agent receives: "What's the total cost if we buy 5 items at $12 each with 8% tax?"
-2. Research Agent pushes context with topic "calculate-base-cost"
-3. Research Agent asks Calculator: "multiply 5 by 12"
-4. Calculator responds: "60"
-5. Research Agent pops context
-6. Research Agent pushes new context with topic "calculate-tax"
-7. Research Agent asks Calculator: "multiply 60 by 0.08"
-8. Calculator responds: "4.8"
-9. Research Agent pops context
-10. Research Agent pushes context with topic "calculate-total"
-11. Research Agent asks Calculator: "add 60 and 4.8"
-12. Calculator responds: "64.8"
-13. Research Agent pops context
-14. Research Agent responds to original request: "The total cost is $64.80"
 
-**Verifies**:
-- Context push creates isolated conversation scope
-- Context pop returns to parent scope
-- Each context maintains separate correlation
-- Messages within context are tagged appropriately
+**Setup Commands:**
+```bash
+# Connect as research agent (we'll manage contexts)
+mkfifo research-in research-out
+meup client connect \
+  --space test-space \
+  --participant-id research-agent \
+  --gateway ws://localhost:8080 \
+  --token "research-token" \
+  --fifo-in research-in \
+  --fifo-out research-out &
+RESEARCH_PID=$!
 
-### Scenario 6: Multi-Agent Collaboration
-**Agents**: Researcher, Calculator, Writer, Coordinator
-**Steps**:
-1. Coordinator receives complex request
-2. Delegates research to Researcher
-3. Researcher uses Calculator for analysis
-4. Writer summarizes findings
-5. Coordinator assembles final response
-
-**Verifies**:
-- Multi-agent coordination
-- Capability-based delegation
-- Complex workflows
-
-## Test Matrix
-
-| Test Case | Echo | Calc | Proposer | Fulfiller | Coordinator | Context |
-|-----------|------|------|----------|-----------|-------------|---------|
-| Basic connectivity | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Chat messages | ✓ | | ✓ | ✓ | ✓ | ✓ |
-| MCP tools/list | | ✓ | | ✓ | ✓ | ✓ |
-| MCP tools/call | | ✓ | | ✓ | ✓ | ✓ |
-| Create proposal | | | ✓ | | | |
-| Review proposal | | | | ✓ | ✓ | |
-| Execute proposal | | | | ✓ | ✓ | |
-| Context push | | | | | | ✓ |
-| Context pop | | | | | | ✓ |
-| Capability check | | | ✓ | ✓ | ✓ | |
-
-
-## Test Execution Plan
-
-### Phase 1: Test Agent Implementation
-- [ ] Echo agent
-- [ ] Calculator agent
-- [ ] Proposer agent
-- [ ] Fulfiller agent
-- [ ] Coordinator agent
-- [ ] Context-aware agent
-
-### Phase 2: Integration Tests
-- [ ] Basic message flow with echo agent
-- [ ] MCP operations with calculator
-- [ ] Proposal pattern with proposer/fulfiller
-- [ ] Capability granting and revocation
-- [ ] Context management
-- [ ] Multi-agent collaboration scenario
-- [ ] Error recovery and edge cases
-
-## Test Environment
-
-### Local Development
-```yaml
-gateway:
-  port: 8080
-  logLevel: debug
-  enableMetrics: true
-
-agents:
-  - echo-agent
-  - calculator-agent
-  - proposer-agent
-  - fulfiller-agent
+# Connect as calculator (responds to tool calls)
+mkfifo calc-in calc-out
+meup client connect \
+  --space test-space \
+  --participant-id calc-agent \
+  --gateway ws://localhost:8080 \
+  --token "calculator-token" \
+  --fifo-in calc-in \
+  --fifo-out calc-out &
+CALC_PID=$!
 ```
 
-### CI/CD Pipeline
-```yaml
-test:
-  - npm run test:unit
-  - npm run test:integration
-  - npm run test:e2e
+**Test Steps:**
+```bash
+# Step 1: Send initial request
+echo '{"kind":"chat","payload":{"text":"Calculate: 5 items at $12 each with 8% tax"}}' > research-in
+
+# Step 2: Research agent pushes context for base cost calculation
+CONTEXT_PUSH=$(timeout 5 cat research-out | grep '"kind":"context/push"' | head -1)
+CONTEXT_ID_1=$(echo "$CONTEXT_PUSH" | jq -r '.correlation_id')
+echo "$CONTEXT_PUSH" | jq -e '.payload.topic == "calculate-base-cost"'
+
+# Step 3: Within context, ask calculator to multiply
+echo '{"kind":"mcp/tools/call","to":["calc-agent"],"correlation_id":"'$CONTEXT_ID_1'","payload":{"tool":"multiply","params":{"a":5,"b":12}}}' > research-in
+
+# Step 4: Verify calculator response has context correlation
+CALC_RESPONSE=$(timeout 5 cat calc-out | grep "$CONTEXT_ID_1" | head -1)
+echo "$CALC_RESPONSE" | jq -e '.correlation_id == "'$CONTEXT_ID_1'"'
+echo "$CALC_RESPONSE" | jq -e '.payload.result == 60'
+
+# Step 5: Pop context
+echo '{"kind":"context/pop","correlation_id":"'$CONTEXT_ID_1'"}' > research-in
+
+# Step 6: Push new context for tax calculation
+CONTEXT_PUSH=$(timeout 5 cat research-out | grep '"kind":"context/push"' | tail -1)
+CONTEXT_ID_2=$(echo "$CONTEXT_PUSH" | jq -r '.correlation_id')
+echo "$CONTEXT_PUSH" | jq -e '.payload.topic == "calculate-tax"'
+
+# Step 7: Calculate tax
+echo '{"kind":"mcp/tools/call","to":["calc-agent"],"correlation_id":"'$CONTEXT_ID_2'","payload":{"tool":"multiply","params":{"a":60,"b":0.08}}}' > research-in
+CALC_RESPONSE=$(timeout 5 cat calc-out | grep "$CONTEXT_ID_2" | head -1)
+echo "$CALC_RESPONSE" | jq -e '.payload.result == 4.8'
+
+# Step 8: Pop tax context
+echo '{"kind":"context/pop","correlation_id":"'$CONTEXT_ID_2'"}' > research-in
+
+# Step 9: Push context for total
+CONTEXT_PUSH=$(timeout 5 cat research-out | grep '"kind":"context/push"' | tail -1)
+CONTEXT_ID_3=$(echo "$CONTEXT_PUSH" | jq -r '.correlation_id')
+
+# Step 10: Calculate total
+echo '{"kind":"mcp/tools/call","to":["calc-agent"],"correlation_id":"'$CONTEXT_ID_3'","payload":{"tool":"add","params":{"a":60,"b":4.8}}}' > research-in
+CALC_RESPONSE=$(timeout 5 cat calc-out | grep "$CONTEXT_ID_3" | head -1)
+echo "$CALC_RESPONSE" | jq -e '.payload.result == 64.8'
+
+# Step 11: Pop final context
+echo '{"kind":"context/pop","correlation_id":"'$CONTEXT_ID_3'"}' > research-in
+
+# Step 12: Verify final response
+FINAL_RESPONSE=$(timeout 5 cat research-out | grep '"kind":"chat"' | grep "64.80" | head -1)
+echo "$FINAL_RESPONSE" | jq -e '.payload.text | contains("$64.80")'
+
+# Cleanup
+kill $RESEARCH_PID $CALC_PID
+rm research-in research-out calc-in calc-out
 ```
 
-## Success Metrics
+**Pass Criteria:**
+- [ ] Context push creates new correlation ID
+- [ ] Messages within context use that correlation ID
+- [ ] Context pop returns to parent
+- [ ] Each context maintains isolation
+- [ ] Final result correctly aggregates all calculations
 
-### Coverage
-- All 6 test agents implemented
-- All integration test scenarios pass
-- 100% of defined scenarios tested
+### Scenario 6: Error Recovery and Edge Cases
 
-### Quality
-- Protocol compliance verified
-- Capability enforcement working
-- Proposal pattern functioning correctly
-- Context management operational
+**Setup Commands:**
+```bash
+# Use existing gateway from previous tests
+```
 
-## Risk Mitigation
+**Test Steps:**
+```bash
+# Test 1: Malformed JSON
+mkfifo test-in test-out
+meup cli connect --space test-space --participant-id test-client \
+  --gateway ws://localhost:8080 --fifo-in test-in --fifo-out test-out &
+TEST_PID=$!
 
-### Identified Risks
-1. **WebSocket connection stability**: Implement reconnection logic
-2. **Capability bypass**: Thorough testing of pattern matching
-3. **Context leaks**: Verify isolation between contexts
-4. **Proposal spam**: Rate limiting implementation
+echo '{"kind":"chat", invalid json}' > test-in
+ERROR=$(timeout 5 cat test-out | grep '"kind":"system/error"' | head -1)
+echo "$ERROR" | jq -e '.payload.error | contains("JSON")'
 
-### Mitigation Strategies
-- Comprehensive error handling
-- Timeout mechanisms
-- Circuit breakers
-- Graceful degradation
+# Test 2: Missing required fields
+echo '{"kind":"chat"}' > test-in  # Missing payload
+ERROR=$(timeout 5 cat test-out | grep '"kind":"system/error"' | head -1)
+echo "$ERROR" | jq -e '.payload.error | contains("payload")'
 
-## Tools and Frameworks
+# Test 3: Invalid protocol version
+echo '{"protocol":"meup/v0.1","kind":"chat","payload":{"text":"test"}}' > test-in
+ERROR=$(timeout 5 cat test-out | grep '"kind":"system/error"' | head -1)
+echo "$ERROR" | jq -e '.payload.error | contains("protocol")'
 
-### Testing Tools
-- **Vitest**: Unit testing
-- **WebSocket Client**: Integration testing
-- **Docker Compose**: Test environment
+# Test 4: Disconnect and reconnect
+kill $TEST_PID
+sleep 2
+meup cli connect --space test-space --participant-id test-client \
+  --gateway ws://localhost:8080 --fifo-in test-in --fifo-out test-out &
+TEST_PID=$!
+echo '{"kind":"chat","payload":{"text":"reconnected"}}' > test-in
+RESPONSE=$(timeout 5 cat test-out | grep '"kind":"chat"' | head -1)
+echo "$RESPONSE" | jq -e '.payload.text'
 
-### Monitoring
-- Gateway metrics endpoint
-- Agent status reporting
-- Message flow tracing
+# Cleanup
+kill $TEST_PID
+rm test-in test-out
+```
 
-## Deliverables
+**Pass Criteria:**
+- [ ] Malformed JSON returns error
+- [ ] Missing fields return error
+- [ ] Invalid protocol rejected
+- [ ] Reconnection works
 
-1. **Test Agents**: 6 fully implemented test agents
-2. **Test Suite**: Comprehensive automated tests
-3. **Test Report**: Results showing all tests pass
-4. **Bug Report**: Issues found and resolutions
+## Final Cleanup
+
+```bash
+# Stop all processes
+kill $GATEWAY_PID
+rm *.log
+
+# Verify all FIFOs cleaned up
+ls *.in *.out 2>/dev/null || echo "All FIFOs cleaned"
+
+# Check for orphaned processes
+ps aux | grep meup | grep -v grep || echo "No orphaned processes"
+```
+
+## Test Execution Summary
+
+The coding agent will execute these tests by:
+
+1. **Starting services**: Use bash commands to start gateway and agents
+2. **Creating FIFOs**: Make named pipes for bidirectional communication
+3. **Sending messages**: Echo JSON messages into input FIFOs
+4. **Reading responses**: Read from output FIFOs with timeout
+5. **Verifying results**: Use jq to parse and validate JSON responses
+6. **Cleanup**: Kill processes and remove FIFOs
+
+Each test step includes:
+- Exact command to run
+- Expected output format
+- Validation using jq queries
+- Error conditions to check
+
+## Success Criteria
+
+All tests pass when:
+1. Each jq validation returns 0 (success)
+2. No unexpected errors in gateway.log
+3. All processes start and stop cleanly
+4. FIFOs are properly cleaned up
+5. Expected message flows complete within timeout
