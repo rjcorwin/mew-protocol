@@ -420,6 +420,193 @@ Example:
 meup gateway start --port 8080 --space-config ./configs/production.yaml
 ```
 
+## Interactive Space Connection
+
+### `meup space connect`
+
+Connects to a running space interactively, allowing users to participate directly through various UI modes.
+
+```bash
+meup space connect [options]
+
+Options:
+  --space-config <path>   Path to space.yaml (default: ./space.yaml)
+  --participant <id>      Participant ID to connect as
+  --token <token>         Authentication token (prompts if not provided)
+  --ui <mode>             UI mode: terminal|web|electron|game (default: terminal)
+  --theme <theme>         UI theme name (UI-specific)
+  --gateway <url>         Override gateway URL from config
+```
+
+### UI Modes
+
+#### Terminal UI (Default)
+The default interactive terminal interface for text-based interaction:
+
+```bash
+# Connect with default terminal UI
+meup space connect --participant human-reviewer
+
+# Terminal UI features:
+# - Real-time message display
+# - Command input with history
+# - Syntax highlighting for code blocks
+# - Tab completion for commands
+# - Split panes for different contexts
+```
+
+#### Web UI
+Browser-based interface accessible via localhost:
+
+```bash
+# Start web UI on default port 3000
+meup space connect --ui web
+
+# Opens browser to http://localhost:3000
+# Features: Rich text, file uploads, visual tool results
+```
+
+#### Electron App
+Native desktop application with full system integration:
+
+```bash
+# Launch Electron desktop app
+meup space connect --ui electron --theme dark
+
+# Features: System notifications, file drag-drop, offline mode
+```
+
+#### Game UI (Experimental)
+3D environment using Proton3 or similar game engine:
+
+```bash
+# Launch game-like 3D interface
+meup space connect --ui game
+
+# Features: Spatial audio, avatars, virtual workspace
+```
+
+### Space Configuration for UI
+
+The space.yaml can specify default UI settings and allowed UI modes:
+
+```yaml
+# space.yaml
+ui:
+  default_mode: terminal  # Default UI when not specified
+  allowed_modes:          # Restrict available UIs
+    - terminal
+    - web
+    - electron
+  terminal:
+    theme: monokai
+    font_size: 14
+    show_timestamps: true
+  web:
+    port: 3000
+    auto_open: true
+    allow_file_uploads: true
+  electron:
+    window_size: [1200, 800]
+    start_minimized: false
+    system_tray: true
+  game:
+    engine: proton3
+    world: collaborative_office
+    vr_enabled: false
+
+# Per-participant UI preferences
+participants:
+  human-reviewer:
+    ui_preferences:
+      default_mode: electron  # Override default for this participant
+      terminal:
+        theme: solarized-dark
+```
+
+### Connection Flow
+
+1. **Load Configuration**: Read space.yaml to get gateway URL and participant settings
+2. **Authenticate**: Use provided token or prompt for credentials
+3. **Initialize UI**: Start selected UI mode with configured settings
+4. **Connect to Gateway**: Establish WebSocket connection
+5. **Join Space**: Send join message with participant ID
+6. **Interactive Session**: Handle user input and display messages
+
+### Terminal UI Commands
+
+When connected via terminal UI, special commands are available:
+
+```
+/help              Show available commands
+/participants      List active participants
+/capabilities      Show your current capabilities
+/tools             List available MCP tools
+/context push      Push new context
+/context pop       Pop current context
+/context show      Display context stack
+/file <path>       Send file content
+/exit              Disconnect from space
+```
+
+### Example Sessions
+
+#### Developer Review Session
+```bash
+# Start space with configuration
+meup gateway start --space-config ./code-review.yaml &
+
+# Developer connects with terminal UI
+meup space connect --participant developer --ui terminal
+
+# Manager connects with Electron app
+meup space connect --participant manager --ui electron
+
+# CI system connects programmatically (non-interactive)
+meup client connect --participant ci-bot --token $CI_TOKEN
+```
+
+#### Collaborative Design Session
+```bash
+# Designer uses web UI for rich media
+meup space connect --participant designer --ui web
+
+# Engineer uses terminal for code focus
+meup space connect --participant engineer --ui terminal
+
+# Product manager uses game UI for spatial collaboration
+meup space connect --participant pm --ui game
+```
+
+### Custom UI Integration
+
+Third-party UIs can integrate by implementing the UI interface:
+
+```typescript
+interface SpaceUI {
+  // Initialize UI with configuration
+  init(config: UIConfig): Promise<void>;
+  
+  // Connect to gateway
+  connect(gateway: string, token: string): Promise<void>;
+  
+  // Handle incoming messages
+  onMessage(message: MEUPMessage): void;
+  
+  // Send user input as message
+  sendMessage(message: MEUPMessage): void;
+  
+  // Clean shutdown
+  disconnect(): Promise<void>;
+}
+```
+
+Register custom UI:
+```bash
+meup ui register my-custom-ui ./my-ui-module.js
+meup space connect --ui my-custom-ui
+```
+
 ## Next Steps
 
 After tests pass with this minimal implementation:
