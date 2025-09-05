@@ -1,115 +1,99 @@
 # TODO
 
-## MEUP v0.2 - COMPLETED ✓
+## Current Focus: Complete TEST_PLAN.md Implementation
 
-All tasks for the v0.2 release have been completed on 2025-01-03.
+Based on test results, we need to implement missing features for Scenarios 3-6:
 
-### Completed ADR Implementation Tasks
-- [x] h2n-1: Update ADR-h2n to select Option 2 (Always Array) with decision rationale
-- [x] h2n-2: Add workflow context and Go compatibility reasoning to ADR-h2n
-- [x] d4n-1: Review ADR-d4n for arbitrary participant configuration support
-- [x] d4n-2: Ensure ADR-d4n supports workflow engine configuration (DAG structure, runtime config)
-- [x] readme-1: Update proposed ADRs README with ADR-h2n entry
+### 🚀 Priority 1: Capability System via space.yaml
+- [ ] gateway-cap-1: Design gateway library with bidirectional hooks
+  - [ ] Capability resolver hook (gateway → CLI)
+  - [ ] Participant joined callback (gateway → CLI)
+  - [ ] Authorization hook for message validation
+- [ ] gateway-cap-2: Implement space.yaml parser and loader in CLI
+  - [ ] Parse participant definitions with process management config
+  - [ ] Support capability subsetting per request
+  - [ ] Handle dynamic participant registration
+- [ ] gateway-cap-3: Implement CLI process management from space.yaml
+  - [ ] Spawn local agents with command/args/env
+  - [ ] Handle auto_start and restart_policy
+  - [ ] Execute space_commands on start/stop
+- [ ] gateway-cap-4: Implement capability pattern matching
+  - [ ] Simple string matching (kind: "chat")
+  - [ ] Wildcard patterns (kind: "mcp/*")
+  - [ ] Complex patterns with payload inspection
+- [ ] gateway-cap-5: Add configuration loading options
+  - [ ] --space-config flag
+  - [ ] MEUP_SPACE_CONFIG environment variable
+  - [ ] Default ./space.yaml location
+- [ ] gateway-cap-6: Implement dynamic updates
+  - [ ] Config reloading without restart
+  - [ ] Auto-update space.yaml when new participants join
+  - [ ] Capability grant/revoke updates config
 
-### Completed Implementation Priority Order
-- [x] impl-1: Implement core protocol (ADRs x7k, m3p, q8f)
-- [x] impl-1.5: Standardize property naming convention (ADR j3k)
-- [x] impl-2: Implement basic operations (ADR v2c - proposals and lifecycle)
-- [x] impl-3: Implement correlation (ADR h2n - array correlation IDs)
-- [x] impl-4: Implement reasoning transparency and sub-context (ADRs t8k, k9j, p4m)
-- [x] impl-5: Implement space management (ADRs g7r - delegation)
-- [x] impl-6: Space configuration moved to future CLI implementation (ADR d4n)
-- [x] review-1: Editor review of draft spec and accept proposals
+### 🚀 Priority 2: Context Management (Enables Scenario 5)
+- [ ] context-1: Add context stack to gateway per participant
+- [ ] context-2: Implement context/push handler
+- [ ] context-3: Implement context/pop handler
+- [ ] context-4: Preserve correlation_id arrays through context operations
+- [ ] context-5: Track context hierarchy in message routing
 
-### Release Tasks
-- [x] release-1: Move all proposed ADRs to accepted folder
-- [x] release-2: Update ADR statuses to Accepted with Complete incorporation
-- [x] release-3: Fix all spec inconsistencies and errors
-- [x] release-4: Update spec date to 2025-01-03
-- [x] release-5: Create v0.2 release commit and tag
+### 🚀 Priority 3: Enhanced Validation (Improves Scenario 6)
+- [ ] validate-1: Add protocol version checking (reject non-v0.2)
+- [ ] validate-2: Add strict payload validation for each message kind
+- [ ] validate-3: Improve error messages with specific failure reasons
+- [ ] validate-4: Add message schema validation
 
-## Future Work (v0.2 and beyond)
+### 📋 Test Completion
+- [x] test-scenario-1: Basic Message Flow ✅ PASSED
+- [x] test-scenario-2: MCP Tool Execution ✅ PASSED
+- [ ] test-scenario-3: Proposals with capability blocking (needs capability system)
+- [ ] test-scenario-4: Dynamic capability granting (needs capability system)
+- [ ] test-scenario-5: Context management (needs context implementation)
+- [ ] test-scenario-6: Error recovery (needs better validation)
 
-### SDK Implementation
-- [x] sdk-1: Update client SDK for v0.2 spec (@meup/client)
-- [x] sdk-2: Update agent SDK for v0.2 spec (@meup/agent)
-- [x] sdk-3: Implement reference gateway (@meup/gateway)
-- [x] sdk-4: Create TypeScript types package (@meup/types)
+## Completed Tasks (Archived)
 
-### Test Planning and Review
-- [x] test-plan-1: Create test plan document
-- [x] test-plan-2: Define test scenarios
-- [x] test-plan-3: Create test directory structure
-- [ ] test-plan-4: Editor review and approval of test plan
-    - Ensure that the test plan is realistic for a coding agent to verify.
-- [ ] test-plan-5: Finalize test agent specifications
+### MEUP v0.2 Protocol ✅
+- All ADRs implemented and accepted
+- Spec released 2025-01-03
+- Core protocol complete
 
-### Test Agents and Examples (After Plan Approval)
-- [ ] test-agent-1: Create echo agent (simple response agent)
-- [ ] test-agent-2: Create calculator agent (MCP tool provider)
-- [ ] test-agent-3: Create proposer agent (untrusted, makes proposals)
-- [ ] test-agent-4: Create fulfiller agent (trusted, executes proposals)
-- [ ] test-agent-5: Create coordinator agent (reviews and routes)
-- [ ] test-agent-6: Create context-aware agent (uses sub-contexts)
+### CLI Minimal Implementation ✅
+- Gateway with WebSocket server
+- Client with FIFO mode (fixed with tail -F)
+- Echo agent (autonomous)
+- Calculator agent (MCP tools)
+- Fulfiller agent (proposal handling)
+- Token creation (basic)
 
-### CLI and Integration Testing (After Agent Implementation)
-- [ ] cli-1: Implement CLI with space configuration (using ADR-d4n)
-- [ ] cli-2: CLI command to start gateway
-- [ ] cli-3: CLI command to run agents
-- [ ] cli-4: CLI command to monitor spaces
-- [ ] test-1: Test basic message flow (echo agent)
-- [ ] test-2: Test MCP tool calls (calculator agent)
-- [ ] test-3: Test proposal-execute pattern (proposer + fulfiller)
-- [ ] test-4: Test capability enforcement
-- [ ] test-5: Test context management (push/pop/resume)
-- [ ] test-6: Test multi-agent collaboration scenario
+### Test Infrastructure ✅
+- Test scripts created for all scenarios
+- FIFO automation working
+- Individual scenario runners created
 
-### Package Publishing (After Integration Testing)
-- [ ] pub-1: Run full integration test suite
-- [ ] pub-2: Update package versions if needed
-- [ ] pub-3: Publish @meup/client to npm
-- [ ] pub-4: Publish @meup/agent to npm
-- [ ] pub-5: Publish @meup/gateway to npm
-- [ ] pub-6: Publish @meup/types to npm
-- [ ] pub-7: Create GitHub release with examples
+## Future Work (After TEST_PLAN.md Complete)
 
-### Additional Tools
-- [ ] tool-1: Create meup-inspector debugging tool
-- [ ] tool-2: Build proposal review UI/tool
-- [ ] tool-3: Create space admin dashboard
+### CLI Production Features
+- Space configuration from spec
+- Authentication system
+- Configuration files
+- Environment variables
+- Production documentation
 
-### Future SDKs
-- [ ] sdk-5: Create Python SDK (@meup/python-sdk)
-- [ ] sdk-6: Create Go SDK (@meup/go-sdk)
+### Additional Testing
+- Integration test suite
+- Performance benchmarks
+- Multi-agent collaboration scenarios
+- End-to-end workflows
 
-### Example Implementations
-- [ ] example-1: Create trusted coordinator agent example
-- [ ] example-2: Create untrusted assistant agent example
-- [ ] example-3: Create MCP tool provider agent example
-- [ ] example-4: Build multi-agent collaboration demo
-- [ ] example-5: Create progressive automation demo
-
-### Testing and Documentation
-- [ ] test-1: Write gateway integration tests
-- [ ] test-2: Write SDK unit tests
-- [ ] test-3: Create end-to-end test suite
-- [ ] test-4: Add performance benchmarks
-- [ ] doc-1: Create migration guide from MCPx v0.1
-- [ ] doc-2: Add SDK usage examples and tutorials
-- [ ] doc-3: Document gateway implementation requirements
-- [ ] doc-4: Create architecture diagrams
-- [ ] doc-5: Write deployment guide
-
-### Community
-- [ ] community-1: Gather implementation feedback for v0.3
-- [ ] community-2: Create Discord/discussion forum
-- [ ] community-3: Write blog post announcing v0.2
-- [ ] community-4: Create video tutorial series
-- [ ] community-5: Establish governance process
+### Community & Documentation
+- Migration guide from v0.1
+- Architecture diagrams
+- Video tutorials
+- Blog posts
 
 ### v0.3 Planning
-- [ ] v03-1: Design authentication improvements
-- [ ] v03-2: Specify message persistence layer
-- [ ] v03-3: Define rate limiting and quotas
-- [ ] v03-4: Add message routing between spaces
-- [ ] v03-5: Specify federation protocol
+- Message persistence
+- Rate limiting
+- Space federation
+- Enhanced routing
