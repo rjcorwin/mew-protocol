@@ -10,16 +10,12 @@ The MEUP CLI (`@meup/cli`) provides minimal command-line tools needed to execute
 
 ## Scope
 
-This specification covers ONLY what's needed for testing:
-- Gateway server startup
-- Client connections with FIFO mode
-- Three built-in test agents (echo, calculator, fulfiller)
-- Basic token generation
-
-This specification does NOT cover:
-- Space configuration (deferred to next version)
-- Advanced features
-- Production deployment
+This specification covers:
+- Gateway server with space configuration support
+- Client connections with FIFO mode for automation
+- Interactive space connection via terminal UI
+- Capability management through space.yaml
+- Process management for local agents
 
 ## Architecture
 
@@ -27,24 +23,26 @@ This specification does NOT cover:
 @meup/cli
 ├── Commands
 │   ├── gateway.js    # Start gateway server
-│   ├── client.js     # Connect as client with FIFO
-│   ├── agent.js      # Start built-in agents
+│   ├── client.js     # Connect as client (interactive or FIFO)
+│   ├── space.js      # Space management (up/down)
 │   └── token.js      # Generate test tokens
-├── Agents
-│   ├── echo.js       # Echo agent
-│   ├── calculator.js # Calculator agent  
-│   └── fulfiller.js  # Fulfiller agent
-└── SDK Dependencies
-    ├── @meup/gateway
-    ├── @meup/client
-    └── @meup/agent
+├── SDK Dependencies
+│   ├── @meup/gateway
+│   ├── @meup/client
+│   ├── @meup/agent
+│   └── @meup/capability-matcher
+└── External Dependencies
+    ├── js-yaml           # Parse space.yaml config
+    ├── commander         # CLI argument parsing
+    ├── ws                # WebSocket client
+    └── readline          # Terminal UI
 ```
 
 ## Commands
 
 ### `meup gateway start`
 
-Starts a gateway server for testing.
+Starts a gateway server.
 
 ```bash
 meup gateway start [options]
@@ -61,7 +59,7 @@ meup gateway start --port 8080 --log-level debug
 
 ### `meup client connect`
 
-Connects to a gateway as a client with FIFO mode for test automation.
+Connects to a gateway as a client. Supports interactive mode (default) or FIFO mode for automation.
 
 ```bash
 meup client connect [options]
@@ -71,46 +69,71 @@ Options:
   --space <space>        Space to join (required)
   --token <token>        Authentication token
   --participant-id <id>  Participant ID
-  --fifo-in <path>       Input FIFO for receiving commands
-  --fifo-out <path>      Output FIFO for sending messages
+  --fifo-in <path>       Input FIFO for automation (optional)
+  --fifo-out <path>      Output FIFO for automation (optional)
+  --no-interactive       Disable interactive mode when using FIFOs
 ```
 
-**FIFO Mode:**
-- Input: Send JSON messages to `fifo-in`
-- Output: Receive JSON messages from `fifo-out`
-- Essential for test automation
+**Interactive Mode (default):**
+- Uses readline-based terminal interface
+- Plain text automatically becomes chat messages
+- JSON envelopes can be sent for any message type
+- Commands start with `/` (e.g., `/help`, `/exit`)
+- See responses in real-time
+- Press Ctrl+C to exit
 
-**Example:**
+**FIFO Mode (for automation):**
+- Specify both --fifo-in and --fifo-out
+- Send JSON messages to fifo-in
+- Receive JSON messages from fifo-out
+- Add --no-interactive to disable terminal input
+
+**Examples:**
 ```bash
-# Create FIFOs
-mkfifo cli-in cli-out
+# Interactive mode (default)
+meup client connect \
+  --gateway ws://localhost:8080 \
+  --space test-space \
+  --participant-id human-user
 
-# Connect with FIFOs
+# FIFO mode for automation
+mkfifo cli-in cli-out
 meup client connect \
   --gateway ws://localhost:8080 \
   --space test-space \
   --participant-id test-client \
   --fifo-in cli-in \
-  --fifo-out cli-out &
+  --fifo-out cli-out \
+  --no-interactive &
 ```
 
-### `meup agent start`
+## Running Agents
 
-Starts a built-in test agent.
+Agents are standalone executables that connect to the gateway. They are NOT started through the CLI but run directly or via space.yaml configuration.
+
+### Direct Execution
 
 ```bash
-meup agent start [options]
+# Run example agents directly
+node ./agents/echo.js --gateway ws://localhost:8080 --token echo-token
+node ./agents/calculator.js --gateway ws://localhost:8080 --space test-space
+python ./my-custom-agent.py --gateway ws://localhost:8080
 
-Options:
-  --type <type>          Agent type: echo|calculator|fulfiller (required)
-  --gateway <url>        WebSocket URL (required)
-  --space <space>        Space to join (required)
-  --token <token>        Authentication token
+# Each agent handles its own argument parsing
 ```
 
-**Example:**
-```bash
-meup agent start --type echo --gateway ws://localhost:8080 --space test-space
+### Via Space Configuration
+
+Agents can be auto-started when the gateway starts:
+
+```yaml
+# space.yaml
+participants:
+  echo-agent:
+    command: "node"
+    args: ["./agents/echo.js", "--gateway", "ws://localhost:8080"]
+    auto_start: true
+    tokens: ["echo-token"]
 ```
 
 ### `meup token create`
@@ -132,64 +155,6 @@ meup token create \
   --capabilities '[{"kind":"chat"}]'
 ```
 
-## Built-in Test Agents
-
-### Echo Agent
-
-Automatically echoes any chat message with "Echo: " prefix.
-
-**Behavior:**
-```json
-// Input
-{"kind": "chat", "payload": {"text": "Hello"}}
-
-// Output  
-{"kind": "chat", "payload": {"text": "Echo: Hello"}}
-```
-
-### Calculator Agent
-
-Provides three MCP tools: add, multiply, evaluate.
-
-**Tools:**
-- `add(a, b)` - Returns a + b
-- `multiply(a, b)` - Returns a * b  
-- `evaluate(expression)` - Evaluates math expression
-
-**Example:**
-```json
-// Request
-{
-  "kind": "mcp/request",
-  "payload": {
-    "method": "tools/call",
-    "params": {
-      "name": "add",
-      "arguments": {"a": 5, "b": 3}
-    }
-  }
-}
-
-// Response
-{
-  "kind": "mcp/response",
-  "payload": {
-    "result": {
-      "content": [{"type": "text", "text": "8"}]
-    }
-  }
-}
-```
-
-### Fulfiller Agent
-
-Automatically fulfills any `mcp/proposal` it sees.
-
-**Behavior:**
-1. Observes: `{"kind": "mcp/proposal", "id": "prop-123", ...}`
-2. Sends: `{"kind": "mcp/request", "correlation_id": ["prop-123"], ...}`
-
-The fulfiller copies the proposal payload and adds the proposal ID as correlation_id.
 
 ## FIFO Message Format
 
@@ -223,16 +188,16 @@ Messages sent to/from FIFOs are MEUP v0.2 protocol envelopes.
 
 The test plan uses the CLI as follows:
 
-1. **Start Gateway:**
+1. **Start Gateway (with space config):**
    ```bash
-   meup gateway start --port 8080 --log-level debug > gateway.log 2>&1 &
+   meup gateway start --port 8080 --space-config ./space.yaml > gateway.log 2>&1 &
    ```
 
-2. **Start Test Agents:**
+2. **Start Agents (if not auto-started):**
    ```bash
-   meup agent start --type echo --gateway ws://localhost:8080 --space test-space &
-   meup agent start --type calculator --gateway ws://localhost:8080 --space test-space &
-   meup agent start --type fulfiller --gateway ws://localhost:8080 --space test-space &
+   # Agents are separate programs, not part of CLI
+   # Example: node ./tests/agents/echo.js --gateway ws://localhost:8080 &
+   # Or define in space.yaml with auto_start: true
    ```
 
 3. **Connect Test Clients with FIFOs:**
@@ -262,18 +227,17 @@ The test plan uses the CLI as follows:
 - Start WebSocket server on specified port
 - Accept client connections
 - Route messages between participants in same space
-- No authentication required for initial version
+- Load space.yaml for capability configuration
+- Provide hooks for capability resolution
 
 ### Client
 - Connect to gateway WebSocket
 - Join specified space
-- Read JSON from fifo-in, send to gateway
-- Write received messages to fifo-out as JSON
+- Support interactive mode (readline) by default
+- Support FIFO mode for automation
+- Read JSON from fifo-in, send to gateway (FIFO mode)
+- Write received messages to fifo-out as JSON (FIFO mode)
 
-### Agents
-- **Echo**: Listen for chat, respond with "Echo: " + text
-- **Calculator**: Implement add, multiply, evaluate tools
-- **Fulfiller**: Watch for proposals, auto-fulfill them
 
 ### Token
 - Generate simple JWT or even just return the participant-id as token
@@ -377,8 +341,8 @@ The space.yaml can define how local participants should be started:
 participants:
   calculator-agent:
     type: local
-    command: "meup agent start"
-    args: ["--type", "calculator"]
+    command: "node"
+    args: ["./agents/calculator.js", "--gateway", "ws://localhost:8080"]
     env:
       LOG_LEVEL: "debug"
       CACHE_DIR: "/tmp/calculator-cache"
@@ -420,132 +384,102 @@ Example:
 meup gateway start --port 8080 --space-config ./configs/production.yaml
 ```
 
-## Interactive Space Connection
+## Space Management
 
-### `meup space connect`
+### `meup space up`
 
-Connects to a running space interactively, allowing users to participate directly through various UI modes.
+Brings up all components of a space based on space.yaml configuration, optionally connecting interactively as a participant.
 
 ```bash
-meup space connect [options]
+meup space up [options]
 
 Options:
   --space-config <path>   Path to space.yaml (default: ./space.yaml)
-  --participant <id>      Participant ID to connect as
-  --token <token>         Authentication token (prompts if not provided)
-  --ui <mode>             UI mode: terminal|web|electron|game (default: terminal)
-  --theme <theme>         UI theme name (UI-specific)
-  --gateway <url>         Override gateway URL from config
+  --participant <id>      Optional: Connect as this participant after bringing up space
+  --detach, -d            Run in background without connecting
 ```
 
-### UI Modes
+This command:
+1. Starts the gateway based on space.yaml settings
+2. Starts all agents with `auto_start: true`
+3. Optionally connects you as a participant (see Participant Resolution below)
 
-#### Terminal UI (Default)
-The default interactive terminal interface for text-based interaction:
+When connecting as a participant, tokens and capabilities come from space.yaml - no need to specify them.
 
-```bash
-# Connect with default terminal UI
-meup space connect --participant human-reviewer
+#### Participant Resolution
 
-# Terminal UI features:
-# - Real-time message display
-# - Command input with history
-# - Syntax highlighting for code blocks
-# - Tab completion for commands
-# - Split panes for different contexts
-```
+The CLI automatically determines which participant to connect as using this precedence:
 
-#### Web UI
-Browser-based interface accessible via localhost:
+1. **Explicit flag**: `--participant <id>` always takes priority
+2. **Space default**: `default_participant` field in space.yaml
+3. **Single human**: Auto-selects if only one participant without a `command` field exists
+4. **Interactive prompt**: Shows list of human participants to choose from
+5. **System username**: Used if it matches a human participant (last resort)
+6. **Detached mode**: Runs without connecting if no participant can be determined
 
-```bash
-# Start web UI on default port 3000
-meup space connect --ui web
-
-# Opens browser to http://localhost:3000
-# Features: Rich text, file uploads, visual tool results
-```
-
-#### Electron App
-Native desktop application with full system integration:
-
-```bash
-# Launch Electron desktop app
-meup space connect --ui electron --theme dark
-
-# Features: System notifications, file drag-drop, offline mode
-```
-
-#### Game UI (Experimental)
-3D environment using Proton3 or similar game engine:
-
-```bash
-# Launch game-like 3D interface
-meup space connect --ui game
-
-# Features: Spatial audio, avatars, virtual workspace
-```
-
-### Space Configuration for UI
-
-The space.yaml can specify default UI settings and allowed UI modes:
-
+Example space.yaml with participant resolution:
 ```yaml
-# space.yaml
-ui:
-  default_mode: terminal  # Default UI when not specified
-  allowed_modes:          # Restrict available UIs
-    - terminal
-    - web
-    - electron
-  terminal:
-    theme: monokai
-    font_size: 14
-    show_timestamps: true
-  web:
-    port: 3000
-    auto_open: true
-    allow_file_uploads: true
-  electron:
-    window_size: [1200, 800]
-    start_minimized: false
-    system_tray: true
-  game:
-    engine: proton3
-    world: collaborative_office
-    vr_enabled: false
-
-# Per-participant UI preferences
+space:
+  id: my-space
+  default_participant: developer  # Optional default
+  
 participants:
-  human-reviewer:
-    ui_preferences:
-      default_mode: electron  # Override default for this participant
-      terminal:
-        theme: solarized-dark
+  developer:           # Human participant (no command)
+    tokens: [...]
+  echo-agent:         # Agent participant (has command)
+    command: "node"
+    args: ["./agents/echo.js"]
+    auto_start: true
+  rjcorwin:           # Matches system username
+    tokens: [...]
 ```
 
-### Connection Flow
+### `meup space down`
 
-1. **Load Configuration**: Read space.yaml to get gateway URL and participant settings
-2. **Authenticate**: Use provided token or prompt for credentials
-3. **Initialize UI**: Start selected UI mode with configured settings
-4. **Connect to Gateway**: Establish WebSocket connection
-5. **Join Space**: Send join message with participant ID
-6. **Interactive Session**: Handle user input and display messages
+Stops all components of a running space.
 
-### Terminal UI Commands
+```bash
+meup space down [options]
 
-When connected via terminal UI, special commands are available:
+Options:
+  --space-config <path>   Path to space.yaml (default: ./space.yaml)
+  --force                 Force kill processes if graceful shutdown fails
+```
+
+This command:
+1. Disconnects all clients
+2. Stops all agents started by the space
+3. Shuts down the gateway
+4. Cleans up any temporary files
+
+### Terminal Interface
+
+#### Input Handling
+
+The terminal interface uses smart detection to handle both simple chat and full protocol messages:
+
+1. **Commands** (start with `/`): Execute special actions
+2. **JSON envelopes** (valid MEUP JSON): Send as-is for full protocol access  
+3. **Plain text**: Automatically wrapped as chat messages
+
+Examples:
+```bash
+> Hello everyone                    # Sends chat message
+> {"kind": "mcp/request", ...}      # Sends JSON envelope as-is
+> /help                              # Executes help command
+> How's it going?                    # Sends chat message
+> { invalid json                     # Sends as chat (not valid JSON)
+```
+
+#### Terminal Commands
+
+Special commands available when connected interactively:
 
 ```
 /help              Show available commands
 /participants      List active participants
 /capabilities      Show your current capabilities
-/tools             List available MCP tools
-/context push      Push new context
-/context pop       Pop current context
-/context show      Display context stack
-/file <path>       Send file content
+/chat <text>       Force text to be sent as chat (edge cases)
 /exit              Disconnect from space
 ```
 
@@ -553,58 +487,35 @@ When connected via terminal UI, special commands are available:
 
 #### Developer Review Session
 ```bash
-# Start space with configuration
-meup gateway start --space-config ./code-review.yaml &
+# Bring up space and connect as developer
+meup space up --space-config ./code-review.yaml --participant developer
 
-# Developer connects with terminal UI
-meup space connect --participant developer --ui terminal
-
-# Manager connects with Electron app
-meup space connect --participant manager --ui electron
-
-# CI system connects programmatically (non-interactive)
-meup client connect --participant ci-bot --token $CI_TOKEN
+# In another terminal, CI system connects with FIFOs for automation
+mkfifo ci-in ci-out
+meup client connect \
+  --gateway ws://localhost:8080 \
+  --space code-review \
+  --participant ci-bot \
+  --fifo-in ci-in \
+  --fifo-out ci-out &
 ```
 
-#### Collaborative Design Session
+#### Test Automation Session
 ```bash
-# Designer uses web UI for rich media
-meup space connect --participant designer --ui web
+# Bring up the space in background
+meup space up --detach
 
-# Engineer uses terminal for code focus
-meup space connect --participant engineer --ui terminal
+# Connect test clients with FIFOs
+mkfifo client1-in client1-out
+meup client connect \
+  --gateway ws://localhost:8080 \
+  --space test-space \
+  --participant test-client-1 \
+  --fifo-in client1-in \
+  --fifo-out client1-out &
 
-# Product manager uses game UI for spatial collaboration
-meup space connect --participant pm --ui game
-```
-
-### Custom UI Integration
-
-Third-party UIs can integrate by implementing the UI interface:
-
-```typescript
-interface SpaceUI {
-  // Initialize UI with configuration
-  init(config: UIConfig): Promise<void>;
-  
-  // Connect to gateway
-  connect(gateway: string, token: string): Promise<void>;
-  
-  // Handle incoming messages
-  onMessage(message: MEUPMessage): void;
-  
-  // Send user input as message
-  sendMessage(message: MEUPMessage): void;
-  
-  // Clean shutdown
-  disconnect(): Promise<void>;
-}
-```
-
-Register custom UI:
-```bash
-meup ui register my-custom-ui ./my-ui-module.js
-meup space connect --ui my-custom-ui
+# Send test messages
+echo '{"kind":"chat","payload":{"text":"test"}}' > client1-in
 ```
 
 ## Next Steps
