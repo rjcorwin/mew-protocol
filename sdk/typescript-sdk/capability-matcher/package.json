@@ -1,7 +1,7 @@
 {
   "name": "@meup/capability-matcher",
-  "version": "0.1.0",
-  "description": "Pattern matching for MEUP capability definitions",
+  "version": "0.2.0",
+  "description": "Pattern matching for MEUP capability definitions (ADR-q8f implementation)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -14,9 +14,10 @@
     "meup",
     "capability",
     "pattern-matching",
-    "permissions"
+    "permissions",
+    "adr-q8f"
   ],
-  "author": "",
+  "author": "MEUP Working Group",
   "license": "MIT",
   "devDependencies": {
     "@types/jest": "^29.5.0",
@@ -28,6 +29,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@meup/types": "file:../types",
     "jsonpath-plus": "^8.0.0",
     "lodash": "^4.17.21",
     "micromatch": "^4.0.5"

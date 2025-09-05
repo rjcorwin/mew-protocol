@@ -188,7 +188,7 @@ Use simple strings for common cases, JSON objects for complex patterns.
 
 ## Implementation
 
-The decision to use JSON Pattern Matching was validated through a prototype implementation (see `/packages/capability-matcher`) that successfully demonstrates:
+The decision to use JSON Pattern Matching was validated through a prototype implementation (see `/sdk/typescript-sdk/capability-matcher`) that successfully demonstrates:
 
 1. **Proven feasibility** - All pattern types work as specified using existing libraries
 2. **Performance** - Built-in caching provides acceptable performance
