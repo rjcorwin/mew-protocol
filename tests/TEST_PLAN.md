@@ -25,9 +25,15 @@ echo "Starting test execution at $(date)"
 This folder will contain:
 - `scripts/` - All test scripts generated during the run
 - `configs/` - The space.yaml configuration file
+- `agents/` - Test agent executables (copied from tests/agents/)
 - `logs/` - Output logs from gateway and agents
 - `results/` - Test results in JSON format
 - `fifos/` - Named pipes for FIFO communication
+
+The test agents are standalone Node.js scripts that implement the MEUP agent protocol:
+- `agents/echo.js` - Echoes chat messages
+- `agents/calculator.js` - Provides MCP math tools
+- `agents/fulfiller.js` - Auto-fulfills proposals
 
 ## Testing Strategy
 
@@ -35,10 +41,10 @@ This folder will contain:
 All tests will be executed by the coding agent using the MEUP CLI in FIFO mode. The CLI interface specification is documented in [CLI_INTERFACE.md](./CLI_INTERFACE.md).
 
 **Important Testing Approach:**
-- Some participants are real autonomous agents (`meup agent start`):
-  - **Echo agent**: Automatically echoes any chat message it receives
-  - **Calculator agent**: Provides MCP tools (add, multiply, evaluate)
-  - **Fulfiller agent**: Automatically fulfills any proposal it observes
+- Some participants are real autonomous agents (run directly from `tests/agents/`):
+  - **Echo agent** (`tests/agents/echo.js`): Automatically echoes any chat message it receives
+  - **Calculator agent** (`tests/agents/calculator.js`): Provides MCP tools (add, multiply, evaluate)
+  - **Fulfiller agent** (`tests/agents/fulfiller.js`): Automatically fulfills any proposal it observes
 - Other participants are CLI connections (`meup client connect`) puppeted by the coding agent:
   - **Proposer**: Coding agent manually sends proposals via CLI
   - **Coordinator**: Coding agent controls capability grants/revokes
@@ -84,6 +90,9 @@ echo "Working in test directory: $(pwd)"
 
 # Copy space configuration to test directory
 cp /Users/rj/Git/rjcorwin/mcpx-protocol/cli/space.yaml "${TEST_RUN_DIR}/configs/space.yaml"
+
+# Copy test agents to test directory
+cp -r /Users/rj/Git/rjcorwin/mcpx-protocol/tests/agents "${TEST_RUN_DIR}/"
 
 # Configuration
 export GATEWAY_PORT=8080
@@ -151,7 +160,7 @@ cleanup() {
   rm -f *-in *-out
   
   # Check for orphaned processes (only our user, more careful)
-  ORPHANS=$(ps -u $USER | grep -E 'meup.*(gateway|agent|client)' | grep -v grep | grep -v "$$")
+  ORPHANS=$(ps -u $USER | grep -E '(meup|node.*agents/|gateway|client)' | grep -v grep | grep -v "$$")
   if [ -n "$ORPHANS" ]; then
     echo "WARNING: Found potential orphaned MEUP processes:"
     echo "$ORPHANS"
@@ -175,9 +184,8 @@ trap cleanup EXIT
 **Setup Commands:**
 ```bash
 # Note: Echo agent has auto_start: false in space.yaml, so we start it manually
-# Terminal 2: Start echo agent (real autonomous agent)
-meup agent start \
-  --type echo \
+# Start echo agent directly
+node ./agents/echo.js \
   --gateway ws://localhost:8080 \
   --space test-space \
   --token "echo-token" &
@@ -212,6 +220,7 @@ echo "$RESPONSE" | jq -e '.protocol == "meup/v0.2"'
 echo "$RESPONSE" | jq -e '.kind == "chat"'
 echo "$RESPONSE" | jq -e '.from == "echo-agent"'
 echo "$RESPONSE" | jq -e '.payload.text == "Echo: Hello echo"'
+# Note: Chat responses typically don't have correlation_id unless replying to specific message
 
 # Cleanup
 kill $ECHO_PID $CLI_PID
@@ -228,9 +237,8 @@ rm cli-in cli-out
 
 **Setup Commands:**
 ```bash
-# Start calculator agent (real autonomous agent)
-meup agent start \
-  --type calculator \
+# Start calculator agent directly
+node ./agents/calculator.js \
   --gateway ws://localhost:8080 \
   --space test-space \
   --token "calculator-token" &
@@ -250,35 +258,43 @@ CLI_PID=$!
 
 **Test Steps:**
 ```bash
-# Step 1: List available tools
-echo '{"kind":"mcp/request","payload":{"method":"tools/list","params":{}}}' > cli-in
-TOOLS=$(timeout 5 cat cli-out | head -1)
+# Step 1: List available tools (ask calculator directly)
+echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > cli-in
+TOOLS=$(timeout 5 cat cli-out | grep '"from":"calculator-agent"' | head -1)
 echo "$TOOLS" | jq '.payload.result.tools'
 
-# Verify calculator tools are present
+# Verify calculator tools are present (at least from the calculator agent)
 echo "$TOOLS" | jq -e '.payload.result.tools[] | select(.name == "add")'
 echo "$TOOLS" | jq -e '.payload.result.tools[] | select(.name == "multiply")'
 echo "$TOOLS" | jq -e '.payload.result.tools[] | select(.name == "evaluate")'
 
-# Step 2: Test add function
-echo '{"kind":"mcp/request","to":["calc-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > cli-in
-RESULT=$(timeout 5 cat cli-out | grep '"from":"calc-agent"' | grep '"kind":"mcp/response"' | head -1)
+# Step 2: Test add function (need to track request ID for correlation)
+REQUEST_ID="req-add-1"
+echo '{"id":"'$REQUEST_ID'","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > cli-in
+RESULT=$(timeout 5 cat cli-out | grep '"from":"calculator-agent"' | grep '"kind":"mcp/response"' | head -1)
 echo "$RESULT" | jq -e '.payload.result.content[0].text == "8"'
+echo "$RESULT" | jq -e '.correlation_id == ["'$REQUEST_ID'"]'
 
 # Step 3: Test multiply function
-echo '{"kind":"mcp/request","to":["calc-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":6}}}}' > cli-in
-RESULT=$(timeout 5 cat cli-out | grep '"from":"calc-agent"' | grep '"kind":"mcp/response"' | head -1)
+REQUEST_ID="req-mult-1"
+echo '{"id":"'$REQUEST_ID'","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":6}}}}' > cli-in
+RESULT=$(timeout 5 cat cli-out | grep '"from":"calculator-agent"' | grep '"kind":"mcp/response"' | head -1)
 echo "$RESULT" | jq -e '.payload.result.content[0].text == "42"'
+echo "$RESULT" | jq -e '.correlation_id == ["'$REQUEST_ID'"]'
 
 # Step 4: Test evaluate expression
-echo '{"kind":"mcp/request","to":["calc-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"2 * (3 + 4)"}}}}' > cli-in
-RESULT=$(timeout 5 cat cli-out | grep '"from":"calc-agent"' | grep '"kind":"mcp/response"' | head -1)
+REQUEST_ID="req-eval-1"
+echo '{"id":"'$REQUEST_ID'","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"2 * (3 + 4)"}}}}' > cli-in
+RESULT=$(timeout 5 cat cli-out | grep '"from":"calculator-agent"' | grep '"kind":"mcp/response"' | head -1)
 echo "$RESULT" | jq -e '.payload.result.content[0].text == "14"'
+echo "$RESULT" | jq -e '.correlation_id == ["'$REQUEST_ID'"]'
 
 # Step 5: Test error handling (invalid expression)
-echo '{"kind":"mcp/request","to":["calc-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"2 * (3 +"}}}}' > cli-in
-ERROR=$(timeout 5 cat cli-out | grep '"from":"calc-agent"' | grep '"kind":"mcp/response"' | grep '"error"' | head -1)
+REQUEST_ID="req-eval-error-1"
+echo '{"id":"'$REQUEST_ID'","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"2 * (3 +"}}}}' > cli-in
+ERROR=$(timeout 5 cat cli-out | grep '"from":"calculator-agent"' | grep '"kind":"mcp/response"' | grep '"error"' | head -1)
 echo "$ERROR" | jq -e '.payload.error.message | contains("Invalid expression")'
+echo "$ERROR" | jq -e '.correlation_id == ["'$REQUEST_ID'"]'
 
 # Cleanup
 kill $CALC_PID $CLI_PID  
@@ -308,9 +324,8 @@ meup client connect \
 PROP_PID=$!
 # Note: Gateway determines capabilities based on token, not CLI flags
 
-# Start fulfiller agent (real autonomous agent that auto-fulfills)
-meup agent start \
-  --type fulfiller \
+# Start fulfiller agent directly (auto-fulfills proposals)
+node ./agents/fulfiller.js \
   --gateway ws://localhost:8080 \
   --space test-space \
   --token "fulfiller-token" &
@@ -346,11 +361,17 @@ echo "$PROPOSAL_JSON" > prop-in
 sleep 2
 
 # Note: We can observe the fulfillment request in the logs
-# The fulfiller will send an mcp/request with correlation_id pointing to the proposal
+# The fulfiller will send an mcp/request with correlation_id array pointing to the proposal
 
-# Step 5: Verify execution result (broadcast to all, proposer can observe)
-RESULT=$(timeout 5 cat prop-out | grep '"kind":"mcp/response"' | grep "$PROPOSAL_ID" | head -1)
+# Step 4: Verify the fulfiller's execution request (observable by all)
+# The fulfiller sends mcp/request with correlation_id: ["proposal-id"]
+FULFILL_REQUEST=$(timeout 5 cat prop-out | grep '"kind":"mcp/request"' | grep '"correlation_id"' | head -1)
+echo "$FULFILL_REQUEST" | jq -e '.correlation_id | type == "array"'
+
+# Step 5: Verify execution result (the response from calculator)
+RESULT=$(timeout 5 cat prop-out | grep '"kind":"mcp/response"' | head -1)
 echo "$RESULT" | jq -e '.payload.result.content[0].text == "8"'
+echo "$RESULT" | jq -e '.correlation_id | type == "array"'
 
 # Cleanup
 kill $PROP_PID $FULFILL_PID
@@ -394,7 +415,7 @@ LIMITED_PID=$!
 **Test Steps:**
 ```bash
 # Step 1: Limited agent attempts MCP operation (blocked)
-echo '{"kind":"mcp/tools/list","payload":{}}' > limited-in
+echo '{"kind":"mcp/request","payload":{"method":"tools/list","params":{}}}' > limited-in
 ERROR=$(timeout 5 cat limited-out | grep '"kind":"system/error"' | head -1)
 echo "$ERROR" | jq -e '.payload.error | contains("capability")'
 
@@ -403,25 +424,25 @@ GRANT_JSON=$(cat <<EOF
 {
   "kind": "capability/grant",
   "payload": {
-    "to": "limited-agent",
-    "capabilities": ["mcp/tools/list"]
+    "recipient": "limited-agent",
+    "capabilities": [{"kind": "mcp/request", "payload": {"method": "tools/list"}}]
   }
 }
 EOF
 )
 echo "$GRANT_JSON" > coord-in
 
-# Step 3: Limited agent receives grant notification
-GRANT=$(timeout 5 cat limited-out | grep '"kind":"capability/granted"' | head -1)
-echo "$GRANT" | jq '.payload.capabilities'
+# Step 3: Limited agent receives grant acknowledgment (broadcast)
+GRANT_ACK=$(timeout 5 cat limited-out | grep '"kind":"capability/grant-ack"' | head -1)
+echo "$GRANT_ACK" | jq '.payload.status'
 
 # Step 4: Limited agent can now list tools
-echo '{"kind":"mcp/tools/list","payload":{}}' > limited-in
-TOOLS=$(timeout 5 cat limited-out | grep '"kind":"mcp/tools/response"' | head -1)
-echo "$TOOLS" | jq -e '.payload.tools'
+echo '{"kind":"mcp/request","payload":{"method":"tools/list","params":{}}}' > limited-in
+TOOLS=$(timeout 5 cat limited-out | grep '"kind":"mcp/response"' | head -1)
+echo "$TOOLS" | jq -e '.payload.result.tools'
 
 # Step 5: But still can't call tools
-echo '{"kind":"mcp/tools/call","payload":{"tool":"add","params":{"a":1,"b":2}}}' > limited-in
+echo '{"kind":"mcp/request","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":1,"b":2}}}}' > limited-in
 ERROR=$(timeout 5 cat limited-out | grep '"kind":"system/error"' | head -1)
 echo "$ERROR" | jq -e '.payload.error | contains("capability")'
 
@@ -430,8 +451,8 @@ REVOKE_JSON=$(cat <<EOF
 {
   "kind": "capability/revoke",
   "payload": {
-    "from": "limited-agent",
-    "capabilities": ["mcp/tools/list"]
+    "recipient": "limited-agent",
+    "capabilities": [{"kind": "mcp/request", "payload": {"method": "tools/list"}}]
   }
 }
 EOF
@@ -439,7 +460,7 @@ EOF
 echo "$REVOKE_JSON" > coord-in
 
 # Step 7: Limited agent can no longer list tools
-echo '{"kind":"mcp/tools/list","payload":{}}' > limited-in
+echo '{"kind":"mcp/request","payload":{"method":"tools/list","params":{}}}' > limited-in
 ERROR=$(timeout 5 cat limited-out | grep '"kind":"system/error"' | head -1)
 echo "$ERROR" | jq -e '.payload.error | contains("capability")'
 
@@ -455,11 +476,11 @@ rm coord-in coord-out limited-in limited-out
 - [ ] Non-granted operations still blocked
 - [ ] Revoked capability is blocked again
 
-### Scenario 5: Context Management
+### Scenario 5: Reasoning with Context Field
 
 **Setup Commands:**
 ```bash
-# Connect as research agent (we'll manage contexts)
+# Connect as research agent (will use reasoning messages)
 mkfifo research-in research-out
 meup client connect \
   --space test-space \
@@ -470,79 +491,116 @@ meup client connect \
   --fifo-out research-out &
 RESEARCH_PID=$!
 
-# Connect as calculator (responds to tool calls)
-mkfifo calc-in calc-out
-meup client connect \
-  --space test-space \
-  --participant-id calc-agent \
+# Start calculator agent directly
+node ./agents/calculator.js \
   --gateway ws://localhost:8080 \
-  --token "calculator-token" \
-  --fifo-in calc-in \
-  --fifo-out calc-out &
+  --space test-space \
+  --token "calculator-token" &
 CALC_PID=$!
 ```
 
 **Test Steps:**
 ```bash
-# Step 1: Send initial request
-echo '{"kind":"chat","payload":{"text":"Calculate: 5 items at $12 each with 8% tax"}}' > research-in
+# Step 1: Receive initial request
+REQUEST_ID="req-123"
+echo '{"id":"'$REQUEST_ID'","kind":"chat","payload":{"text":"Calculate: 5 items at $12 each with 8% tax"}}' > research-in
 
-# Step 2: Research agent pushes context for base cost calculation
-CONTEXT_PUSH=$(timeout 5 cat research-out | grep '"kind":"context/push"' | head -1)
-CONTEXT_ID_1=$(echo "$CONTEXT_PUSH" | jq -r '.correlation_id')
-echo "$CONTEXT_PUSH" | jq -e '.payload.topic == "calculate-base-cost"'
+# Step 2: Research agent starts reasoning
+REASON_START_JSON=$(cat <<EOF
+{
+  "kind": "reasoning/start",
+  "correlation_id": ["$REQUEST_ID"],
+  "payload": {
+    "message": "Calculating total with tax for 5 items at $12 each"
+  }
+}
+EOF
+)
+echo "$REASON_START_JSON" > research-in
 
-# Step 3: Within context, ask calculator to multiply
-echo '{"kind":"mcp/tools/call","to":["calc-agent"],"correlation_id":"'$CONTEXT_ID_1'","payload":{"tool":"multiply","params":{"a":5,"b":12}}}' > research-in
+# Get the reasoning start message ID to use as context
+REASON_ID="reason-start-1"
 
-# Step 4: Verify calculator response has context correlation
-CALC_RESPONSE=$(timeout 5 cat calc-out | grep "$CONTEXT_ID_1" | head -1)
-echo "$CALC_RESPONSE" | jq -e '.correlation_id == "'$CONTEXT_ID_1'"'
-echo "$CALC_RESPONSE" | jq -e '.payload.result == 60'
+# Step 3: Send reasoning thought about base cost
+THOUGHT_JSON=$(cat <<EOF
+{
+  "kind": "reasoning/thought",
+  "context": "$REASON_ID",
+  "payload": {
+    "message": "First, I need to calculate the base cost: 5 × 12"
+  }
+}
+EOF
+)
+echo "$THOUGHT_JSON" > research-in
 
-# Step 5: Pop context
-echo '{"kind":"context/pop","correlation_id":"'$CONTEXT_ID_1'"}' > research-in
+# Step 4: Call calculator within reasoning context
+echo '{"kind":"mcp/request","to":["calculator-agent"],"context":"'$REASON_ID'","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":5,"b":12}}}}' > research-in
 
-# Step 6: Push new context for tax calculation
-CONTEXT_PUSH=$(timeout 5 cat research-out | grep '"kind":"context/push"' | tail -1)
-CONTEXT_ID_2=$(echo "$CONTEXT_PUSH" | jq -r '.correlation_id')
-echo "$CONTEXT_PUSH" | jq -e '.payload.topic == "calculate-tax"'
+# Step 5: Read calculator response (should have correlation_id to request)
+CALC_RESPONSE=$(timeout 5 cat research-out | grep '"kind":"mcp/response"' | grep '"from":"calculator-agent"' | head -1)
+echo "$CALC_RESPONSE" | jq -e '.payload.result.content[0].text == "60"'
+
+# Step 6: Send reasoning thought about tax
+THOUGHT_JSON=$(cat <<EOF
+{
+  "kind": "reasoning/thought",
+  "context": "$REASON_ID",
+  "payload": {
+    "message": "Now calculating 8% tax on $60"
+  }
+}
+EOF
+)
+echo "$THOUGHT_JSON" > research-in
 
 # Step 7: Calculate tax
-echo '{"kind":"mcp/tools/call","to":["calc-agent"],"correlation_id":"'$CONTEXT_ID_2'","payload":{"tool":"multiply","params":{"a":60,"b":0.08}}}' > research-in
-CALC_RESPONSE=$(timeout 5 cat calc-out | grep "$CONTEXT_ID_2" | head -1)
-echo "$CALC_RESPONSE" | jq -e '.payload.result == 4.8'
+echo '{"kind":"mcp/request","to":["calculator-agent"],"context":"'$REASON_ID'","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":60,"b":0.08}}}}' > research-in
+CALC_RESPONSE=$(timeout 5 cat research-out | grep '"kind":"mcp/response"' | tail -1)
+echo "$CALC_RESPONSE" | jq -e '.payload.result.content[0].text == "4.8"'
 
-# Step 8: Pop tax context
-echo '{"kind":"context/pop","correlation_id":"'$CONTEXT_ID_2'"}' > research-in
+# Step 8: Calculate total
+echo '{"kind":"mcp/request","to":["calculator-agent"],"context":"'$REASON_ID'","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":60,"b":4.8}}}}' > research-in
+CALC_RESPONSE=$(timeout 5 cat research-out | grep '"kind":"mcp/response"' | tail -1)
+echo "$CALC_RESPONSE" | jq -e '.payload.result.content[0].text == "64.8"'
 
-# Step 9: Push context for total
-CONTEXT_PUSH=$(timeout 5 cat research-out | grep '"kind":"context/push"' | tail -1)
-CONTEXT_ID_3=$(echo "$CONTEXT_PUSH" | jq -r '.correlation_id')
+# Step 9: Send reasoning conclusion
+CONCLUSION_JSON=$(cat <<EOF
+{
+  "kind": "reasoning/conclusion",
+  "context": "$REASON_ID",
+  "payload": {
+    "message": "Total cost is $64.80 (base: $60, tax: $4.80)"
+  }
+}
+EOF
+)
+echo "$CONCLUSION_JSON" > research-in
 
-# Step 10: Calculate total
-echo '{"kind":"mcp/tools/call","to":["calc-agent"],"correlation_id":"'$CONTEXT_ID_3'","payload":{"tool":"add","params":{"a":60,"b":4.8}}}' > research-in
-CALC_RESPONSE=$(timeout 5 cat calc-out | grep "$CONTEXT_ID_3" | head -1)
-echo "$CALC_RESPONSE" | jq -e '.payload.result == 64.8'
-
-# Step 11: Pop final context
-echo '{"kind":"context/pop","correlation_id":"'$CONTEXT_ID_3'"}' > research-in
-
-# Step 12: Verify final response
-FINAL_RESPONSE=$(timeout 5 cat research-out | grep '"kind":"chat"' | grep "64.80" | head -1)
-echo "$FINAL_RESPONSE" | jq -e '.payload.text | contains("$64.80")'
+# Step 10: Send final response
+RESPONSE_JSON=$(cat <<EOF
+{
+  "kind": "chat",
+  "correlation_id": ["$REQUEST_ID"],
+  "payload": {
+    "text": "The total cost is $64.80 (5 items × $12 = $60, plus 8% tax = $4.80)"
+  }
+}
+EOF
+)
+echo "$RESPONSE_JSON" > research-in
 
 # Cleanup
 kill $RESEARCH_PID $CALC_PID
-rm research-in research-out calc-in calc-out
+rm research-in research-out
 ```
 
 **Pass Criteria:**
-- [ ] Context push creates new correlation ID
-- [ ] Messages within context use that correlation ID
-- [ ] Context pop returns to parent
-- [ ] Each context maintains isolation
-- [ ] Final result correctly aggregates all calculations
+- [ ] Reasoning start creates context
+- [ ] Messages within reasoning use context field
+- [ ] Calculator responses include proper correlation_id
+- [ ] Reasoning thoughts organize the calculation flow
+- [ ] Final response correctly aggregates all calculations
 
 ### Scenario 6: Error Recovery and Edge Cases
 
@@ -555,7 +613,7 @@ rm research-in research-out calc-in calc-out
 ```bash
 # Test 1: Malformed JSON
 mkfifo test-in test-out
-meup cli connect --space test-space --participant-id test-client \
+meup client connect --space test-space --participant-id test-client \
   --gateway ws://localhost:8080 --fifo-in test-in --fifo-out test-out &
 TEST_PID=$!
 
@@ -576,7 +634,7 @@ echo "$ERROR" | jq -e '.payload.error | contains("protocol")'
 # Test 4: Disconnect and reconnect
 kill $TEST_PID
 sleep 2
-meup cli connect --space test-space --participant-id test-client \
+meup client connect --space test-space --participant-id test-client \
   --gateway ws://localhost:8080 --fifo-in test-in --fifo-out test-out &
 TEST_PID=$!
 echo '{"kind":"chat","payload":{"text":"reconnected"}}' > test-in
@@ -605,7 +663,7 @@ rm *.log
 ls *.in *.out 2>/dev/null || echo "All FIFOs cleaned"
 
 # Check for orphaned processes
-ps aux | grep meup | grep -v grep || echo "No orphaned processes"
+ps aux | grep -E '(meup|node.*agents/)' | grep -v grep || echo "No orphaned processes"
 ```
 
 ## Test Execution Summary
