@@ -1,5 +1,34 @@
 # MEUP v0.2 Test Plan - Coding Agent Executable
 
+## Test Run Setup
+
+### Creating Test Run Folder
+Before starting any test execution, create a dedicated folder to contain all test artifacts:
+
+```bash
+# Create test run folder with convention: test-YYMMDD-HHMM
+TEST_RUN_DIR="./test-$(date +%y%m%d-%H%M)"
+mkdir -p "$TEST_RUN_DIR"
+cd "$TEST_RUN_DIR"
+
+# Create subdirectories for organization
+mkdir -p scripts      # Test scripts
+mkdir -p configs      # Space configuration files
+mkdir -p logs         # Gateway and agent logs
+mkdir -p results      # Test results and reports
+mkdir -p fifos        # FIFO pipes for client communication
+
+echo "Test run directory created: $TEST_RUN_DIR"
+echo "Starting test execution at $(date)"
+```
+
+This folder will contain:
+- `scripts/` - All test scripts generated during the run
+- `configs/` - The space.yaml configuration file
+- `logs/` - Output logs from gateway and agents
+- `results/` - Test results in JSON format
+- `fifos/` - Named pipes for FIFO communication
+
 ## Testing Strategy
 
 ### Execution Method
@@ -37,13 +66,14 @@ which jq || echo "ERROR: jq not found (required for JSON parsing)"
 which mkfifo || echo "ERROR: mkfifo not found (required for FIFO creation)"
 which timeout || echo "ERROR: timeout not found (required for read timeouts)"
 
-# Create test directory
-TEST_DIR="/tmp/meup-tests-$(date +%s)"
-mkdir -p "$TEST_DIR"
-cd "$TEST_DIR"
+# Ensure we're in the test run directory created above
+if [ -z "$TEST_RUN_DIR" ]; then
+  echo "ERROR: TEST_RUN_DIR not set. Run test setup first."
+  exit 1
+fi
 
-# Create log directory
-mkdir -p logs
+cd "$TEST_RUN_DIR"
+echo "Working in test directory: $(pwd)"
 ```
 
 ### Test Environment Setup
@@ -56,7 +86,7 @@ mkdir -p logs
 export GATEWAY_PORT=8080
 export GATEWAY_URL="ws://localhost:${GATEWAY_PORT}"
 export TEST_SPACE="test-space-$(date +%s)"
-export LOG_DIR="./logs"
+export LOG_DIR="${TEST_RUN_DIR}/logs"
 
 # Start gateway
 echo "Starting gateway on port $GATEWAY_PORT..."

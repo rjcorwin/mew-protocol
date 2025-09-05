@@ -1,187 +1,107 @@
 # MEUP Test Suite
 
-Comprehensive testing for the MEUP protocol implementation including test agents, integration tests, and multi-agent scenarios.
+Comprehensive testing for the MEUP protocol implementation.
 
-## Directory Structure
+## Test Structure
+
+Each test run creates a dedicated folder with the convention `test-YYMMDD-HHMM` containing:
 
 ```
-tests/
-├── agents/              # Test agent implementations
-│   ├── echo-agent.ts       # Simple echo responses
-│   ├── calculator-agent.ts # MCP tool provider
-│   ├── proposer-agent.ts   # Untrusted agent making proposals
-│   ├── fulfiller-agent.ts  # Trusted agent executing proposals
-│   ├── coordinator-agent.ts # Reviews and routes proposals
-│   └── context-agent.ts    # Tests sub-context management
-├── integration/         # Integration test scripts
-│   ├── basic-flow.test.ts
-│   ├── mcp-tools.test.ts
-│   ├── proposals.test.ts
-│   ├── capabilities.test.ts
-│   └── context.test.ts
-├── scenarios/          # Multi-agent test scenarios
-│   ├── collaboration.ts
-│   ├── progressive-automation.ts
-│   └── untrusted-execution.ts
-└── utils/              # Test utilities
-    ├── test-harness.ts
-    └── assertions.ts
+test-YYMMDD-HHMM/
+├── scripts/      # Test scripts generated during the run
+├── configs/      # Space configuration files (space.yaml)
+├── logs/         # Gateway and agent output logs
+├── results/      # Test results in JSON format
+└── fifos/        # Named pipes for FIFO communication
 ```
+
+The main test plan is documented in [TEST_PLAN.md](./TEST_PLAN.md), which provides:
+- Step-by-step test scenarios
+- CLI commands for running tests
+- Expected outputs and validation steps
+- Test automation using FIFO mode
 
 ## Test Agents
 
-### 1. Echo Agent (`echo-agent.ts`)
-- **Purpose**: Test basic message flow
-- **Capabilities**: `chat`
-- **Behavior**: Echoes received chat messages
-- **Tests**: Message routing, presence, basic connectivity
+The CLI provides built-in test agents for testing:
 
-### 2. Calculator Agent (`calculator-agent.ts`)
+### 1. Echo Agent
+- **Type**: `echo`
+- **Purpose**: Test basic message flow
+- **Behavior**: Echoes received chat messages with "Echo: " prefix
+- **Usage**: `meup agent start --type echo`
+
+### 2. Calculator Agent
+- **Type**: `calculator`
 - **Purpose**: Test MCP tool provision and calling
-- **Capabilities**: `mcp/*`
 - **Tools Provided**:
   - `add(a, b)` - Addition
   - `multiply(a, b)` - Multiplication
   - `evaluate(expression)` - Expression evaluation
-- **Tests**: Tool discovery, tool execution, error handling
+- **Usage**: `meup agent start --type calculator`
 
-### 3. Proposer Agent (`proposer-agent.ts`)
-- **Purpose**: Test proposal creation by untrusted agents
-- **Role**: `untrusted`
-- **Capabilities**: `chat`, `meup/proposal`
-- **Behavior**: Proposes tool calls and requests it can't execute directly
-- **Tests**: Proposal creation, capability limitations
-
-### 4. Fulfiller Agent (`fulfiller-agent.ts`)
+### 3. Fulfiller Agent
+- **Type**: `fulfiller`
 - **Purpose**: Test proposal execution
-- **Role**: `trusted`
-- **Capabilities**: `*`
-- **Behavior**: Reviews and executes approved proposals
-- **Tests**: Proposal review, execution, rejection
+- **Behavior**: Automatically fulfills any `mcp/proposal` it observes
+- **Usage**: `meup agent start --type fulfiller`
 
-### 5. Coordinator Agent (`coordinator-agent.ts`)
-- **Purpose**: Test complex proposal routing and review
-- **Role**: `coordinator`
-- **Capabilities**: `*`
-- **Behavior**: 
-  - Reviews proposals based on rules
-  - Routes to appropriate fulfillers
-  - Maintains audit log
-- **Tests**: Complex routing, multi-step approval
+## Test Scenarios
 
-### 6. Context Agent (`context-agent.ts`)
-- **Purpose**: Test sub-context protocol
-- **Capabilities**: `mcp/*`, `meup/context`
-- **Behavior**: 
-  - Pushes context for sub-tasks
-  - Maintains context-specific state
-  - Tests pop/resume operations
-- **Tests**: Context stack management, scoped conversations
+The TEST_PLAN.md includes 6 test scenarios:
 
-## Integration Test Plan
-
-### Phase 1: Basic Connectivity
-1. Start gateway
-2. Connect echo agent
-3. Send messages
-4. Verify responses
-5. Test disconnect/reconnect
-
-### Phase 2: MCP Operations
-1. Start calculator agent
-2. Discover tools via `tools/list`
-3. Call tools with valid inputs
-4. Test error cases
-5. Verify response correlation
-
-### Phase 3: Proposal-Execute Pattern
-1. Start proposer (untrusted) and fulfiller (trusted)
-2. Proposer attempts direct tool call (should fail)
-3. Proposer creates proposal
-4. Fulfiller reviews and accepts
-5. Verify execution and response
-
-### Phase 4: Capability Enforcement
-1. Test operations with different capability sets
-2. Verify blocked operations
-3. Test capability granting/revoking
-4. Verify dynamic capability updates
-
-### Phase 5: Context Management
-1. Test context push for sub-task
-2. Verify message scoping
-3. Test context pop
-4. Test context resume
-5. Verify context stack state
-
-### Phase 6: Multi-Agent Scenarios
-1. **Collaboration**: Multiple agents working together
-2. **Progressive Automation**: Learning from human decisions
-3. **Untrusted Execution**: Safe execution of untrusted code
+1. **Basic Message Flow**: Echo agent responds to chat messages
+2. **MCP Tool Execution**: Calculator agent provides and executes tools
+3. **Proposal Pattern**: Untrusted proposer with trusted fulfiller
+4. **Dynamic Capabilities**: Granting and revoking capabilities
+5. **Context Management**: Push/pop context stacks
+6. **Error Recovery**: Handling invalid messages and errors
 
 ## Running Tests
 
-### Using CLI (when implemented)
+### Quick Start
 
 ```bash
+# Create test run directory
+TEST_RUN_DIR="./test-$(date +%y%m%d-%H%M)"
+mkdir -p "$TEST_RUN_DIR"
+cd "$TEST_RUN_DIR"
+
 # Start gateway
-meup gateway start
+meup gateway start --port 8080 --log-level debug > logs/gateway.log 2>&1 &
 
-# Run individual test agent
-meup agent run tests/agents/echo-agent.ts
+# Start test agents
+meup agent start --type echo --gateway ws://localhost:8080 --space test-space &
+meup agent start --type calculator --gateway ws://localhost:8080 --space test-space &
+meup agent start --type fulfiller --gateway ws://localhost:8080 --space test-space &
 
-# Run integration test suite
-meup test integration
+# Connect test client with FIFOs
+mkfifo cli-in cli-out
+meup client connect \
+  --gateway ws://localhost:8080 \
+  --space test-space \
+  --fifo-in cli-in \
+  --fifo-out cli-out &
 
-# Run specific scenario
-meup test scenario collaboration
+# Send test messages
+echo '{"kind":"chat","payload":{"text":"hello"}}' > cli-in
+
+# Read responses
+cat cli-out
 ```
 
-### Manual Testing
+## Test Validation
 
-```bash
-# Terminal 1: Start gateway
-cd sdk/typescript-sdk/gateway
-npm run start:dev
+Each test scenario in TEST_PLAN.md includes:
 
-# Terminal 2: Run echo agent
-cd tests/agents
-npx tsx echo-agent.ts
+1. **Setup**: Commands to start gateway and agents
+2. **Execution**: Step-by-step test operations
+3. **Validation**: Expected outputs and assertions
+4. **Cleanup**: Resource teardown
 
-# Terminal 3: Run test client
-cd tests/integration
-npx tsx basic-flow.test.ts
-```
+## Current Status
 
-## Test Utilities
+See [TEST_PLAN.md](./TEST_PLAN.md) for detailed test scenarios and execution steps.
 
-### Test Harness (`test-harness.ts`)
-- Gateway lifecycle management
-- Agent spawning and management
-- Message capture and verification
-- Timing and synchronization
-
-### Assertions (`assertions.ts`)
-- Custom assertions for MEUP messages
-- Capability matching helpers
-- Context state verification
-- Proposal lifecycle tracking
-
-## Success Criteria
-
-Each test phase must verify:
-
-1. **Protocol Compliance**: All messages follow MEUP v0.2 spec
-2. **Capability Enforcement**: Access control works correctly
-3. **Message Routing**: Messages reach intended recipients
-4. **State Management**: Context and presence tracked correctly
-5. **Error Handling**: Graceful failure and error messages
-6. **Performance**: Acceptable latency and throughput
-
-## Coverage Goals
-
-- **Unit Tests**: 80% coverage of SDK code
-- **Integration Tests**: All major flows tested
-- **Scenario Tests**: Real-world use cases validated
-- **Edge Cases**: Error conditions and boundaries tested
-- **Load Tests**: Performance under stress verified
+- ✅ Scenarios 1-2: Basic flow and MCP tools (passing)
+- ⏳ Scenarios 3-6: Require capability system implementation
