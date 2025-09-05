@@ -41,6 +41,7 @@ All tasks for the v0.2 release have been completed on 2025-01-03.
 - [x] test-plan-2: Define test scenarios
 - [x] test-plan-3: Create test directory structure
 - [ ] test-plan-4: Editor review and approval of test plan
+    - Ensure that the test plan is realistic for a coding agent to verify.
 - [ ] test-plan-5: Finalize test agent specifications
 
 ### Test Agents and Examples (After Plan Approval)
