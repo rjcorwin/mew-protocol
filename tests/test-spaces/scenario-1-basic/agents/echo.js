@@ -62,6 +62,11 @@ ws.on('message', (data) => {
         }
       };
       
+      // Preserve correlation_id if the original message had an id
+      if (message.id) {
+        echoMessage.correlation_id = [message.id];
+      }
+      
       ws.send(JSON.stringify(echoMessage));
       console.log(`Echoed: "${text}"`);
     }

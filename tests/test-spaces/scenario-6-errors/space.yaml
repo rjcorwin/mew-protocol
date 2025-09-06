@@ -1,10 +1,11 @@
-name: test-space
-description: Scenario 6 - Error recovery and edge cases
+space:
+  id: test-space
+  name: "Scenario 6 - Error Recovery and Edge Cases"
+  description: "Test error recovery and edge cases"
 
 participants:
-  - id: test-client
-    description: Test client for error testing
+  test-client:
+    tokens: ["test-token"]
     capabilities:
       - kind: chat
       - kind: system/*
-    fifo: true

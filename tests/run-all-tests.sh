@@ -28,11 +28,18 @@ run_test() {
   echo -e "${YELLOW}Running $test_name...${NC}"
   
   if [ -f "$test_script" ]; then
-    if bash "$test_script" > /tmp/test-output-$$.log 2>&1; then
+    if timeout 30 bash "$test_script" > /tmp/test-output-$$.log 2>&1; then
       echo -e "${GREEN}✅ $test_name PASSED${NC}"
       ((TOTAL_PASS++))
     else
-      echo -e "${RED}❌ $test_name FAILED${NC}"
+      EXIT_CODE=$?
+      if [ $EXIT_CODE -eq 124 ]; then
+        echo -e "${RED}❌ $test_name TIMEOUT${NC}"
+        pkill -f "meup.js" 2>/dev/null || true
+        pkill -f "calculator.js" 2>/dev/null || true
+      else
+        echo -e "${RED}❌ $test_name FAILED${NC}"
+      fi
       echo "   See /tmp/test-output-$$.log for details"
       ((TOTAL_FAIL++))
       FAILED_TESTS="$FAILED_TESTS\n  - $test_name"

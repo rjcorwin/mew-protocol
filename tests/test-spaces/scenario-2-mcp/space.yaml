@@ -1,20 +1,19 @@
-name: test-space
-description: Scenario 2 - MCP tool execution test
+space:
+  id: test-space
+  name: "Scenario 2 - MCP Tool Execution"
+  description: "Test MCP tool execution with calculator agent"
 
 participants:
-  - id: calculator-agent
-    auto_start: true
-    description: Calculator agent providing MCP tools
+  calculator-agent:
+    tokens: ["calculator-token"]
     capabilities:
       - kind: mcp/response
       - kind: system/*
-    fifo: false
     
-  - id: test-client
-    description: Test client that calls MCP tools
+  test-client:
+    tokens: ["test-token"]
     capabilities:
       - kind: mcp/request
         payload:
           method: tools/*
       - kind: system/*
-    fifo: true

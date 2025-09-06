@@ -1,18 +1,17 @@
-name: test-space
-description: Scenario 1 - Basic message flow test
+space:
+  id: test-space
+  name: "Scenario 1 - Basic Message Flow"
+  description: "Test basic message flow with echo agent"
 
 participants:
-  - id: echo-agent
-    auto_start: true
-    description: Echo agent for testing basic message flow
+  echo-agent:
+    tokens: ["echo-token"]
     capabilities:
       - kind: chat
       - kind: system/*
-    fifo: true
     
-  - id: test-client  
-    description: Test client for sending messages
+  test-client:
+    tokens: ["test-token"]
     capabilities:
       - kind: chat
       - kind: system/*
-    fifo: true

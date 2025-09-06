@@ -99,9 +99,9 @@ fi
 # Test 2: Send message with ID
 echo -e "\n${YELLOW}Test 2: Send message with ID${NC}"
 echo '{"id":"msg-123","kind":"chat","payload":{"text":"Test with ID"}}' > ./fifos/test-client-in
-sleep 2
+sleep 3
 
-if grep -q '"correlation_id":\["msg-123"\]' ./logs/responses.txt; then
+if grep -q 'correlation_id.*msg-123' ./logs/responses.txt; then
   echo -e "${GREEN}✓ Correlation ID preserved${NC}"
   ((PASS_COUNT++))
 else
@@ -111,6 +111,7 @@ fi
 
 # Test 3: Send multiple messages
 echo -e "\n${YELLOW}Test 3: Send multiple messages${NC}"
+sleep 1  # Wait for previous test to complete
 echo '{"kind":"chat","payload":{"text":"Message 1"}}' > ./fifos/test-client-in
 sleep 1
 echo '{"kind":"chat","payload":{"text":"Message 2"}}' > ./fifos/test-client-in

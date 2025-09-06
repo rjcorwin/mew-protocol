@@ -1,17 +1,17 @@
-name: test-space
-description: Scenario 5 - Reasoning with context field
+space:
+  id: test-space
+  name: "Scenario 5 - Reasoning with Context Field"
+  description: "Test reasoning messages with context field"
 
 participants:
-  - id: calculator-agent
-    auto_start: true
-    description: Calculator agent providing MCP tools
+  calculator-agent:
+    tokens: ["calculator-token"]
     capabilities:
       - kind: mcp/response
       - kind: system/*
-    fifo: false
     
-  - id: research-agent
-    description: Research agent with reasoning capabilities
+  research-agent:
+    tokens: ["research-token"]
     capabilities:
       - kind: reasoning/*
       - kind: mcp/request
@@ -19,4 +19,3 @@ participants:
           method: tools/*
       - kind: chat
       - kind: system/*
-    fifo: true
