@@ -8,6 +8,7 @@ const gatewayCommand = require('./commands/gateway');
 const clientCommand = require('./commands/client');
 const agentCommand = require('./commands/agent');
 const tokenCommand = require('./commands/token');
+const spaceCommand = require('./commands/space');
 
 // Setup CLI
 program
@@ -20,6 +21,7 @@ program.addCommand(gatewayCommand);
 program.addCommand(clientCommand);
 program.addCommand(agentCommand);
 program.addCommand(tokenCommand);
+program.addCommand(spaceCommand);
 
 // Parse arguments
 program.parse(process.argv);

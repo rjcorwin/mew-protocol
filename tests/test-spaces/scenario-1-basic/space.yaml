@@ -9,9 +9,11 @@ participants:
     capabilities:
       - kind: chat
       - kind: system/*
+    fifo: false  # Agent doesn't need FIFOs
     
   test-client:
     tokens: ["test-token"]
     capabilities:
       - kind: chat
       - kind: system/*
+    fifo: true  # Create FIFOs for test client

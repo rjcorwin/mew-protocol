@@ -42,36 +42,43 @@
     - [x] All agent .js files that can be symlinked/copied
   - [x] `test-spaces/run-all-tests.sh` - Master test runner created
 
-### Phase 2: Implement `meup space` Commands
-- [ ] Add FIFO configuration support to space.yaml:
-  - [ ] Add optional `fifo: true/false` field per participant
-  - [ ] Or `fifo: { enabled: true, path: "./custom/path" }` for custom paths
-  - [ ] Default to no FIFO unless explicitly configured
+### Phase 2: Implement `meup space` Commands ✅
+- [x] Add FIFO configuration support to space.yaml:
+  - [x] Add optional `fifo: true/false` field per participant
+  - [x] Default to no FIFO unless explicitly configured
 
-- [ ] `meup space up` command:
-  - [ ] Read space.yaml in current directory (or --space-dir)
-  - [ ] Start gateway with space configuration
-  - [ ] Auto-start agents with auto_start: true
-  - [ ] For participants with `fifo: true` in space.yaml:
-    - [ ] Create FIFOs in `./fifos/` (or custom path):
-      - [ ] `{participant-id}-in`
-      - [ ] `{participant-id}-out`
-    - [ ] Auto-connect participant using FIFO mode
-  - [ ] Save PID file for cleanup (`.meup/pids.json`)
-  - [ ] Display connection info and status
+- [x] `meup space up` command:
+  - [x] Read space.yaml in current directory (or --space-dir)
+  - [x] Start gateway with space configuration
+  - [x] Auto-start agents with auto_start: true
+  - [x] For participants with `fifo: true` in space.yaml:
+    - [x] Create FIFOs in `./fifos/`:
+      - [x] `{participant-id}-in`
+      - [x] `{participant-id}-out`
+  - [x] Save PID file for cleanup (`.meup/pids.json`)
+  - [x] Display connection info and status
 
-- [ ] `meup space down` command:
-  - [ ] Read PID file from `.meup/pids.json`
-  - [ ] Gracefully shutdown gateway
-  - [ ] Terminate all agent processes
-  - [ ] Clean up FIFOs
-  - [ ] Remove PID file
+- [x] `meup space down` command:
+  - [x] Read PID file from `.meup/pids.json`
+  - [x] Gracefully shutdown gateway
+  - [x] Terminate all agent processes
+  - [x] Clean up FIFOs
+  - [x] Remove PID file
 
-- [ ] `meup space status` command:
-  - [ ] Show running spaces
-  - [ ] List connected participants
-  - [ ] Display gateway health
-  - [ ] Show FIFO paths
+- [x] `meup space status` command:
+  - [x] Show running spaces
+  - [x] List connected participants
+  - [x] Display gateway health
+  - [x] Show FIFO paths
+
+### Phase 2.5: Fix Space Command Issues ✅
+- [x] **Background process management**: Improve handling of detached processes to prevent orphaning
+- [x] **PID validation**: Validate that stored PIDs are still running and belong to expected commands
+- [x] **FIFO creation error handling**: Check if `mkfifo` command is available before using it
+- [x] **Port conflict checking**: Check if port is already in use before starting gateway
+- [x] **Implement auto-connect**: Add auto_connect support for FIFO participants in space.yaml
+- [x] **Fix runningSpaces persistence**: Store running spaces in ~/.meup/running-spaces.json so status works across CLI sessions
+- [x] **Add gateway health check**: Replace fixed sleep with actual health check when starting gateway
 
 ### Phase 3: Test Script Simplification
 - [ ] Create `test-spaces/scenario-0-manual/`:
@@ -113,6 +120,15 @@
 - [ ] Remove test-space/ directory (replaced by test-spaces/*)
 - [ ] Update .gitignore for test artifacts
 - [ ] Ensure all tests pass with new structure
+
+## 🔧 Future Improvements for Space Commands
+
+### Robustness Enhancements
+- [ ] **Race condition in FIFO creation**: Add file locking or sequential creation when multiple participants create FIFOs simultaneously
+- [ ] **WebSocket health check**: Extend health check to verify WebSocket server, not just HTTP endpoint
+- [ ] **Space.yaml validation**: Validate that space.yaml hasn't changed between `space up` and `space down`
+- [ ] **Token validation**: Improve token handling to validate against actual space configuration
+- [ ] **Configurable health check timeout**: Make the 30-second health check timeout configurable
 
 ## 🚀 Future Enhancements (After Refactoring)
 
