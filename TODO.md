@@ -7,6 +7,11 @@
 - Implement `meup space up/down` commands for automated space management
 - Reduce redundancy in test scripts and documentation
 - Create a cleaner separation between different test scenarios
+- **Keep everything within the current directory** - no /tmp usage or external paths
+  - Test artifacts stay in test directories
+  - Logs go to `./logs/` within each test space
+  - PID files in `./.meup/` within the space directory
+  - FIFOs in `./fifos/` within the space directory
 
 ### Phase 1: Test Space Reorganization
 - [ ] Create `test-spaces/` directory structure:
@@ -86,7 +91,9 @@
 - [ ] Create master test runner:
   - [ ] `run-all-tests.sh` that iterates through test-spaces/scenario-*
   - [ ] Each test is self-contained in its directory
-  - [ ] No assembly required - just copy and run
+  - [ ] No assembly required - just cd and run
+  - [ ] Test output logs stay in each scenario directory (not /tmp)
+  - [ ] Summary report written to `./test-results.log`
 
 ### Phase 4: Documentation Updates
 - [ ] Update TEST_PLAN.md:
