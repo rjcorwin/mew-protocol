@@ -1,0 +1,25 @@
+name: test-space
+description: Scenario 4 - Dynamic capability granting
+
+participants:
+  - id: calculator-agent
+    auto_start: true
+    description: Calculator agent providing MCP tools
+    capabilities:
+      - kind: mcp/response
+      - kind: system/*
+    fifo: false
+    
+  - id: coordinator
+    description: Coordinator with admin privileges
+    capabilities:
+      - kind: capability/grant
+      - kind: capability/revoke
+      - kind: system/*
+    fifo: true
+    
+  - id: limited-agent
+    description: Agent with minimal initial capabilities
+    capabilities:
+      - kind: system/*
+    fifo: true

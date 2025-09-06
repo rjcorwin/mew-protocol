@@ -1,0 +1,29 @@
+name: test-space
+description: Scenario 3 - Proposals with capability blocking
+
+participants:
+  - id: calculator-agent
+    auto_start: true
+    description: Calculator agent providing MCP tools
+    capabilities:
+      - kind: mcp/response
+      - kind: system/*
+    fifo: false
+    
+  - id: fulfiller
+    auto_start: true  
+    description: Fulfiller that executes proposals
+    capabilities:
+      - kind: mcp/request
+        payload:
+          method: tools/*
+      - kind: mcp/proposal
+      - kind: system/*
+    fifo: false
+    
+  - id: proposer
+    description: Proposer with limited capabilities
+    capabilities:
+      - kind: mcp/proposal
+      - kind: system/*
+    fifo: true
