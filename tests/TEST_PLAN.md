@@ -18,40 +18,39 @@
 ### All Scenarios Implemented
 All 6 test scenarios from the TEST_PLAN have been implemented. The MEUP v0.2 CLI is feature-complete!
 
-## Test Run Setup
+## Test Setup
 
-### Creating Test Run Folder
-Before starting any test execution, create a dedicated folder to contain all test artifacts:
+### Test Space Directory
+All test resources are contained in the `test-space/` directory:
+- `space.yaml` - Space configuration with all test participants
+- `agents/` - Test agent implementations:
+  - `echo.js` - Echoes chat messages
+  - `calculator.js` - Provides MCP math tools
+  - `fulfiller.js` - Auto-fulfills proposals
+
+### Running Tests
 
 ```bash
-# Create test run folder with convention: test-YYMMDD-HHMM
-TEST_RUN_DIR="./test-$(date +%y%m%d-%H%M)"
-mkdir -p "$TEST_RUN_DIR"
-cd "$TEST_RUN_DIR"
+# Run all test scenarios
+./run-all-tests.sh
 
-# Create subdirectories for organization
-mkdir -p scripts      # Test scripts
-mkdir -p configs      # Space configuration files
-mkdir -p logs         # Gateway and agent logs
-mkdir -p results      # Test results and reports
-mkdir -p fifos        # FIFO pipes for client communication
-
-echo "Test run directory created: $TEST_RUN_DIR"
-echo "Starting test execution at $(date)"
+# Or run individual scenarios
+./test-scenario1.sh  # Basic message flow
+./test-scenario2.sh  # MCP tool execution
+./test-scenario3.sh  # Proposals with capabilities
+./test-scenario4.sh  # Dynamic capability granting
+./test-scenario5.sh  # Reasoning with context
+./test-scenario6.sh  # Error recovery
 ```
 
-This folder will contain:
-- `scripts/` - All test scripts generated during the run
-- `configs/` - The space.yaml configuration file
-- `agents/` - Test agent executables (copied from tests/agents/)
-- `logs/` - Output logs from gateway and agents
-- `results/` - Test results in JSON format
-- `fifos/` - Named pipes for FIFO communication
+Each test script automatically:
+1. Creates a temporary test directory
+2. Copies the test-space contents
+3. Starts the gateway with space.yaml
+4. Runs the test scenario
+5. Cleans up afterward
 
-The test agents are standalone Node.js scripts that implement the MEUP agent protocol:
-- `agents/echo.js` - Echoes chat messages
-- `agents/calculator.js` - Provides MCP math tools
-- `agents/fulfiller.js` - Auto-fulfills proposals
+No manual setup required!
 
 ## Testing Strategy
 

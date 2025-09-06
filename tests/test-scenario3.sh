@@ -17,7 +17,7 @@ mkdir -p "$TEST_DIR"
 cd "$TEST_DIR"
 
 # Copy space configuration
-cp ../../cli/space.yaml ./
+cp -r ../test-space/* ./
 
 # Use random port to avoid conflicts
 PORT=$((8000 + RANDOM % 1000))
@@ -45,7 +45,7 @@ echo -e "${GREEN}✓ Gateway started${NC}"
 
 # Start calculator agent (to execute the actual tool calls)
 echo "Starting calculator agent..."
-node ../../tests/agents/calculator.js \
+node ./agents/calculator.js \
   --gateway "ws://localhost:$PORT" \
   --space test-space \
   --token "calculator-token" \
@@ -56,7 +56,7 @@ sleep 2
 
 # Start fulfiller agent (auto-fulfills proposals)
 echo "Starting fulfiller agent..."
-node ../../tests/agents/fulfiller.js \
+node ./agents/fulfiller.js \
   --gateway "ws://localhost:$PORT" \
   --space test-space \
   --token "fulfiller-token" \

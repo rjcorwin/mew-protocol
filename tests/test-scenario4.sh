@@ -17,7 +17,7 @@ mkdir -p "$TEST_DIR"
 cd "$TEST_DIR"
 
 # Copy space configuration
-cp ../../cli/space.yaml ./
+cp -r ../test-space/* ./
 
 # Use random port to avoid conflicts
 PORT=$((8000 + RANDOM % 1000))
@@ -45,7 +45,7 @@ echo -e "${GREEN}✓ Gateway started${NC}"
 
 # Start calculator agent (provides tools)
 echo "Starting calculator agent..."
-node ../../tests/agents/calculator.js \
+node ./agents/calculator.js \
   --gateway "ws://localhost:$PORT" \
   --space test-space \
   --token "calculator-token" \

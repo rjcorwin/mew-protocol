@@ -17,7 +17,7 @@ mkdir -p "$TEST_DIR"
 cd "$TEST_DIR"
 
 # Copy space configuration
-cp ../../cli/space.yaml ./
+cp -r ../test-space/* ./
 
 # Use random port to avoid conflicts
 PORT=$((8000 + RANDOM % 1000))
