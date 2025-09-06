@@ -37,13 +37,20 @@
     - [ ] All agent .js files that can be symlinked/copied
 
 ### Phase 2: Implement `meup space` Commands
+- [ ] Add FIFO configuration support to space.yaml:
+  - [ ] Add optional `fifo: true/false` field per participant
+  - [ ] Or `fifo: { enabled: true, path: "./custom/path" }` for custom paths
+  - [ ] Default to no FIFO unless explicitly configured
+
 - [ ] `meup space up` command:
   - [ ] Read space.yaml in current directory (or --space-dir)
   - [ ] Start gateway with space configuration
   - [ ] Auto-start agents with auto_start: true
-  - [ ] Create FIFOs for each participant in `./fifos/`:
-    - [ ] `{participant-id}-in`
-    - [ ] `{participant-id}-out`
+  - [ ] For participants with `fifo: true` in space.yaml:
+    - [ ] Create FIFOs in `./fifos/` (or custom path):
+      - [ ] `{participant-id}-in`
+      - [ ] `{participant-id}-out`
+    - [ ] Auto-connect participant using FIFO mode
   - [ ] Save PID file for cleanup (`.meup/pids.json`)
   - [ ] Display connection info and status
 
