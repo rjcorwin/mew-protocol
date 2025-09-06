@@ -1,5 +1,23 @@
 # MEUP v0.2 Test Plan - Coding Agent Executable
 
+## Implementation Status
+
+**Last Updated:** 2025-01-06
+
+### Completed
+- ✅ Test Scenario 1: Basic Message Flow (test-scenario1.sh)
+- ✅ Test Scenario 2: MCP Tool Execution (test-scenario2.sh)
+- ✅ Test Agents: echo.js, calculator.js, fulfiller.js
+- ✅ FIFO handling fixed with background `cat` process
+
+### In Progress
+- 🔄 Test Scenario 3: Proposals with capability blocking
+- 🔄 Test Scenario 4: Dynamic capability granting
+
+### Not Started
+- ⏳ Test Scenario 5: Reasoning with context field
+- ⏳ Test Scenario 6: Error recovery
+
 ## Test Run Setup
 
 ### Creating Test Run Folder
@@ -83,6 +101,9 @@ echo "Working in test directory: $(pwd)"
 ```
 
 ### Test Environment Setup
+
+**IMPORTANT FIFO Reading Note:**
+When reading from FIFOs in test scripts, use `cat cli-out > responses.txt &` in the background BEFORE starting the client, then kill the cat process after tests. This ensures all messages are captured. The `timeout 5 cat` approach shown in examples may miss messages.
 
 ```bash
 #!/bin/bash

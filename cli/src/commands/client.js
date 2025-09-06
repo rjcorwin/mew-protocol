@@ -31,7 +31,7 @@ client
     ws.on('open', () => {
       console.log('Connected to gateway');
       
-      // Send join message
+      // Send join message (gateway-specific, not MEUP protocol)
       ws.send(JSON.stringify({
         type: 'join',
         participantId,

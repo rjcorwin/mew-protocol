@@ -59,8 +59,8 @@ Implementation priorities to get tests passing:
 ### 📋 Test Scenarios Status
 - [x] Scenario 1: Basic Message Flow ✅ PASSED
 - [x] Scenario 2: MCP Tool Execution ✅ PASSED
-- [x] Scenario 3: Proposals with capability blocking → **READY TO TEST** (capability system complete)
-- [x] Scenario 4: Dynamic capability granting → **READY TO TEST** (capability system complete)
+- [ ] Scenario 3: Proposals with capability blocking → **READY TO TEST** (capability system complete)
+- [ ] Scenario 4: Dynamic capability granting → **READY TO TEST** (capability system complete)
 - [ ] Scenario 5: Reasoning with context field → **Needs reasoning message support**
 - [ ] Scenario 6: Error recovery → **Needs better validation**
 
@@ -78,11 +78,10 @@ Implementation priorities to get tests passing:
 
 ## Next Steps
 
-1. **Test Scenarios 3-4**: Create proper test agents and verify proposal/capability flows work
+1. **Test Scenarios 3-4**: Write test scripts for proposal and capability grant/revoke flows
 2. **Reasoning Messages**: Add support for reasoning message kinds with context field
-3. **Fix FIFO Test Handling**: Improve test scripts to properly read FIFO outputs
-4. **Enhanced Validation**: Add strict protocol version and payload validation
-5. **Documentation**: Update README with capability system usage
+3. **Enhanced Validation**: Add strict protocol version and payload validation
+4. **Documentation**: Update README with capability system usage
 
 ## Completed Tasks (Archived)
 
@@ -104,9 +103,10 @@ Implementation priorities to get tests passing:
 - **Process management for auto-starting agents**
 
 ### Test Infrastructure ✅
-- Test scripts created for all scenarios
-- FIFO automation working
+- Test scripts created for scenarios 1-2
+- FIFO automation working (fixed with `cat` instead of `tail -F`)
 - Individual scenario runners created
+- Test agents implemented (echo, calculator, fulfiller)
 
 ## Future Work (After TEST_PLAN.md Complete)
 
