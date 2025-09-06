@@ -124,6 +124,11 @@ client
       });
     }
     
+    // If no interactive and no FIFO input, just wait
+    if (options.noInteractive && !options.fifoIn) {
+      console.log('Running in non-interactive mode without FIFO input');
+    }
+    
     // Handle shutdown
     process.on('SIGINT', () => {
       console.log('\nDisconnecting...');

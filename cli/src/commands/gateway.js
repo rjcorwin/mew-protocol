@@ -2,6 +2,10 @@ const { Command } = require('commander');
 const WebSocket = require('ws');
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
+const yaml = require('js-yaml');
+const path = require('path');
+const { spawn } = require('child_process');
 
 const gateway = new Command('gateway')
   .description('Gateway server management');
@@ -11,9 +15,24 @@ gateway
   .description('Start a MEUP gateway server')
   .option('-p, --port <port>', 'Port to listen on', '8080')
   .option('-l, --log-level <level>', 'Log level (debug|info|warn|error)', 'info')
+  .option('-s, --space-config <path>', 'Path to space.yaml configuration', './space.yaml')
   .action(async (options) => {
     const port = parseInt(options.port);
-    console.log(`Starting Enhanced MEUP gateway on port ${port}...`);
+    console.log(`Starting MEUP gateway on port ${port}...`);
+    
+    // Load space configuration (CLI responsibility, not gateway)
+    let spaceConfig = null;
+    try {
+      const configPath = path.resolve(options.spaceConfig);
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      spaceConfig = yaml.load(configContent);
+      console.log(`Loaded space configuration from ${configPath}`);
+      console.log(`Space ID: ${spaceConfig.space.id}`);
+      console.log(`Participants configured: ${Object.keys(spaceConfig.participants).length}`);
+    } catch (error) {
+      console.error(`Failed to load space configuration: ${error.message}`);
+      console.log('Continuing with default configuration...');
+    }
     
     // Create Express app for health endpoint
     const app = express();
@@ -39,57 +58,156 @@ gateway
     // Track spaces and participants
     const spaces = new Map(); // spaceId -> { participants: Map(participantId -> ws) }
     
-    // Track participant capabilities
-    const capabilities = new Map(); // participantId -> Set of capability patterns
+    // Track participant info
+    const participantTokens = new Map(); // participantId -> token
+    const participantCapabilities = new Map(); // participantId -> capabilities array
     
-    // Track context stacks
-    const contextStacks = new Map(); // participantId -> array of context objects
+    // Track spawned processes
+    const spawnedProcesses = new Map(); // participantId -> ChildProcess
     
-    // Default capabilities by token type
-    const defaultCapabilities = {
-      'admin-token': ['*'], // All capabilities
-      'calculator-token': ['mcp/*', 'chat'],
-      'fulfiller-token': ['mcp/*', 'chat', 'proposal/accept'],
-      'proposer-token': ['chat', 'mcp/proposal'], // Can only chat and propose
-      'limited-token': ['chat'], // Very limited
-      'echo-token': ['chat'],
-      'research-token': ['chat', 'context/*', 'mcp/*']
+    // Gateway hooks for external configuration
+    let capabilityResolver = null;
+    let participantJoinedCallback = null;
+    let authorizationHook = null;
+    
+    // Set capability resolver hook
+    gateway.setCapabilityResolver = function(resolver) {
+      capabilityResolver = resolver;
     };
     
-    // Check if participant has capability
-    function hasCapability(participantId, requiredCapability) {
-      const participantCaps = capabilities.get(participantId);
-      if (!participantCaps) return false;
+    // Set participant joined callback
+    gateway.onParticipantJoined = function(callback) {
+      participantJoinedCallback = callback;
+    };
+    
+    // Set authorization hook
+    gateway.setAuthorizationHook = function(hook) {
+      authorizationHook = hook;
+    };
+    
+    // Default capability resolver using space.yaml
+    async function defaultCapabilityResolver(token, participantId, messageKind) {
+      if (!spaceConfig) {
+        // Fallback to basic defaults
+        return [{kind: 'chat'}];
+      }
+      
+      // Find participant by token
+      for (const [pid, config] of Object.entries(spaceConfig.participants)) {
+        if (config.tokens && config.tokens.includes(token)) {
+          return config.capabilities || spaceConfig.defaults?.capabilities || [];
+        }
+      }
+      
+      // Return default capabilities if no match
+      return spaceConfig.defaults?.capabilities || [{kind: 'chat'}];
+    }
+    
+    // Use custom resolver if set, otherwise use default
+    async function resolveCapabilities(token, participantId, messageKind) {
+      if (capabilityResolver) {
+        return await capabilityResolver(token, participantId, messageKind);
+      }
+      return await defaultCapabilityResolver(token, participantId, messageKind);
+    }
+    
+    // Check if message matches capability pattern
+    function matchesCapability(message, capability) {
+      // Simple kind matching first
+      if (capability.kind === '*') return true;
+      if (capability.kind === message.kind) return true;
+      
+      // Wildcard pattern matching
+      if (capability.kind && capability.kind.endsWith('/*')) {
+        const prefix = capability.kind.slice(0, -2);
+        if (message.kind && message.kind.startsWith(prefix + '/')) {
+          // Check payload patterns if specified
+          if (capability.payload) {
+            return matchesPayloadPattern(message.payload, capability.payload);
+          }
+          return true;
+        }
+      }
+      
+      // Exact kind match with payload pattern
+      if (capability.kind === message.kind && capability.payload) {
+        return matchesPayloadPattern(message.payload, capability.payload);
+      }
+      
+      return false;
+    }
+    
+    // Match payload patterns (simplified version)
+    function matchesPayloadPattern(payload, pattern) {
+      if (!payload || !pattern) return false;
+      
+      for (const [key, value] of Object.entries(pattern)) {
+        if (typeof value === 'string') {
+          // Handle wildcards in strings
+          if (value.endsWith('*')) {
+            const prefix = value.slice(0, -1);
+            if (!payload[key] || !payload[key].startsWith(prefix)) {
+              return false;
+            }
+          } else if (payload[key] !== value) {
+            return false;
+          }
+        } else if (typeof value === 'object') {
+          // Recursive matching for nested objects
+          if (!matchesPayloadPattern(payload[key], value)) {
+            return false;
+          }
+        }
+      }
+      
+      return true;
+    }
+    
+    // Check if participant has capability for message
+    async function hasCapabilityForMessage(participantId, message) {
+      const capabilities = participantCapabilities.get(participantId) || [];
       
       // Check each capability pattern
-      for (const pattern of participantCaps) {
-        if (pattern === '*') return true; // Wildcard - all capabilities
-        if (pattern === requiredCapability) return true; // Exact match
-        
-        // Wildcard pattern matching (e.g., 'mcp/*' matches 'mcp/request')
-        if (pattern.endsWith('/*')) {
-          const prefix = pattern.slice(0, -2);
-          if (requiredCapability.startsWith(prefix + '/')) return true;
+      for (const cap of capabilities) {
+        if (matchesCapability(message, cap)) {
+          return true;
         }
       }
       
       return false;
     }
     
-    // Get required capability for a message kind
-    function getRequiredCapability(kind) {
-      const capabilityMap = {
-        'mcp/request': 'mcp/request',
-        'mcp/response': 'mcp/response',
-        'mcp/proposal': 'mcp/proposal',
-        'capability/grant': 'capability/admin',
-        'capability/revoke': 'capability/admin',
-        'context/push': 'context/push',
-        'context/pop': 'context/pop',
-        'chat': 'chat'
-      };
+    // Auto-start agents with auto_start: true
+    function autoStartAgents() {
+      if (!spaceConfig || !spaceConfig.participants) return;
       
-      return capabilityMap[kind] || null;
+      for (const [participantId, config] of Object.entries(spaceConfig.participants)) {
+        if (config.auto_start && config.command) {
+          console.log(`Auto-starting agent: ${participantId}`);
+          
+          const child = spawn(config.command, config.args || [], {
+            env: { ...process.env, ...config.env },
+            stdio: 'inherit'
+          });
+          
+          spawnedProcesses.set(participantId, child);
+          
+          child.on('error', (error) => {
+            console.error(`Failed to start ${participantId}:`, error);
+          });
+          
+          child.on('exit', (code, signal) => {
+            console.log(`${participantId} exited with code ${code}, signal ${signal}`);
+            spawnedProcesses.delete(participantId);
+            
+            // Handle restart policy
+            if (config.restart_policy === 'on-failure' && code !== 0) {
+              console.log(`Restarting ${participantId} due to failure...`);
+              setTimeout(() => autoStartAgents(), 5000);
+            }
+          });
+        }
+      }
     }
     
     // Validate message structure
@@ -124,7 +242,7 @@ gateway
         console.log('New WebSocket connection');
       }
       
-      ws.on('message', (data) => {
+      ws.on('message', async (data) => {
         try {
           const message = JSON.parse(data.toString());
           
@@ -145,7 +263,7 @@ gateway
           // Handle join (special case - before capability check)
           if (message.kind === 'system/join' || message.type === 'join') {
             participantId = message.participantId || message.payload?.participantId || `participant-${Date.now()}`;
-            spaceId = message.space || message.payload?.space || 'default';
+            spaceId = message.space || message.payload?.space || spaceConfig?.space?.id || 'default';
             const token = message.token || message.payload?.token;
             
             // Create space if it doesn't exist
@@ -159,90 +277,132 @@ gateway
             ws.participantId = participantId;
             ws.spaceId = spaceId;
             
-            // Set capabilities based on token
-            const capabilitySet = new Set(defaultCapabilities[token] || ['chat']);
-            capabilities.set(participantId, capabilitySet);
+            // Store token and resolve capabilities
+            participantTokens.set(participantId, token);
+            const capabilities = await resolveCapabilities(token, participantId, null);
+            participantCapabilities.set(participantId, capabilities);
             
-            // Initialize context stack
-            contextStacks.set(participantId, []);
-            
-            // Send welcome message with capabilities
-            ws.send(JSON.stringify({
+            // Send welcome message per MEUP v0.2 spec
+            const welcomeMessage = {
               protocol: 'meup/v0.2',
+              id: `welcome-${Date.now()}`,
+              ts: new Date().toISOString(),
+              from: 'system:gateway',
+              to: [participantId],
               kind: 'system/welcome',
               payload: {
-                participantId,
-                space: spaceId,
-                capabilities: Array.from(capabilitySet)
+                you: {
+                  id: participantId,
+                  capabilities: capabilities
+                },
+                participants: Array.from(space.participants.keys())
+                  .filter(pid => pid !== participantId)
+                  .map(pid => ({
+                    id: pid,
+                    capabilities: participantCapabilities.get(pid) || []
+                  }))
               }
-            }));
+            };
+            
+            ws.send(JSON.stringify(welcomeMessage));
+            
+            // Broadcast presence to others
+            const presenceMessage = {
+              protocol: 'meup/v0.2',
+              id: `presence-${Date.now()}`,
+              ts: new Date().toISOString(),
+              from: 'system:gateway',
+              kind: 'system/presence',
+              payload: {
+                event: 'join',
+                participant: {
+                  id: participantId,
+                  capabilities: capabilities
+                }
+              }
+            };
+            
+            for (const [pid, pws] of space.participants.entries()) {
+              if (pid !== participantId && pws.readyState === WebSocket.OPEN) {
+                pws.send(JSON.stringify(presenceMessage));
+              }
+            }
+            
+            // Call participant joined callback if set
+            if (participantJoinedCallback) {
+              await participantJoinedCallback(participantId, token, {
+                space: spaceId,
+                capabilities: capabilities
+              });
+            }
             
             console.log(`${participantId} joined space ${spaceId} with token ${token || 'none'}`);
             return;
           }
           
           // Check capabilities for non-join messages
-          const requiredCapability = getRequiredCapability(message.kind);
-          if (requiredCapability && !hasCapability(participantId, requiredCapability)) {
-            ws.send(JSON.stringify({
+          if (!await hasCapabilityForMessage(participantId, message)) {
+            const errorMessage = {
               protocol: 'meup/v0.2',
+              id: `error-${Date.now()}`,
+              ts: new Date().toISOString(),
+              from: 'system:gateway',
+              to: [participantId],
               kind: 'system/error',
+              correlation_id: message.id ? [message.id] : undefined,
               payload: {
-                error: `Insufficient capability: ${requiredCapability} required`,
-                code: 'CAPABILITY_DENIED'
+                error: 'capability_violation',
+                attempted_kind: message.kind,
+                your_capabilities: participantCapabilities.get(participantId) || []
               }
-            }));
+            };
+            
+            ws.send(JSON.stringify(errorMessage));
+            
             if (options.logLevel === 'debug') {
-              console.log(`Capability denied for ${participantId}: ${requiredCapability}`);
+              console.log(`Capability denied for ${participantId}: ${message.kind}`);
             }
             return;
           }
           
-          // Handle capability management
-          if (message.kind === 'capability/grant') {
-            handleCapabilityGrant(message, ws, participantId, spaces, capabilities, options);
-            return;
-          } else if (message.kind === 'capability/revoke') {
-            handleCapabilityRevoke(message, ws, participantId, spaces, capabilities, options);
-            return;
+          // Handle capability management messages
+          if (message.kind === 'capability/grant' || message.kind === 'capability/revoke') {
+            // These are routed like normal messages but may trigger gateway behavior
+            // The gateway doesn't enforce who can send these, just routes them
           }
           
-          // Handle context management
-          if (message.kind === 'context/push') {
-            handleContextPush(message, ws, participantId, contextStacks, spaces, options);
-            return;
-          } else if (message.kind === 'context/pop') {
-            handleContextPop(message, ws, participantId, contextStacks, spaces, options);
-            return;
+          // Add protocol envelope fields if missing
+          const envelope = {
+            protocol: message.protocol || 'meup/v0.2',
+            id: message.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: message.ts || new Date().toISOString(),
+            from: participantId,
+            ...message
+          };
+          
+          // Ensure correlation_id is always an array if present
+          if (envelope.correlation_id && !Array.isArray(envelope.correlation_id)) {
+            envelope.correlation_id = [envelope.correlation_id];
           }
           
-          // Route regular messages to all participants in space
+          // Route message based on 'to' field
           if (spaceId && spaces.has(spaceId)) {
             const space = spaces.get(spaceId);
             
-            // Add context correlation if in a context
-            const contextStack = contextStacks.get(participantId) || [];
-            const correlationId = contextStack.length > 0 
-              ? contextStack[contextStack.length - 1].correlationId 
-              : message.correlation_id;
-            
-            const envelope = {
-              protocol: 'meup/v0.2',
-              id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              ts: new Date().toISOString(),
-              from: participantId,
-              ...message
-            };
-            
-            // Preserve correlation_id if in context
-            if (correlationId) {
-              envelope.correlation_id = Array.isArray(correlationId) ? correlationId : [correlationId];
-            }
-            
-            // Broadcast to all participants in the space
-            for (const [pid, pws] of space.participants.entries()) {
-              if (pws.readyState === WebSocket.OPEN) {
-                pws.send(JSON.stringify(envelope));
+            if (envelope.to && Array.isArray(envelope.to)) {
+              // Send to specific participants
+              for (const targetId of envelope.to) {
+                const targetWs = space.participants.get(targetId);
+                if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                  targetWs.send(JSON.stringify(envelope));
+                }
+              }
+            } else {
+              // Broadcast to all participants
+              for (const [pid, pws] of space.participants.entries()) {
+                if (pws.readyState === WebSocket.OPEN) {
+                  pws.send(JSON.stringify(envelope));
+                }
               }
             }
             
@@ -271,8 +431,29 @@ gateway
         if (participantId && spaceId && spaces.has(spaceId)) {
           const space = spaces.get(spaceId);
           space.participants.delete(participantId);
-          capabilities.delete(participantId);
-          contextStacks.delete(participantId);
+          participantTokens.delete(participantId);
+          participantCapabilities.delete(participantId);
+          
+          // Broadcast leave presence
+          const presenceMessage = {
+            protocol: 'meup/v0.2',
+            id: `presence-${Date.now()}`,
+            ts: new Date().toISOString(),
+            from: 'system:gateway',
+            kind: 'system/presence',
+            payload: {
+              event: 'leave',
+              participant: {
+                id: participantId
+              }
+            }
+          };
+          
+          for (const [pid, pws] of space.participants.entries()) {
+            if (pws.readyState === WebSocket.OPEN) {
+              pws.send(JSON.stringify(presenceMessage));
+            }
+          }
           
           if (options.logLevel === 'debug') {
             console.log(`${participantId} disconnected from ${spaceId}`);
@@ -283,204 +464,34 @@ gateway
     
     // Start server
     server.listen(port, () => {
-      console.log(`Enhanced Gateway listening on port ${port}`);
+      console.log(`Gateway listening on port ${port}`);
       console.log(`Health endpoint: http://localhost:${port}/health`);
       console.log(`WebSocket endpoint: ws://localhost:${port}`);
-      console.log('Features: Capability enforcement, Context management, Message validation');
+      if (spaceConfig) {
+        console.log(`Space configuration loaded: ${spaceConfig.space.name}`);
+      }
+      
+      // Auto-start agents
+      autoStartAgents();
+    });
+    
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('Shutting down gateway...');
+      
+      // Stop spawned processes
+      for (const [pid, child] of spawnedProcesses.entries()) {
+        console.log(`Stopping ${pid}...`);
+        child.kill('SIGTERM');
+      }
+      
+      // Close WebSocket server
+      wss.close(() => {
+        server.close(() => {
+          process.exit(0);
+        });
+      });
     });
   });
-
-// Handle capability grant
-function handleCapabilityGrant(message, ws, fromParticipant, spaces, capabilities, options) {
-  // Check admin permission
-  if (!hasCapability(fromParticipant, 'capability/admin')) {
-    ws.send(JSON.stringify({
-      protocol: 'meup/v0.2',
-      kind: 'system/error',
-      payload: {
-        error: 'Not authorized to grant capabilities',
-        code: 'UNAUTHORIZED'
-      }
-    }));
-    return;
-  }
-  
-  const targetParticipant = message.payload?.to;
-  const newCapabilities = message.payload?.capabilities || [];
-  
-  // Add capabilities
-  const targetCaps = capabilities.get(targetParticipant) || new Set();
-  for (const cap of newCapabilities) {
-    targetCaps.add(cap);
-  }
-  capabilities.set(targetParticipant, targetCaps);
-  
-  // Find and notify target
-  for (const space of spaces.values()) {
-    const targetWs = space.participants.get(targetParticipant);
-    if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-      targetWs.send(JSON.stringify({
-        protocol: 'meup/v0.2',
-        kind: 'capability/granted',
-        from: fromParticipant,
-        payload: {
-          capabilities: newCapabilities
-        }
-      }));
-      break;
-    }
-  }
-  
-  if (options.logLevel === 'debug') {
-    console.log(`Granted capabilities to ${targetParticipant}:`, newCapabilities);
-  }
-}
-
-// Handle capability revoke
-function handleCapabilityRevoke(message, ws, fromParticipant, spaces, capabilities, options) {
-  // Check admin permission
-  if (!hasCapability(fromParticipant, 'capability/admin')) {
-    ws.send(JSON.stringify({
-      protocol: 'meup/v0.2',
-      kind: 'system/error',
-      payload: {
-        error: 'Not authorized to revoke capabilities',
-        code: 'UNAUTHORIZED'
-      }
-    }));
-    return;
-  }
-  
-  const targetParticipant = message.payload?.from;
-  const revokeCapabilities = message.payload?.capabilities || [];
-  
-  // Remove capabilities
-  const targetCaps = capabilities.get(targetParticipant);
-  if (targetCaps) {
-    for (const cap of revokeCapabilities) {
-      targetCaps.delete(cap);
-    }
-  }
-  
-  // Find and notify target
-  for (const space of spaces.values()) {
-    const targetWs = space.participants.get(targetParticipant);
-    if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-      targetWs.send(JSON.stringify({
-        protocol: 'meup/v0.2',
-        kind: 'capability/revoked',
-        from: fromParticipant,
-        payload: {
-          capabilities: revokeCapabilities
-        }
-      }));
-      break;
-    }
-  }
-  
-  if (options.logLevel === 'debug') {
-    console.log(`Revoked capabilities from ${targetParticipant}:`, revokeCapabilities);
-  }
-}
-
-// Handle context push
-function handleContextPush(message, ws, participantId, contextStacks, spaces, options) {
-  const stack = contextStacks.get(participantId) || [];
-  const newContext = {
-    correlationId: message.correlation_id || `ctx-${Date.now()}`,
-    topic: message.payload?.topic,
-    pushedAt: new Date().toISOString()
-  };
-  
-  stack.push(newContext);
-  contextStacks.set(participantId, stack);
-  
-  // Broadcast context push to space
-  if (ws.spaceId && spaces.has(ws.spaceId)) {
-    const space = spaces.get(ws.spaceId);
-    const envelope = {
-      protocol: 'meup/v0.2',
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ts: new Date().toISOString(),
-      from: participantId,
-      kind: 'context/push',
-      correlation_id: newContext.correlationId,
-      payload: message.payload
-    };
-    
-    for (const [pid, pws] of space.participants.entries()) {
-      if (pws.readyState === WebSocket.OPEN) {
-        pws.send(JSON.stringify(envelope));
-      }
-    }
-  }
-  
-  if (options.logLevel === 'debug') {
-    console.log(`Context pushed by ${participantId}:`, newContext);
-  }
-}
-
-// Handle context pop
-function handleContextPop(message, ws, participantId, contextStacks, spaces, options) {
-  const stack = contextStacks.get(participantId) || [];
-  
-  if (stack.length === 0) {
-    ws.send(JSON.stringify({
-      protocol: 'meup/v0.2',
-      kind: 'system/error',
-      payload: {
-        error: 'No context to pop',
-        code: 'CONTEXT_EMPTY'
-      }
-    }));
-    return;
-  }
-  
-  const poppedContext = stack.pop();
-  
-  // Broadcast context pop to space
-  if (ws.spaceId && spaces.has(ws.spaceId)) {
-    const space = spaces.get(ws.spaceId);
-    const envelope = {
-      protocol: 'meup/v0.2',
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ts: new Date().toISOString(),
-      from: participantId,
-      kind: 'context/pop',
-      correlation_id: poppedContext.correlationId,
-      payload: {
-        topic: poppedContext.topic
-      }
-    };
-    
-    for (const [pid, pws] of space.participants.entries()) {
-      if (pws.readyState === WebSocket.OPEN) {
-        pws.send(JSON.stringify(envelope));
-      }
-    }
-  }
-  
-  if (options.logLevel === 'debug') {
-    console.log(`Context popped by ${participantId}:`, poppedContext);
-  }
-}
-
-// Helper to check if participant has a capability
-function hasCapability(participantId, requiredCapability) {
-  const participantCaps = capabilities.get(participantId);
-  if (!participantCaps) return false;
-  
-  for (const pattern of participantCaps) {
-    if (pattern === '*') return true;
-    if (pattern === requiredCapability) return true;
-    
-    if (pattern.endsWith('/*')) {
-      const prefix = pattern.slice(0, -2);
-      if (requiredCapability.startsWith(prefix + '/')) return true;
-    }
-  }
-  
-  return false;
-}
 
 module.exports = gateway;
