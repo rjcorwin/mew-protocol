@@ -1,202 +1,149 @@
 # TODO
 
-## ✅ COMPLETED: All TEST_PLAN.md Scenarios Implemented!
+## 🎯 Current Focus: Test Infrastructure Refactoring
 
-Implementation priorities to get tests passing:
+### Goals
+- Simplify test setup by making each test space self-contained
+- Implement `meup space up/down` commands for automated space management
+- Reduce redundancy in test scripts and documentation
+- Create a cleaner separation between different test scenarios
 
-### ✅ Completed: Minimal Capability System (Unblocks Scenarios 3-4)
+### Phase 1: Test Space Reorganization
+- [ ] Create `test-spaces/` directory structure:
+  - [ ] `test-spaces/scenario-1-basic/` - Basic message flow test
+    - [ ] `space.yaml` - Only echo agent and test client
+    - [ ] `agents/` - Just echo.js
+    - [ ] `test.sh` - Test script for this scenario
+  - [ ] `test-spaces/scenario-2-mcp/` - MCP tool execution
+    - [ ] `space.yaml` - Calculator agent and test client
+    - [ ] `agents/` - Just calculator.js
+    - [ ] `test.sh` - Test script
+  - [ ] `test-spaces/scenario-3-proposals/` - Proposal flow
+    - [ ] `space.yaml` - Calculator, fulfiller, proposer
+    - [ ] `agents/` - calculator.js, fulfiller.js
+    - [ ] `test.sh` - Test script
+  - [ ] `test-spaces/scenario-4-capabilities/` - Dynamic capabilities
+    - [ ] `space.yaml` - Coordinator, limited-agent, calculator
+    - [ ] `agents/` - calculator.js
+    - [ ] `test.sh` - Test script
+  - [ ] `test-spaces/scenario-5-reasoning/` - Reasoning messages
+    - [ ] `space.yaml` - Research agent, calculator
+    - [ ] `agents/` - calculator.js
+    - [ ] `test.sh` - Test script
+  - [ ] `test-spaces/scenario-6-errors/` - Error recovery
+    - [ ] `space.yaml` - Test client only
+    - [ ] `test.sh` - Test script
+  - [ ] `test-spaces/shared-agents/` - Shared agent implementations
+    - [ ] All agent .js files that can be symlinked/copied
 
-#### Step 1: Gateway Hooks ✅
-- [x] Add setCapabilityResolver() hook to gateway
-- [x] Add onParticipantJoined() callback to gateway  
-- [x] Add setAuthorizationHook() for message validation
-- [x] Gateway calls resolver on every message
+### Phase 2: Implement `meup space` Commands
+- [ ] `meup space up` command:
+  - [ ] Read space.yaml in current directory (or --space-dir)
+  - [ ] Start gateway with space configuration
+  - [ ] Auto-start agents with auto_start: true
+  - [ ] Create FIFOs for each participant in `./fifos/`:
+    - [ ] `{participant-id}-in`
+    - [ ] `{participant-id}-out`
+  - [ ] Save PID file for cleanup (`.meup/pids.json`)
+  - [ ] Display connection info and status
 
-#### Step 2: Space Config Loader ✅
-- [x] Load space.yaml on gateway start with --space-config flag
-- [x] Parse participants and capabilities using js-yaml
-- [x] Implement capability resolver that uses space.yaml data
-- [x] Wire resolver to gateway hooks
+- [ ] `meup space down` command:
+  - [ ] Read PID file from `.meup/pids.json`
+  - [ ] Gracefully shutdown gateway
+  - [ ] Terminate all agent processes
+  - [ ] Clean up FIFOs
+  - [ ] Remove PID file
 
-#### Step 3: Capability Matching ✅
-- [x] Implemented matchesCapability() with JSON pattern matching
-- [x] Implement hasCapabilityForMessage() check using patterns from space.yaml
-- [x] Support wildcards (mcp/*) and simple strings (chat)
-- [x] Return capability subsets based on message kind
+- [ ] `meup space status` command:
+  - [ ] Show running spaces
+  - [ ] List connected participants
+  - [ ] Display gateway health
+  - [ ] Show FIFO paths
 
-#### Step 4: Token → Participant Mapping ✅
-- [x] Map tokens to participants from space.yaml
-- [x] Look up capabilities by token
-- [x] Handle unknown tokens with defaults
-- [x] Store participant ID on connection
+### Phase 3: Test Script Simplification
+- [ ] Create `test-spaces/scenario-0-manual/`:
+  - [ ] Manual startup test (current approach)
+  - [ ] Verify each component can be started individually
+  - [ ] Document as "debugging/development" scenario
 
-### 🚀 Priority 2: Process Management (Partially Complete)
-- [x] Auto-start agents with auto_start: true
-- [x] Spawn processes with command/args/env
-- [x] Implement restart policies
-- [x] Track spawned process PIDs
+- [ ] Update remaining test scripts to use `meup space up/down`:
+  - [ ] Remove redundant gateway startup code
+  - [ ] Remove FIFO creation (handled by `meup space up`)
+  - [ ] Simplify to just:
+    ```bash
+    meup space up
+    # Run test logic
+    meup space down
+    ```
 
-### ✅ Completed: Reasoning Messages Support
-- [x] Support reasoning/start, reasoning/thought, reasoning/conclusion (via wildcard patterns)
-- [x] Context field for grouping related messages (passes through gateway)
-- [x] Preserve correlation_id arrays properly
-- [x] Messages with context field pass through correctly
-- [x] Test scenario 5 passing with full reasoning flow
+- [ ] Create master test runner:
+  - [ ] `run-all-tests.sh` that iterates through test-spaces/scenario-*
+  - [ ] Each test is self-contained in its directory
+  - [ ] No assembly required - just copy and run
 
-### ✅ Completed: Dynamic Capability System
-- [x] capability/grant message handling
-- [x] capability/revoke message handling  
-- [x] Runtime capability storage and merging
-- [x] capability/grant-ack acknowledgments
-- [x] Permission checks for capability operations
+### Phase 4: Documentation Updates
+- [ ] Update TEST_PLAN.md:
+  - [ ] Remove redundant setup instructions
+  - [ ] Document new test-spaces structure
+  - [ ] Explain `meup space up/down` usage
+  - [ ] Keep focus on test scenarios, not implementation details
 
-### 🚀 Priority 4: Enhanced Validation (Future Enhancement)
-- [ ] Add protocol version checking (reject non-v0.2)
-- [ ] Add strict payload validation for each message kind
-- [ ] Improve error messages with specific failure reasons
-- [ ] Add message schema validation
+- [ ] Create test-spaces/README.md:
+  - [ ] Overview of test organization
+  - [ ] How to run individual tests
+  - [ ] How to create new test scenarios
 
-### 📋 Priority 5: Interactive Connection (meup space connect)
-- [ ] Implement terminal UI mode (default)
-- [ ] Parse space.yaml for participant settings
+### Phase 5: Cleanup and Polish
+- [ ] Remove old test-scenario*.sh files from tests/
+- [ ] Remove test-space/ directory (replaced by test-spaces/*)
+- [ ] Update .gitignore for test artifacts
+- [ ] Ensure all tests pass with new structure
+
+## 🚀 Future Enhancements (After Refactoring)
+
+### Enhanced Space Management
+- [ ] `meup space logs` - Tail logs from all participants
+- [ ] `meup space restart` - Restart failed agents
+- [ ] `meup space scale` - Add/remove agent instances
+- [ ] Support for multiple spaces running simultaneously
+
+### Interactive Connection
+- [ ] `meup space connect` - Interactive terminal UI
+- [ ] Parse participant from space.yaml
 - [ ] Handle authentication/token prompt
 - [ ] Process slash commands (/help, /participants, etc.)
-- [ ] Support other UI modes later (web, electron, game)
 
-### ✅ Test Scenarios Status - ALL COMPLETE!
-- [x] Scenario 1: Basic Message Flow ✅ PASSED
-- [x] Scenario 2: MCP Tool Execution ✅ PASSED
-- [x] Scenario 3: Proposals with capability blocking ✅ PASSED
-- [x] Scenario 4: Dynamic capability granting ✅ IMPLEMENTED
-- [x] Scenario 5: Reasoning with context field ✅ PASSED
-- [x] Scenario 6: Error recovery ✅ PASSED (5/6 tests pass)
+### Production Features
+- [ ] Configuration management (~/.meup/config.yaml)
+- [ ] Environment variable support
+- [ ] TLS/SSL support
+- [ ] Rate limiting
+- [ ] Token generation and validation
 
-## Implementation Order
+## 📊 Success Metrics
+- All 6 test scenarios pass with new structure
+- Test setup time reduced from minutes to seconds
+- Single command to run entire test suite
+- Each test scenario is self-documenting
+- No manual assembly of test environments
 
-1. ✅ **Gateway hooks** - Enable capability resolution 
-2. ✅ **Space config loader** - Read space.yaml
-3. ✅ **Capability matcher** - Check permissions
-4. ✅ **Token mapping** - Connect tokens to participants
-5. ✅ **Test scenarios 1-3** - Basic flow, MCP tools, proposals
-6. ✅ **Test scenario 5** - Reasoning with context field
-7. ✅ **Test scenario 6** - Error recovery (5/6 tests pass)
-8. ✅ **Test infrastructure** - All test scripts and agents working
-9. ✅ **Dynamic capabilities** - Implemented capability/grant and capability/revoke
-10. ✅ **Test scenario 4** - Dynamic capability grant/revoke working
+---
 
-## Next Steps
+## Archived: Completed Work
 
-### ✅ COMPLETED: Dynamic Capability System (Test Scenario 4)
-
-**Implemented Features:**
-1. **Dynamic Capability Management in Gateway**:
-   - [x] Handler for `capability/grant` messages in gateway.js
-   - [x] Handler for `capability/revoke` messages in gateway.js
-   - [x] Runtime capability storage per participant (Map)
-   - [x] Merged runtime + static capabilities in hasCapabilityForMessage()
-   - [x] Grant acknowledgments sent to recipients
-   - [x] Permission checks for grant/revoke operations
-   
-2. **Test Scenario 4 Script**:
-   - [x] Created test-scenario4.sh with 9 test cases
-   - [x] Tests dynamic granting and revoking of capabilities
-   - [x] Verifies authorization requirements for grant/revoke
-   
-3. **Documentation Updated**:
-   - [x] TEST_PLAN.md marked complete for all scenarios
-   - [x] run-all-tests.sh includes scenario 4
-
-### 🚀 Short Term (Production Readiness)
-1. **Interactive Connection** (`meup space connect`):
-   - Implement terminal UI mode
-   - Parse space.yaml for participant settings
-   - Handle authentication/token prompt
-   - Process slash commands (/help, /participants, etc.)
-2. **Enhanced Validation**:
-   - Protocol version checking
-   - Strict payload validation
-   - Better error messages
-3. **Process Management Improvements**:
-   - Better error handling for spawned processes
-   - Process health monitoring
-   - Automatic restart on failure
-
-### 📦 Medium Term (v0.1.0 Release)
-1. **Configuration Management**:
-   - Environment variable support
-   - Config file loading (~/.meup/config.yaml)
-   - Multi-space management
-2. **Security Enhancements**:
-   - Token generation and validation
-   - TLS/SSL support
-   - Rate limiting
-3. **Documentation**:
-   - Complete API documentation
-   - Tutorial videos
-   - Example projects
-
-## 🎉 Major Milestone: MEUP v0.2 CLI Implementation Complete
-
-**All core features implemented:**
-- WebSocket-based gateway with capability system
-- Dynamic capability granting and revoking
+### ✅ MEUP v0.2 Protocol Implementation
+- All core protocol features implemented
+- Gateway with WebSocket support
+- Capability-based access control
+- Dynamic capability granting/revoking
 - MCP tool execution and proposals
 - Reasoning messages with context field
 - Error recovery and validation
-- Complete test suite with 6 scenarios
 
-## Completed Tasks (Archived)
-
-### MEUP v0.2 Protocol ✅
-- All ADRs implemented and accepted
-- Spec released 2025-01-03
-- Core protocol complete
-
-### CLI Minimal Implementation ✅
-- Gateway with WebSocket server
-- Client with FIFO mode (fixed with tail -F)
-- Echo agent (autonomous)
-- Calculator agent (MCP tools)
-- Fulfiller agent (proposal handling)
-- Token creation (basic)
-- **Capability system with space.yaml configuration**
-- **Gateway hooks for external resolvers**
-- **JSON pattern matching for capabilities**
-- **Process management for auto-starting agents**
-
-### Test Infrastructure ✅
-- Test scripts created for scenarios 1-3, 5-6 (5 of 6 complete)
-- FIFO automation working (fixed with background writer process)
-- Individual scenario runners created
-- Test agents implemented (echo, calculator, fulfiller)
-- Proposal flow with auto-fulfillment working
-- Reasoning message flow with context field working
-- Error recovery tests implemented
-- run-all-tests.sh script for full test suite execution
-
-## Future Work (After TEST_PLAN.md Complete)
-
-### CLI Production Features
-- Space configuration from spec
-- Authentication system
-- Configuration files
-- Environment variables
-- Production documentation
-
-### Additional Testing
-- Integration test suite
-- Performance benchmarks
-- Multi-agent collaboration scenarios
-- End-to-end workflows
-
-### Community & Documentation
-- Migration guide from v0.1
-- Architecture diagrams
-- Video tutorials
-- Blog posts
-
-### v0.3 Planning
-- Message persistence
-- Rate limiting
-- Space federation
-- Enhanced routing
+### ✅ Test Scenarios (Current Implementation)
+- Scenario 1: Basic Message Flow ✅
+- Scenario 2: MCP Tool Execution ✅
+- Scenario 3: Proposals with capabilities ✅
+- Scenario 4: Dynamic capability granting ✅ (8/9 tests)
+- Scenario 5: Reasoning with context ✅
+- Scenario 6: Error recovery ✅ (5/6 tests)
