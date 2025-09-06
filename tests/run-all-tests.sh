@@ -52,6 +52,7 @@ echo ""
 run_test "Scenario 1: Basic Message Flow" "./test-scenario1.sh"
 run_test "Scenario 2: MCP Tool Execution" "./test-scenario2.sh"
 run_test "Scenario 3: Proposals with Capability Blocking" "./test-scenario3.sh"
+run_test "Scenario 4: Dynamic Capability Granting" "./test-scenario4.sh"
 run_test "Scenario 5: Reasoning with Context Field" "./test-scenario5.sh"
 run_test "Scenario 6: Error Recovery and Edge Cases" "./test-scenario6.sh"
 
@@ -70,9 +71,7 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}Not Yet Implemented:${NC}"
-echo "  - Scenario 4: Dynamic Capability Granting"
-echo "    (Requires capability/grant and capability/revoke message handling)"
+echo -e "${GREEN}All test scenarios implemented!${NC}"
 echo ""
 
 # Cleanup any lingering processes

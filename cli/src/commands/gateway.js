@@ -61,6 +61,7 @@ gateway
     // Track participant info
     const participantTokens = new Map(); // participantId -> token
     const participantCapabilities = new Map(); // participantId -> capabilities array
+    const runtimeCapabilities = new Map(); // participantId -> Map(grantId -> capabilities)
     
     // Track spawned processes
     const spawnedProcesses = new Map(); // participantId -> ChildProcess
@@ -115,7 +116,6 @@ gateway
     function matchesCapability(message, capability) {
       // Simple kind matching first
       if (capability.kind === '*') return true;
-      if (capability.kind === message.kind) return true;
       
       // Wildcard pattern matching
       if (capability.kind && capability.kind.endsWith('/*')) {
@@ -129,9 +129,14 @@ gateway
         }
       }
       
-      // Exact kind match with payload pattern
-      if (capability.kind === message.kind && capability.payload) {
-        return matchesPayloadPattern(message.payload, capability.payload);
+      // Exact kind match
+      if (capability.kind === message.kind) {
+        // If capability has payload pattern, it must match
+        if (capability.payload) {
+          return matchesPayloadPattern(message.payload, capability.payload);
+        }
+        // No payload pattern means any payload is allowed
+        return true;
       }
       
       return false;
@@ -165,10 +170,26 @@ gateway
     
     // Check if participant has capability for message
     async function hasCapabilityForMessage(participantId, message) {
-      const capabilities = participantCapabilities.get(participantId) || [];
+      // Get static capabilities from config
+      const staticCapabilities = participantCapabilities.get(participantId) || [];
+      
+      // Get runtime capabilities (granted dynamically)
+      const runtimeCaps = runtimeCapabilities.get(participantId);
+      const dynamicCapabilities = runtimeCaps ? Array.from(runtimeCaps.values()).flat() : [];
+      
+      // Merge static and dynamic capabilities
+      const allCapabilities = [...staticCapabilities, ...dynamicCapabilities];
+      
+      if (options.logLevel === 'debug' && dynamicCapabilities.length > 0) {
+        console.log(`Checking capabilities for ${participantId}:`, {
+          static: staticCapabilities,
+          dynamic: dynamicCapabilities,
+          message: {kind: message.kind, payload: message.payload}
+        });
+      }
       
       // Check each capability pattern
-      for (const cap of capabilities) {
+      for (const cap of allCapabilities) {
         if (matchesCapability(message, cap)) {
           return true;
         }
@@ -366,9 +387,130 @@ gateway
           }
           
           // Handle capability management messages
-          if (message.kind === 'capability/grant' || message.kind === 'capability/revoke') {
-            // These are routed like normal messages but may trigger gateway behavior
-            // The gateway doesn't enforce who can send these, just routes them
+          if (message.kind === 'capability/grant') {
+            // Check if sender has capability to grant capabilities
+            const canGrant = await hasCapabilityForMessage(participantId, {kind: 'capability/grant'});
+            if (!canGrant) {
+              const errorMessage = {
+                protocol: 'meup/v0.2',
+                id: `error-${Date.now()}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                to: [participantId],
+                kind: 'system/error',
+                correlation_id: message.id ? [message.id] : undefined,
+                payload: {
+                  error: 'capability_violation',
+                  message: 'You do not have permission to grant capabilities',
+                  attempted_kind: message.kind
+                }
+              };
+              ws.send(JSON.stringify(errorMessage));
+              return;
+            }
+            
+            const recipient = message.payload?.recipient;
+            const grantCapabilities = message.payload?.capabilities || [];
+            const grantId = message.id || `grant-${Date.now()}`;
+            
+            if (recipient && grantCapabilities.length > 0) {
+              // Initialize runtime capabilities for recipient if needed
+              if (!runtimeCapabilities.has(recipient)) {
+                runtimeCapabilities.set(recipient, new Map());
+              }
+              
+              // Store the granted capabilities
+              const recipientCaps = runtimeCapabilities.get(recipient);
+              recipientCaps.set(grantId, grantCapabilities);
+              
+              console.log(`Granted capabilities to ${recipient}: ${JSON.stringify(grantCapabilities)}`);
+              console.log(`Runtime capabilities for ${recipient}:`, Array.from(recipientCaps.entries()));
+              
+              // Send acknowledgment to recipient
+              const space = spaces.get(spaceId);
+              const recipientWs = space?.participants.get(recipient);
+              if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
+                const ackMessage = {
+                  protocol: 'meup/v0.2',
+                  id: `ack-${Date.now()}`,
+                  ts: new Date().toISOString(),
+                  from: 'system:gateway',
+                  to: [recipient],
+                  kind: 'capability/grant-ack',
+                  correlation_id: [grantId],
+                  payload: {
+                    status: 'accepted',
+                    grant_id: grantId,
+                    capabilities: grantCapabilities
+                  }
+                };
+                recipientWs.send(JSON.stringify(ackMessage));
+              }
+            }
+          } else if (message.kind === 'capability/revoke') {
+            // Check if sender has capability to revoke capabilities
+            const canRevoke = await hasCapabilityForMessage(participantId, {kind: 'capability/revoke'});
+            if (!canRevoke) {
+              const errorMessage = {
+                protocol: 'meup/v0.2',
+                id: `error-${Date.now()}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                to: [participantId],
+                kind: 'system/error',
+                correlation_id: message.id ? [message.id] : undefined,
+                payload: {
+                  error: 'capability_violation',
+                  message: 'You do not have permission to revoke capabilities',
+                  attempted_kind: message.kind
+                }
+              };
+              ws.send(JSON.stringify(errorMessage));
+              return;
+            }
+            
+            const recipient = message.payload?.recipient;
+            const grantIdToRevoke = message.payload?.grant_id;
+            const capabilitiesToRevoke = message.payload?.capabilities;
+            
+            if (recipient) {
+              const recipientCaps = runtimeCapabilities.get(recipient);
+              
+              if (recipientCaps) {
+                if (grantIdToRevoke) {
+                  // Revoke by grant ID
+                  if (recipientCaps.has(grantIdToRevoke)) {
+                    recipientCaps.delete(grantIdToRevoke);
+                    console.log(`Revoked grant ${grantIdToRevoke} from ${recipient}`);
+                  }
+                } else if (capabilitiesToRevoke) {
+                  // Revoke by capability patterns - remove all matching grants
+                  for (const [grantId, caps] of recipientCaps.entries()) {
+                    const remainingCaps = caps.filter(cap => {
+                      // Check if this capability should be revoked
+                      for (const revokePattern of capabilitiesToRevoke) {
+                        if (JSON.stringify(cap) === JSON.stringify(revokePattern)) {
+                          return false; // Remove this capability
+                        }
+                      }
+                      return true; // Keep this capability
+                    });
+                    
+                    if (remainingCaps.length === 0) {
+                      recipientCaps.delete(grantId);
+                    } else {
+                      recipientCaps.set(grantId, remainingCaps);
+                    }
+                  }
+                  console.log(`Revoked capabilities from ${recipient}: ${JSON.stringify(capabilitiesToRevoke)}`);
+                }
+                
+                // Clean up empty entries
+                if (recipientCaps.size === 0) {
+                  runtimeCapabilities.delete(recipient);
+                }
+              }
+            }
           }
           
           // Add protocol envelope fields if missing
@@ -433,6 +575,7 @@ gateway
           space.participants.delete(participantId);
           participantTokens.delete(participantId);
           participantCapabilities.delete(participantId);
+          runtimeCapabilities.delete(participantId);
           
           // Broadcast leave presence
           const presenceMessage = {
