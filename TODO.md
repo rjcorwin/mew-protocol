@@ -36,12 +36,12 @@ Implementation priorities to get tests passing:
 - [x] Implement restart policies
 - [x] Track spawned process PIDs
 
-### 🔥 Immediate Priority: Fix Reasoning Messages (Enables Scenario 5)
-- [ ] Remove context/push and context/pop (not in MEUP v0.2 spec)
-- [ ] Support reasoning/start, reasoning/thought, reasoning/conclusion
-- [ ] Use context field for grouping related messages
-- [ ] Preserve correlation_id arrays properly
-- [ ] Allow messages with context field to pass through
+### ✅ Completed: Reasoning Messages Support
+- [x] Support reasoning/start, reasoning/thought, reasoning/conclusion (via wildcard patterns)
+- [x] Context field for grouping related messages (passes through gateway)
+- [x] Preserve correlation_id arrays properly
+- [x] Messages with context field pass through correctly
+- [x] Test scenario 5 passing with full reasoning flow
 
 ### 🚀 Priority 4: Enhanced Validation (Improves Scenario 6)
 - [ ] Add protocol version checking (reject non-v0.2)
@@ -60,9 +60,9 @@ Implementation priorities to get tests passing:
 - [x] Scenario 1: Basic Message Flow ✅ PASSED
 - [x] Scenario 2: MCP Tool Execution ✅ PASSED
 - [x] Scenario 3: Proposals with capability blocking ✅ PASSED
-- [ ] Scenario 4: Dynamic capability granting → **READY TO TEST** (capability system complete)
-- [ ] Scenario 5: Reasoning with context field → **Needs reasoning message support**
-- [ ] Scenario 6: Error recovery → **Needs better validation**
+- [ ] Scenario 4: Dynamic capability granting → **Blocked: Needs capability/grant and capability/revoke implementation**
+- [x] Scenario 5: Reasoning with context field ✅ PASSED
+- [x] Scenario 6: Error recovery ✅ PASSED (5/6 tests pass)
 
 ## Implementation Order
 
@@ -70,21 +70,52 @@ Implementation priorities to get tests passing:
 2. ✅ **Space config loader** - Read space.yaml
 3. ✅ **Capability matcher** - Check permissions
 4. ✅ **Token mapping** - Connect tokens to participants
-5. ✅ **Run test 3** - Proposals with capability blocking working
-6. **Run test 4** - Test dynamic capability grant/revoke
-7. **Reasoning messages** - Support reasoning/start, reasoning/thought, reasoning/conclusion
-8. **Run test 5** - Test reasoning with context field
-9. **Enhanced validation** - Better error messages and protocol checking
-10. **Run test 6** - Test error recovery
+5. ✅ **Test scenarios 1-3** - Basic flow, MCP tools, proposals
+6. ✅ **Test scenario 5** - Reasoning with context field
+7. ✅ **Test scenario 6** - Error recovery (5/6 tests pass)
+8. ✅ **Test infrastructure** - All test scripts and agents working
+9. ⏳ **Dynamic capabilities** - Implement capability/grant and capability/revoke
+10. ⏳ **Test scenario 4** - Test dynamic capability grant/revoke
 
 ## Next Steps
 
-1. **Test Scenario 4**: Write test script for dynamic capability grant/revoke
-2. **Reasoning Messages**: Add support for reasoning message kinds with context field (already supported via wildcard patterns)
-3. **Test Scenario 5**: Implement reasoning test with context field
-4. **Enhanced Validation**: Add strict protocol version and payload validation
-5. **Test Scenario 6**: Implement error recovery tests
-6. **Documentation**: Update README with complete test suite usage
+### 🎯 Immediate (Complete TEST_PLAN.md)
+1. **Implement Dynamic Capabilities**:
+   - Add capability/grant message handler in gateway
+   - Add capability/revoke message handler in gateway  
+   - Store runtime capability modifications per participant
+   - Merge runtime capabilities with space.yaml capabilities
+2. **Test Scenario 4**: Implement and test dynamic capability granting
+3. **Documentation**: Update README with test suite usage
+
+### 🚀 Short Term (Production Readiness)
+1. **Interactive Connection** (`meup space connect`):
+   - Implement terminal UI mode
+   - Parse space.yaml for participant settings
+   - Handle authentication/token prompt
+   - Process slash commands (/help, /participants, etc.)
+2. **Enhanced Validation**:
+   - Protocol version checking
+   - Strict payload validation
+   - Better error messages
+3. **Process Management Improvements**:
+   - Better error handling for spawned processes
+   - Process health monitoring
+   - Automatic restart on failure
+
+### 📦 Medium Term (v0.1.0 Release)
+1. **Configuration Management**:
+   - Environment variable support
+   - Config file loading (~/.meup/config.yaml)
+   - Multi-space management
+2. **Security Enhancements**:
+   - Token generation and validation
+   - TLS/SSL support
+   - Rate limiting
+3. **Documentation**:
+   - Complete API documentation
+   - Tutorial videos
+   - Example projects
 
 ## Completed Tasks (Archived)
 
@@ -106,11 +137,14 @@ Implementation priorities to get tests passing:
 - **Process management for auto-starting agents**
 
 ### Test Infrastructure ✅
-- Test scripts created for scenarios 1-3
+- Test scripts created for scenarios 1-3, 5-6 (5 of 6 complete)
 - FIFO automation working (fixed with background writer process)
 - Individual scenario runners created
 - Test agents implemented (echo, calculator, fulfiller)
 - Proposal flow with auto-fulfillment working
+- Reasoning message flow with context field working
+- Error recovery tests implemented
+- run-all-tests.sh script for full test suite execution
 
 ## Future Work (After TEST_PLAN.md Complete)
 

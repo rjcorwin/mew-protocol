@@ -8,15 +8,13 @@
 - ✅ Test Scenario 1: Basic Message Flow (test-scenario1.sh)
 - ✅ Test Scenario 2: MCP Tool Execution (test-scenario2.sh)
 - ✅ Test Scenario 3: Proposals with capability blocking (test-scenario3.sh)
+- ✅ Test Scenario 5: Reasoning with context field (test-scenario5.sh)
+- ✅ Test Scenario 6: Error recovery and edge cases (test-scenario6.sh) - 5/6 tests pass
 - ✅ Test Agents: echo.js, calculator.js, fulfiller.js
 - ✅ FIFO handling fixed with background writer process for multiple messages
 
-### In Progress
-- 🔄 Test Scenario 4: Dynamic capability granting
-
-### Not Started
-- ⏳ Test Scenario 5: Reasoning with context field
-- ⏳ Test Scenario 6: Error recovery
+### Not Yet Implemented
+- ⏳ Test Scenario 4: Dynamic capability granting (requires capability/grant and capability/revoke message handling in gateway)
 
 ## Test Run Setup
 
