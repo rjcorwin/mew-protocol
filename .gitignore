@@ -30,6 +30,13 @@ coverage/
 *.lcov
 .nyc_output/
 
+# Test artifacts
+tests/test-spaces/*/logs/
+tests/test-spaces/*/fifos/
+tests/test-spaces/*/.meup/
+tests/test-spaces/test-results.log
+tests/test-run-*/
+
 # IDE
 .vscode/
 .idea/

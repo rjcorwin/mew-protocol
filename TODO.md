@@ -13,33 +13,34 @@
   - PID files in `./.meup/` within the space directory
   - FIFOs in `./fifos/` within the space directory
 
-### Phase 1: Test Space Reorganization
-- [ ] Create `test-spaces/` directory structure:
-  - [ ] `test-spaces/scenario-1-basic/` - Basic message flow test
-    - [ ] `space.yaml` - Only echo agent and test client
-    - [ ] `agents/` - Just echo.js
-    - [ ] `test.sh` - Test script for this scenario
-  - [ ] `test-spaces/scenario-2-mcp/` - MCP tool execution
-    - [ ] `space.yaml` - Calculator agent and test client
-    - [ ] `agents/` - Just calculator.js
-    - [ ] `test.sh` - Test script
-  - [ ] `test-spaces/scenario-3-proposals/` - Proposal flow
-    - [ ] `space.yaml` - Calculator, fulfiller, proposer
-    - [ ] `agents/` - calculator.js, fulfiller.js
-    - [ ] `test.sh` - Test script
-  - [ ] `test-spaces/scenario-4-capabilities/` - Dynamic capabilities
-    - [ ] `space.yaml` - Coordinator, limited-agent, calculator
-    - [ ] `agents/` - calculator.js
-    - [ ] `test.sh` - Test script
-  - [ ] `test-spaces/scenario-5-reasoning/` - Reasoning messages
-    - [ ] `space.yaml` - Research agent, calculator
-    - [ ] `agents/` - calculator.js
-    - [ ] `test.sh` - Test script
-  - [ ] `test-spaces/scenario-6-errors/` - Error recovery
-    - [ ] `space.yaml` - Test client only
-    - [ ] `test.sh` - Test script
-  - [ ] `test-spaces/shared-agents/` - Shared agent implementations
-    - [ ] All agent .js files that can be symlinked/copied
+### Phase 1: Test Space Reorganization ✅
+- [x] Create `test-spaces/` directory structure:
+  - [x] `test-spaces/scenario-1-basic/` - Basic message flow test
+    - [x] `space.yaml` - Only echo agent and test client
+    - [x] `agents/` - Just echo.js
+    - [x] `test.sh` - Test script for this scenario
+  - [x] `test-spaces/scenario-2-mcp/` - MCP tool execution
+    - [x] `space.yaml` - Calculator agent and test client
+    - [x] `agents/` - Just calculator.js
+    - [x] `test.sh` - Test script
+  - [x] `test-spaces/scenario-3-proposals/` - Proposal flow
+    - [x] `space.yaml` - Calculator, fulfiller, proposer
+    - [x] `agents/` - calculator.js, fulfiller.js
+    - [x] `test.sh` - Test script
+  - [x] `test-spaces/scenario-4-capabilities/` - Dynamic capabilities
+    - [x] `space.yaml` - Coordinator, limited-agent, calculator
+    - [x] `agents/` - calculator.js
+    - [x] `test.sh` - Test script
+  - [x] `test-spaces/scenario-5-reasoning/` - Reasoning messages
+    - [x] `space.yaml` - Research agent, calculator
+    - [x] `agents/` - calculator.js
+    - [x] `test.sh` - Test script
+  - [x] `test-spaces/scenario-6-errors/` - Error recovery
+    - [x] `space.yaml` - Test client only
+    - [x] `test.sh` - Test script
+  - [x] `test-spaces/shared-agents/` - Shared agent implementations
+    - [x] All agent .js files that can be symlinked/copied
+  - [x] `test-spaces/run-all-tests.sh` - Master test runner created
 
 ### Phase 2: Implement `meup space` Commands
 - [ ] Add FIFO configuration support to space.yaml:
@@ -88,12 +89,12 @@
     meup space down
     ```
 
-- [ ] Create master test runner:
-  - [ ] `run-all-tests.sh` that iterates through test-spaces/scenario-*
-  - [ ] Each test is self-contained in its directory
-  - [ ] No assembly required - just cd and run
-  - [ ] Test output logs stay in each scenario directory (not /tmp)
-  - [ ] Summary report written to `./test-results.log`
+- [x] Create master test runner:
+  - [x] `run-all-tests.sh` that iterates through test-spaces/scenario-*
+  - [x] Each test is self-contained in its directory
+  - [x] No assembly required - just cd and run
+  - [x] Test output logs stay in each scenario directory (not /tmp)
+  - [x] Summary report written to `./test-results.log`
 
 ### Phase 4: Documentation Updates
 - [ ] Update TEST_PLAN.md:
