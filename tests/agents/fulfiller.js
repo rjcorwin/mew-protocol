@@ -52,16 +52,19 @@ ws.on('message', (data) => {
     // Auto-fulfill any MCP proposal we see
     if (message.kind === 'mcp/proposal' && message.from !== participantId) {
       console.log(`Saw proposal from ${message.from}, auto-fulfilling...`);
+      console.log(`Proposal details: ${JSON.stringify(message)}`);
       
       // Extract the proposal details
       const method = message.payload?.method;
       const params = message.payload?.params || {};
       
       // Create fulfillment request with correlation to the proposal
+      // If the proposal has no target, send to calculator-agent
+      const target = message.to || ['calculator-agent'];
       const fulfillmentRequest = {
         id: `fulfill-${Date.now()}`,
         kind: 'mcp/request',
-        to: message.to || [], // Use same target as proposal
+        to: target,
         correlation_id: [message.id], // Reference the proposal
         payload: {
           jsonrpc: '2.0',
@@ -76,6 +79,8 @@ ws.on('message', (data) => {
         ws.send(JSON.stringify(fulfillmentRequest));
         console.log(`Fulfilled proposal ${message.id} with method ${method}`);
       }, 500);
+    } else if (message.kind === 'mcp/proposal') {
+      console.log(`Ignoring own proposal: ${message.id}`);
     }
   } catch (error) {
     console.error('Error processing message:', error);

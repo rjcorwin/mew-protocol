@@ -59,7 +59,7 @@ Implementation priorities to get tests passing:
 ### 📋 Test Scenarios Status
 - [x] Scenario 1: Basic Message Flow ✅ PASSED
 - [x] Scenario 2: MCP Tool Execution ✅ PASSED
-- [ ] Scenario 3: Proposals with capability blocking → **READY TO TEST** (capability system complete)
+- [x] Scenario 3: Proposals with capability blocking ✅ PASSED
 - [ ] Scenario 4: Dynamic capability granting → **READY TO TEST** (capability system complete)
 - [ ] Scenario 5: Reasoning with context field → **Needs reasoning message support**
 - [ ] Scenario 6: Error recovery → **Needs better validation**
@@ -70,18 +70,21 @@ Implementation priorities to get tests passing:
 2. ✅ **Space config loader** - Read space.yaml
 3. ✅ **Capability matcher** - Check permissions
 4. ✅ **Token mapping** - Connect tokens to participants
-5. **Run tests 3-4** - Test proposal and capability grant/revoke
-6. **Reasoning messages** - Support reasoning/start, reasoning/thought, reasoning/conclusion
-7. **Run test 5** - Test reasoning with context field
-8. **Enhanced validation** - Better error messages and protocol checking
-9. **Run test 6** - Test error recovery
+5. ✅ **Run test 3** - Proposals with capability blocking working
+6. **Run test 4** - Test dynamic capability grant/revoke
+7. **Reasoning messages** - Support reasoning/start, reasoning/thought, reasoning/conclusion
+8. **Run test 5** - Test reasoning with context field
+9. **Enhanced validation** - Better error messages and protocol checking
+10. **Run test 6** - Test error recovery
 
 ## Next Steps
 
-1. **Test Scenarios 3-4**: Write test scripts for proposal and capability grant/revoke flows
-2. **Reasoning Messages**: Add support for reasoning message kinds with context field
-3. **Enhanced Validation**: Add strict protocol version and payload validation
-4. **Documentation**: Update README with capability system usage
+1. **Test Scenario 4**: Write test script for dynamic capability grant/revoke
+2. **Reasoning Messages**: Add support for reasoning message kinds with context field (already supported via wildcard patterns)
+3. **Test Scenario 5**: Implement reasoning test with context field
+4. **Enhanced Validation**: Add strict protocol version and payload validation
+5. **Test Scenario 6**: Implement error recovery tests
+6. **Documentation**: Update README with complete test suite usage
 
 ## Completed Tasks (Archived)
 
@@ -103,10 +106,11 @@ Implementation priorities to get tests passing:
 - **Process management for auto-starting agents**
 
 ### Test Infrastructure ✅
-- Test scripts created for scenarios 1-2
-- FIFO automation working (fixed with `cat` instead of `tail -F`)
+- Test scripts created for scenarios 1-3
+- FIFO automation working (fixed with background writer process)
 - Individual scenario runners created
 - Test agents implemented (echo, calculator, fulfiller)
+- Proposal flow with auto-fulfillment working
 
 ## Future Work (After TEST_PLAN.md Complete)
 

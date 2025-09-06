@@ -7,11 +7,11 @@
 ### Completed
 - ✅ Test Scenario 1: Basic Message Flow (test-scenario1.sh)
 - ✅ Test Scenario 2: MCP Tool Execution (test-scenario2.sh)
+- ✅ Test Scenario 3: Proposals with capability blocking (test-scenario3.sh)
 - ✅ Test Agents: echo.js, calculator.js, fulfiller.js
-- ✅ FIFO handling fixed with background `cat` process
+- ✅ FIFO handling fixed with background writer process for multiple messages
 
 ### In Progress
-- 🔄 Test Scenario 3: Proposals with capability blocking
 - 🔄 Test Scenario 4: Dynamic capability granting
 
 ### Not Started
