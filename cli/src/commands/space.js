@@ -221,8 +221,9 @@ function removePidFile(spaceDir) {
 
 /**
  * Create FIFOs for participant if configured
+ * @param {boolean} createOutputFifo - Whether to create output FIFO (false when output_log is set)
  */
-function createFifos(spaceDir, participantId) {
+function createFifos(spaceDir, participantId, createOutputFifo = true) {
   const fifoDir = path.join(spaceDir, 'fifos');
   if (!fs.existsSync(fifoDir)) {
     fs.mkdirSync(fifoDir, { recursive: true });
@@ -237,10 +238,12 @@ function createFifos(spaceDir, participantId) {
   }
   
   try {
+    // Always create input FIFO
     if (!fs.existsSync(inFifo)) {
       execSync(`mkfifo "${inFifo}"`);
     }
-    if (!fs.existsSync(outFifo)) {
+    // Only create output FIFO if requested
+    if (createOutputFifo && !fs.existsSync(outFifo)) {
       execSync(`mkfifo "${outFifo}"`);
     }
   } catch (error) {
@@ -248,7 +251,7 @@ function createFifos(spaceDir, participantId) {
     throw error;
   }
   
-  return { inFifo, outFifo };
+  return { inFifo, outFifo: createOutputFifo ? outFifo : null };
 }
 
 /**
@@ -411,30 +414,53 @@ space
       
       // Create FIFOs for participants with fifo: true
       if (participant.fifo === true) {
+        // Determine if we need output FIFO (not needed if output_log is set)
+        const createOutputFifo = !participant.output_log;
+        
         console.log(`Creating FIFOs for ${participantId}...`);
-        const { inFifo, outFifo } = createFifos(spaceDir, participantId);
-        console.log(`✓ FIFOs created: ${participantId}-in, ${participantId}-out`);
+        const { inFifo, outFifo } = createFifos(spaceDir, participantId, createOutputFifo);
+        
+        if (createOutputFifo) {
+          console.log(`✓ FIFOs created: ${participantId}-in, ${participantId}-out`);
+        } else {
+          console.log(`✓ FIFO created: ${participantId}-in (output goes to ${participant.output_log})`);
+        }
         
         // If auto_connect is true, connect the participant
         if (participant.auto_connect === true) {
-          console.log(`Connecting ${participantId} via FIFO...`);
+          console.log(`Connecting ${participantId}...`);
           
           const clientLogPath = path.join(logsDir, `${participantId}-client.log`);
+          
+          // Build client arguments
+          const clientArgs = [
+            'client',
+            'connect',
+            '--gateway', `ws://localhost:${options.port}`,
+            '--space', spaceId,
+            '--participant-id', participantId,
+            '--token', participant.tokens?.[0] || 'token',
+            '--fifo-in', inFifo
+          ];
+          
+          // Add output configuration
+          if (participant.output_log) {
+            // Ensure logs directory exists
+            const outputLogPath = path.join(spaceDir, participant.output_log);
+            const outputLogDir = path.dirname(outputLogPath);
+            if (!fs.existsSync(outputLogDir)) {
+              fs.mkdirSync(outputLogDir, { recursive: true });
+            }
+            clientArgs.push('--output-file', outputLogPath);
+          } else {
+            clientArgs.push('--fifo-out', outFifo);
+          }
           
           try {
             const clientApp = await startPM2Process({
               name: `${spaceId}-${participantId}-client`,
               script: path.join(__dirname, '../../bin/meup.js'),
-              args: [
-                'client',
-                'connect',
-                '--gateway', `ws://localhost:${options.port}`,
-                '--space', spaceId,
-                '--participant-id', participantId,
-                '--token', participant.tokens?.[0] || 'token',
-                '--fifo-in', inFifo,
-                '--fifo-out', outFifo
-              ],
+              args: clientArgs,
               cwd: spaceDir,
               autorestart: false,
               error_file: path.join(logsDir, `${participantId}-client-error.log`),

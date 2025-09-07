@@ -18,5 +18,6 @@ participants:
     capabilities:
       - kind: chat
       - kind: system/*
-    fifo: true
-    auto_connect: true
+    fifo: true  # Create input FIFO
+    output_log: "./logs/test-client-output.log"  # Output to file instead of FIFO
+    auto_connect: true  # Auto-connect the test client

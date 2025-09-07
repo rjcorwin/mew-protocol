@@ -57,14 +57,14 @@ fi
 # Export variables for check.sh to use
 export SPACE_RUNNING=true
 export FIFO_IN="$TEST_DIR/fifos/test-client-in"
-export FIFO_OUT="$TEST_DIR/fifos/test-client-out"
+export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
 
 echo ""
 echo -e "${GREEN}=== Setup Complete ===${NC}"
 echo ""
 echo -e "${BLUE}For manual testing:${NC}"
 echo "  1. Send messages: echo '{\"kind\":\"chat\",\"payload\":{\"text\":\"Hello\"}}' > $FIFO_IN"
-echo "  2. Read responses: cat < $FIFO_OUT"
+echo "  2. Read responses: tail -f $OUTPUT_LOG"
 echo "  3. Check logs: tail -f $TEST_DIR/logs/*.log"
 echo "  4. Run checks: ./check.sh"
 echo "  5. Clean up: ./teardown.sh"

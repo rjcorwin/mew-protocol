@@ -376,6 +376,57 @@ participants:
       - kind: "chat"
 ```
 
+#### FIFO and Output Configuration
+
+Participants can be configured with FIFOs for automation and testing:
+
+```yaml
+participants:
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: "chat"
+    fifo: true  # Create input FIFO (and output FIFO unless output_log is set)
+    output_log: "./logs/test-client.log"  # Redirect output to file (non-blocking)
+    auto_connect: true  # Auto-connect when space starts
+```
+
+**FIFO Configuration Options:**
+
+- `fifo: true` - Creates FIFOs for the participant:
+  - When `output_log` is NOT set: Creates both input and output FIFOs
+  - When `output_log` IS set: Creates only input FIFO, output goes to log file
+
+- `output_log: <path>` - Redirects client output to a file instead of FIFO:
+  - Prevents blocking issues in automated tests
+  - Allows analysis of output after test completion
+  - Appends to file if it exists
+
+- `auto_connect: true` - Automatically connects the client when space starts
+
+**Use Cases:**
+
+```yaml
+# Automated testing (non-blocking)
+test-client:
+  fifo: true
+  output_log: "./logs/test-output.log"  # Output to file
+  auto_connect: true
+
+# Interactive debugging (traditional FIFOs)  
+debug-client:
+  fifo: true
+  # No output_log means both FIFOs are created
+  auto_connect: false  # Connect manually for debugging
+
+# Agent without FIFOs
+echo-agent:
+  fifo: false
+  auto_start: true
+  command: "node"
+  args: ["./agents/echo.js"]
+```
+
 The CLI handles:
 - **Process Management**: Starting/stopping local agents based on config
 - **Environment Setup**: Passing environment variables to agents

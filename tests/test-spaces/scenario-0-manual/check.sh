@@ -21,7 +21,8 @@ NC='\033[0m' # No Color
 if [ -z "$TEST_DIR" ]; then
   export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
   export FIFO_IN="$TEST_DIR/fifos/test-client-in"
-  export FIFO_OUT="$TEST_DIR/fifos/test-client-out"
+  # With output_log, we read from the log file instead of FIFO
+  export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
   
   # Try to detect port from running space
   if [ -f "$TEST_DIR/.meup/pids.json" ]; then
@@ -62,9 +63,9 @@ run_test() {
 # Test 1: Check if gateway is running
 run_test "Gateway is running" "curl -s http://localhost:$TEST_PORT/health | grep -q 'ok'"
 
-# Test 2: Check if FIFOs exist
+# Test 2: Check if input FIFO and output log exist
 run_test "Input FIFO exists" "[ -p '$FIFO_IN' ]"
-run_test "Output FIFO exists" "[ -p '$FIFO_OUT' ]"
+run_test "Output log exists" "[ -f '$OUTPUT_LOG' ]"
 
 # Test 3: Check if echo agent is connected (check logs)
 run_test "Echo agent connected" "grep -q 'Echo agent connected' '$TEST_DIR/logs/space-up.log' || grep -q 'Connected to gateway' '$TEST_DIR/logs/echo.log' 2>/dev/null"
@@ -72,10 +73,8 @@ run_test "Echo agent connected" "grep -q 'Echo agent connected' '$TEST_DIR/logs/
 # Test 4: Send a message and check for echo response
 echo -e "\n${YELLOW}Testing message flow...${NC}"
 
-# Start reading from output FIFO in background
-RESPONSE_FILE="$TEST_DIR/logs/test-response-$$.txt"
-timeout 5 cat "$FIFO_OUT" > "$RESPONSE_FILE" 2>/dev/null &
-CAT_PID=$!
+# We'll read from the output log file
+RESPONSE_FILE="$OUTPUT_LOG"
 
 # Send test message
 TEST_MESSAGE='{"kind":"chat","payload":{"text":"Test message from check.sh"}}'
@@ -83,9 +82,6 @@ echo "$TEST_MESSAGE" > "$FIFO_IN"
 
 # Wait for response
 sleep 2
-
-# Kill the cat process if still running
-kill $CAT_PID 2>/dev/null || true
 
 # Check if we got both the original and echo response
 if [ -f "$RESPONSE_FILE" ]; then
@@ -107,8 +103,7 @@ if [ -f "$RESPONSE_FILE" ]; then
     ((TESTS_FAILED++))
   fi
   
-  # Clean up response file
-  rm -f "$RESPONSE_FILE"
+  # Don't clean up the log file - it's persistent
 else
   echo -e "Message flow test: ${RED}✗ (no response received)${NC}"
   ((TESTS_FAILED+=2))
@@ -116,10 +111,6 @@ fi
 
 # Test 5: Test rapid message handling
 echo -e "\n${YELLOW}Testing rapid message handling...${NC}"
-
-RAPID_RESPONSE_FILE="$TEST_DIR/logs/rapid-response-$$.txt"
-timeout 5 cat "$FIFO_OUT" > "$RAPID_RESPONSE_FILE" 2>/dev/null &
-CAT_PID=$!
 
 # Send 3 messages rapidly
 for i in 1 2 3; do
@@ -130,24 +121,14 @@ done
 # Wait for responses
 sleep 2
 
-# Kill the cat process if still running
-kill $CAT_PID 2>/dev/null || true
+# Count how many echo responses we got in the log file
+ECHO_COUNT=$(grep -c '"Echo: Rapid message' "$RESPONSE_FILE" 2>/dev/null || echo 0)
 
-# Count how many echo responses we got
-if [ -f "$RAPID_RESPONSE_FILE" ]; then
-  ECHO_COUNT=$(grep -c '"Echo: Rapid message' "$RAPID_RESPONSE_FILE" 2>/dev/null || echo 0)
-  
-  if [ "$ECHO_COUNT" -eq 3 ]; then
-    echo -e "All 3 rapid messages processed: ${GREEN}✓${NC}"
-    ((TESTS_PASSED++))
-  else
-    echo -e "Rapid message processing: ${RED}✗ (got $ECHO_COUNT/3 responses)${NC}"
-    ((TESTS_FAILED++))
-  fi
-  
-  rm -f "$RAPID_RESPONSE_FILE"
+if [ "$ECHO_COUNT" -eq 3 ]; then
+  echo -e "All 3 rapid messages processed: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++))
 else
-  echo -e "Rapid message test: ${RED}✗ (no responses received)${NC}"
+  echo -e "Rapid message processing: ${RED}✗ (got $ECHO_COUNT/3 responses)${NC}"
   ((TESTS_FAILED++))
 fi
 

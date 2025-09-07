@@ -15,14 +15,21 @@ client
   .option('-p, --participant-id <id>', 'Participant ID')
   .option('--fifo-in <path>', 'Input FIFO for receiving commands')
   .option('--fifo-out <path>', 'Output FIFO for sending messages')
+  .option('--output-file <path>', 'Output file for logging messages (alternative to FIFO)')
   .action(async (options) => {
     const participantId = options.participantId || `client-${Date.now()}`;
     console.log(`Connecting to ${options.gateway} as ${participantId}...`);
     
-    // Create write stream for FIFO if specified
-    let fifoStream = null;
-    if (options.fifoOut) {
-      fifoStream = fs.createWriteStream(options.fifoOut, { flags: 'a' });
+    // Create write stream for output (either FIFO or file)
+    let outputStream = null;
+    if (options.outputFile) {
+      // File output (non-blocking)
+      outputStream = fs.createWriteStream(options.outputFile, { flags: 'a' });
+      console.log(`Output will be written to file: ${options.outputFile}`);
+    } else if (options.fifoOut) {
+      // FIFO output (may block)
+      outputStream = fs.createWriteStream(options.fifoOut, { flags: 'a' });
+      console.log(`Output will be written to FIFO: ${options.fifoOut}`);
     }
     
     // Connect to gateway
@@ -44,13 +51,13 @@ client
       const message = JSON.parse(data.toString());
       console.log('Client received:', JSON.stringify(message).substring(0, 100));
       
-      if (fifoStream) {
-        // Write to output FIFO using stream
-        fifoStream.write(JSON.stringify(message) + '\n', (err) => {
+      if (outputStream) {
+        // Write to output stream (FIFO or file)
+        outputStream.write(JSON.stringify(message) + '\n', (err) => {
           if (err) {
-            console.error('Failed to write to FIFO:', err.message);
+            console.error('Failed to write to output:', err.message);
           } else {
-            console.log('Wrote to FIFO');
+            console.log('Wrote to output');
           }
         });
       } else {
@@ -70,57 +77,35 @@ client
     
     // Set up input handling
     if (options.fifoIn) {
-      // Read from FIFO directly using createReadStream
       console.log(`Reading from FIFO: ${options.fifoIn}`);
       
-      // Helper function to set up FIFO reading
-      const setupFifoReader = () => {
-        // Open the FIFO in read mode with no buffering
-        const fifoStream = fs.createReadStream(options.fifoIn, { 
-          encoding: 'utf8',
-          // Disable internal buffering for immediate data availability
-          highWaterMark: 1
-        });
-        
-        // Use readline to process line by line
-        const rl = readline.createInterface({
-          input: fifoStream,
-          crlfDelay: Infinity
-        });
-        
-        rl.on('line', (line) => {
-          try {
-            console.log(`FIFO received: ${line}`);
-            const message = JSON.parse(line);
-            ws.send(JSON.stringify(message));
-            console.log(`Sent to gateway: ${JSON.stringify(message)}`);
-          } catch (error) {
-            console.error('Error parsing input:', error);
-          }
-        });
-        
-        // When FIFO closes (writer disconnects), reopen it
-        fifoStream.on('end', () => {
-          console.log('FIFO writer disconnected, reopening...');
-          // Small delay before reopening to prevent tight loop
-          setTimeout(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              setupFifoReader();
-            }
-          }, 100);
-        });
-        
-        fifoStream.on('error', (error) => {
-          console.error(`FIFO read error: ${error.message}`);
-          // Try to reopen on error
-          if (ws.readyState === WebSocket.OPEN) {
-            setTimeout(setupFifoReader, 1000);
-          }
-        });
-      };
+      // Use tail -F to read from FIFO continuously
+      const { spawn } = require('child_process');
+      const tail = spawn('tail', ['-F', options.fifoIn]);
       
-      // Start reading from FIFO
-      setupFifoReader();
+      const rl = readline.createInterface({
+        input: tail.stdout,
+        crlfDelay: Infinity
+      });
+      
+      rl.on('line', (line) => {
+        try {
+          console.log(`FIFO received: ${line}`);
+          const message = JSON.parse(line);
+          ws.send(JSON.stringify(message));
+          console.log(`Sent to gateway: ${JSON.stringify(message)}`);
+        } catch (error) {
+          console.error('Error parsing input:', error);
+        }
+      });
+      
+      tail.stderr.on('data', (data) => {
+        console.error(`tail error: ${data}`);
+      });
+      
+      tail.on('exit', (code) => {
+        console.log(`tail process exited with code ${code}`);
+      });
     } else {
       // Interactive mode
       const rl = readline.createInterface({
