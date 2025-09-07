@@ -992,6 +992,11 @@ space
     } else {
       console.log('\nNothing to clean.');
     }
+    
+    // Disconnect from PM2 if we connected
+    if (itemsToClean.pm2) {
+      disconnectPM2();
+    }
   });
 
 // Helper function to format bytes

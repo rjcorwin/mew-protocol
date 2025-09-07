@@ -16,6 +16,9 @@ NC='\033[0m' # No Color
 # Get test directory
 export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Use random port to avoid conflicts
+export TEST_PORT=$((8000 + RANDOM % 1000))
+
 echo -e "${YELLOW}=== Scenario 1: Basic Message Flow Test ===${NC}"
 echo -e "${BLUE}Testing basic echo functionality and message routing${NC}"
 echo ""
@@ -30,7 +33,12 @@ trap cleanup EXIT
 
 # Step 1: Setup the space
 echo -e "${YELLOW}Step 1: Setting up space...${NC}"
-. ./setup.sh
+# Run setup in subprocess but capture the environment it sets
+./setup.sh
+
+# Export the paths that check.sh needs
+export FIFO_IN="$TEST_DIR/fifos/test-client-in"
+export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
 
 # Step 2: Run checks
 echo ""
