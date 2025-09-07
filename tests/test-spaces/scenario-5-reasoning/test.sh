@@ -264,9 +264,8 @@ fi
 # Cleanup
 echo -e "\n${YELLOW}Cleaning up...${NC}"
 kill $WRITER_PID 2>/dev/null || true
-kill $CALC_PID 2>/dev/null || true
-kill $RESEARCH_PID 2>/dev/null || true
-kill $GATEWAY_PID 2>/dev/null || true
-rm -f ./fifos/research-in ./fifos/research-out
+
+# Use space down command to stop all components
+../../../cli/bin/meup.js space down
 
 exit $EXIT_CODE

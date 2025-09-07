@@ -9,3 +9,5 @@ participants:
     capabilities:
       - kind: chat
       - kind: system/*
+    fifo: true
+    auto_connect: true

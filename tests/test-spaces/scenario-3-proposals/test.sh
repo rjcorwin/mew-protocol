@@ -14,84 +14,25 @@ echo -e "${YELLOW}=== Test Scenario 3: Proposals with Capability Blocking ===${N
 # Use random port to avoid conflicts
 PORT=$((8000 + RANDOM % 1000))
 
-# Start gateway with space configuration
-echo "Starting gateway on port $PORT..."
-../../../cli/bin/meup.js gateway start \
-  --port "$PORT" \
-  --log-level debug \
-  --space-config ./space.yaml \
-  > ./logs/gateway.log 2>&1 &
-GATEWAY_PID=$!
+# Start the space using meup space up
+echo "Starting space on port $PORT..."
+../../../cli/bin/meup.js space up --port "$PORT" > ./logs/space-up.log 2>&1
 
-# Wait for gateway
+# Check if space started successfully
+if ../../../cli/bin/meup.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
+  echo -e "${GREEN}✓ Space started successfully${NC}"
+else
+  echo -e "${RED}✗ Space failed to start${NC}"
+  cat ./logs/space-up.log
+  exit 1
+fi
+
+# Wait for all components to be ready
 sleep 3
 
-# Check if gateway is running
-if ! kill -0 $GATEWAY_PID 2>/dev/null; then
-  echo -e "${RED}Gateway failed to start${NC}"
-  cat ./logs/gateway.log
-  exit 1
-fi
-
-echo -e "${GREEN}✓ Gateway started${NC}"
-
-# Start calculator agent
-echo "Starting calculator agent..."
-node ./agents/calculator.js \
-  --gateway "ws://localhost:$PORT" \
-  --space test-space \
-  --token "calculator-token" \
-  > ./logs/calculator.log 2>&1 &
-CALC_PID=$!
-
-# Start fulfiller agent
-echo "Starting fulfiller agent..."
-node ./agents/fulfiller.js \
-  --gateway "ws://localhost:$PORT" \
-  --space test-space \
-  --token "fulfiller-token" \
-  > ./logs/fulfiller.log 2>&1 &
-FULFILLER_PID=$!
-
-sleep 3
-
-# Check if agents are running
-if ! kill -0 $CALC_PID 2>/dev/null; then
-  echo -e "${RED}Calculator agent failed to start${NC}"
-  cat ./logs/calculator.log
-  exit 1
-fi
-
-if ! kill -0 $FULFILLER_PID 2>/dev/null; then
-  echo -e "${RED}Fulfiller agent failed to start${NC}"
-  cat ./logs/fulfiller.log
-  exit 1
-fi
-
-echo -e "${GREEN}✓ Agents started${NC}"
-
-# Create FIFOs for proposer
-mkdir -p ./fifos
-mkfifo ./fifos/proposer-in ./fifos/proposer-out
-
-# Connect proposer
-echo "Connecting proposer..."
-../../../cli/bin/meup.js client connect \
-  --gateway "ws://localhost:$PORT" \
-  --space test-space \
-  --participant-id proposer \
-  --token "proposer-token" \
-  --fifo-in ./fifos/proposer-in \
-  --fifo-out ./fifos/proposer-out \
-  > ./logs/proposer.log 2>&1 &
-PROPOSER_PID=$!
-
-# Start reading from FIFO
+# Start reading from FIFO (FIFOs are created by space up)
 cat ./fifos/proposer-out > ./logs/responses.txt &
 CAT_PID=$!
-
-# Wait for connection
-sleep 3
 
 echo -e "\n${YELLOW}=== Running Proposal Tests ===${NC}"
 
@@ -211,10 +152,8 @@ fi
 # Cleanup
 echo -e "\n${YELLOW}Cleaning up...${NC}"
 kill $CAT_PID 2>/dev/null || true
-kill $PROPOSER_PID 2>/dev/null || true
-kill $FULFILLER_PID 2>/dev/null || true
-kill $CALC_PID 2>/dev/null || true
-kill $GATEWAY_PID 2>/dev/null || true
-rm -f ./fifos/proposer-in ./fifos/proposer-out
+
+# Use space down command to stop all components
+../../../cli/bin/meup.js space down
 
 exit $EXIT_CODE

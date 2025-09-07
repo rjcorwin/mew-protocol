@@ -9,6 +9,9 @@ participants:
     capabilities:
       - kind: mcp/response
       - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["./agents/calculator.js", "--gateway", "ws://localhost:{{PORT}}", "--space", "test-space", "--token", "calculator-token"]
     
   coordinator:
     tokens: ["admin-token"]
@@ -16,8 +19,12 @@ participants:
       - kind: capability/grant
       - kind: capability/revoke
       - kind: system/*
+    fifo: true
+    auto_connect: true
     
   limited-agent:
     tokens: ["limited-token"]
     capabilities:
       - kind: system/*
+    fifo: true
+    auto_connect: true

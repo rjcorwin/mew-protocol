@@ -9,6 +9,9 @@ participants:
     capabilities:
       - kind: mcp/response
       - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["./agents/calculator.js", "--gateway", "ws://localhost:{{PORT}}", "--space", "test-space", "--token", "calculator-token"]
     
   research-agent:
     tokens: ["research-token"]
@@ -19,3 +22,5 @@ participants:
           method: tools/*
       - kind: chat
       - kind: system/*
+    fifo: true
+    auto_connect: true

@@ -10,6 +10,9 @@ participants:
       - kind: chat
       - kind: system/*
     fifo: false  # Agent doesn't need FIFOs
+    auto_start: true
+    command: "node"
+    args: ["./agents/echo.js", "--gateway", "ws://localhost:{{PORT}}", "--space", "test-space", "--token", "echo-token"]
     
   test-client:
     tokens: ["test-token"]
@@ -17,3 +20,4 @@ participants:
       - kind: chat
       - kind: system/*
     fifo: true  # Create FIFOs for test client
+    auto_connect: true  # Auto-connect the test client

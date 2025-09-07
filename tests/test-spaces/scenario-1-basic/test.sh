@@ -14,69 +14,25 @@ echo -e "${YELLOW}=== Test Scenario 1: Basic Message Flow ===${NC}"
 # Use random port to avoid conflicts
 PORT=$((8000 + RANDOM % 1000))
 
-# Start gateway with space configuration
-echo "Starting gateway on port $PORT..."
-../../../cli/bin/meup.js gateway start \
-  --port "$PORT" \
-  --log-level debug \
-  --space-config ./space.yaml \
-  > ./logs/gateway.log 2>&1 &
-GATEWAY_PID=$!
+# Start the space using meup space up
+echo "Starting space on port $PORT..."
+../../../cli/bin/meup.js space up --port "$PORT" > ./logs/space-up.log 2>&1
 
-# Wait for gateway
+# Check if space started successfully
+if ../../../cli/bin/meup.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
+  echo -e "${GREEN}✓ Space started successfully${NC}"
+else
+  echo -e "${RED}✗ Space failed to start${NC}"
+  cat ./logs/space-up.log
+  exit 1
+fi
+
+# Wait for all components to be ready
 sleep 3
 
-# Check if gateway is running
-if ! kill -0 $GATEWAY_PID 2>/dev/null; then
-  echo -e "${RED}Gateway failed to start${NC}"
-  cat ./logs/gateway.log
-  exit 1
-fi
-
-echo -e "${GREEN}✓ Gateway started${NC}"
-
-# Start echo agent
-echo "Starting echo agent..."
-node ./agents/echo.js \
-  --gateway "ws://localhost:$PORT" \
-  --space test-space \
-  --token "echo-token" \
-  > ./logs/echo.log 2>&1 &
-ECHO_PID=$!
-
-sleep 2
-
-# Check if echo agent is running
-if ! kill -0 $ECHO_PID 2>/dev/null; then
-  echo -e "${RED}Echo agent failed to start${NC}"
-  cat ./logs/echo.log
-  exit 1
-fi
-
-echo -e "${GREEN}✓ Echo agent started${NC}"
-
-# Create FIFOs for test client
-mkdir -p ./fifos
-mkfifo ./fifos/test-client-in ./fifos/test-client-out
-
-# Connect test client
-echo "Connecting test client..."
-../../../cli/bin/meup.js client connect \
-  --gateway "ws://localhost:$PORT" \
-  --space test-space \
-  --participant-id test-client \
-  --token "test-token" \
-  --fifo-in ./fifos/test-client-in \
-  --fifo-out ./fifos/test-client-out \
-  > ./logs/test-client.log 2>&1 &
-CLIENT_PID=$!
-
-# Start reading from FIFO
+# Start reading from FIFO (FIFOs are created by space up)
 cat ./fifos/test-client-out > ./logs/responses.txt &
 CAT_PID=$!
-
-# Wait for connection
-sleep 3
 
 echo -e "\n${YELLOW}=== Running Tests ===${NC}"
 
@@ -157,9 +113,8 @@ fi
 # Cleanup
 echo -e "\n${YELLOW}Cleaning up...${NC}"
 kill $CAT_PID 2>/dev/null || true
-kill $CLIENT_PID 2>/dev/null || true
-kill $ECHO_PID 2>/dev/null || true
-kill $GATEWAY_PID 2>/dev/null || true
-rm -f ./fifos/test-client-in ./fifos/test-client-out
+
+# Use space down command to stop all components
+../../../cli/bin/meup.js space down
 
 exit $EXIT_CODE

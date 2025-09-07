@@ -9,6 +9,9 @@ participants:
     capabilities:
       - kind: mcp/response
       - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["./agents/calculator.js", "--gateway", "ws://localhost:{{PORT}}", "--space", "test-space", "--token", "calculator-token"]
     
   fulfiller:
     tokens: ["fulfiller-token"]
@@ -18,9 +21,14 @@ participants:
           method: tools/*
       - kind: mcp/proposal
       - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["./agents/fulfiller.js", "--gateway", "ws://localhost:{{PORT}}", "--space", "test-space", "--token", "fulfiller-token"]
     
   proposer:
     tokens: ["proposer-token"]
     capabilities:
       - kind: mcp/proposal
       - kind: system/*
+    fifo: true
+    auto_connect: true

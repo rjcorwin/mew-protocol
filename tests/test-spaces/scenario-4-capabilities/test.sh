@@ -100,7 +100,7 @@ FAIL_COUNT=0
 
 # Test 1: Limited agent attempts MCP operation (should be blocked)
 echo -e "\n${YELLOW}Test 1: Limited agent attempts tools/list (should be blocked)${NC}"
-echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > ./fifos/limited-in
+echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > ./fifos/limited-agent-in
 sleep 2
 
 if grep -q '"kind":"system/error"' ./logs/limited-responses.txt; then
@@ -128,7 +128,7 @@ fi
 
 # Test 3: Limited agent can now list tools
 echo -e "\n${YELLOW}Test 3: Limited agent attempts tools/list (should succeed)${NC}"
-echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > ./fifos/limited-in
+echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > ./fifos/limited-agent-in
 sleep 3
 
 if tail -10 ./logs/limited-responses.txt | grep -q '"kind":"mcp/response"'; then
@@ -141,7 +141,7 @@ fi
 
 # Test 4: Limited agent still can't call tools
 echo -e "\n${YELLOW}Test 4: Limited agent attempts tools/call (should be blocked)${NC}"
-echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":1,"b":2}}}}' > ./fifos/limited-in
+echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":1,"b":2}}}}' > ./fifos/limited-agent-in
 sleep 2
 
 if tail -5 ./logs/limited-responses.txt | grep -q '"kind":"system/error"'; then
@@ -168,7 +168,7 @@ fi
 
 # Test 6: Limited agent can now call tools
 echo -e "\n${YELLOW}Test 6: Limited agent calls tool (should succeed)${NC}"
-echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > ./fifos/limited-in
+echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > ./fifos/limited-agent-in
 sleep 3
 
 if tail -10 ./logs/limited-responses.txt | grep -q '"kind":"mcp/response"'; then
@@ -190,7 +190,7 @@ echo -e "${GREEN}✓ Revoke message sent${NC}"
 
 # Test 8: Limited agent can no longer call tools
 echo -e "\n${YELLOW}Test 8: Limited agent attempts tools/call after revoke (should be blocked)${NC}"
-echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":2,"b":3}}}}' > ./fifos/limited-in
+echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":2,"b":3}}}}' > ./fifos/limited-agent-in
 sleep 2
 
 if tail -5 ./logs/limited-responses.txt | grep -q '"kind":"system/error"'; then
@@ -203,7 +203,7 @@ fi
 
 # Test 9: But tools/list should still work (granted separately)
 echo -e "\n${YELLOW}Test 9: Limited agent attempts tools/list (should still work)${NC}"
-echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > ./fifos/limited-in
+echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > ./fifos/limited-agent-in
 sleep 3
 
 if tail -10 ./logs/limited-responses.txt | grep -q '"kind":"mcp/response"'; then
@@ -232,10 +232,8 @@ fi
 
 # Cleanup
 echo -e "\n${YELLOW}Cleaning up...${NC}"
-kill $CALC_PID 2>/dev/null || true
-kill $COORD_PID 2>/dev/null || true
-kill $LIMITED_PID 2>/dev/null || true
-kill $GATEWAY_PID 2>/dev/null || true
-rm -f ./fifos/coordinator-in ./fifos/coordinator-out ./fifos/limited-in ./fifos/limited-out
+
+# Use space down command to stop all components
+../../../cli/bin/meup.js space down
 
 exit $EXIT_CODE

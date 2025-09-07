@@ -9,6 +9,9 @@ participants:
     capabilities:
       - kind: mcp/response
       - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["./agents/calculator.js", "--gateway", "ws://localhost:{{PORT}}", "--space", "test-space", "--token", "calculator-token"]
     
   test-client:
     tokens: ["test-token"]
@@ -17,3 +20,5 @@ participants:
         payload:
           method: tools/*
       - kind: system/*
+    fifo: true
+    auto_connect: true

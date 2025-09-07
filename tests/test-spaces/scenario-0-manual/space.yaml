@@ -1,0 +1,17 @@
+space:
+  id: manual-debug-space
+  name: "Scenario 0 - Manual Debug/Development"
+  description: "Manual test setup for debugging individual components"
+
+participants:
+  echo-agent:
+    tokens: ["echo-token"]
+    capabilities:
+      - kind: chat
+      - kind: system/*
+    
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: chat
+      - kind: system/*
