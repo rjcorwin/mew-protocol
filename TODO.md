@@ -1,6 +1,6 @@
 # TODO
 
-## 🎯 Current Focus: Test Infrastructure Refactoring
+## 🎯 Current Focus: Update All Test Scenarios to New Pattern
 
 ### Goals
 - Simplify test setup by making each test space self-contained
@@ -80,51 +80,57 @@
 - [x] **Fix runningSpaces persistence**: Store running spaces in ~/.meup/running-spaces.json so status works across CLI sessions
 - [x] **Add gateway health check**: Replace fixed sleep with actual health check when starting gateway
 
-### Phase 3: Test Script Simplification
+### Phase 3: Update All Test Scenarios to Use New Pattern
 
-**Context**: Now that we have `meup space up/down` commands working (Phase 2), we can dramatically simplify our test scripts. Currently, each test script (`test-spaces/scenario-*/test.sh`) manually:
-- Starts the gateway
-- Creates FIFOs
-- Manages PIDs
-- Handles cleanup
+**Context**: We've successfully implemented:
+- ✅ PM2-based process management (solved gateway lifecycle issue)
+- ✅ `meup space up/down/status` commands working reliably
+- ✅ `meup space clean` command for artifact cleanup
+- ✅ scenario-0-manual created with modular test pattern (setup.sh, check.sh, teardown.sh)
 
-This can all be replaced with `meup space up` and `meup space down` commands.
-
-**Current State**:
-- Each scenario has a `test.sh` that does manual setup (see `test-spaces/scenario-1-basic/test.sh` for example)
-- There's also a `test-with-space-cmd.sh` in scenario-1-basic that shows how to use space commands
-- All scenarios have proper `space.yaml` files with `fifo: true` configured where needed
+**Pattern from scenario-0-manual**:
+- `setup.sh` - Initializes the space (uses `meup space up`)
+- `check.sh` - Runs test assertions (can be run independently)
+- `teardown.sh` - Cleans up the space (uses `meup space down` and `meup space clean`)
+- `test.sh` - Combines all three for automated testing
 
 **What needs to be done**:
 
-- [ ] Create `test-spaces/scenario-0-manual/`:
-  - [ ] Copy the current manual approach from existing test.sh files
-  - [ ] This preserves the ability to debug individual components
-  - [ ] Add README explaining when to use manual vs automated startup
-  - [ ] Document as "debugging/development" scenario
+- [ ] Update scenario-1-basic to use new pattern:
+  - [ ] Create setup.sh, check.sh, teardown.sh scripts
+  - [ ] Update test.sh to use the modular scripts
+  - [ ] Add echo agent to space.yaml with auto_start
+  - [ ] Test that all checks pass
 
-- [ ] Update all test scripts (`test-spaces/scenario-*/test.sh`) to use `meup space up/down`:
-  - [ ] Remove gateway startup code (lines creating gateway process)
-  - [ ] Remove FIFO creation code (now handled by `meup space up`)
-  - [ ] Remove PID management code
-  - [ ] Replace with simple pattern:
-    ```bash
-    # Start the space
-    ../../../cli/bin/meup.js space up --port $PORT
-    
-    # Connect any manual agents if needed (ones without auto_start)
-    # ... test logic here ...
-    
-    # Stop the space
-    ../../../cli/bin/meup.js space down
-    ```
-  - [ ] Update each scenario:
-    - [ ] scenario-1-basic/test.sh
-    - [ ] scenario-2-mcp/test.sh
-    - [ ] scenario-3-proposals/test.sh
-    - [ ] scenario-4-capabilities/test.sh
-    - [ ] scenario-5-reasoning/test.sh
-    - [ ] scenario-6-errors/test.sh
+- [ ] Update scenario-2-mcp to use new pattern:
+  - [ ] Create setup.sh, check.sh, teardown.sh scripts
+  - [ ] Update test.sh to use the modular scripts
+  - [ ] Add calculator agent to space.yaml with auto_start
+  - [ ] Test MCP tool execution works
+
+- [ ] Update scenario-3-proposals to use new pattern:
+  - [ ] Create setup.sh, check.sh, teardown.sh scripts
+  - [ ] Update test.sh to use the modular scripts
+  - [ ] Add all agents to space.yaml with auto_start
+  - [ ] Test proposal flow works
+
+- [ ] Update scenario-4-capabilities to use new pattern:
+  - [ ] Create setup.sh, check.sh, teardown.sh scripts
+  - [ ] Update test.sh to use the modular scripts
+  - [ ] Add agents to space.yaml with auto_start
+  - [ ] Test capability management works
+
+- [ ] Update scenario-5-reasoning to use new pattern:
+  - [ ] Create setup.sh, check.sh, teardown.sh scripts
+  - [ ] Update test.sh to use the modular scripts
+  - [ ] Add agents to space.yaml with auto_start
+  - [ ] Test reasoning messages work
+
+- [ ] Update scenario-6-errors to use new pattern:
+  - [ ] Create setup.sh, check.sh, teardown.sh scripts
+  - [ ] Update test.sh to use the modular scripts
+  - [ ] Update space.yaml configuration
+  - [ ] Test error handling works
 
 - [x] Create master test runner:
   - [x] `run-all-tests.sh` that iterates through test-spaces/scenario-*
@@ -133,23 +139,19 @@ This can all be replaced with `meup space up` and `meup space down` commands.
   - [x] Test output logs stay in each scenario directory (not /tmp)
   - [x] Summary report written to `./test-results.log`
 
-### Phase 4: Documentation Updates
-- [ ] Update TEST_PLAN.md:
-  - [ ] Remove redundant setup instructions
-  - [ ] Document new test-spaces structure
-  - [ ] Explain `meup space up/down` usage
-  - [ ] Keep focus on test scenarios, not implementation details
+### Phase 4: Verify All Tests Pass
+- [ ] Run `test-spaces/run-all-tests.sh`
+- [ ] Ensure all 6 scenarios pass
+- [ ] Fix any failures or race conditions
+- [ ] Document any known issues
 
-- [ ] Create test-spaces/README.md:
-  - [ ] Overview of test organization
-  - [ ] How to run individual tests
+### Phase 5: Documentation Updates
+- [ ] Update TEST_PLAN.md to reflect new test structure
+- [ ] Update test-spaces/README.md with:
+  - [ ] How to run tests
+  - [ ] How to debug failing tests
   - [ ] How to create new test scenarios
-
-### Phase 5: Cleanup and Polish
-- [ ] Remove old test-scenario*.sh files from tests/
-- [ ] Remove test-space/ directory (replaced by test-spaces/*)
-- [ ] Update .gitignore for test artifacts
-- [ ] Ensure all tests pass with new structure
+- [ ] Document the modular test pattern for future contributors
 
 ## 🔧 Future Improvements for Space Commands
 
@@ -191,6 +193,17 @@ This can all be replaced with `meup space up` and `meup space down` commands.
 ---
 
 ## Archived: Completed Work
+
+### ✅ Gateway Process Lifecycle Issue (RESOLVED)
+- **Solution**: Implemented PM2 as embedded process manager
+- **ADR**: Created ADR-001-pmg-process-manager.md
+- **Status**: Gateway now stays alive reliably when spawned by `meup space up`
+
+### ✅ Space Cleanup Command
+- **Implementation**: Created `meup space clean` command
+- **ADR**: Created ADR-002-cln-space-cleanup-command.md
+- **Features**: Dry-run, selective cleaning, safety checks
+- **Status**: Fully integrated into test scripts
 
 ### ✅ MEUP v0.2 Protocol Implementation
 - All core protocol features implemented
