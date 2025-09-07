@@ -9,9 +9,14 @@ participants:
     capabilities:
       - kind: chat
       - kind: system/*
+    command: "node"
+    args: ["./agents/echo.js", "--gateway", "ws://localhost:${PORT}", "--space", "manual-debug-space", "--token", "echo-token"]
+    auto_start: true
     
   test-client:
     tokens: ["test-token"]
     capabilities:
       - kind: chat
       - kind: system/*
+    fifo: true
+    auto_connect: true
