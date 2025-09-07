@@ -96,11 +96,13 @@
 
 **What needs to be done**:
 
-- [ ] Update scenario-1-basic to use new pattern:
-  - [ ] Create setup.sh, check.sh, teardown.sh scripts
-  - [ ] Update test.sh to use the modular scripts
-  - [ ] Add echo agent to space.yaml with auto_start
-  - [ ] Test that all checks pass
+- [x] Update scenario-1-basic to use new pattern: ✅
+  - [x] Create setup.sh, check.sh, teardown.sh scripts
+  - [x] Update test.sh to use the modular scripts
+  - [x] Add echo agent to space.yaml with auto_start
+  - [x] Test that all checks pass
+  - [x] Fix FIFO blocking issues with output_log configuration
+  - [x] Fix test.sh hanging issues
 
 - [ ] Update scenario-2-mcp to use new pattern:
   - [ ] Create setup.sh, check.sh, teardown.sh scripts
