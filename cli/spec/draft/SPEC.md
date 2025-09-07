@@ -24,7 +24,7 @@ This specification covers:
 ├── Commands
 │   ├── gateway.js    # Start gateway server
 │   ├── client.js     # Connect as client (interactive or FIFO)
-│   ├── space.js      # Space management (up/down)
+│   ├── space.js      # Space management (up/down/status)
 │   └── token.js      # Generate test tokens
 ├── SDK Dependencies
 │   ├── @meup/gateway
@@ -32,6 +32,7 @@ This specification covers:
 │   ├── @meup/agent
 │   └── @meup/capability-matcher
 └── External Dependencies
+    ├── pm2               # Process manager (embedded library)
     ├── js-yaml           # Parse space.yaml config
     ├── commander         # CLI argument parsing
     ├── ws                # WebSocket client
@@ -405,6 +406,51 @@ Example:
 meup gateway start --port 8080 --space-config ./configs/production.yaml
 ```
 
+## Process Management
+
+The CLI uses PM2 as an embedded library for reliable process management. This ensures that gateway and agent processes remain running even after the parent CLI command exits.
+
+### PM2 Integration Architecture
+
+PM2 is used programmatically as a library, not as a global tool:
+
+```javascript
+// Each space gets its own isolated PM2 daemon
+process.env.PM2_HOME = path.join(spaceDir, '.meup/pm2');
+
+// Connect to space-specific PM2 daemon
+const pm2 = require('pm2');
+pm2.connect((err) => {
+  // All PM2 operations are space-local
+});
+```
+
+### Space-Local Process Management
+
+Each space maintains complete isolation:
+
+```
+space-directory/
+├── space.yaml           # Space configuration
+├── .meup/              
+│   ├── pm2/            # PM2 daemon for this space only
+│   │   ├── pm2.log     # PM2 daemon logs
+│   │   ├── pm2.pid     # Daemon process ID
+│   │   └── pids/       # Managed process PIDs
+│   └── pids.json       # Space metadata
+├── logs/               # Process output logs
+│   ├── gateway.log
+│   └── agent-*.log
+└── fifos/              # FIFO pipes if configured
+```
+
+Benefits of this approach:
+- **No global PM2 required**: PM2 is bundled with the CLI
+- **Complete isolation**: Multiple spaces can run simultaneously
+- **Self-contained**: All artifacts stay within the space directory
+- **Transparent**: Users don't need to know PM2 is being used
+- **Reliable**: Processes survive parent CLI exit
+
 ## Space Management
 
 ### `meup space up`
@@ -421,11 +467,12 @@ Options:
 ```
 
 This command:
-1. Starts the gateway based on space.yaml settings
-2. Starts all agents with `auto_start: true`
-3. Optionally connects you as a participant (see Participant Resolution below)
+1. Creates space-local PM2 daemon in `.meup/pm2/`
+2. Starts the gateway using PM2 for process management
+3. Starts all agents with `auto_start: true` via PM2
+4. Optionally connects you as a participant (see Participant Resolution below)
 
-When connecting as a participant, tokens and capabilities come from space.yaml - no need to specify them.
+All processes are managed by PM2 and will continue running after the CLI exits. When connecting as a participant, tokens and capabilities come from space.yaml - no need to specify them.
 
 #### Participant Resolution
 
@@ -455,6 +502,24 @@ participants:
     tokens: [...]
 ```
 
+### `meup space status`
+
+Shows the status of running space processes.
+
+```bash
+meup space status [options]
+
+Options:
+  --space-config <path>   Path to space.yaml (default: ./space.yaml)
+  --json                  Output as JSON
+```
+
+This command:
+1. Connects to the space-local PM2 daemon
+2. Lists all managed processes with their status
+3. Shows gateway health check results
+4. Displays connected participants
+
 ### `meup space down`
 
 Stops all components of a running space.
@@ -469,9 +534,10 @@ Options:
 
 This command:
 1. Disconnects all clients
-2. Stops all agents started by the space
-3. Shuts down the gateway
-4. Cleans up any temporary files
+2. Stops all PM2-managed processes for this space
+3. Shuts down the space-local PM2 daemon
+4. Cleans up FIFOs and temporary files
+5. Preserves logs for debugging
 
 ### Terminal Interface
 

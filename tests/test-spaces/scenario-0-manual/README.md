@@ -1,162 +1,145 @@
-# Scenario 0: Manual Debug/Development Setup
+# Scenario 0: Basic Message Flow Test
 
-This scenario provides a manual approach to starting MEUP components for debugging and development purposes. Unlike the automated `meup space up/down` commands used in other scenarios, this gives you direct control over each component.
+This scenario tests basic message flow with echo functionality and provides both automated and manual testing options using a modular script pattern.
 
-## When to Use Manual Setup
+## Test Pattern
 
-Use this manual approach when you need to:
-- Debug individual components in isolation
-- Test specific failure scenarios
-- Experiment with different configurations
-- Understand the underlying mechanics of MEUP
-- Troubleshoot issues with the automated space commands
-- Run components with custom debugging flags
+This scenario implements a reusable test pattern with separated concerns:
+
+- **`setup.sh`** - Initializes the test space (can be run standalone for manual testing)
+- **`check.sh`** - Runs test assertions (works with both manual and automated setup)
+- **`teardown.sh`** - Cleans up the test space
+- **`test.sh`** - Combines all three for automated testing
+- **`test-manual.sh`** - Original manual setup script for debugging
+
+## Running Tests
+
+### Automated Testing (CI/CD)
+```bash
+# Run the complete test automatically
+./test.sh
+
+# This will:
+# 1. Setup the space using `meup space up`
+# 2. Run all test checks
+# 3. Teardown the space
+# 4. Report pass/fail status
+```
+
+### Manual Testing (Debugging)
+
+#### Option 1: Using the modular pattern
+```bash
+# Start the space
+./setup.sh
+
+# In another terminal, run checks
+./check.sh
+
+# Send manual messages
+echo '{"kind":"chat","payload":{"text":"Hello"}}' > ./fifos/test-client-in
+cat < ./fifos/test-client-out
+
+# When done, cleanup
+./teardown.sh
+```
+
+#### Option 2: Using the original manual script
+```bash
+# For full manual control over each component
+./test-manual.sh
+
+# This gives you direct control over:
+# - Gateway startup with custom flags
+# - Individual agent processes
+# - FIFO creation
+# - PID management
+```
+
+## Test Checks
+
+The `check.sh` script validates:
+
+1. **Gateway Health** - Gateway is running and responding to health checks
+2. **FIFO Existence** - Input and output FIFOs are created
+3. **Agent Connection** - Echo agent is connected to the gateway
+4. **Message Flow** - Messages are received and echoed back
+5. **Rapid Message Handling** - Multiple messages sent quickly are all processed
 
 ## Components
 
-- **Gateway**: The MEUP gateway server that routes messages
-- **Echo Agent**: A simple agent that echoes back chat messages
-- **Test Client**: A client connected via FIFOs for sending/receiving messages
+- **Gateway**: MEUP gateway server on a random port
+- **Echo Agent**: Simple agent that echoes chat messages with "Echo: " prefix
+- **Test Client**: Client connected via FIFOs for message I/O
 
-## Running the Manual Setup
+## Directory Structure
 
-```bash
-# Make scripts executable
-chmod +x test.sh cleanup.sh
-
-# Run the manual setup
-./test.sh
+```
+scenario-0-manual/
+├── agents/
+│   └── echo.js           # Echo agent implementation
+├── space.yaml            # Space configuration
+├── setup.sh              # Setup script (space initialization)
+├── check.sh              # Test assertions
+├── teardown.sh           # Cleanup script
+├── test.sh               # Automated test (combines all)
+├── test-manual.sh        # Original manual setup for debugging
+├── cleanup.sh            # Legacy cleanup script
+└── README.md             # This file
 ```
 
-The script will:
-1. Start the gateway on a random port
-2. Start the echo agent
-3. Create FIFOs for test client communication
-4. Connect the test client
-5. Run a basic test to verify everything works
-6. Wait for Ctrl+C to cleanup
+## Environment Variables
 
-## Manual Testing
+Scripts use these environment variables for coordination:
 
-Once the setup is running, you can send messages manually:
+- `TEST_PORT` - Gateway port (random if not set)
+- `TEST_DIR` - Test directory path
+- `FIFO_IN` - Input FIFO path
+- `FIFO_OUT` - Output FIFO path
+- `SPACE_RUNNING` - Boolean flag set by setup.sh
+- `PRESERVE_LOGS` - If true, teardown.sh keeps logs
 
+## Debugging
+
+### Check Component Status
 ```bash
-# Send a chat message
-echo '{"kind":"chat","payload":{"text":"Hello, echo!"}}' > ./fifos/test-client-in
+# See what's running
+../../../cli/bin/meup.js space status
 
-# Watch responses
-tail -f ./logs/responses.txt
-
-# Monitor gateway logs
-tail -f ./logs/gateway.log
-
-# Monitor echo agent logs
-tail -f ./logs/echo.log
+# Check logs
+tail -f logs/space-up.log
+tail -f logs/echo.log
 ```
 
-## Debugging Tips
-
-### Component Not Starting?
-Check the specific log file:
+### Test FIFO Communication
 ```bash
-tail -50 ./logs/gateway.log
-tail -50 ./logs/echo.log
-tail -50 ./logs/test-client.log
+# Terminal 1: Listen for output
+cat < fifos/test-client-out
+
+# Terminal 2: Send input
+echo '{"kind":"chat","payload":{"text":"Test"}}' > fifos/test-client-in
 ```
 
-### Messages Not Flowing?
-1. Verify all components are running:
+### Preserve Logs for Debugging
 ```bash
-ps aux | grep meup
-ps aux | grep echo.js
+# Keep logs after teardown
+PRESERVE_LOGS=true ./teardown.sh
 ```
 
-2. Check FIFOs exist:
-```bash
-ls -la ./fifos/
-```
+## Extending This Pattern
 
-3. Test FIFO connectivity:
-```bash
-# In one terminal
-cat ./fifos/test-client-out
+To create a new test scenario using this pattern:
 
-# In another terminal
-echo '{"kind":"chat","payload":{"text":"test"}}' > ./fifos/test-client-in
-```
+1. Copy the modular scripts (setup.sh, check.sh, teardown.sh, test.sh)
+2. Modify `check.sh` to test your specific scenario
+3. Update `space.yaml` with your agents and participants
+4. Add your agent implementations to `agents/`
 
-### Port Already in Use?
-The script uses a random port, but if you get a port conflict, you can specify a different port:
-```bash
-PORT=9999 ./test.sh
-```
+## Benefits of This Pattern
 
-## Manual Component Control
-
-You can also start components individually:
-
-### 1. Gateway Only
-```bash
-../../../cli/bin/meup.js gateway start \
-  --port 8080 \
-  --log-level debug \
-  --space-config ./space.yaml
-```
-
-### 2. Echo Agent Only
-```bash
-node ./agents/echo.js \
-  --gateway ws://localhost:8080 \
-  --space manual-debug-space \
-  --token echo-token
-```
-
-### 3. Test Client Only
-```bash
-# Create FIFOs first
-mkfifo ./fifos/test-client-in ./fifos/test-client-out
-
-# Connect client
-../../../cli/bin/meup.js client connect \
-  --gateway ws://localhost:8080 \
-  --space manual-debug-space \
-  --participant-id test-client \
-  --token test-token \
-  --fifo-in ./fifos/test-client-in \
-  --fifo-out ./fifos/test-client-out
-```
-
-## Cleanup
-
-The script will cleanup automatically when you press Ctrl+C. You can also cleanup manually:
-
-```bash
-./cleanup.sh
-```
-
-To completely reset (including logs):
-```bash
-./cleanup.sh
-rm -rf ./logs/*
-```
-
-## Comparison with Automated Setup
-
-| Aspect | Manual Setup | Automated (`meup space up`) |
-|--------|-------------|------------------------------|
-| Control | Full control over each component | Automated orchestration |
-| Debugging | Easier to debug individual parts | Harder to isolate issues |
-| Setup Time | Slower, step-by-step | Fast, single command |
-| Use Case | Development, debugging | Testing, production |
-| PID Management | Manual tracking | Automatic via `.meup/` |
-| FIFO Creation | Manual `mkfifo` | Automatic based on config |
-| Cleanup | Manual or script | `meup space down` |
-
-## Files
-
-- `space.yaml` - Space configuration
-- `test.sh` - Manual setup script with debugging output
-- `cleanup.sh` - Cleanup script
-- `agents/echo.js` - Echo agent implementation
-- `logs/` - Directory for component logs
-- `fifos/` - Directory for named pipes
+1. **Flexibility** - Run automated or manual as needed
+2. **Modularity** - Each script has a single responsibility
+3. **Debuggability** - Easy to run individual steps
+4. **Reusability** - Pattern can be applied to all test scenarios
+5. **CI/CD Ready** - test.sh provides clean exit codes for automation
+6. **Developer Friendly** - Manual options for debugging and development

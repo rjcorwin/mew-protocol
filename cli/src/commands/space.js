@@ -5,39 +5,75 @@ const yaml = require('js-yaml');
 const { spawn, execSync } = require('child_process');
 const net = require('net');
 const http = require('http');
+const pm2 = require('pm2');
 
 const space = new Command('space')
   .description('Manage MEUP spaces');
 
-// Track spawned processes for cleanup
-const activeProcesses = new Set();
-
-// Cleanup handler
-function cleanupOnExit() {
-  console.log('\nCleaning up spawned processes...');
-  for (const pid of activeProcesses) {
-    try {
-      // Kill the process group (negative PID)
-      process.kill(-pid, 'SIGTERM');
-    } catch (error) {
-      // Process might already be dead
-    }
-  }
-  process.exit(0);
+// PM2 connection helper
+function connectPM2(spaceDir) {
+  return new Promise((resolve, reject) => {
+    // For now, use default PM2 home to avoid issues
+    // TODO: Investigate why custom PM2_HOME causes hanging
+    
+    console.log('Connecting to PM2 (using default PM2_HOME)...');
+    
+    // Connect to PM2 daemon (will start if not running)
+    pm2.connect((err) => {
+      if (err) {
+        console.error('PM2 connect error:', err);
+        reject(err);
+      } else {
+        console.log('PM2 connected successfully');
+        resolve();
+      }
+    });
+  });
 }
 
-// Register cleanup handlers
-process.on('SIGINT', cleanupOnExit);
-process.on('SIGTERM', cleanupOnExit);
-process.on('exit', () => {
-  for (const pid of activeProcesses) {
-    try {
-      process.kill(-pid, 'SIGKILL');
-    } catch (error) {
-      // Ignore errors
-    }
-  }
-});
+// PM2 start helper
+function startPM2Process(config) {
+  return new Promise((resolve, reject) => {
+    pm2.start(config, (err, apps) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(apps[0]);
+      }
+    });
+  });
+}
+
+// PM2 list helper
+function listPM2Processes() {
+  return new Promise((resolve, reject) => {
+    pm2.list((err, list) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(list);
+      }
+    });
+  });
+}
+
+// PM2 delete helper
+function deletePM2Process(name) {
+  return new Promise((resolve, reject) => {
+    pm2.delete(name, (err) => {
+      if (err && !err.message.includes('not found')) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+// PM2 disconnect helper
+function disconnectPM2() {
+  pm2.disconnect();
+}
 
 // Get path to store running spaces info
 function getSpacesFilePath() {
@@ -284,36 +320,54 @@ space
       fs.mkdirSync(logsDir, { recursive: true });
     }
     
-    // Start gateway
+    // Connect to PM2 with space-local daemon
+    console.log('Initializing PM2 daemon...');
+    try {
+      await connectPM2(spaceDir);
+    } catch (error) {
+      console.error(`Failed to connect to PM2: ${error.message}`);
+      process.exit(1);
+    }
+    
+    // Start gateway using PM2
     console.log(`Starting gateway on port ${options.port}...`);
     const gatewayLogPath = path.join(logsDir, 'gateway.log');
-    const gatewayLog = fs.openSync(gatewayLogPath, 'a');
-    const gatewayProcess = spawn('node', [
-      path.join(__dirname, '../../bin/meup.js'),
-      'gateway',
-      'start',
-      '--port', options.port,
-      '--log-level', options.logLevel,
-      '--space-config', configPath
-    ], {
-      detached: true,
-      stdio: ['ignore', gatewayLog, gatewayLog]
-    });
     
-    fs.closeSync(gatewayLog); // Close the file handle
-    gatewayProcess.unref();
-    pids.gateway = gatewayProcess.pid;
-    activeProcesses.add(gatewayProcess.pid);
-    console.log(`✓ Gateway started (PID: ${pids.gateway})`);
+    try {
+      const gatewayApp = await startPM2Process({
+        name: `${spaceId}-gateway`,
+        script: path.join(__dirname, '../../bin/meup.js'),
+        args: [
+          'gateway',
+          'start',
+          '--port', options.port,
+          '--log-level', options.logLevel,
+          '--space-config', configPath
+        ],
+        cwd: spaceDir,
+        autorestart: false,
+        max_memory_restart: '500M',
+        error_file: path.join(logsDir, 'gateway-error.log'),
+        out_file: gatewayLogPath,
+        merge_logs: true,
+        time: true
+      });
+      
+      pids.gateway = gatewayApp.process.pid || gatewayApp.pm2_env.pm_id;
+      console.log(`✓ Gateway started via PM2 (PID: ${pids.gateway})`);
+    } catch (error) {
+      console.error(`Failed to start gateway: ${error.message}`);
+      disconnectPM2();
+      process.exit(1);
+    }
     
     // Wait for gateway to be ready
     console.log('Waiting for gateway to be ready...');
     const gatewayReady = await waitForGateway(options.port);
     if (!gatewayReady) {
       console.error('Gateway failed to become ready. Check logs/gateway.log for details.');
-      if (pids.gateway) {
-        try { process.kill(pids.gateway, 'SIGTERM'); } catch (e) {}
-      }
+      await deletePM2Process(`${spaceId}-gateway`);
+      disconnectPM2();
       process.exit(1);
     }
     console.log('✓ Gateway is ready');
@@ -324,7 +378,6 @@ space
         console.log(`Starting agent: ${participantId}...`);
         
         const agentLogPath = path.join(logsDir, `${participantId}.log`);
-        const agentLog = fs.openSync(agentLogPath, 'a');
         const agentArgs = participant.args || [];
         
         // Replace placeholders in args
@@ -334,17 +387,26 @@ space
              .replace('${TOKEN}', participant.tokens?.[0] || 'token')
         );
         
-        const agentProcess = spawn(participant.command, processedArgs, {
-          detached: true,
-          stdio: ['ignore', agentLog, agentLog],
-          cwd: spaceDir
-        });
-        
-        fs.closeSync(agentLog); // Close the file handle
-        agentProcess.unref();
-        pids.agents[participantId] = agentProcess.pid;
-        activeProcesses.add(agentProcess.pid);
-        console.log(`✓ ${participantId} started (PID: ${pids.agents[participantId]})`);
+        try {
+          const agentApp = await startPM2Process({
+            name: `${spaceId}-${participantId}`,
+            script: participant.command,
+            args: processedArgs,
+            cwd: spaceDir,
+            autorestart: false,
+            max_memory_restart: '200M',
+            error_file: path.join(logsDir, `${participantId}-error.log`),
+            out_file: agentLogPath,
+            merge_logs: true,
+            time: true,
+            env: participant.env || {}
+          });
+          
+          pids.agents[participantId] = agentApp.process.pid || agentApp.pm2_env.pm_id;
+          console.log(`✓ ${participantId} started via PM2 (PID: ${pids.agents[participantId]})`);
+        } catch (error) {
+          console.error(`Failed to start ${participantId}: ${error.message}`);
+        }
       }
       
       // Create FIFOs for participants with fifo: true
@@ -358,27 +420,34 @@ space
           console.log(`Connecting ${participantId} via FIFO...`);
           
           const clientLogPath = path.join(logsDir, `${participantId}-client.log`);
-          const clientLog = fs.openSync(clientLogPath, 'a');
-          const clientProcess = spawn('node', [
-            path.join(__dirname, '../../bin/meup.js'),
-            'client',
-            'connect',
-            '--gateway', `ws://localhost:${options.port}`,
-            '--space', spaceId,
-            '--participant-id', participantId,
-            '--token', participant.tokens?.[0] || 'token',
-            '--fifo-in', inFifo,
-            '--fifo-out', outFifo
-          ], {
-            detached: true,
-            stdio: ['ignore', clientLog, clientLog]
-          });
           
-          fs.closeSync(clientLog); // Close the file handle
-          clientProcess.unref();
-          pids.clients[participantId] = clientProcess.pid;
-          activeProcesses.add(clientProcess.pid);
-          console.log(`✓ ${participantId} connected (PID: ${pids.clients[participantId]})`);
+          try {
+            const clientApp = await startPM2Process({
+              name: `${spaceId}-${participantId}-client`,
+              script: path.join(__dirname, '../../bin/meup.js'),
+              args: [
+                'client',
+                'connect',
+                '--gateway', `ws://localhost:${options.port}`,
+                '--space', spaceId,
+                '--participant-id', participantId,
+                '--token', participant.tokens?.[0] || 'token',
+                '--fifo-in', inFifo,
+                '--fifo-out', outFifo
+              ],
+              cwd: spaceDir,
+              autorestart: false,
+              error_file: path.join(logsDir, `${participantId}-client-error.log`),
+              out_file: clientLogPath,
+              merge_logs: true,
+              time: true
+            });
+            
+            pids.clients[participantId] = clientApp.process.pid || clientApp.pm2_env.pm_id;
+            console.log(`✓ ${participantId} connected via PM2 (PID: ${pids.clients[participantId]})`);
+          } catch (error) {
+            console.error(`Failed to connect ${participantId}: ${error.message}`);
+          }
         }
       }
     }
@@ -394,6 +463,9 @@ space
     const runningSpaces = loadRunningSpaces();
     runningSpaces.set(spaceDir, pids);
     saveRunningSpaces(runningSpaces);
+    
+    // Disconnect from PM2 daemon (it continues running)
+    disconnectPM2();
   });
 
 // Command: meup space down
@@ -401,7 +473,7 @@ space
   .command('down')
   .description('Stop a running space')
   .option('-d, --space-dir <path>', 'Space directory', '.')
-  .action((options) => {
+  .action(async (options) => {
     const spaceDir = path.resolve(options.spaceDir);
     
     console.log(`Stopping space in ${spaceDir}...`);
@@ -413,71 +485,64 @@ space
       process.exit(1);
     }
     
-    console.log(`Stopping ${pids.spaceName} (${pids.spaceId})...`);
+    const spaceId = pids.spaceId;
+    console.log(`Stopping ${pids.spaceName} (${spaceId})...`);
     
-    // Stop clients first (kill process groups)
-    for (const [participantId, pid] of Object.entries(pids.clients || {})) {
-      try {
-        process.kill(-pid, 'SIGTERM'); // Kill process group
-        activeProcesses.delete(pid);
-        console.log(`✓ Stopped client: ${participantId} (PID: ${pid})`);
-      } catch (error) {
-        if (error.code !== 'ESRCH') {
-          // Try regular kill if group kill fails
-          try {
-            process.kill(pid, 'SIGTERM');
-            activeProcesses.delete(pid);
-            console.log(`✓ Stopped client: ${participantId} (PID: ${pid})`);
-          } catch (e) {
-            if (e.code !== 'ESRCH') {
-              console.error(`Failed to stop client ${participantId}: ${e.message}`);
-            }
-          }
-        }
-      }
+    // Connect to PM2
+    try {
+      await connectPM2(spaceDir);
+    } catch (error) {
+      console.error(`Failed to connect to PM2: ${error.message}`);
+      console.log('Space may have been stopped manually.');
     }
     
-    // Stop agents (kill process groups)
-    for (const [participantId, pid] of Object.entries(pids.agents || {})) {
-      try {
-        process.kill(-pid, 'SIGTERM'); // Kill process group
-        activeProcesses.delete(pid);
-        console.log(`✓ Stopped agent: ${participantId} (PID: ${pid})`);
-      } catch (error) {
-        if (error.code !== 'ESRCH') {
-          // Try regular kill if group kill fails
-          try {
-            process.kill(pid, 'SIGTERM');
-            activeProcesses.delete(pid);
-            console.log(`✓ Stopped agent: ${participantId} (PID: ${pid})`);
-          } catch (e) {
-            if (e.code !== 'ESRCH') {
-              console.error(`Failed to stop agent ${participantId}: ${e.message}`);
-            }
-          }
-        }
+    // Stop all PM2 processes for this space
+    try {
+      // Stop clients first
+      for (const participantId of Object.keys(pids.clients || {})) {
+        await deletePM2Process(`${spaceId}-${participantId}-client`);
+        console.log(`✓ Stopped client: ${participantId}`);
       }
+      
+      // Stop agents
+      for (const participantId of Object.keys(pids.agents || {})) {
+        await deletePM2Process(`${spaceId}-${participantId}`);
+        console.log(`✓ Stopped agent: ${participantId}`);
+      }
+      
+      // Stop gateway
+      if (pids.gateway) {
+        await deletePM2Process(`${spaceId}-gateway`);
+        console.log(`✓ Stopped gateway`);
+      }
+      
+      // Kill PM2 daemon for this space
+      try {
+        await new Promise((resolve, reject) => {
+          pm2.killDaemon((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        console.log('✓ Stopped PM2 daemon');
+      } catch (error) {
+        // Daemon might already be dead
+      }
+    } catch (error) {
+      console.error(`Error stopping processes: ${error.message}`);
     }
     
-    // Stop gateway (kill process group)
-    if (pids.gateway) {
+    // Disconnect from PM2
+    disconnectPM2();
+    
+    // Clean up PM2 directory
+    const pm2Dir = path.join(spaceDir, '.meup', 'pm2');
+    if (fs.existsSync(pm2Dir)) {
       try {
-        process.kill(-pids.gateway, 'SIGTERM'); // Kill process group
-        activeProcesses.delete(pids.gateway);
-        console.log(`✓ Stopped gateway (PID: ${pids.gateway})`);
+        fs.rmSync(pm2Dir, { recursive: true, force: true });
+        console.log('✓ Cleaned up PM2 directory');
       } catch (error) {
-        if (error.code !== 'ESRCH') {
-          // Try regular kill if group kill fails
-          try {
-            process.kill(pids.gateway, 'SIGTERM');
-            activeProcesses.delete(pids.gateway);
-            console.log(`✓ Stopped gateway (PID: ${pids.gateway})`);
-          } catch (e) {
-            if (e.code !== 'ESRCH') {
-              console.error(`Failed to stop gateway: ${e.message}`);
-            }
-          }
-        }
+        console.error(`Failed to clean PM2 directory: ${error.message}`);
       }
     }
     
@@ -502,7 +567,7 @@ space
   .command('status')
   .description('Show status of running spaces')
   .option('-d, --space-dir <path>', 'Space directory (optional)', null)
-  .action((options) => {
+  .action(async (options) => {
     if (options.spaceDir) {
       // Show status for specific space
       const spaceDir = path.resolve(options.spaceDir);
@@ -513,14 +578,43 @@ space
         return;
       }
       
-      console.log(`Space: ${pids.spaceName} (${pids.spaceId})`);
+      const spaceId = pids.spaceId;
+      console.log(`Space: ${pids.spaceName} (${spaceId})`);
       console.log(`Directory: ${pids.spaceDir}`);
-      console.log(`Gateway: ws://localhost:${pids.port} (PID: ${pids.gateway})`);
+      console.log(`Gateway: ws://localhost:${pids.port}`);
       
-      if (Object.keys(pids.agents).length > 0) {
-        console.log('\nAgents:');
-        for (const [id, pid] of Object.entries(pids.agents)) {
-          // Check if process is still running
+      // Connect to PM2 to get process status
+      try {
+        await connectPM2(spaceDir);
+        const processes = await listPM2Processes();
+        
+        // Filter processes for this space
+        const spaceProcesses = processes.filter(p => p.name && p.name.startsWith(spaceId));
+        
+        if (spaceProcesses.length > 0) {
+          console.log('\nProcesses (via PM2):');
+          for (const proc of spaceProcesses) {
+            const status = proc.pm2_env.status === 'online' ? 'running' : proc.pm2_env.status;
+            const memory = proc.monit ? `${Math.round(proc.monit.memory / 1024 / 1024)}MB` : 'N/A';
+            console.log(`  - ${proc.name}: ${status} (PID: ${proc.pid}, Memory: ${memory})`);
+          }
+        }
+        
+        disconnectPM2();
+      } catch (error) {
+        // Fall back to PID checking if PM2 connection fails
+        console.log('\nProcesses (PID check):');
+        
+        if (pids.gateway) {
+          try {
+            process.kill(pids.gateway, 0);
+            console.log(`  - Gateway: running (PID: ${pids.gateway})`);
+          } catch (error) {
+            console.log(`  - Gateway: stopped (PID: ${pids.gateway})`);
+          }
+        }
+        
+        for (const [id, pid] of Object.entries(pids.agents || {})) {
           try {
             process.kill(pid, 0);
             console.log(`  - ${id}: running (PID: ${pid})`);
@@ -528,12 +622,8 @@ space
             console.log(`  - ${id}: stopped (PID: ${pid})`);
           }
         }
-      }
-      
-      if (Object.keys(pids.clients).length > 0) {
-        console.log('\nClients:');
-        for (const [id, pid] of Object.entries(pids.clients)) {
-          // Check if process is still running
+        
+        for (const [id, pid] of Object.entries(pids.clients || {})) {
           try {
             process.kill(pid, 0);
             console.log(`  - ${id}: connected (PID: ${pid})`);

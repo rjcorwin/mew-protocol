@@ -18,6 +18,25 @@ gateway
   .option('-s, --space-config <path>', 'Path to space.yaml configuration', './space.yaml')
   .action(async (options) => {
     const port = parseInt(options.port);
+    
+    // If we're running as a detached process, redirect console output to a log file
+    if (process.env.GATEWAY_LOG_FILE) {
+      const fs = require('fs');
+      const logStream = fs.createWriteStream(process.env.GATEWAY_LOG_FILE, { flags: 'a' });
+      const originalLog = console.log;
+      const originalError = console.error;
+      
+      console.log = function(...args) {
+        const message = args.join(' ');
+        logStream.write(`[${new Date().toISOString()}] ${message}\n`);
+      };
+      
+      console.error = function(...args) {
+        const message = args.join(' ');
+        logStream.write(`[${new Date().toISOString()}] ERROR: ${message}\n`);
+      };
+    }
+    
     console.log(`Starting MEUP gateway on port ${port}...`);
     
     // Load space configuration (CLI responsibility, not gateway)
@@ -634,6 +653,41 @@ gateway
           process.exit(0);
         });
       });
+    });
+    
+    // Handle SIGINT (Ctrl+C) as well
+    process.on('SIGINT', () => {
+      console.log('\nShutting down gateway...');
+      
+      // Stop spawned processes
+      for (const [pid, child] of spawnedProcesses.entries()) {
+        console.log(`Stopping ${pid}...`);
+        child.kill('SIGTERM');
+      }
+      
+      // Close WebSocket server
+      wss.close(() => {
+        server.close(() => {
+          process.exit(0);
+        });
+      });
+    });
+    
+    // Keep the process alive
+    // The server.listen() callback doesn't prevent Node from exiting
+    // When spawned with detached and stdio: ['ignore'], stdin is closed
+    // Create an interval that won't be garbage collected
+    const keepAlive = setInterval(() => {
+      // This empty function keeps the event loop active
+    }, 2147483647); // Maximum 32-bit signed integer (~24.8 days)
+    
+    // Make sure the interval is not optimized away
+    keepAlive.unref = () => {};
+    
+    // Return a promise that never resolves to keep the process alive
+    // This is needed when the gateway is started as a detached process
+    return new Promise(() => {
+      // This promise intentionally never resolves
     });
   });
 
