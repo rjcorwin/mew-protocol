@@ -356,7 +356,7 @@ space
         time: true
       });
       
-      pids.gateway = gatewayApp.process.pid || gatewayApp.pm2_env.pm_id;
+      pids.gateway = gatewayApp.pid || gatewayApp.pm2_env?.pm_id || 'unknown';
       console.log(`✓ Gateway started via PM2 (PID: ${pids.gateway})`);
     } catch (error) {
       console.error(`Failed to start gateway: ${error.message}`);
@@ -405,7 +405,7 @@ space
             env: participant.env || {}
           });
           
-          pids.agents[participantId] = agentApp.process.pid || agentApp.pm2_env.pm_id;
+          pids.agents[participantId] = agentApp.pid || agentApp.pm2_env?.pm_id || 'unknown';
           console.log(`✓ ${participantId} started via PM2 (PID: ${pids.agents[participantId]})`);
         } catch (error) {
           console.error(`Failed to start ${participantId}: ${error.message}`);
@@ -469,7 +469,7 @@ space
               time: true
             });
             
-            pids.clients[participantId] = clientApp.process.pid || clientApp.pm2_env.pm_id;
+            pids.clients[participantId] = clientApp.pid || clientApp.pm2_env?.pm_id || 'unknown';
             console.log(`✓ ${participantId} connected via PM2 (PID: ${pids.clients[participantId]})`);
           } catch (error) {
             console.error(`Failed to connect ${participantId}: ${error.message}`);
