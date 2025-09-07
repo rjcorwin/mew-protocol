@@ -55,32 +55,69 @@ ws.on('message', (data) => {
       console.log(`Proposal details: ${JSON.stringify(message)}`);
       
       // Extract the proposal details
-      const method = message.payload?.method;
-      const params = message.payload?.params || {};
+      const proposal = message.payload?.proposal || {};
       
-      // Create fulfillment request with correlation to the proposal
-      // If the proposal has no target, send to calculator-agent
-      const target = message.to || ['calculator-agent'];
-      const fulfillmentRequest = {
-        id: `fulfill-${Date.now()}`,
-        kind: 'mcp/request',
-        to: target,
-        correlation_id: [message.id], // Reference the proposal
-        payload: {
-          jsonrpc: '2.0',
-          id: Date.now(),
-          method: method,
-          params: params
-        }
-      };
-      
-      // Wait a moment to simulate review, then fulfill
-      setTimeout(() => {
-        ws.send(JSON.stringify(fulfillmentRequest));
-        console.log(`Fulfilled proposal ${message.id} with method ${method}`);
-      }, 500);
+      // Handle calculation proposals
+      if (proposal.type === 'calculation') {
+        const operation = proposal.operation;
+        const args = proposal.arguments || {};
+        
+        // Map operation to calculator tool name
+        let toolName = operation; // add, multiply, etc.
+        
+        // Create fulfillment request to calculator
+        const fulfillmentRequest = {
+          id: `fulfill-${Date.now()}`,
+          kind: 'mcp/request',
+          to: ['calculator-agent'],
+          correlation_id: [message.id], // Reference the proposal
+          payload: {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/call',
+            params: {
+              name: toolName,
+              arguments: args
+            }
+          }
+        };
+        
+        // Wait a moment to simulate review, then fulfill
+        setTimeout(() => {
+          ws.send(JSON.stringify(fulfillmentRequest));
+          console.log(`Fulfilled proposal ${message.id} with tool ${toolName}`);
+        }, 500);
+      } else {
+        // Unknown proposal type
+        const errorResponse = {
+          id: `error-${Date.now()}`,
+          kind: 'mcp/proposal',
+          to: [message.from],
+          correlation_id: [message.id],
+          payload: {
+            error: 'Unknown proposal type: ' + proposal.type
+          }
+        };
+        ws.send(JSON.stringify(errorResponse));
+        console.log(`Rejected unknown proposal type: ${proposal.type}`);
+      }
     } else if (message.kind === 'mcp/proposal') {
       console.log(`Ignoring own proposal: ${message.id}`);
+    } else if (message.kind === 'mcp/response' && message.correlation_id) {
+      // Forward calculator responses back to proposer
+      console.log(`Received response from calculator, forwarding to proposer`);
+      const proposalResponse = {
+        id: `response-${Date.now()}`,
+        kind: 'mcp/proposal',
+        to: ['proposer'],
+        correlation_id: message.correlation_id,
+        payload: {
+          type: 'fulfillment',
+          result: message.payload?.result
+        }
+      };
+      ws.send(JSON.stringify(proposalResponse));
+      console.log(`Forwarded response to proposer`);
     }
   } catch (error) {
     console.error('Error processing message:', error);

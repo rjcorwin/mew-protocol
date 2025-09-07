@@ -11,7 +11,7 @@ participants:
       - kind: system/*
     auto_start: true
     command: "node"
-    args: ["./agents/calculator.js", "--gateway", "ws://localhost:{{PORT}}", "--space", "test-space", "--token", "calculator-token"]
+    args: ["./agents/calculator.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "calculator-token"]
     
   coordinator:
     tokens: ["admin-token"]
@@ -20,6 +20,7 @@ participants:
       - kind: capability/revoke
       - kind: system/*
     fifo: true
+    output_log: "./logs/coordinator-output.log"
     auto_connect: true
     
   limited-agent:
@@ -27,4 +28,5 @@ participants:
     capabilities:
       - kind: system/*
     fifo: true
+    output_log: "./logs/limited-agent-output.log"
     auto_connect: true

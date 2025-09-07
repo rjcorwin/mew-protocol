@@ -35,13 +35,20 @@ run_test() {
   echo "[$test_name]" >> "$TEST_RESULTS_LOG"
   
   if [ -d "$test_dir" ] && [ -f "$test_dir/test.sh" ]; then
-    cd "$test_dir"
+    pushd "$test_dir" > /dev/null
     
     # Create logs directory if it doesn't exist
     mkdir -p logs
     
+    # Run the test with the wrapper script if available, otherwise use test.sh directly
+    if [ -f "./run-test.sh" ]; then
+      TEST_SCRIPT="./run-test.sh"
+    else
+      TEST_SCRIPT="./test.sh"
+    fi
+    
     # Run the test with timeout
-    if timeout 60 ./test.sh > ./logs/test-output.log 2>&1; then
+    if timeout 60 $TEST_SCRIPT > ./logs/test-output.log 2>&1; then
       echo -e "${GREEN}✅ $test_name PASSED${NC}"
       echo "Status: PASSED" >> "../../$TEST_RESULTS_LOG"
       ((TOTAL_PASS++))
@@ -62,7 +69,7 @@ run_test() {
       FAILED_TESTS="$FAILED_TESTS\n  - $test_name"
     fi
     
-    cd ../..
+    popd > /dev/null
   else
     echo -e "${RED}❌ $test_name directory or script not found${NC}"
     echo "Status: NOT FOUND" >> "$TEST_RESULTS_LOG"
