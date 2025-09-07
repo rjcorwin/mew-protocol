@@ -70,31 +70,57 @@ client
     
     // Set up input handling
     if (options.fifoIn) {
-      // Read from FIFO using tail -F approach
+      // Read from FIFO directly using createReadStream
       console.log(`Reading from FIFO: ${options.fifoIn}`);
       
-      const { spawn } = require('child_process');
-      const tail = spawn('tail', ['-F', options.fifoIn]);
+      // Helper function to set up FIFO reading
+      const setupFifoReader = () => {
+        // Open the FIFO in read mode with no buffering
+        const fifoStream = fs.createReadStream(options.fifoIn, { 
+          encoding: 'utf8',
+          // Disable internal buffering for immediate data availability
+          highWaterMark: 1
+        });
+        
+        // Use readline to process line by line
+        const rl = readline.createInterface({
+          input: fifoStream,
+          crlfDelay: Infinity
+        });
+        
+        rl.on('line', (line) => {
+          try {
+            console.log(`FIFO received: ${line}`);
+            const message = JSON.parse(line);
+            ws.send(JSON.stringify(message));
+            console.log(`Sent to gateway: ${JSON.stringify(message)}`);
+          } catch (error) {
+            console.error('Error parsing input:', error);
+          }
+        });
+        
+        // When FIFO closes (writer disconnects), reopen it
+        fifoStream.on('end', () => {
+          console.log('FIFO writer disconnected, reopening...');
+          // Small delay before reopening to prevent tight loop
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              setupFifoReader();
+            }
+          }, 100);
+        });
+        
+        fifoStream.on('error', (error) => {
+          console.error(`FIFO read error: ${error.message}`);
+          // Try to reopen on error
+          if (ws.readyState === WebSocket.OPEN) {
+            setTimeout(setupFifoReader, 1000);
+          }
+        });
+      };
       
-      const rl = readline.createInterface({
-        input: tail.stdout,
-        crlfDelay: Infinity
-      });
-      
-      rl.on('line', (line) => {
-        try {
-          console.log(`FIFO received: ${line}`);
-          const message = JSON.parse(line);
-          ws.send(JSON.stringify(message));
-          console.log(`Sent to gateway: ${JSON.stringify(message)}`);
-        } catch (error) {
-          console.error('Error parsing input:', error);
-        }
-      });
-      
-      tail.stderr.on('data', (data) => {
-        console.error(`tail error: ${data}`);
-      });
+      // Start reading from FIFO
+      setupFifoReader();
     } else {
       // Interactive mode
       const rl = readline.createInterface({
