@@ -80,7 +80,7 @@
 - [x] **Fix runningSpaces persistence**: Store running spaces in ~/.meup/running-spaces.json so status works across CLI sessions
 - [x] **Add gateway health check**: Replace fixed sleep with actual health check when starting gateway
 
-### Phase 3: Test Script Simplification
+### Phase 3: Test Script Simplification ✅
 
 **Context**: Now that we have `meup space up/down` commands working (Phase 2), we can dramatically simplify our test scripts. Currently, each test script (`test-spaces/scenario-*/test.sh`) manually:
 - Starts the gateway
@@ -97,17 +97,17 @@ This can all be replaced with `meup space up` and `meup space down` commands.
 
 **What needs to be done**:
 
-- [ ] Create `test-spaces/scenario-0-manual/`:
-  - [ ] Copy the current manual approach from existing test.sh files
-  - [ ] This preserves the ability to debug individual components
-  - [ ] Add README explaining when to use manual vs automated startup
-  - [ ] Document as "debugging/development" scenario
+- [x] Create `test-spaces/scenario-0-manual/`:
+  - [x] Copy the current manual approach from existing test.sh files
+  - [x] This preserves the ability to debug individual components
+  - [x] Add README explaining when to use manual vs automated startup
+  - [x] Document as "debugging/development" scenario
 
-- [ ] Update all test scripts (`test-spaces/scenario-*/test.sh`) to use `meup space up/down`:
-  - [ ] Remove gateway startup code (lines creating gateway process)
-  - [ ] Remove FIFO creation code (now handled by `meup space up`)
-  - [ ] Remove PID management code
-  - [ ] Replace with simple pattern:
+- [x] Update all test scripts (`test-spaces/scenario-*/test.sh`) to use `meup space up/down`:
+  - [x] Remove gateway startup code (lines creating gateway process)
+  - [x] Remove FIFO creation code (now handled by `meup space up`)
+  - [x] Remove PID management code
+  - [x] Replace with simple pattern:
     ```bash
     # Start the space
     ../../../cli/bin/meup.js space up --port $PORT
@@ -118,13 +118,13 @@ This can all be replaced with `meup space up` and `meup space down` commands.
     # Stop the space
     ../../../cli/bin/meup.js space down
     ```
-  - [ ] Update each scenario:
-    - [ ] scenario-1-basic/test.sh
-    - [ ] scenario-2-mcp/test.sh
-    - [ ] scenario-3-proposals/test.sh
-    - [ ] scenario-4-capabilities/test.sh
-    - [ ] scenario-5-reasoning/test.sh
-    - [ ] scenario-6-errors/test.sh
+  - [x] Update each scenario:
+    - [x] scenario-1-basic/test.sh
+    - [x] scenario-2-mcp/test.sh
+    - [x] scenario-3-proposals/test.sh
+    - [x] scenario-4-capabilities/test.sh
+    - [x] scenario-5-reasoning/test.sh
+    - [x] scenario-6-errors/test.sh
 
 - [x] Create master test runner:
   - [x] `run-all-tests.sh` that iterates through test-spaces/scenario-*
