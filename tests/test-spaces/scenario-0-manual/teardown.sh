@@ -39,13 +39,22 @@ if [ -f ".meup/pids.json" ]; then
   done
 fi
 
-# Clean up test artifacts (optional - comment out to preserve logs for debugging)
+# Clean up test artifacts using meup space clean
 if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
-  echo "Removing test artifacts..."
-  rm -rf logs fifos .meup 2>/dev/null || true
+  echo "Cleaning test artifacts..."
+  
+  # Use the new meup space clean command
+  ../../../cli/bin/meup.js space clean --all --force 2>/dev/null || {
+    # Fallback to manual cleanup if clean command fails
+    echo "Clean command failed, using manual cleanup..."
+    rm -rf logs fifos .meup 2>/dev/null || true
+  }
+  
   echo -e "${GREEN}✓ Test artifacts removed${NC}"
 else
   echo -e "${YELLOW}Preserving logs (PRESERVE_LOGS=true)${NC}"
+  # Clean only fifos and .meup, preserve logs
+  ../../../cli/bin/meup.js space clean --fifos --force 2>/dev/null || true
 fi
 
 echo -e "${GREEN}✓ Cleanup complete${NC}"

@@ -687,4 +687,294 @@ space
     }
   });
 
+// Command: meup space clean
+space
+  .command('clean')
+  .description('Clean up space artifacts (logs, fifos, temporary files)')
+  .option('--all', 'Clean everything including .meup directory')
+  .option('--logs', 'Clean only log files')
+  .option('--fifos', 'Clean only FIFO pipes')
+  .option('--force', 'Skip confirmation prompts')
+  .option('--dry-run', 'Show what would be cleaned without doing it')
+  .action(async (options) => {
+    const spaceDir = process.cwd();
+    const spaceConfigPath = path.join(spaceDir, 'space.yaml');
+    
+    // Check if this is a valid space directory
+    if (!fs.existsSync(spaceConfigPath)) {
+      console.error('Error: space.yaml not found in current directory');
+      process.exit(1);
+    }
+    
+    // Check if space is running
+    const pids = loadPidFile(spaceDir);
+    const isRunning = pids && pids.gateway && isProcessRunning(pids.gateway);
+    
+    // Collect items to clean
+    const itemsToClean = {
+      logs: [],
+      fifos: [],
+      meup: false,
+      pm2: false
+    };
+    
+    // Determine what to clean based on options
+    const cleanLogs = options.logs || (!options.fifos && !options.all) || options.all;
+    const cleanFifos = options.fifos || (!options.logs && !options.all) || options.all;
+    const cleanMeup = options.all;
+    
+    // Collect log files
+    if (cleanLogs) {
+      const logsDir = path.join(spaceDir, 'logs');
+      if (fs.existsSync(logsDir)) {
+        const files = fs.readdirSync(logsDir);
+        for (const file of files) {
+          const filePath = path.join(logsDir, file);
+          const stats = fs.statSync(filePath);
+          if (stats.isFile()) {
+            itemsToClean.logs.push({
+              path: filePath,
+              size: stats.size,
+              name: file
+            });
+          }
+        }
+      }
+    }
+    
+    // Collect FIFO pipes
+    if (cleanFifos) {
+      const fifosDir = path.join(spaceDir, 'fifos');
+      if (fs.existsSync(fifosDir)) {
+        const files = fs.readdirSync(fifosDir);
+        for (const file of files) {
+          const filePath = path.join(fifosDir, file);
+          const stats = fs.statSync(filePath);
+          if (stats.isFIFO()) {
+            // Check if FIFO is in use
+            let inUse = false;
+            if (isRunning && pids.clients) {
+              // Check if any client is using this FIFO
+              for (const clientId of Object.keys(pids.clients)) {
+                if (file === `${clientId}-in` || file === `${clientId}-out`) {
+                  inUse = true;
+                  break;
+                }
+              }
+            }
+            itemsToClean.fifos.push({
+              path: filePath,
+              name: file,
+              inUse
+            });
+          }
+        }
+      }
+    }
+    
+    // Check .meup directory
+    if (cleanMeup) {
+      const meupDir = path.join(spaceDir, '.meup');
+      if (fs.existsSync(meupDir)) {
+        itemsToClean.meup = true;
+        // Check for PM2 directory
+        const pm2Dir = path.join(meupDir, 'pm2');
+        if (fs.existsSync(pm2Dir)) {
+          itemsToClean.pm2 = true;
+        }
+      }
+    }
+    
+    // Calculate total size
+    let totalSize = 0;
+    let totalFiles = 0;
+    
+    for (const log of itemsToClean.logs) {
+      totalSize += log.size;
+      totalFiles++;
+    }
+    
+    // Show what will be cleaned
+    if (options.dryRun) {
+      console.log('Would clean:\n');
+      
+      if (itemsToClean.logs.length > 0) {
+        console.log(`  - ${itemsToClean.logs.length} log files (${formatBytes(totalSize)})`);
+        if (options.verbose) {
+          for (const log of itemsToClean.logs) {
+            console.log(`    - ${log.name} (${formatBytes(log.size)})`);
+          }
+        }
+      }
+      
+      if (itemsToClean.fifos.length > 0) {
+        const activeFifos = itemsToClean.fifos.filter(f => f.inUse);
+        const inactiveFifos = itemsToClean.fifos.filter(f => !f.inUse);
+        if (inactiveFifos.length > 0) {
+          console.log(`  - ${inactiveFifos.length} FIFO pipes (inactive)`);
+        }
+        if (activeFifos.length > 0) {
+          console.log(`  - ${activeFifos.length} FIFO pipes (ACTIVE - will be skipped)`);
+        }
+      }
+      
+      if (itemsToClean.meup) {
+        console.log('  - .meup directory (including process state)');
+        if (itemsToClean.pm2) {
+          console.log('    - PM2 daemon and logs');
+        }
+      }
+      
+      if (totalFiles > 0) {
+        console.log(`\nTotal: ${formatBytes(totalSize)} would be freed`);
+      }
+      
+      return;
+    }
+    
+    // Warn if space is running
+    if (isRunning && !options.force) {
+      console.log(`Space "${pids.spaceName}" is currently running.`);
+      
+      if (cleanMeup) {
+        console.error('Error: Cannot clean .meup directory while space is running.');
+        console.error('Use "meup space down" first, or remove --all flag.');
+        process.exit(1);
+      }
+      
+      console.log('Warning: This will clean artifacts while space is active.');
+      console.log('Use "meup space down" first, or use --force to proceed anyway.');
+      
+      const readline = require('readline');
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+      
+      const answer = await new Promise(resolve => {
+        rl.question('Continue? (y/N): ', resolve);
+      });
+      rl.close();
+      
+      if (answer.toLowerCase() !== 'y') {
+        console.log('Aborted.');
+        process.exit(0);
+      }
+    }
+    
+    // Confirm destructive operations
+    if (cleanMeup && !options.force) {
+      console.log('This will remove ALL space artifacts including configuration.');
+      
+      const readline = require('readline');
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+      
+      const answer = await new Promise(resolve => {
+        rl.question('Are you sure? (y/N): ', resolve);
+      });
+      rl.close();
+      
+      if (answer.toLowerCase() !== 'y') {
+        console.log('Aborted.');
+        process.exit(0);
+      }
+    }
+    
+    // Perform cleaning
+    let cleanedCount = 0;
+    let errors = [];
+    
+    // Clean logs
+    if (itemsToClean.logs.length > 0) {
+      console.log('Cleaning logs...');
+      for (const log of itemsToClean.logs) {
+        try {
+          fs.unlinkSync(log.path);
+          cleanedCount++;
+        } catch (error) {
+          errors.push(`Failed to delete ${log.name}: ${error.message}`);
+        }
+      }
+      console.log(`✓ Cleaned ${itemsToClean.logs.length} log files`);
+    }
+    
+    // Clean FIFOs (skip active ones)
+    if (itemsToClean.fifos.length > 0) {
+      const inactiveFifos = itemsToClean.fifos.filter(f => !f.inUse);
+      if (inactiveFifos.length > 0) {
+        console.log('Cleaning FIFOs...');
+        for (const fifo of inactiveFifos) {
+          try {
+            fs.unlinkSync(fifo.path);
+            cleanedCount++;
+          } catch (error) {
+            errors.push(`Failed to delete ${fifo.name}: ${error.message}`);
+          }
+        }
+        console.log(`✓ Cleaned ${inactiveFifos.length} FIFO pipes`);
+      }
+      
+      const activeFifos = itemsToClean.fifos.filter(f => f.inUse);
+      if (activeFifos.length > 0) {
+        console.log(`⚠ Skipped ${activeFifos.length} active FIFO pipes`);
+      }
+    }
+    
+    // Clean .meup directory
+    if (itemsToClean.meup) {
+      console.log('Cleaning .meup directory...');
+      const meupDir = path.join(spaceDir, '.meup');
+      
+      // If PM2 daemon is running, try to kill it first
+      if (itemsToClean.pm2 && !isRunning) {
+        try {
+          await connectPM2(spaceDir);
+          await new Promise((resolve, reject) => {
+            pm2.killDaemon((err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          console.log('✓ Stopped PM2 daemon');
+        } catch (error) {
+          // Daemon might already be dead
+        }
+      }
+      
+      // Remove the directory
+      try {
+        fs.rmSync(meupDir, { recursive: true, force: true });
+        console.log('✓ Cleaned .meup directory');
+      } catch (error) {
+        errors.push(`Failed to clean .meup directory: ${error.message}`);
+      }
+    }
+    
+    // Report results
+    if (errors.length > 0) {
+      console.log('\n⚠ Some items could not be cleaned:');
+      for (const error of errors) {
+        console.log(`  - ${error}`);
+      }
+    }
+    
+    if (cleanedCount > 0 || itemsToClean.meup) {
+      console.log(`\n✓ Cleanup complete! ${totalSize > 0 ? `Freed ${formatBytes(totalSize)}` : ''}`);
+    } else {
+      console.log('\nNothing to clean.');
+    }
+  });
+
+// Helper function to format bytes
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 module.exports = space;

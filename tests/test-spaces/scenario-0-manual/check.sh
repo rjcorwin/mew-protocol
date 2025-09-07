@@ -151,6 +151,19 @@ else
   ((TESTS_FAILED++))
 fi
 
+# Test 6: Test clean command (dry-run only to avoid disrupting running space)
+echo -e "\n${YELLOW}Testing clean command...${NC}"
+
+# Test dry-run functionality
+CLEAN_OUTPUT=$($TEST_DIR/../../../cli/bin/meup.js space clean --dry-run 2>&1)
+if echo "$CLEAN_OUTPUT" | grep -q "Would clean:"; then
+  echo -e "Clean command dry-run: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++))
+else
+  echo -e "Clean command dry-run: ${RED}✗${NC}"
+  ((TESTS_FAILED++))
+fi
+
 # Summary
 echo ""
 echo -e "${YELLOW}=== Test Summary ===${NC}"

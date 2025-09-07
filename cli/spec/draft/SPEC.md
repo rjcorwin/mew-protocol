@@ -539,6 +539,56 @@ This command:
 4. Cleans up FIFOs and temporary files
 5. Preserves logs for debugging
 
+### `meup space clean`
+
+Cleans up space artifacts such as logs, FIFOs, and temporary files. Provides safety checks to prevent accidental data loss.
+
+```bash
+meup space clean [options]
+
+Options:
+  --all                 Clean everything including .meup directory
+  --logs                Clean only log files
+  --fifos               Clean only FIFO pipes
+  --force               Skip confirmation prompts
+  --dry-run             Show what would be cleaned without doing it
+```
+
+**Default behavior (no flags):**
+- Cleans `logs/*` (except current session if running)
+- Cleans `fifos/*` (except active pipes)
+- Cleans temporary response files
+- Preserves `.meup/` directory (contains process state)
+
+**With `--all`:**
+- Everything from default cleaning
+- Removes `.meup/` directory entirely
+- Stops PM2 daemon for this space
+
+**Safety features:**
+- Warns if space is currently running
+- Requires confirmation for destructive operations
+- Never cleans active FIFO pipes
+- Preserves space.yaml and agent files
+- Shows summary of what will be cleaned
+
+**Examples:**
+```bash
+# Clean logs after debugging session
+meup space clean --logs
+
+# Start completely fresh for testing
+meup space down
+meup space clean --all
+
+# Check what would be cleaned
+meup space clean --dry-run
+
+# CI/CD cleanup (no prompts)
+meup space down
+meup space clean --all --force
+```
+
 ### Terminal Interface
 
 #### Input Handling

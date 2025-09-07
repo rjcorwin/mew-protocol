@@ -65,6 +65,7 @@ The `check.sh` script validates:
 3. **Agent Connection** - Echo agent is connected to the gateway
 4. **Message Flow** - Messages are received and echoed back
 5. **Rapid Message Handling** - Multiple messages sent quickly are all processed
+6. **Clean Command** - Tests that `meup space clean --dry-run` works correctly
 
 ## Components
 
@@ -118,6 +119,19 @@ cat < fifos/test-client-out
 
 # Terminal 2: Send input
 echo '{"kind":"chat","payload":{"text":"Test"}}' > fifos/test-client-in
+```
+
+### Clean Space Artifacts
+```bash
+# Preview what will be cleaned
+../../../cli/bin/meup.js space clean --dry-run
+
+# Clean only logs (preserves running space)
+../../../cli/bin/meup.js space clean --logs --force
+
+# Complete cleanup after stopping space
+../../../cli/bin/meup.js space down
+../../../cli/bin/meup.js space clean --all --force
 ```
 
 ### Preserve Logs for Debugging
