@@ -73,7 +73,7 @@ run_test() {
   # Clean up any processes from this test
   pkill -f "meup" 2>/dev/null || true
   pkill -f "pm2" 2>/dev/null || true
-  pkill -f "calculator.js" 2>/dev/null || true
+  pkill -f "calculator-participant.js" 2>/dev/null || true
   pkill -f "meup-bridge" 2>/dev/null || true
   pkill -f "@modelcontextprotocol" 2>/dev/null || true
   sleep 1
@@ -85,7 +85,7 @@ run_test() {
 echo -e "${YELLOW}Cleaning up any existing test processes...${NC}"
 pkill -f "meup" 2>/dev/null || true
 pkill -f "pm2" 2>/dev/null || true
-pkill -f "calculator.js" 2>/dev/null || true
+pkill -f "calculator-participant.js" 2>/dev/null || true
 pkill -f "meup-bridge" 2>/dev/null || true
 pkill -f "@modelcontextprotocol" 2>/dev/null || true
 sleep 2

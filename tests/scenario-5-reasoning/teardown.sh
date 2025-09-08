@@ -24,7 +24,7 @@ sleep 2
 
 # Force kill any remaining processes
 pkill -f "meup.*gateway" 2>/dev/null || true
-pkill -f "calculator.js" 2>/dev/null || true
+pkill -f "calculator-participant.js" 2>/dev/null || true
 
 # Clean up FIFOs (important to prevent blocking)
 if [ -d fifos ]; then

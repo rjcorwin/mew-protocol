@@ -55,7 +55,7 @@ All test scenarios are located in this directory. Each scenario is self-containe
 ## Test Agents
 
 The `/agents/` directory contains reusable test agents used across scenarios:
-- `calculator.js` - Simple calculator agent for MCP testing
+- `calculator-participant.js` - Simple calculator agent for MCP testing using MEUPParticipant
 - `fulfiller.js` - Agent that fulfills proposals
 - `proposer.js` - Agent that creates proposals
 - `requester.js` - Agent that makes various requests
