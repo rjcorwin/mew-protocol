@@ -81,6 +81,8 @@ run_test() {
   pkill -f "meup" 2>/dev/null || true
   pkill -f "pm2" 2>/dev/null || true
   pkill -f "calculator.js" 2>/dev/null || true
+  pkill -f "meup-bridge" 2>/dev/null || true
+  pkill -f "@modelcontextprotocol" 2>/dev/null || true
   sleep 1
   
   echo ""
@@ -91,6 +93,8 @@ echo -e "${YELLOW}Cleaning up any existing test processes...${NC}"
 pkill -f "meup" 2>/dev/null || true
 pkill -f "pm2" 2>/dev/null || true
 pkill -f "calculator.js" 2>/dev/null || true
+pkill -f "meup-bridge" 2>/dev/null || true
+pkill -f "@modelcontextprotocol" 2>/dev/null || true
 sleep 2
 
 # Run all test scenarios
@@ -107,6 +111,7 @@ run_test "Scenario 3: Proposals with Capability Blocking" "./scenario-3-proposal
 run_test "Scenario 4: Dynamic Capability Granting" "./scenario-4-capabilities"
 run_test "Scenario 5: Reasoning with Context Field" "./scenario-5-reasoning"
 run_test "Scenario 6: Error Recovery and Edge Cases" "./scenario-6-errors"
+run_test "Scenario 7: MCP Bridge Integration" "./scenario-7-mcp-bridge"
 
 # Summary
 echo -e "${BLUE}================================================${NC}"
