@@ -9,7 +9,7 @@ timeout 30 ./test.sh
 TEST_EXIT=$?
 
 # Clean up any hanging processes
-../../../cli/bin/meup.js space down 2>/dev/null || true
+../../cli/bin/meup.js space down 2>/dev/null || true
 pkill -f "scenario-7" 2>/dev/null || true
 
 exit $TEST_EXIT

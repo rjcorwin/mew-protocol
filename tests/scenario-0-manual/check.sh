@@ -136,7 +136,7 @@ fi
 echo -e "\n${YELLOW}Testing clean command...${NC}"
 
 # Test dry-run functionality
-CLEAN_OUTPUT=$($TEST_DIR/../../../cli/bin/meup.js space clean --dry-run 2>&1)
+CLEAN_OUTPUT=$($TEST_DIR/../../cli/bin/meup.js space clean --dry-run 2>&1)
 if echo "$CLEAN_OUTPUT" | grep -q "Would clean:"; then
   echo -e "Clean command dry-run: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))

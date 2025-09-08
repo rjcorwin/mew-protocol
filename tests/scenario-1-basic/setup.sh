@@ -26,7 +26,7 @@ cd "$TEST_DIR"
 
 # Clean up any previous runs
 echo "Cleaning up previous test artifacts..."
-../../../cli/bin/meup.js space clean --all --force 2>/dev/null || true
+../../cli/bin/meup.js space clean --all --force 2>/dev/null || true
 
 # Use random port to avoid conflicts
 if [ -z "$TEST_PORT" ]; then
@@ -39,10 +39,10 @@ echo "Starting space on port $TEST_PORT..."
 mkdir -p ./logs
 
 # Start the space using meup space up
-../../../cli/bin/meup.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1
+../../cli/bin/meup.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1
 
 # Check if space started successfully
-if ../../../cli/bin/meup.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
+if ../../cli/bin/meup.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
   echo -e "${GREEN}✓ Space started successfully${NC}"
 else
   echo -e "${RED}✗ Space failed to start${NC}"

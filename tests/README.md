@@ -1,107 +1,73 @@
-# MEUP Test Suite
+# MEUP Protocol Tests
 
-Comprehensive testing for the MEUP protocol implementation.
-
-## Test Structure
-
-Each test run creates a dedicated folder with the convention `test-YYMMDD-HHMM` containing:
-
-```
-test-YYMMDD-HHMM/
-├── scripts/      # Test scripts generated during the run
-├── configs/      # Space configuration files (space.yaml)
-├── logs/         # Gateway and agent output logs
-├── results/      # Test results in JSON format
-└── fifos/        # Named pipes for FIFO communication
-```
-
-The main test plan is documented in [TEST_PLAN.md](./TEST_PLAN.md), which provides:
-- Step-by-step test scenarios
-- CLI commands for running tests
-- Expected outputs and validation steps
-- Test automation using FIFO mode
-
-## Test Agents
-
-The CLI provides built-in test agents for testing:
-
-### 1. Echo Agent
-- **Type**: `echo`
-- **Purpose**: Test basic message flow
-- **Behavior**: Echoes received chat messages with "Echo: " prefix
-- **Usage**: `meup agent start --type echo`
-
-### 2. Calculator Agent
-- **Type**: `calculator`
-- **Purpose**: Test MCP tool provision and calling
-- **Tools Provided**:
-  - `add(a, b)` - Addition
-  - `multiply(a, b)` - Multiplication
-  - `evaluate(expression)` - Expression evaluation
-- **Usage**: `meup agent start --type calculator`
-
-### 3. Fulfiller Agent
-- **Type**: `fulfiller`
-- **Purpose**: Test proposal execution
-- **Behavior**: Automatically fulfills any `mcp/proposal` it observes
-- **Usage**: `meup agent start --type fulfiller`
-
-## Test Scenarios
-
-The TEST_PLAN.md includes 6 test scenarios:
-
-1. **Basic Message Flow**: Echo agent responds to chat messages
-2. **MCP Tool Execution**: Calculator agent provides and executes tools
-3. **Proposal Pattern**: Untrusted proposer with trusted fulfiller
-4. **Dynamic Capabilities**: Granting and revoking capabilities
-5. **Context Management**: Push/pop context stacks
-6. **Error Recovery**: Handling invalid messages and errors
+This directory contains the test suite for the MEUP (Multiplexed Extensible Unified Protocol) v0.2 implementation.
 
 ## Running Tests
 
-### Quick Start
-
+### Run all tests
 ```bash
-# Create test run directory
-TEST_RUN_DIR="./test-$(date +%y%m%d-%H%M)"
-mkdir -p "$TEST_RUN_DIR"
-cd "$TEST_RUN_DIR"
-
-# Start gateway
-meup gateway start --port 8080 --log-level debug > logs/gateway.log 2>&1 &
-
-# Start test agents
-meup agent start --type echo --gateway ws://localhost:8080 --space test-space &
-meup agent start --type calculator --gateway ws://localhost:8080 --space test-space &
-meup agent start --type fulfiller --gateway ws://localhost:8080 --space test-space &
-
-# Connect test client with FIFOs
-mkfifo cli-in cli-out
-meup client connect \
-  --gateway ws://localhost:8080 \
-  --space test-space \
-  --fifo-in cli-in \
-  --fifo-out cli-out &
-
-# Send test messages
-echo '{"kind":"chat","payload":{"text":"hello"}}' > cli-in
-
-# Read responses
-cat cli-out
+./run-all-tests.sh
 ```
 
-## Test Validation
+### Run individual test scenarios
+```bash
+cd scenario-1-basic
+./test.sh
+```
 
-Each test scenario in TEST_PLAN.md includes:
+## Test Scenarios
 
-1. **Setup**: Commands to start gateway and agents
-2. **Execution**: Step-by-step test operations
-3. **Validation**: Expected outputs and assertions
-4. **Cleanup**: Resource teardown
+All test scenarios are located in this directory. Each scenario is self-contained with:
+- `space.yaml` - Space configuration
+- `test.sh` - Main test script
+- `setup.sh` - Test setup
+- `check.sh` - Result verification
+- `teardown.sh` - Cleanup
+- `run-test.sh` - Wrapper with timeout handling (if needed)
 
-## Current Status
+### Available Scenarios
 
-See [TEST_PLAN.md](./TEST_PLAN.md) for detailed test scenarios and execution steps.
+- **scenario-0-manual** - Manual debugging environment
+- **scenario-1-basic** - Basic message flow between agents
+- **scenario-2-mcp** - MCP tool execution and responses
+- **scenario-3-proposals** - Proposal system with capability blocking
+- **scenario-4-capabilities** - Dynamic capability granting
+- **scenario-5-reasoning** - Reasoning with context field
+- **scenario-6-errors** - Error recovery and edge cases
+- **scenario-7-mcp-bridge** - MCP server integration via bridge
 
-- ✅ Scenarios 1-2: Basic flow and MCP tools (passing)
-- ⏳ Scenarios 3-6: Require capability system implementation
+## Test Agents
+
+The `/agents/` directory contains reusable test agents used across scenarios:
+- `calculator.js` - Simple calculator agent for MCP testing
+- `fulfiller.js` - Agent that fulfills proposals
+- `proposer.js` - Agent that creates proposals
+- `requester.js` - Agent that makes various requests
+
+## Adding New Tests
+
+1. Create a new directory: `scenario-N-description/`
+2. Add required files:
+   - `space.yaml` - Define participants and capabilities
+   - `test.sh` - Main test logic
+   - `setup.sh` - Create test prerequisites
+   - `check.sh` - Verify test results
+   - `teardown.sh` - Clean up test artifacts
+3. Add the test to `run-all-tests.sh`
+
+## Debugging
+
+To debug a failing test:
+1. Run the test individually to see output
+2. Check logs in `scenario-*/logs/`
+3. Use scenario-0-manual for interactive debugging
+
+## Architecture
+
+Tests use PM2 for process management and the MEUP CLI to start spaces. Each test:
+1. Sets up a space with a gateway and participants
+2. Runs test agents that interact via MEUP messages
+3. Verifies expected outcomes
+4. Cleans up all processes and artifacts
+
+For protocol details, see the main MEUP documentation.

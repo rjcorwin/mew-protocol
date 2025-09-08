@@ -1,5 +1,5 @@
 #!/bin/bash
-# Teardown script for Scenario 6: Error Recovery and Edge Cases
+# Teardown script for Scenario 4: Dynamic Capability Granting
 
 # Colors for output
 RED='\033[0;31m'
@@ -17,13 +17,14 @@ cd "$TEST_DIR"
 
 # Stop the space
 echo "Stopping space..."
-../../../cli/bin/meup.js space down > /dev/null 2>&1
+../../cli/bin/meup.js space down > /dev/null 2>&1
 
 # Give processes time to exit
 sleep 2
 
 # Force kill any remaining processes
 pkill -f "meup.*gateway" 2>/dev/null || true
+pkill -f "calculator.js" 2>/dev/null || true
 
 # Clean up FIFOs (important to prevent blocking)
 if [ -d fifos ]; then

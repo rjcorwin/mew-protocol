@@ -25,11 +25,11 @@ PORT=$((8000 + RANDOM % 1000))
 mkdir -p ./logs ./fifos
 
 echo -e "${YELLOW}Step 1: Starting Gateway${NC}"
-echo -e "Command: ../../../cli/bin/meup.js gateway start --port $PORT --log-level debug --space-config ./space.yaml"
+echo -e "Command: ../../cli/bin/meup.js gateway start --port $PORT --log-level debug --space-config ./space.yaml"
 echo ""
 
 # Start gateway with space configuration
-../../../cli/bin/meup.js gateway start \
+../../cli/bin/meup.js gateway start \
   --port "$PORT" \
   --log-level debug \
   --space-config ./space.yaml \
@@ -97,11 +97,11 @@ echo -e "${GREEN}✓ FIFOs created${NC}"
 echo ""
 
 echo -e "${YELLOW}Step 4: Connecting Test Client${NC}"
-echo -e "Command: ../../../cli/bin/meup.js client connect --gateway ws://localhost:$PORT --space manual-debug-space --participant-id test-client --token test-token --fifo-in ./fifos/test-client-in --fifo-out ./fifos/test-client-out"
+echo -e "Command: ../../cli/bin/meup.js client connect --gateway ws://localhost:$PORT --space manual-debug-space --participant-id test-client --token test-token --fifo-in ./fifos/test-client-in --fifo-out ./fifos/test-client-out"
 echo ""
 
 # Connect test client
-../../../cli/bin/meup.js client connect \
+../../cli/bin/meup.js client connect \
   --gateway "ws://localhost:$PORT" \
   --space manual-debug-space \
   --participant-id test-client \

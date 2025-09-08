@@ -13,7 +13,7 @@ mkdir -p logs
 # Start space
 echo "Starting space..."
 PORT=9850
-../../../cli/bin/meup.js space up \
+../../cli/bin/meup.js space up \
   --config ./space.yaml \
   --port $PORT \
   --log-level debug \
@@ -47,7 +47,7 @@ else
 fi
 
 # Clean up
-../../../cli/bin/meup.js space down
+../../cli/bin/meup.js space down
 rm -rf /tmp/mcp-test-files
 
 echo "Test complete"

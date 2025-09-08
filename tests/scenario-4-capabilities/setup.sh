@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup script for Scenario 6: Error Recovery and Edge Cases
+# Setup script for Scenario 4: Dynamic Capability Granting
 
 set -e
 
@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${YELLOW}=== Setting up Test Space ===${NC}"
-echo -e "${BLUE}Scenario: Error Recovery and Edge Cases${NC}"
+echo -e "${BLUE}Scenario: Dynamic Capability Granting${NC}"
 echo -e "${BLUE}Directory: $(pwd)${NC}"
 
 # Get directory of this script
@@ -22,7 +22,7 @@ cd "$TEST_DIR"
 mkdir -p logs fifos
 
 # Generate random port
-export TEST_PORT=$((8660 + RANDOM % 100))
+export TEST_PORT=$((8440 + RANDOM % 100))
 
 # Clean up function
 cleanup() {
@@ -62,7 +62,7 @@ cleanup
 
 # Start the space using meup CLI
 echo "Starting space on port $TEST_PORT..."
-PORT=$TEST_PORT ../../../cli/bin/meup.js space up \
+PORT=$TEST_PORT ../../cli/bin/meup.js space up \
   --config ./space.yaml \
   --port $TEST_PORT \
   --log-level debug \
@@ -82,7 +82,8 @@ echo "Waiting for components to initialize..."
 sleep 5
 
 # Verify FIFOs and logs are created
-if [ -p fifos/test-client-in ] && [ -f logs/test-client-output.log ]; then
+if [ -p fifos/coordinator-in ] && [ -p fifos/limited-agent-in ] && \
+   [ -f logs/coordinator-output.log ] && [ -f logs/limited-agent-output.log ]; then
   echo -e "${GREEN}✓ Setup complete${NC}"
 else
   echo -e "${RED}✗ Setup incomplete - missing FIFOs or logs${NC}"
@@ -91,15 +92,20 @@ else
 fi
 
 # Export paths for check.sh
-export TEST_FIFO="$TEST_DIR/fifos/test-client-in"
-export TEST_LOG="$TEST_DIR/logs/test-client-output.log"
+export COORD_FIFO="$TEST_DIR/fifos/coordinator-in"
+export LIMITED_FIFO="$TEST_DIR/fifos/limited-agent-in"
+export COORD_LOG="$TEST_DIR/logs/coordinator-output.log"
+export LIMITED_LOG="$TEST_DIR/logs/limited-agent-output.log"
 
 echo -e "\nGateway running on: ws://localhost:$TEST_PORT"
-echo "Test client I/O:"
-echo "  Input FIFO: $TEST_FIFO"
-echo "  Output Log: $TEST_LOG"
+echo "Coordinator client I/O:"
+echo "  Input FIFO: $COORD_FIFO"
+echo "  Output Log: $COORD_LOG"
+echo "Limited agent I/O:"
+echo "  Input FIFO: $LIMITED_FIFO"
+echo "  Output Log: $LIMITED_LOG"
 
 echo -e "\nYou can now:"
 echo "  - Run tests with: ./check.sh"
-echo "  - Send messages: echo '{\"kind\":\"chat\",...}' > $TEST_FIFO"
-echo "  - Read responses: tail -f $TEST_LOG"
+echo "  - Grant capabilities: echo '{\"kind\":\"capability/grant\",...}' > $COORD_FIFO"
+echo "  - Read logs: tail -f logs/*.log"

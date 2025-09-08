@@ -13,7 +13,7 @@ echo "=== Scenario 7: MCP Bridge Test ==="
 PORT=$((9700 + RANDOM % 100))
 echo "Starting space on port $PORT..."
 
-../../../cli/bin/meup.js space up \
+../../cli/bin/meup.js space up \
   --config ./space.yaml \
   --port $PORT \
   --log-level debug \
@@ -27,7 +27,7 @@ sleep 5
 CHECK_RESULT=$?
 
 # Teardown
-../../../cli/bin/meup.js space down
+../../cli/bin/meup.js space down
 ./teardown.sh
 
 exit $CHECK_RESULT

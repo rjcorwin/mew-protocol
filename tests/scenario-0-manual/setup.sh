@@ -42,7 +42,7 @@ mkdir -p "$TEST_DIR/logs" "$TEST_DIR/fifos" "$TEST_DIR/.meup"
 # Start the space using meup space up
 echo -e "${YELLOW}Starting space with meup space up...${NC}"
 cd "$TEST_DIR"
-../../../cli/bin/meup.js space up --port "$TEST_PORT" > "$TEST_DIR/logs/space-up.log" 2>&1
+../../cli/bin/meup.js space up --port "$TEST_PORT" > "$TEST_DIR/logs/space-up.log" 2>&1
 
 # Check if space started successfully
 if [ $? -eq 0 ]; then

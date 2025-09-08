@@ -16,10 +16,10 @@ PORT=$((8000 + RANDOM % 1000))
 
 # Start the space
 echo "Starting space with 'meup space up'..."
-../../../cli/bin/meup.js space up --port "$PORT" > space-up.log 2>&1
+../../cli/bin/meup.js space up --port "$PORT" > space-up.log 2>&1
 
 # Check if space started
-if ../../../cli/bin/meup.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
+if ../../cli/bin/meup.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
   echo -e "${GREEN}✓ Space started successfully${NC}"
 else
   echo -e "${RED}✗ Space failed to start${NC}"
@@ -45,7 +45,7 @@ sleep 2
 if ! kill -0 $ECHO_PID 2>/dev/null; then
   echo -e "${RED}Echo agent failed to start${NC}"
   cat ./logs/echo.log
-  ../../../cli/bin/meup.js space down
+  ../../cli/bin/meup.js space down
   exit 1
 fi
 
@@ -57,7 +57,7 @@ if [ -p ./fifos/test-client-in ] && [ -p ./fifos/test-client-out ]; then
 else
   echo -e "${RED}✗ FIFOs not created${NC}"
   kill $ECHO_PID 2>/dev/null || true
-  ../../../cli/bin/meup.js space down
+  ../../cli/bin/meup.js space down
   exit 1
 fi
 
@@ -67,7 +67,7 @@ CAT_PID=$!
 
 # Connect test client
 echo "Connecting test client..."
-../../../cli/bin/meup.js client connect \
+../../cli/bin/meup.js client connect \
   --gateway "ws://localhost:$PORT" \
   --space test-space \
   --participant-id test-client \
@@ -131,7 +131,7 @@ kill $ECHO_PID 2>/dev/null || true
 
 # Use space down command
 echo "Stopping space with 'meup space down'..."
-../../../cli/bin/meup.js space down
+../../cli/bin/meup.js space down
 
 echo -e "${GREEN}✓ Cleanup complete${NC}"
 

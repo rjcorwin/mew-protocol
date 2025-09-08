@@ -25,7 +25,7 @@ cd "$TEST_DIR"
 
 # Stop the space using meup space down
 echo "Stopping space..."
-../../../cli/bin/meup.js space down 2>/dev/null || true
+../../cli/bin/meup.js space down 2>/dev/null || true
 
 # Additional cleanup for any orphaned processes
 if [ -f ".meup/pids.json" ]; then
@@ -44,7 +44,7 @@ if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
   echo "Cleaning test artifacts..."
   
   # Use the new meup space clean command
-  ../../../cli/bin/meup.js space clean --all --force 2>/dev/null || {
+  ../../cli/bin/meup.js space clean --all --force 2>/dev/null || {
     # Fallback to manual cleanup if clean command fails
     echo "Clean command failed, using manual cleanup..."
     rm -rf logs fifos .meup 2>/dev/null || true
@@ -54,7 +54,7 @@ if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
 else
   echo -e "${YELLOW}Preserving logs (PRESERVE_LOGS=true)${NC}"
   # Clean only fifos and .meup, preserve logs
-  ../../../cli/bin/meup.js space clean --fifos --force 2>/dev/null || true
+  ../../cli/bin/meup.js space clean --fifos --force 2>/dev/null || true
 fi
 
 echo -e "${GREEN}✓ Cleanup complete${NC}"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Teardown script for Scenario 4: Dynamic Capability Granting
+# Teardown script for Scenario 5: Reasoning with Context Field
 
 # Colors for output
 RED='\033[0;31m'
@@ -17,7 +17,7 @@ cd "$TEST_DIR"
 
 # Stop the space
 echo "Stopping space..."
-../../../cli/bin/meup.js space down > /dev/null 2>&1
+../../cli/bin/meup.js space down > /dev/null 2>&1
 
 # Give processes time to exit
 sleep 2

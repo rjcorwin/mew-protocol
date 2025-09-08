@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup script for Scenario 5: Reasoning with Context Field
+# Setup script for Scenario 6: Error Recovery and Edge Cases
 
 set -e
 
@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${YELLOW}=== Setting up Test Space ===${NC}"
-echo -e "${BLUE}Scenario: Reasoning with Context Field${NC}"
+echo -e "${BLUE}Scenario: Error Recovery and Edge Cases${NC}"
 echo -e "${BLUE}Directory: $(pwd)${NC}"
 
 # Get directory of this script
@@ -22,7 +22,7 @@ cd "$TEST_DIR"
 mkdir -p logs fifos
 
 # Generate random port
-export TEST_PORT=$((8550 + RANDOM % 100))
+export TEST_PORT=$((8660 + RANDOM % 100))
 
 # Clean up function
 cleanup() {
@@ -62,7 +62,7 @@ cleanup
 
 # Start the space using meup CLI
 echo "Starting space on port $TEST_PORT..."
-PORT=$TEST_PORT ../../../cli/bin/meup.js space up \
+PORT=$TEST_PORT ../../cli/bin/meup.js space up \
   --config ./space.yaml \
   --port $TEST_PORT \
   --log-level debug \
@@ -82,7 +82,7 @@ echo "Waiting for components to initialize..."
 sleep 5
 
 # Verify FIFOs and logs are created
-if [ -p fifos/research-agent-in ] && [ -f logs/research-agent-output.log ]; then
+if [ -p fifos/test-client-in ] && [ -f logs/test-client-output.log ]; then
   echo -e "${GREEN}✓ Setup complete${NC}"
 else
   echo -e "${RED}✗ Setup incomplete - missing FIFOs or logs${NC}"
@@ -91,15 +91,15 @@ else
 fi
 
 # Export paths for check.sh
-export RESEARCH_FIFO="$TEST_DIR/fifos/research-agent-in"
-export RESEARCH_LOG="$TEST_DIR/logs/research-agent-output.log"
+export TEST_FIFO="$TEST_DIR/fifos/test-client-in"
+export TEST_LOG="$TEST_DIR/logs/test-client-output.log"
 
 echo -e "\nGateway running on: ws://localhost:$TEST_PORT"
-echo "Research agent I/O:"
-echo "  Input FIFO: $RESEARCH_FIFO"
-echo "  Output Log: $RESEARCH_LOG"
+echo "Test client I/O:"
+echo "  Input FIFO: $TEST_FIFO"
+echo "  Output Log: $TEST_LOG"
 
 echo -e "\nYou can now:"
 echo "  - Run tests with: ./check.sh"
-echo "  - Send reasoning messages: echo '{\"kind\":\"reasoning/start\",...}' > $RESEARCH_FIFO"
-echo "  - Read responses: tail -f $RESEARCH_LOG"
+echo "  - Send messages: echo '{\"kind\":\"chat\",...}' > $TEST_FIFO"
+echo "  - Read responses: tail -f $TEST_LOG"
