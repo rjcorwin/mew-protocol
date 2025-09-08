@@ -8,8 +8,8 @@
     - [x] [TD0.1.1] Typed API to handle each message kind (MEUPClient complete)
     - [ ] [TD0.1.2] Migrate existing test agents to use MEUPClient
         - [x] [TD0.1.2.1] Update echo.js agent in scenario-1
-        - [ ] [TD0.1.2.2] Update calculator.js agent in scenario-2
-        - [ ] [TD0.1.2.3] Update proposer.js and fulfiller.js in scenario-3
+        - [x] [TD0.1.2.2] Update calculator.js agent in scenario-2
+        - [x] [TD0.1.2.3] Update fulfiller.js in scenario-3
         - [ ] [TD0.1.2.4] Update remaining test agents
     - [ ] [TD0.1.3] Create example client applications
         - [ ] [TD0.1.3.1] Basic chat client example

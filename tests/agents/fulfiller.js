@@ -4,7 +4,11 @@
  * For MEUP v0.2 test scenarios
  */
 
-const WebSocket = require('ws');
+const path = require('path');
+
+// Import MEUPClient from the SDK
+const clientPath = path.resolve(__dirname, '../../sdk/typescript-sdk/client/dist/index.js');
+const { MEUPClient } = require(clientPath);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -32,25 +36,47 @@ const participantId = 'fulfiller-agent';
 // Track pending fulfillments to correlate responses
 const pendingFulfillments = new Map(); // request_id -> original_proposal_from
 
-console.log(`Fulfiller agent connecting to ${options.gateway}...`);
-
-const ws = new WebSocket(options.gateway);
-
-ws.on('open', () => {
-  console.log('Fulfiller agent connected to gateway');
-  
-  // Send join message (gateway-specific)
-  ws.send(JSON.stringify({
-    type: 'join',
-    participantId: participantId,
-    space: options.space,
-    token: options.token
-  }));
+// Create MEUP client
+const client = new MEUPClient({
+  gateway: options.gateway,
+  space: options.space,
+  token: options.token,
+  participant_id: participantId,
+  capabilities: [],
+  reconnect: true
 });
 
-ws.on('message', (data) => {
+console.log(`Fulfiller agent connecting to ${options.gateway}...`);
+
+// Track if we've sent the initial join message
+let joined = false;
+
+// Handle connection events
+client.onConnected(() => {
+  console.log('Fulfiller agent connected to gateway');
+  
+  // For compatibility with the gateway, send a join message
+  if (!joined) {
+    client.send({
+      type: 'join',
+      participantId: participantId,
+      space: options.space,
+      token: options.token
+    });
+    joined = true;
+  }
+});
+
+// Connect to gateway
+client.connect()
+  .catch((error) => {
+    console.error('Failed to connect:', error);
+    process.exit(1);
+  });
+
+// Handle incoming messages
+client.onMessage((message) => {
   try {
-    const message = JSON.parse(data.toString());
     
     // Auto-fulfill any MCP proposal we see
     if (message.kind === 'mcp/proposal' && message.from !== participantId) {
@@ -102,7 +128,7 @@ ws.on('message', (data) => {
         // Track who requested this so we can forward the response
         pendingFulfillments.set(fulfillmentRequest.payload.id, message.from);
         
-        ws.send(JSON.stringify(fulfillmentRequest));
+        client.send(fulfillmentRequest);
         console.log(`Fulfilled proposal ${message.id} with method ${method}`);
       }, 500);
     } else if (message.kind === 'mcp/proposal') {
@@ -137,7 +163,7 @@ ws.on('message', (data) => {
           }
         };
         
-        ws.send(JSON.stringify(resultMessage));
+        client.send(resultMessage);
         console.log(`Forwarded result to ${originalProposer}: ${JSON.stringify(responsePayload.result)}`);
       }
     }
@@ -146,11 +172,11 @@ ws.on('message', (data) => {
   }
 });
 
-ws.on('error', (error) => {
-  console.error('WebSocket error:', error);
+client.onError((error) => {
+  console.error('Client error:', error);
 });
 
-ws.on('close', () => {
+client.onDisconnected(() => {
   console.log('Fulfiller agent disconnected from gateway');
   process.exit(0);
 });
@@ -158,6 +184,6 @@ ws.on('close', () => {
 // Handle shutdown
 process.on('SIGINT', () => {
   console.log('\nShutting down fulfiller agent...');
-  ws.close();
+  client.disconnect();
   process.exit(0);
 });
