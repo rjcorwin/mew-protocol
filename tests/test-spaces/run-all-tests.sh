@@ -77,12 +77,29 @@ run_test() {
     FAILED_TESTS="$FAILED_TESTS\n  - $test_name (not found)"
   fi
   
+  # Clean up any processes from this test
+  pkill -f "meup" 2>/dev/null || true
+  pkill -f "pm2" 2>/dev/null || true
+  pkill -f "calculator.js" 2>/dev/null || true
+  sleep 1
+  
   echo ""
 }
+
+# Clean up any leftover processes before starting
+echo -e "${YELLOW}Cleaning up any existing test processes...${NC}"
+pkill -f "meup" 2>/dev/null || true
+pkill -f "pm2" 2>/dev/null || true
+pkill -f "calculator.js" 2>/dev/null || true
+sleep 2
 
 # Run all test scenarios
 echo -e "${BLUE}Running Test Scenarios...${NC}"
 echo ""
+
+# Optional: Include scenario-0 (manual/debug test)
+# Uncomment the following line if you want to include scenario-0
+# run_test "Scenario 0: Manual/Debug Test" "./scenario-0-manual"
 
 run_test "Scenario 1: Basic Message Flow" "./scenario-1-basic"
 run_test "Scenario 2: MCP Tool Execution" "./scenario-2-mcp"
