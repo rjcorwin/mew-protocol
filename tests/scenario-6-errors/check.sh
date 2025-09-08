@@ -40,7 +40,8 @@ check_test() {
 
 # Basic connectivity tests
 echo "Testing: Gateway is running ... \c"
-if pgrep -f "meup.*gateway" > /dev/null 2>&1; then
+# Check if gateway is listening on the port
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -87,7 +88,7 @@ echo -e "\n${YELLOW}Test 3: Message to non-existent participant${NC}"
 sleep 2
 
 # This should be handled gracefully without errors
-if pgrep -f "meup.*gateway" > /dev/null 2>&1; then
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "Non-existent participant handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -104,7 +105,7 @@ LARGE_MSG+='"}}'
 sleep 2
 
 # Check if processes are still running
-if pgrep -f "meup.*gateway" > /dev/null 2>&1; then
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "Large message handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -119,7 +120,7 @@ for i in {1..20}; do
 done
 sleep 3
 
-if pgrep -f "meup.*gateway" > /dev/null 2>&1; then
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "Rapid messages handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -132,7 +133,7 @@ echo -e "\n${YELLOW}Test 6: Empty message${NC}"
 (echo '' > "$TEST_FIFO" &)
 sleep 1
 
-if pgrep -f "meup.*gateway" > /dev/null 2>&1; then
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "Empty message handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -145,7 +146,7 @@ echo -e "\n${YELLOW}Test 7: Malformed JSON (unclosed)${NC}"
 (echo '{"kind":"chat","payload":{"text":"Unclosed' > "$TEST_FIFO" &)
 sleep 2
 
-if pgrep -f "meup.*gateway" > /dev/null 2>&1; then
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "Malformed JSON handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -158,7 +159,7 @@ echo -e "\n${YELLOW}Test 8: Special characters in message${NC}"
 (echo '{"kind":"chat","payload":{"text":"Special chars: \n\t\r\"\\/"}}' > "$TEST_FIFO" &)
 sleep 2
 
-if pgrep -f "meup.*gateway" > /dev/null 2>&1; then
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "Special characters handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
