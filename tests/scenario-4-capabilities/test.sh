@@ -15,18 +15,15 @@ echo -e "${BLUE}Testing dynamic capability granting and revoking${NC}"
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$TEST_DIR"
 
-# Run setup
+# Generate random port (same logic as setup.sh)
+export TEST_PORT=$((8440 + RANDOM % 100))
+
+# Run setup with the port
 echo -e "\n${YELLOW}Step 1: Setting up space...${NC}"
 ./setup.sh
 if [ $? -ne 0 ]; then
   echo -e "${RED}✗ Setup failed${NC}"
   exit 1
-fi
-
-# Export the port that check.sh needs
-export TEST_PORT=$(grep "Gateway running on" logs/space-startup.log 2>/dev/null | grep -o '[0-9]\+' | tail -1)
-if [ -z "$TEST_PORT" ]; then
-  TEST_PORT=$(ls fifos/ 2>/dev/null | head -1 | grep -o '[0-9]\+' || echo "8540")
 fi
 
 # Export the paths that check.sh needs

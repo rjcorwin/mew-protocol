@@ -41,7 +41,8 @@ check_test() {
 
 # Basic connectivity tests
 echo "Testing: Gateway is running ... \c"
-if pgrep -f "meup.*gateway" > /dev/null 2>&1; then
+# Check if gateway is listening on the port
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else

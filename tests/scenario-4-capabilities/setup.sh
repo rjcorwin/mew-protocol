@@ -21,8 +21,10 @@ cd "$TEST_DIR"
 # Create required directories
 mkdir -p logs fifos
 
-# Generate random port
-export TEST_PORT=$((8440 + RANDOM % 100))
+# Use provided port or generate random port
+if [ -z "$TEST_PORT" ]; then
+  export TEST_PORT=$((8440 + RANDOM % 100))
+fi
 
 # Clean up function
 cleanup() {
