@@ -218,7 +218,7 @@ export class MEUPParticipant {
     });
     
     // Handle welcome message
-    this.client.onWelcome(async (data) => {
+    this.client.onWelcome(async (data: any) => {
       this.participantInfo = {
         id: data.you.id,
         capabilities: data.you.capabilities
@@ -231,7 +231,7 @@ export class MEUPParticipant {
     });
     
     // Handle incoming messages
-    this.client.onMessage(async (envelope) => {
+    this.client.onMessage(async (envelope: any) => {
       // Handle MCP responses
       if (envelope.kind === 'mcp/response') {
         await this.handleMCPResponse(envelope);
@@ -251,7 +251,7 @@ export class MEUPParticipant {
     });
     
     // Handle errors
-    this.client.onError((error) => {
+    this.client.onError((error: any) => {
       console.error(`${this.options.participant_id} error:`, error);
     });
     
@@ -276,30 +276,28 @@ export class MEUPParticipant {
   private async handleMCPResponse(envelope: Envelope): Promise<void> {
     // Check if this response correlates to one of our pending requests
     if (envelope.correlation_id) {
-      for (const correlationId of envelope.correlation_id) {
-        const pendingRequest = this.pendingRequests.get(correlationId);
-        if (pendingRequest) {
-          // Clean up
-          clearTimeout(pendingRequest.timeout);
-          this.pendingRequests.delete(correlationId);
-          
-          const payload = envelope.payload;
-          
-          // Check for MCP error
-          if (payload.error) {
-            pendingRequest.reject(new Error(`MCP Error ${payload.error.code}: ${payload.error.message}`));
-            return;
-          }
-          
-          // Resolve with the result
-          if (payload.result) {
-            pendingRequest.resolve(payload.result);
-          } else {
-            pendingRequest.resolve(payload);
-          }
-          
+      const pendingRequest = this.pendingRequests.get(envelope.correlation_id);
+      if (pendingRequest) {
+        // Clean up
+        clearTimeout(pendingRequest.timeout);
+        this.pendingRequests.delete(envelope.correlation_id);
+        
+        const payload = envelope.payload;
+        
+        // Check for MCP error
+        if (payload.error) {
+          pendingRequest.reject(new Error(`MCP Error ${payload.error.code}: ${payload.error.message}`));
           return;
         }
+        
+        // Resolve with the result
+        if (payload.result) {
+          pendingRequest.resolve(payload.result);
+        } else {
+          pendingRequest.resolve(payload);
+        }
+        
+        return;
       }
     }
   }
@@ -382,7 +380,7 @@ export class MEUPParticipant {
       from: this.options.participant_id!,
       to: [envelope.from],
       kind: 'mcp/response',
-      correlation_id: envelope.id ? [envelope.id] : undefined,
+      correlation_id: envelope.id,
       payload: {
         jsonrpc: '2.0',
         id: requestId,

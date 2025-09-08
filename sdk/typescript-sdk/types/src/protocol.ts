@@ -25,7 +25,7 @@ export interface Envelope {
   from: string;
   to?: string[];
   kind: string;
-  correlation_id?: string[];
+  correlation_id?: string;
   context?: ContextField;
   payload: any;
 }
@@ -36,7 +36,7 @@ export interface Envelope {
 export interface PartialEnvelope {
   to?: string[];
   kind: string;
-  correlation_id?: string[];
+  correlation_id?: string;
   context?: ContextField;
   payload: any;
 }
@@ -47,7 +47,7 @@ export interface PartialEnvelope {
 export interface ContextField {
   operation: 'push' | 'pop' | 'resume';
   topic?: string;
-  correlation_id?: string[];
+  correlation_id?: string;
 }
 
 // ============================================================================

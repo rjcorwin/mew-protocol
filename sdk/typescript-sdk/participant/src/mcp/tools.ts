@@ -52,7 +52,7 @@ export class ToolRegistry {
       return {
         error: {
           code: -32601,
-          message: `Tool not found: ${name}`
+          message: `Unknown tool: ${name}`
         }
       };
     }
