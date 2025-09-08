@@ -4,7 +4,6 @@
 
 import type {
   Envelope,
-  PartialEnvelope,
   Participant,
   Capability,
   Proposal,

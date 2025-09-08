@@ -38,7 +38,10 @@ export type {
   // Chat
   ChatPayload,
   
-  // MCP types
+} from './protocol';
+
+// Re-export MCP types for convenience
+export type {
   JsonRpcRequest,
   JsonRpcResponse,
   JsonRpcNotification,
@@ -51,12 +54,15 @@ export type {
   ToolExecutionResult,
   ResourceContent,
   ProgressParams,
-} from './protocol';
+} from './mcp';
 
 // Export constants
 export { 
   PROTOCOL_VERSION, 
   MCP_VERSION,
   MessageKinds,
-  MCPMethods,
 } from './protocol';
+
+export {
+  MCPMethods,
+} from './mcp';
