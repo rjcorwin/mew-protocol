@@ -20,6 +20,7 @@ participants:
         payload:
           method: tools/*
       - kind: mcp/proposal
+      - kind: chat
       - kind: system/*
     auto_start: true
     command: "node"

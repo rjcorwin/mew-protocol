@@ -29,6 +29,9 @@ for (let i = 0; i < args.length; i++) {
 
 const participantId = 'fulfiller-agent';
 
+// Track pending fulfillments to correlate responses
+const pendingFulfillments = new Map(); // request_id -> original_proposal_from
+
 console.log(`Fulfiller agent connecting to ${options.gateway}...`);
 
 const ws = new WebSocket(options.gateway);
@@ -54,9 +57,29 @@ ws.on('message', (data) => {
       console.log(`Saw proposal from ${message.from}, auto-fulfilling...`);
       console.log(`Proposal details: ${JSON.stringify(message)}`);
       
-      // Extract the proposal details
-      const method = message.payload?.method;
-      const params = message.payload?.params || {};
+      // Extract the proposal details from the nested structure
+      const proposal = message.payload?.proposal;
+      if (!proposal) {
+        console.log('No proposal data found in message');
+        return;
+      }
+      
+      // Convert proposal to MCP request based on proposal type
+      let method, params;
+      
+      if (proposal.type === 'calculation') {
+        // Map calculation operations to calculator tool names
+        const toolName = proposal.operation; // 'add', 'multiply', etc.
+        method = 'tools/call';
+        params = {
+          name: toolName,
+          arguments: proposal.arguments || {}
+        };
+      } else {
+        // For other proposal types, try to use them directly
+        method = proposal.method || 'tools/call';
+        params = proposal.params || proposal.arguments || {};
+      }
       
       // Create fulfillment request with correlation to the proposal
       // If the proposal has no target, send to calculator-agent
@@ -76,11 +99,47 @@ ws.on('message', (data) => {
       
       // Wait a moment to simulate review, then fulfill
       setTimeout(() => {
+        // Track who requested this so we can forward the response
+        pendingFulfillments.set(fulfillmentRequest.payload.id, message.from);
+        
         ws.send(JSON.stringify(fulfillmentRequest));
         console.log(`Fulfilled proposal ${message.id} with method ${method}`);
       }, 500);
     } else if (message.kind === 'mcp/proposal') {
       console.log(`Ignoring own proposal: ${message.id}`);
+    }
+    
+    // Handle MCP responses and forward results to original proposer
+    if (message.kind === 'mcp/response' && message.from === 'calculator-agent') {
+      const responsePayload = message.payload;
+      const requestId = responsePayload?.id;
+      
+      // Check if this is a response to one of our fulfillments
+      if (requestId && pendingFulfillments.has(requestId)) {
+        const originalProposer = pendingFulfillments.get(requestId);
+        pendingFulfillments.delete(requestId);
+        
+        // Extract the actual result text from the MCP response
+        let resultText = 'Error: Unknown result';
+        if (responsePayload.result?.content?.[0]?.text) {
+          resultText = responsePayload.result.content[0].text;
+        } else if (responsePayload.error) {
+          resultText = `Error: ${responsePayload.error.message || 'Unknown error'}`;
+        }
+        
+        // Forward the result as a chat message to the original proposer
+        const resultMessage = {
+          kind: 'chat',
+          to: [originalProposer],
+          payload: {
+            text: resultText,
+            format: 'plain'
+          }
+        };
+        
+        ws.send(JSON.stringify(resultMessage));
+        console.log(`Forwarded result to ${originalProposer}: ${JSON.stringify(responsePayload.result)}`);
+      }
     }
   } catch (error) {
     console.error('Error processing message:', error);

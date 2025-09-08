@@ -36,6 +36,10 @@ tests/test-spaces/*/fifos/
 tests/test-spaces/*/.meup/
 tests/test-spaces/test-results.log
 tests/test-run-*/
+tests/*/.meup/
+tests/*/logs/
+tests/*/fifos/
+tests/test-results.log
 
 # IDE
 .vscode/
