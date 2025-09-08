@@ -1,0 +1,28 @@
+{
+  "name": "@meup/bridge",
+  "version": "0.1.0",
+  "description": "MCP-MEUP Protocol Bridge",
+  "main": "src/index.js",
+  "bin": {
+    "meup-bridge": "./bin/meup-bridge.js"
+  },
+  "scripts": {
+    "test": "node test/test-bridge.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "commander": "^11.1.0",
+    "debug": "^4.3.4"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "meup",
+    "mcp",
+    "bridge",
+    "protocol"
+  ],
+  "author": "",
+  "license": "MIT"
+}

@@ -375,9 +375,82 @@ space
     }
     console.log('✓ Gateway is ready');
     
-    // Start agents with auto_start: true
+    // Start agents and bridges with auto_start: true
     for (const [participantId, participant] of Object.entries(config.participants || {})) {
-      if (participant.auto_start && participant.command) {
+      // Handle MCP bridge participants
+      if (participant.type === 'mcp-bridge' && participant.auto_start && participant.mcp_server) {
+        console.log(`Starting MCP bridge: ${participantId}...`);
+        
+        const bridgeLogPath = path.join(logsDir, `${participantId}-bridge.log`);
+        const mcpServer = participant.mcp_server;
+        
+        // Build bridge arguments
+        const bridgeArgs = [
+          '--gateway', `ws://localhost:${options.port}`,
+          '--space', spaceId,
+          '--participant-id', participantId,
+          '--token', participant.tokens?.[0] || 'token',
+          '--mcp-command', mcpServer.command,
+        ];
+        
+        // Add MCP args if present
+        if (mcpServer.args && mcpServer.args.length > 0) {
+          bridgeArgs.push('--mcp-args', mcpServer.args.join(','));
+        }
+        
+        // Add MCP env if present
+        if (mcpServer.env) {
+          const envPairs = Object.entries(mcpServer.env).map(([k, v]) => `${k}=${v}`).join(',');
+          bridgeArgs.push('--mcp-env', envPairs);
+        }
+        
+        // Add MCP cwd if present
+        if (mcpServer.cwd) {
+          bridgeArgs.push('--mcp-cwd', mcpServer.cwd);
+        }
+        
+        // Add bridge config options if present
+        if (participant.bridge_config) {
+          if (participant.bridge_config.init_timeout) {
+            bridgeArgs.push('--init-timeout', participant.bridge_config.init_timeout.toString());
+          }
+          if (participant.bridge_config.reconnect !== undefined) {
+            bridgeArgs.push('--reconnect', participant.bridge_config.reconnect.toString());
+          }
+          if (participant.bridge_config.max_reconnects) {
+            bridgeArgs.push('--max-reconnects', participant.bridge_config.max_reconnects.toString());
+          }
+        }
+        
+        try {
+          // Find the bridge executable
+          const bridgePath = path.resolve(__dirname, '..', '..', '..', 'bridge', 'bin', 'meup-bridge.js');
+          
+          const bridgeApp = await startPM2Process({
+            name: `mcp_bridge_${participantId}`,
+            script: bridgePath,
+            args: bridgeArgs,
+            cwd: spaceDir,
+            autorestart: false,
+            max_memory_restart: '200M',
+            error_file: path.join(logsDir, `${participantId}-bridge-error.log`),
+            out_file: bridgeLogPath,
+            merge_logs: true,
+            time: true,
+            env: {
+              ...process.env,
+              NODE_ENV: process.env.NODE_ENV || 'production'
+            }
+          });
+          
+          pids.agents[participantId] = bridgeApp.pid || bridgeApp.pm2_env?.pm_id || 'unknown';
+          console.log(`✓ MCP bridge ${participantId} started via PM2 (PID: ${pids.agents[participantId]})`);
+        } catch (error) {
+          console.error(`Failed to start MCP bridge ${participantId}: ${error.message}`);
+        }
+      }
+      // Handle regular agent participants
+      else if (participant.auto_start && participant.command) {
         console.log(`Starting agent: ${participantId}...`);
         
         const agentLogPath = path.join(logsDir, `${participantId}.log`);
