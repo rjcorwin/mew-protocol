@@ -12,7 +12,7 @@ participants:
     fifo: false  # Agent doesn't need FIFOs
     auto_start: true
     command: "node"
-    args: ["./agents/echo.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "echo-token"]
+    args: ["../agents/echo.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "echo-token"]
     
   test-client:
     tokens: ["test-token"]

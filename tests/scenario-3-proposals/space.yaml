@@ -11,7 +11,7 @@ participants:
       - kind: system/*
     auto_start: true
     command: "node"
-    args: ["./agents/calculator.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "calculator-token"]
+    args: ["../agents/calculator.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "calculator-token"]
     
   fulfiller:
     tokens: ["fulfiller-token"]
@@ -23,7 +23,7 @@ participants:
       - kind: system/*
     auto_start: true
     command: "node"
-    args: ["./agents/fulfiller.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "fulfiller-token"]
+    args: ["../agents/fulfiller.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "fulfiller-token"]
     
   proposer:
     tokens: ["proposer-token"]
