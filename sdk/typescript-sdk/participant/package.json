@@ -1,0 +1,23 @@
+{
+  "name": "@meup/participant",
+  "version": "0.1.0",
+  "description": "MEUP Participant base class for building agents and services",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@meup/types": "file:../types",
+    "@meup/client": "file:../client"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.5",
+    "typescript": "^5.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}

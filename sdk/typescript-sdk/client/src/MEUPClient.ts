@@ -18,12 +18,10 @@ import {
   JsonRpcRequest,
   JsonRpcResponse,
   JsonRpcNotification,
-  JsonRpcMessage,
   ChatPayload,
   ConnectionOptions,
   PendingRequest,
   PendingProposal,
-  ContextField,
   SpaceInfo,
   HistoryOptions,
   PROTOCOL_VERSION,
@@ -782,7 +780,7 @@ export class MEUPClient {
       throw new Error(`Failed to get space info: ${response.statusText}`);
     }
     
-    return response.json();
+    return response.json() as Promise<SpaceInfo>;
   }
 
   async getHistory(options?: HistoryOptions): Promise<Envelope[]> {
@@ -803,6 +801,6 @@ export class MEUPClient {
       throw new Error(`Failed to get history: ${response.statusText}`);
     }
     
-    return response.json();
+    return response.json() as Promise<Envelope[]>;
   }
 }
