@@ -40,15 +40,8 @@ run_test() {
     # Create logs directory if it doesn't exist
     mkdir -p logs
     
-    # Run the test with the wrapper script if available, otherwise use test.sh directly
-    if [ -f "./run-test.sh" ]; then
-      TEST_SCRIPT="./run-test.sh"
-    else
-      TEST_SCRIPT="./test.sh"
-    fi
-    
-    # Run the test with timeout
-    if timeout 60 $TEST_SCRIPT > ./logs/test-output.log 2>&1; then
+    # Run the test with timeout directly
+    if timeout 60 ./test.sh > ./logs/test-output.log 2>&1; then
       echo -e "${GREEN}✅ $test_name PASSED${NC}"
       echo "Status: PASSED" >> "../../$TEST_RESULTS_LOG"
       ((TOTAL_PASS++))
@@ -100,10 +93,6 @@ sleep 2
 # Run all test scenarios
 echo -e "${BLUE}Running Test Scenarios...${NC}"
 echo ""
-
-# Optional: Include scenario-0 (manual/debug test)
-# Uncomment the following line if you want to include scenario-0
-# run_test "Scenario 0: Manual/Debug Test" "./scenario-0-manual"
 
 run_test "Scenario 1: Basic Message Flow" "./scenario-1-basic"
 run_test "Scenario 2: MCP Tool Execution" "./scenario-2-mcp"

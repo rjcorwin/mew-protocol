@@ -18,16 +18,32 @@ cd scenario-1-basic
 ## Test Scenarios
 
 All test scenarios are located in this directory. Each scenario is self-contained with:
-- `space.yaml` - Space configuration
-- `test.sh` - Main test script
-- `setup.sh` - Test setup
-- `check.sh` - Result verification
-- `teardown.sh` - Cleanup
-- `run-test.sh` - Wrapper with timeout handling (if needed)
+
+### Required Files
+- `space.yaml` - Space configuration defining participants, capabilities, and tokens
+- `test.sh` - Main test orchestrator that runs setup → test logic → check → teardown
+
+### Supporting Scripts  
+- `setup.sh` - Sets up the test space (can run standalone for manual debugging)
+- `check.sh` - Verifies test results/assertions
+- `teardown.sh` - Cleans up test artifacts (can run standalone for manual cleanup)
+
+### Usage Patterns
+
+**Automated testing:**
+```bash
+./test.sh  # Runs complete test cycle
+```
+
+**Manual debugging:**
+```bash
+./setup.sh     # Set up space for manual testing
+# ... manually interact with the space ...
+./teardown.sh  # Clean up when done
+```
 
 ### Available Scenarios
 
-- **scenario-0-manual** - Manual debugging environment
 - **scenario-1-basic** - Basic message flow between agents
 - **scenario-2-mcp** - MCP tool execution and responses
 - **scenario-3-proposals** - Proposal system with capability blocking
@@ -60,7 +76,7 @@ The `/agents/` directory contains reusable test agents used across scenarios:
 To debug a failing test:
 1. Run the test individually to see output
 2. Check logs in `scenario-*/logs/`
-3. Use scenario-0-manual for interactive debugging
+3. Use `./setup.sh` in any scenario for interactive debugging
 
 ## Architecture
 
