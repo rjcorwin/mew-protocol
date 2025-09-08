@@ -17,7 +17,7 @@
     - [x] [TD0.2.3] Auto-registration and capability management
     - [ ] [TD0.2.4] Migrate test agents to use MEUPParticipant
         - [x] [TD0.2.4.1] Update calculator.js to use MEUPParticipant (simpler, cleaner code) - Migrated to calculator-participant.js, all scenarios updated
-        - [ ] [TD0.2.4.2] Update fulfiller.js to use MEUPParticipant (promise-based proposal fulfillment)
+        - [x] [TD0.2.4.2] Update fulfiller.js to use MEUPParticipant (promise-based proposal fulfillment)
         - [ ] [TD0.2.4.3] Create new scenario test using promise-based requests
         - [ ] [TD0.2.4.4] Add performance comparison test (MEUPClient vs MEUPParticipant)
 
