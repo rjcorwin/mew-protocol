@@ -594,14 +594,16 @@ export class MEUPClient {
   }
 
   /**
-   * Event handling
+   * Event handling - Generic methods
    */
   on<K extends keyof ClientEventParams>(
     event: K,
     handler: (...args: ClientEventParams[K]) => void
-  ): void {
+  ): () => void {
     const handlers = this.handlers[event] as Set<any>;
     handlers.add(handler);
+    // Return unsubscribe function
+    return () => this.off(event, handler);
   }
 
   off<K extends keyof ClientEventParams>(
@@ -610,6 +612,65 @@ export class MEUPClient {
   ): void {
     const handlers = this.handlers[event] as Set<any>;
     handlers.delete(handler);
+  }
+
+  /**
+   * Convenience event handler methods with type safety
+   */
+  onConnected(handler: VoidHandler): () => void {
+    return this.on(ClientEvents.CONNECTED, handler);
+  }
+
+  onDisconnected(handler: VoidHandler): () => void {
+    return this.on(ClientEvents.DISCONNECTED, handler);
+  }
+
+  onReconnected(handler: VoidHandler): () => void {
+    return this.on(ClientEvents.RECONNECTED, handler);
+  }
+
+  onMessage(handler: MessageHandler): () => void {
+    return this.on(ClientEvents.MESSAGE, handler);
+  }
+
+  onWelcome(handler: WelcomeHandler): () => void {
+    return this.on(ClientEvents.WELCOME, handler);
+  }
+
+  onError(handler: ErrorHandler): () => void {
+    return this.on(ClientEvents.ERROR, handler);
+  }
+
+  onParticipantJoined(handler: ParticipantHandler): () => void {
+    return this.on(ClientEvents.PARTICIPANT_JOINED, handler);
+  }
+
+  onParticipantLeft(handler: ParticipantHandler): () => void {
+    return this.on(ClientEvents.PARTICIPANT_LEFT, handler);
+  }
+
+  onChat(handler: ChatHandler): () => void {
+    return this.on(ClientEvents.CHAT, handler);
+  }
+
+  onProposal(handler: ProposalHandler): () => void {
+    return this.on(ClientEvents.PROPOSAL, handler);
+  }
+
+  onProposalAccept(handler: ProposalAcceptHandler): () => void {
+    return this.on(ClientEvents.PROPOSAL_ACCEPT, handler);
+  }
+
+  onProposalReject(handler: ProposalRejectHandler): () => void {
+    return this.on(ClientEvents.PROPOSAL_REJECT, handler);
+  }
+
+  onCapabilityGrant(handler: CapabilityGrantHandler): () => void {
+    return this.on(ClientEvents.CAPABILITY_GRANT, handler);
+  }
+
+  onCapabilityRevoke(handler: CapabilityRevokeHandler): () => void {
+    return this.on(ClientEvents.CAPABILITY_REVOKE, handler);
   }
 
   private emit<K extends keyof ClientEventParams>(

@@ -24,10 +24,3 @@ export {
 
 // Type exports
 export * from './types';
-
-// Legacy MCPx client for backwards compatibility (deprecated)
-export { 
-  MCPxClient,
-  type ClientEventParams as MCPxClientEventParams,
-  type PeerHandler
-} from './MCPxClient';
