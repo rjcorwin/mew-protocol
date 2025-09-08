@@ -659,6 +659,7 @@ space
     saveRunningSpaces(runningSpaces);
     
     console.log('\n✓ Space stopped successfully!');
+    process.exit(0);
   });
 
 // Command: meup space status
