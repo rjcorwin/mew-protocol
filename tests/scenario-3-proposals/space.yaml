@@ -7,6 +7,9 @@ participants:
   calculator-agent:
     tokens: ["calculator-token"]
     capabilities:
+      - kind: mcp/request
+        payload:
+          method: tools/*
       - kind: mcp/response
       - kind: system/*
     auto_start: true
@@ -19,12 +22,13 @@ participants:
       - kind: mcp/request
         payload:
           method: tools/*
+      - kind: mcp/response
       - kind: mcp/proposal
       - kind: chat
       - kind: system/*
     auto_start: true
     command: "node"
-    args: ["../agents/fulfiller.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "fulfiller-token"]
+    args: ["../agents/fulfiller-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "fulfiller-token"]
     
   proposer:
     tokens: ["proposer-token"]

@@ -57,6 +57,14 @@ class FulfillerAgent extends MEUPParticipant {
 
   async onConnected() {
     console.log('Fulfiller agent connected to gateway');
+    
+    // Debug: Log all incoming messages
+    this.client.onMessage((msg) => {
+      console.log(`Fulfiller received message kind: ${msg.kind} from: ${msg.from}`);
+      if (msg.kind === 'mcp/response') {
+        console.log(`Fulfiller received MCP response:`, JSON.stringify(msg));
+      }
+    });
   }
 
   async handleProposal(envelope) {
@@ -87,6 +95,7 @@ class FulfillerAgent extends MEUPParticipant {
     setTimeout(async () => {
       try {
         console.log(`Fulfilling proposal ${envelope.id} with tool ${toolName}`);
+        console.log(`Sending MCP request to calculator-agent: tools/call with params:`, { name: toolName, arguments: toolArgs });
         
         // Use promise-based request to call the tool
         const result = await this.request(

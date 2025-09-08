@@ -111,6 +111,7 @@ export class MEUPParticipant {
           }
         };
         
+        console.log(`${this.options.participant_id} sending MCP request with envelope.id: ${envelope.id}`);
         this.client.send(envelope);
         return;
       }
@@ -232,6 +233,11 @@ export class MEUPParticipant {
     
     // Handle incoming messages
     this.client.onMessage(async (envelope: any) => {
+      // Debug log
+      if (envelope.kind === 'mcp/response' || envelope.kind === 'mcp/request') {
+        console.log(`${this.options.participant_id} received ${envelope.kind} from ${envelope.from}`);
+      }
+      
       // Handle MCP responses
       if (envelope.kind === 'mcp/response') {
         await this.handleMCPResponse(envelope);
@@ -274,13 +280,23 @@ export class MEUPParticipant {
    * Handle incoming MCP responses and resolve pending promises
    */
   private async handleMCPResponse(envelope: Envelope): Promise<void> {
+    console.log(`${this.options.participant_id} handleMCPResponse called with correlation_id: ${envelope.correlation_id}`);
     // Check if this response correlates to one of our pending requests
     if (envelope.correlation_id) {
-      const pendingRequest = this.pendingRequests.get(envelope.correlation_id);
+      // Handle correlation_id as either string or array
+      const correlationId = Array.isArray(envelope.correlation_id) 
+        ? envelope.correlation_id[0] 
+        : envelope.correlation_id;
+      
+      console.log(`${this.options.participant_id} pending requests:`, Array.from(this.pendingRequests.keys()));
+      console.log(`${this.options.participant_id} looking for: "${correlationId}" (original type: ${typeof envelope.correlation_id})`);
+      const pendingRequest = this.pendingRequests.get(correlationId);
+      console.log(`${this.options.participant_id} pendingRequest found:`, pendingRequest ? 'YES' : 'NO');
       if (pendingRequest) {
+        console.log(`${this.options.participant_id} found matching pending request for ${envelope.correlation_id}`);
         // Clean up
         clearTimeout(pendingRequest.timeout);
-        this.pendingRequests.delete(envelope.correlation_id);
+        this.pendingRequests.delete(correlationId);
         
         const payload = envelope.payload;
         

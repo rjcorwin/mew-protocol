@@ -73,6 +73,22 @@ class CalculatorAgent extends MEUPParticipant {
     console.log('Calculator agent ready!');
     console.log('Available tools:', this.tools.names());
     console.log('Capabilities:', this.participantInfo?.capabilities.map(c => c.kind));
+    
+    // Add debug logging for incoming messages
+    this.onRequest(async (envelope) => {
+      console.log(`Calculator received MCP request from ${envelope.from}:`, JSON.stringify(envelope.payload));
+      // Return null to let the default handler process it
+      return null;
+    });
+    
+    // Override send to debug responses
+    const originalSend = this.client.send.bind(this.client);
+    this.client.send = (envelope) => {
+      if (envelope.kind === 'mcp/response') {
+        console.log(`Calculator sending MCP response to ${envelope.to}:`, JSON.stringify(envelope));
+      }
+      return originalSend(envelope);
+    };
   }
   
   async onShutdown() {
