@@ -4,7 +4,11 @@
  * For MEUP v0.2 test scenarios
  */
 
-const WebSocket = require('ws');
+const path = require('path');
+
+// Import MEUPClient from the SDK
+const clientPath = path.resolve(__dirname, '../../sdk/typescript-sdk/client/dist/index.js');
+const { MEUPClient } = require(clientPath);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -88,33 +92,55 @@ function executeTool(name, args) {
   }
 }
 
-console.log(`Calculator agent connecting to ${options.gateway}...`);
-
-const ws = new WebSocket(options.gateway);
-
-ws.on('open', () => {
-  console.log('Calculator agent connected to gateway');
-  
-  // Send join message (gateway-specific)
-  ws.send(JSON.stringify({
-    type: 'join',
-    participantId: participantId,
-    space: options.space,
-    token: options.token
-  }));
+// Create MEUP client
+const client = new MEUPClient({
+  gateway: options.gateway,
+  space: options.space,
+  token: options.token,
+  participant_id: participantId,
+  capabilities: [],
+  reconnect: true
 });
 
-ws.on('message', (data) => {
+console.log(`Calculator agent connecting to ${options.gateway}...`);
+
+// Track if we've sent the initial join message
+let joined = false;
+
+// Handle connection events
+client.onConnected(() => {
+  console.log('Calculator agent connected to gateway');
+  
+  // For compatibility with the gateway, send a join message
+  if (!joined) {
+    // Send the join message using the client's send method
+    client.send({
+      type: 'join',
+      participantId: participantId,
+      space: options.space,
+      token: options.token
+    });
+    joined = true;
+  }
+});
+
+// Connect to gateway
+client.connect()
+  .catch((error) => {
+    console.error('Failed to connect:', error);
+    process.exit(1);
+  });
+
+// Handle incoming messages
+client.onMessage((envelope) => {
   try {
-    const message = JSON.parse(data.toString());
-    
     // Handle MCP requests addressed to us
-    if (message.kind === 'mcp/request' && 
-        (!message.to || message.to.includes(participantId))) {
+    if (envelope.kind === 'mcp/request' && 
+        (!envelope.to || envelope.to.includes(participantId))) {
       
-      const method = message.payload?.method;
-      const params = message.payload?.params || {};
-      const requestId = message.payload?.id;
+      const method = envelope.payload?.method;
+      const params = envelope.payload?.params || {};
+      const requestId = envelope.payload?.id;
       
       console.log(`Received MCP request: ${method}`);
       
@@ -125,8 +151,8 @@ ws.on('message', (data) => {
           // Return available tools
           response = {
             kind: 'mcp/response',
-            to: [message.from],
-            correlation_id: [message.id],
+            to: [envelope.from],
+            correlation_id: envelope.id ? [envelope.id] : undefined,
             payload: {
               jsonrpc: '2.0',
               id: requestId,
@@ -143,8 +169,8 @@ ws.on('message', (data) => {
           
           response = {
             kind: 'mcp/response',
-            to: [message.from],
-            correlation_id: [message.id],
+            to: [envelope.from],
+            correlation_id: envelope.id ? [envelope.id] : undefined,
             payload: {
               jsonrpc: '2.0',
               id: requestId,
@@ -160,8 +186,8 @@ ws.on('message', (data) => {
           // Method not supported
           response = {
             kind: 'mcp/response',
-            to: [message.from],
-            correlation_id: [message.id],
+            to: [envelope.from],
+            correlation_id: envelope.id ? [envelope.id] : undefined,
             payload: {
               jsonrpc: '2.0',
               id: requestId,
@@ -176,8 +202,8 @@ ws.on('message', (data) => {
         // Tool execution error
         response = {
           kind: 'mcp/response',
-          to: [message.from],
-          correlation_id: [message.id],
+          to: [envelope.from],
+          correlation_id: envelope.id ? [envelope.id] : undefined,
           payload: {
             jsonrpc: '2.0',
             id: requestId,
@@ -189,7 +215,7 @@ ws.on('message', (data) => {
         };
       }
       
-      ws.send(JSON.stringify(response));
+      client.send(response);
       console.log(`Sent response for ${method}`);
     }
   } catch (error) {
@@ -197,11 +223,11 @@ ws.on('message', (data) => {
   }
 });
 
-ws.on('error', (error) => {
-  console.error('WebSocket error:', error);
+client.onError((error) => {
+  console.error('Client error:', error);
 });
 
-ws.on('close', () => {
+client.onDisconnected(() => {
   console.log('Calculator agent disconnected from gateway');
   process.exit(0);
 });
@@ -209,6 +235,6 @@ ws.on('close', () => {
 // Handle shutdown
 process.on('SIGINT', () => {
   console.log('\nShutting down calculator agent...');
-  ws.close();
+  client.disconnect();
   process.exit(0);
 });
