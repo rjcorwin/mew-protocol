@@ -77,18 +77,15 @@ mew up space.yaml
 # 🌌 Space created: workspace-xyz
 # 👤 Human connected (terminal)
 # 📁 project-files connected (MCP filesystem server)
-# 📝 notes-files connected (MCP filesystem server)
-# 🤖 coding-agent connected (Claude Sonnet)
-# ✍️ note-taker connected (GPT-4)
+# 🤖 agent connected (Claude Sonnet)
 # 
 # Type 'help' for commands or start chatting!
 ```
 
 Now you have a shared workspace where:
 - 🧑‍💻 You participate directly via terminal
-- 📁 MCP servers provide filesystem access as participants
-- 🤖 Coding agent can propose operations on project-files
-- ✍️ Note-taker can propose operations on notes-files
+- 📁 MCP filesystem server provides file access
+- 🤖 Agent proposes file operations (read/write)
 - ✅ You approve or reject all proposals before execution
 - 🎓 Over time, trusted patterns can be auto-approved
 
