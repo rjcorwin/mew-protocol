@@ -15,18 +15,25 @@ participants:
         - "/tmp/mcp-test-files"
     auto_start: true
     tokens: ["fs-token"]
+    capabilities:
+      - kind: "system/register"
+      - kind: "system/heartbeat"
+      - kind: "mcp/response"
+      - kind: "chat"
     bridge_config:
       init_timeout: 30000
       reconnect: true
       max_reconnects: 3
   
-  # Test agent that will use the MCP server
-  test-agent:
-    command: "node"
-    args: ["./test-agent.js", "${PORT}", "${SPACE}"]
-    auto_start: true
+  # Test client using FIFO (like scenario-3's proposer)
+  test-client:
     tokens: ["test-token"]
     capabilities:
       - kind: "mcp/request"
         payload:
           method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "system/*"
+    fifo: true
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true

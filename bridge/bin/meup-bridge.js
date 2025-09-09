@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const { program } = require('commander');
-const { MCPBridge } = require('../src/index');
+const { MCPBridge } = require('../dist/index');
 const debug = require('debug')('meup:bridge');
 
 program

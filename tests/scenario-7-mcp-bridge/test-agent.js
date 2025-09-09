@@ -1,31 +1,84 @@
+#!/usr/bin/env node
+/**
+ * Test Agent for MCP Bridge scenario - Simple WebSocket client
+ */
+
 const WebSocket = require('ws');
 const port = process.argv[2];
 const spaceId = process.argv[3];
 
-const ws = new WebSocket(`ws://localhost:${port}?space=${spaceId}&participant-id=test-agent&token=test-token`);
+console.log('Test agent starting with args:', process.argv);
+console.log('Port:', port, 'Space:', spaceId);
+
+if (!port || !spaceId) {
+  console.error('ERROR: Missing port or spaceId arguments');
+  console.error('Usage: node test-agent.js <port> <spaceId>');
+  process.exit(1);
+}
+
+const wsUrl = `ws://localhost:${port}`;
+console.log('Connecting to:', wsUrl);
+
+const ws = new WebSocket(wsUrl);
 
 let testStep = 0;
 let mcpParticipant = null;
+let isAuthenticated = false;
 
 ws.on('open', () => {
-  console.log('Test agent connected');
+  console.log('WebSocket connected, sending join...');
+  
+  // Send join message per MEUP v0.2 spec
+  ws.send(JSON.stringify({
+    protocol: 'meup/v0.2',
+    kind: 'system/join',
+    id: `join-${Date.now()}`,
+    from: 'test-agent',
+    payload: {
+      space: spaceId,
+      participantId: 'test-agent',
+      token: 'test-token'
+    },
+    ts: new Date().toISOString()
+  }));
+});
+
+ws.on('error', (error) => {
+  console.error('WebSocket error:', error.message);
+  process.exit(1);
 });
 
 ws.on('message', (data) => {
   const message = JSON.parse(data.toString());
-  console.log(`Received ${message.kind}`);
+  console.log(`Received ${message.kind}`, message.from ? `from ${message.from}` : '');
+  
+  // Debug output for all messages
+  if (message.kind !== 'system/welcome' && message.kind !== 'system/presence') {
+    console.log('Full message:', JSON.stringify(message, null, 2));
+  }
   
   if (message.kind === 'system/welcome') {
-    console.log('Welcome payload:', JSON.stringify(message.payload));
+    isAuthenticated = true;
+    console.log('Authenticated! Welcome payload participants:', message.payload.participants?.length || 0, 'participants');
+    
     // Look for the filesystem participant
-    mcpParticipant = message.payload.participants.find(p => p.id === 'filesystem');
+    mcpParticipant = message.payload.participants?.find(p => p.id === 'filesystem');
     if (mcpParticipant) {
       console.log('Found MCP participant:', mcpParticipant.id);
-      runTests();
+      setTimeout(() => runTests(), 2000); // Wait for MCP to fully initialize
     } else {
       console.log('MCP participant not found in participants list');
-      console.log('Available participants:', message.payload.participants.map(p => p.id));
-      setTimeout(() => process.exit(1), 1000);
+      console.log('Available participants:', message.payload.participants?.map(p => p.id) || []);
+      console.log('Waiting for filesystem to join...');
+    }
+  }
+  
+  if (message.kind === 'system/presence' && message.payload?.event === 'join') {
+    console.log('Participant joined:', message.payload.participant?.id);
+    if (message.payload.participant?.id === 'filesystem') {
+      mcpParticipant = message.payload.participant;
+      console.log('Filesystem joined! Starting tests in 2 seconds...');
+      setTimeout(() => runTests(), 2000);
     }
   }
   
@@ -37,6 +90,11 @@ ws.on('message', (data) => {
 });
 
 function runTests() {
+  if (!isAuthenticated) {
+    console.log('Waiting for authentication...');
+    return;
+  }
+  
   switch(testStep) {
     case 0:
       // Test 1: List tools
@@ -105,11 +163,6 @@ function runTests() {
       break;
   }
 }
-
-ws.on('error', (error) => {
-  console.error('WebSocket error:', error);
-  process.exit(1);
-});
 
 ws.on('close', () => {
   console.log('WebSocket closed');

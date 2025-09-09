@@ -244,8 +244,14 @@ export class MEUPParticipant {
       }
       
       // Handle MCP requests
-      if (envelope.kind === 'mcp/request' && this.shouldHandleRequest(envelope)) {
-        await this.handleMCPRequest(envelope);
+      if (envelope.kind === 'mcp/request') {
+        console.log(`${this.options.participant_id} received MCP request from ${envelope.from}`);
+        if (this.shouldHandleRequest(envelope)) {
+          console.log(`${this.options.participant_id} handling MCP request`);
+          await this.handleMCPRequest(envelope);
+        } else {
+          console.log(`${this.options.participant_id} not handling MCP request (not addressed to us or no capability)`);
+        }
       }
       
       // Handle proposals
@@ -338,12 +344,17 @@ export class MEUPParticipant {
     const { method, params } = envelope.payload || {};
     const requestId = envelope.payload?.id;
     
+    console.log(`handleMCPRequest: method=${method}, from=${envelope.from}`);
+    
     let response: MCPResponse;
     
     try {
       // Check custom handlers first
+      console.log(`Checking ${this.requestHandlers.size} custom handlers`);
       for (const handler of this.requestHandlers) {
+        console.log('Calling custom handler...');
         const result = await handler(envelope);
+        console.log('Custom handler returned:', result ? 'result' : 'null');
         if (result) {
           response = result;
           break;
@@ -404,6 +415,7 @@ export class MEUPParticipant {
       }
     };
     
+    console.log(`Sending MCP response to ${envelope.from}:`, JSON.stringify(responseEnvelope));
     this.client.send(responseEnvelope);
   }
   

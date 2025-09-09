@@ -1,30 +1,3 @@
-#!/bin/bash
-set -e
-
-echo "=== Simple MCP Bridge Test ==="
-
-# Clean and prepare
-../../cli/bin/meup.js space clean --all --force 2>/dev/null || true
-rm -rf logs
-mkdir -p logs
-
-# Setup test files
-mkdir -p /tmp/mcp-test-files
-echo "Test content" > /tmp/mcp-test-files/test.txt
-
-# Start space
-PORT=$((9900 + RANDOM % 100))
-echo "Starting space on port $PORT..."
-../../cli/bin/meup.js space up --port $PORT > logs/space.log 2>&1 &
-
-# Wait for initialization
-sleep 8
-
-# Send a simple test using curl
-echo "Testing MCP bridge with direct WebSocket message..."
-
-# Use a simple Node.js script to test
-cat > test-simple.js << 'INNER_EOF'
 const WebSocket = require('ws');
 const port = process.argv[2];
 const ws = new WebSocket(\`ws://localhost:\${port}\`);
@@ -79,22 +52,3 @@ setTimeout(() => {
   console.log('TIMEOUT - No response received');
   process.exit(1);
 }, 10000);
-INNER_EOF
-
-node test-simple.js $PORT
-
-RESULT=$?
-
-# Cleanup
-../../cli/bin/meup.js space down
-rm test-simple.js
-rm -rf /tmp/mcp-test-files
-
-if [ $RESULT -eq 0 ]; then
-  echo "✓ Test passed!"
-else
-  echo "✗ Test failed"
-  echo "Check logs/filesystem-bridge.log for details"
-fi
-
-exit $RESULT

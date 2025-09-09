@@ -2,17 +2,27 @@
   "name": "@meup/bridge",
   "version": "0.1.0",
   "description": "MCP-MEUP Protocol Bridge",
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
     "meup-bridge": "./bin/meup-bridge.js"
   },
   "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build",
     "test": "node test/test-bridge.js"
   },
   "dependencies": {
     "ws": "^8.16.0",
     "commander": "^11.1.0",
     "debug": "^4.3.4"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.12",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=14.0.0"
