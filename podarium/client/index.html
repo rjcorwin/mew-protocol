@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Podarium - Isometric Pirate Adventure</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+    #game-container {
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    #ui-overlay {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      color: white;
+      background: rgba(0,0,0,0.7);
+      padding: 15px;
+      border-radius: 8px;
+      min-width: 200px;
+    }
+    #ui-overlay h3 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+    }
+    #ui-overlay .stat {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      background: rgba(0,0,0,0.7);
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+  <div id="ui-overlay">
+    <h3>Podarium</h3>
+    <div class="stat">Health: <span id="health">100</span></div>
+    <div class="stat">Position: <span id="position">0, 0</span></div>
+    <div class="stat">Ship: <span id="ship-status">None</span></div>
+  </div>
+  <div id="controls">
+    <div>WASD: Move | Shift: Dash | J: Attack | K: Shoot | E: Board/Leave Ship</div>
+    <div>On Ship - Q/R: Sails | Space: Anchor | Arrow Keys: Steer</div>
+    <div style="margin-top: 10px;">
+      <a href="/editor.html" style="color: #00ff88; text-decoration: none;">🗺️ Open Map Editor</a>
+    </div>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

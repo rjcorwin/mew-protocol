@@ -1,10 +1,10 @@
 # Release Process
 
-This document describes the process for releasing new versions of the MEUP protocol specification.
+This document describes the process for releasing new versions of the MEW Protocol specification.
 
 ## Version Numbering
 
-MEUP uses a simple version scheme during the experimental phase:
+MEW Protocol uses a simple version scheme during the experimental phase:
 - `v0.x` - Experimental versions with breaking changes allowed
 - `v1.0` - First stable release with compatibility guarantees
 - Post-v1.0 will follow semantic versioning
@@ -45,13 +45,13 @@ cp -r spec/draft spec/v0.x
 ```bash
 # Commit all changes
 git add -A
-git commit -m "Release MEUP v0.x
+git commit -m "Release MEW Protocol v0.x
 
 - Brief summary of major changes
 - Reference to CHANGELOG for details"
 
 # Tag the release
-git tag -a v0.x -m "MEUP v0.x - Brief description"
+git tag -a v0.x -m "MEW Protocol v0.x - Brief description"
 
 # Push to repository
 git push origin main
@@ -63,7 +63,7 @@ git push origin v0.x
 1. Go to GitHub releases page
 2. Click "Create a new release"
 3. Select the tag `v0.x`
-4. Title: "MEUP v0.x"
+4. Title: "MEW Protocol v0.x"
 5. Copy relevant sections from `CHANGELOG.md` to release description
 6. Attach `spec/v0.x/SPEC.md` as a release asset (optional)
 7. Mark as "Pre-release" if still experimental (v0.x)

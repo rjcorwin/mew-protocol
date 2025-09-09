@@ -1,6 +1,21 @@
 # Changelog
 
-All notable changes to the MEUP protocol specification will be documented in this file.
+All notable changes to the MEW Protocol specification will be documented in this file.
+
+## [v0.3] - 2025-01-09
+
+### Changed
+- **BREAKING**: Protocol renamed from MEUP to MEW Protocol (Multi-Entity Workspace Protocol)
+- **BREAKING**: Protocol identifier changed from `meup/v0.2` to `mew/v0.3`
+- Abstract updated to include "herding cats" metaphor explaining the protocol's purpose
+- All references throughout specification updated to use MEW Protocol
+
+### Architecture Decisions
+- **ADR-001**: MEW Protocol name change - defines MEW as Multi-Entity Workspace, capturing the unified context concept while being more intuitive and memorable
+
+### Migration Notes
+- Update all protocol identifiers in messages from `"meup/v0.2"` to `"mew/v0.3"`
+- Update any documentation references from MEUP to MEW Protocol
 
 ## [v0.2] - 2025-01-03
 

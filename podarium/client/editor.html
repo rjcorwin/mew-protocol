@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Podarium - Map Editor</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    #sidebar {
+      width: 300px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    
+    #sidebar h2 {
+      margin-top: 0;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+    
+    .tool-section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+    
+    .tool-section h3 {
+      margin-top: 0;
+      font-size: 16px;
+      color: #a0f0ff;
+    }
+    
+    button {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+    }
+    
+    button:hover {
+      background: #764ba2;
+    }
+    
+    button.active {
+      background: #00ff88;
+      color: black;
+    }
+    
+    input[type="file"] {
+      width: 100%;
+      margin: 10px 0;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid #667eea;
+      color: white;
+      border-radius: 4px;
+    }
+    
+    input[type="range"] {
+      width: 100%;
+      margin: 10px 0;
+    }
+    
+    .color-picker {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+    }
+    
+    .color-picker input[type="color"] {
+      margin-left: 10px;
+      width: 50px;
+      height: 30px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    #editor-container {
+      flex: 1;
+      position: relative;
+    }
+    
+    #coordinates {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .info-text {
+      font-size: 12px;
+      color: #a0f0ff;
+      margin: 5px 0;
+    }
+    
+    #brush-size-display {
+      display: inline-block;
+      margin-left: 10px;
+      color: #00ff88;
+    }
+    
+    .mode-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+    }
+    
+    #json-output {
+      width: 100%;
+      height: 100px;
+      margin-top: 10px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.5);
+      color: #00ff88;
+      border: 1px solid #667eea;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h2>Map Editor</h2>
+    
+    <div class="tool-section">
+      <h3>1. Upload Map Image</h3>
+      <input type="file" id="map-upload" accept="image/*">
+      <div class="info-text">Upload your map background image</div>
+    </div>
+    
+    <div class="tool-section">
+      <h3>2. Drawing Mode</h3>
+      <div class="mode-buttons">
+        <button id="mode-water" class="mode-btn">Water</button>
+        <button id="mode-land" class="mode-btn active">Land</button>
+        <button id="mode-ship" class="mode-btn">Place Ship</button>
+        <button id="mode-erase" class="mode-btn">Erase</button>
+      </div>
+      <div class="info-text">Select what to draw on the map</div>
+    </div>
+    
+    <div class="tool-section">
+      <h3>Brush Settings</h3>
+      <label>Brush Size: <span id="brush-size-display">20</span></label>
+      <input type="range" id="brush-size" min="5" max="100" value="20">
+      
+      <div class="color-picker">
+        <label>Water Color:</label>
+        <input type="color" id="water-color" value="#2980b9">
+      </div>
+      
+      <div class="color-picker">
+        <label>Land Color:</label>
+        <input type="color" id="land-color" value="#27ae60">
+      </div>
+      
+      <label>Opacity: <span id="opacity-display">50%</span></label>
+      <input type="range" id="opacity" min="10" max="100" value="50">
+    </div>
+    
+    <div class="tool-section">
+      <h3>Actions</h3>
+      <button id="clear-boundaries">Clear All Boundaries</button>
+      <button id="clear-ships">Clear All Ships</button>
+      <button id="toggle-view">Toggle View (Map/Boundaries)</button>
+      <button id="export-map">Export Map Data</button>
+      <button id="import-map">Import Map Data</button>
+      <button id="play-map">Play This Map</button>
+    </div>
+    
+    <div class="tool-section">
+      <h3>Map Data</h3>
+      <textarea id="json-output" placeholder="Map data will appear here..."></textarea>
+      <button id="copy-json">Copy to Clipboard</button>
+    </div>
+  </div>
+  
+  <div id="editor-container">
+    <div id="coordinates">
+      <div>X: <span id="mouse-x">0</span></div>
+      <div>Y: <span id="mouse-y">0</span></div>
+      <div>Ships: <span id="ship-count">0</span></div>
+    </div>
+  </div>
+  
+  <script type="module" src="/js/editor.js"></script>
+</body>
+</html>

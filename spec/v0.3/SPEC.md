@@ -1,7 +1,8 @@
-# MEW Protocol Draft Specification
+# MEW Protocol v0.3 Specification
 
-Status: draft  
-Date: 2025-01-09
+Version: v0.3  
+Status: Released  
+Release Date: 2025-01-09
 Intended Status: Experimental  
 Editors: RJ Corwin (https://github.com/rjcorwin)
 
