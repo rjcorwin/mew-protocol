@@ -5,9 +5,9 @@ MEW Protocol (pronounced like a cat's "mew" 🐾) addresses the challenge of "he
 ## The Evolution
 
 ```
-MCP:  human --> [agent --> mcp_server]       (hidden tool use)
-A2A:  human --> [agent <--> agent]           (hidden coordination)
-MEW:  workspace(human <--> agent <--> mcp_server)  (everything visible)
+MCP:  human <--> agent ... agent <--> mcp_server   (separate contexts)
+A2A:  human <--> agent ... agent <--> agent        (separate contexts)
+MEW:  human <--> agent <--> mcp_server             (unified context)
 ```
 
 In MEW Protocol, humans move from **observing** to **participating** - joining agents inside a unified context where:
