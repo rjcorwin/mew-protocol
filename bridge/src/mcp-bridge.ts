@@ -1,7 +1,7 @@
 import Debug from 'debug';
 import path from 'path';
-import { MEUPParticipant } from '../../sdk/typescript-sdk/participant/src/MEUPParticipant';
-import { Envelope } from '../../sdk/typescript-sdk/types/src';
+import { MEUPParticipant } from '@meup/participant';
+import { Envelope } from '@meup/types';
 import { MCPClient, MCPServerConfig } from './mcp-client';
 
 const debug = Debug('meup:bridge');

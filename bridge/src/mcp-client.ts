@@ -55,7 +55,6 @@ export class MCPClient extends EventEmitter {
       const env = { ...process.env, ...this.config.env };
 
       debug(`Starting MCP server: ${this.config.command} ${args.join(' ')}`);
-      console.log('MCP Client: Starting process...', this.config.command, args);
       
       this.process = spawn(this.config.command, args, {
         env,
@@ -64,7 +63,7 @@ export class MCPClient extends EventEmitter {
       });
 
       this.process.on('error', (error) => {
-        console.error('MCP Client: Process error:', error);
+        debug('Process error:', error);
         reject(error);
       });
 
@@ -135,19 +134,16 @@ export class MCPClient extends EventEmitter {
       params
     };
 
-    console.log(`MCP Client: Sending request ${id}: ${method}`);
     debug(`Sending MCP request ${id}:`, method);
     
     return new Promise((resolve, reject) => {
       // Store pending request
-      console.log(`MCP Client: Storing pending request with id ${id}`);
       this.pendingRequests.set(id, {
         resolve,
         reject,
         method,
         timestamp: Date.now()
       });
-      console.log(`MCP Client: Pending requests after storing:`, Array.from(this.pendingRequests.keys()));
 
       // Send request
       this.send(request);
@@ -155,7 +151,7 @@ export class MCPClient extends EventEmitter {
       // Set timeout
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
-          console.log(`MCP Client: Request ${id} timed out for method ${method}`);
+          debug(`Request ${id} timed out for method ${method}`);
           this.pendingRequests.delete(id);
           reject(new Error(`MCP request timeout: ${method}`));
         }
@@ -180,34 +176,26 @@ export class MCPClient extends EventEmitter {
     }
     
     const json = JSON.stringify(message);
-    console.log('MCP Client: Writing to stdin:', json);
     debug('MCP -> Server:', json);
     this.process.stdin.write(json + '\n');
   }
 
   private handleMessage(message: any): void {
-    console.log('MCP Client: Received from server:', JSON.stringify(message));
     debug('Server -> MCP:', message);
 
     // Handle response to our request
     if (message.id !== undefined && (message.result !== undefined || message.error !== undefined)) {
-      console.log(`MCP Client: Checking for pending request with id ${message.id}`);
-      console.log(`MCP Client: Current pending requests:`, Array.from(this.pendingRequests.keys()));
-      
       const pending = this.pendingRequests.get(message.id);
       if (pending) {
-        console.log(`MCP Client: Found pending request for id ${message.id}, resolving...`);
         this.pendingRequests.delete(message.id);
         
         if (message.error) {
-          console.log(`MCP Client: Rejecting request ${message.id} with error:`, message.error);
+          debug(`Rejecting request ${message.id} with error:`, message.error);
           pending.reject(new Error(message.error.message || 'MCP error'));
         } else {
-          console.log(`MCP Client: Resolving request ${message.id} with result:`, message.result);
+          debug(`Resolving request ${message.id} with result`);  
           pending.resolve(message.result);
         }
-      } else {
-        console.log(`MCP Client: No pending request found for id ${message.id}`);
       }
       return;
     }

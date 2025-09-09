@@ -111,7 +111,6 @@ export class MEUPParticipant {
           }
         };
         
-        console.log(`${this.options.participant_id} sending MCP request with envelope.id: ${envelope.id}`);
         this.client.send(envelope);
         return;
       }
@@ -204,8 +203,6 @@ export class MEUPParticipant {
   private setupLifecycle(): void {
     // Handle connection
     this.client.onConnected(() => {
-      console.log(`${this.options.participant_id} connected to gateway`);
-      
       // Send join message for gateway compatibility
       if (!this.joined) {
         this.client.send({
@@ -225,19 +222,12 @@ export class MEUPParticipant {
         capabilities: data.you.capabilities
       };
       
-      console.log(`${this.options.participant_id} welcomed with ${this.participantInfo.capabilities.length} capabilities`);
-      
       // Call ready hook
       await this.onReady();
     });
     
     // Handle incoming messages
     this.client.onMessage(async (envelope: any) => {
-      // Debug log
-      if (envelope.kind === 'mcp/response' || envelope.kind === 'mcp/request') {
-        console.log(`${this.options.participant_id} received ${envelope.kind} from ${envelope.from}`);
-      }
-      
       // Handle MCP responses
       if (envelope.kind === 'mcp/response') {
         await this.handleMCPResponse(envelope);
@@ -245,12 +235,8 @@ export class MEUPParticipant {
       
       // Handle MCP requests
       if (envelope.kind === 'mcp/request') {
-        console.log(`${this.options.participant_id} received MCP request from ${envelope.from}`);
         if (this.shouldHandleRequest(envelope)) {
-          console.log(`${this.options.participant_id} handling MCP request`);
           await this.handleMCPRequest(envelope);
-        } else {
-          console.log(`${this.options.participant_id} not handling MCP request (not addressed to us or no capability)`);
         }
       }
       
@@ -264,13 +250,11 @@ export class MEUPParticipant {
     
     // Handle errors
     this.client.onError((error: any) => {
-      console.error(`${this.options.participant_id} error:`, error);
+      // Error occurred
     });
     
     // Handle disconnection
     this.client.onDisconnected(async () => {
-      console.log(`${this.options.participant_id} disconnected`);
-      
       // Reject all pending requests
       for (const [id, pendingRequest] of this.pendingRequests) {
         clearTimeout(pendingRequest.timeout);
@@ -286,7 +270,6 @@ export class MEUPParticipant {
    * Handle incoming MCP responses and resolve pending promises
    */
   private async handleMCPResponse(envelope: Envelope): Promise<void> {
-    console.log(`${this.options.participant_id} handleMCPResponse called with correlation_id: ${envelope.correlation_id}`);
     // Check if this response correlates to one of our pending requests
     if (envelope.correlation_id) {
       // Handle correlation_id as either string or array
@@ -294,12 +277,8 @@ export class MEUPParticipant {
         ? envelope.correlation_id[0] 
         : envelope.correlation_id;
       
-      console.log(`${this.options.participant_id} pending requests:`, Array.from(this.pendingRequests.keys()));
-      console.log(`${this.options.participant_id} looking for: "${correlationId}" (original type: ${typeof envelope.correlation_id})`);
       const pendingRequest = this.pendingRequests.get(correlationId);
-      console.log(`${this.options.participant_id} pendingRequest found:`, pendingRequest ? 'YES' : 'NO');
       if (pendingRequest) {
-        console.log(`${this.options.participant_id} found matching pending request for ${envelope.correlation_id}`);
         // Clean up
         clearTimeout(pendingRequest.timeout);
         this.pendingRequests.delete(correlationId);
@@ -344,17 +323,12 @@ export class MEUPParticipant {
     const { method, params } = envelope.payload || {};
     const requestId = envelope.payload?.id;
     
-    console.log(`handleMCPRequest: method=${method}, from=${envelope.from}`);
-    
     let response: MCPResponse;
     
     try {
       // Check custom handlers first
-      console.log(`Checking ${this.requestHandlers.size} custom handlers`);
       for (const handler of this.requestHandlers) {
-        console.log('Calling custom handler...');
         const result = await handler(envelope);
-        console.log('Custom handler returned:', result ? 'result' : 'null');
         if (result) {
           response = result;
           break;
@@ -415,7 +389,6 @@ export class MEUPParticipant {
       }
     };
     
-    console.log(`Sending MCP response to ${envelope.from}:`, JSON.stringify(responseEnvelope));
     this.client.send(responseEnvelope);
   }
   
