@@ -5,12 +5,17 @@ MEW Protocol (pronounced like a cat's "mew" 🐾) addresses the challenge of "he
 ## The Evolution
 
 ```
-MCP:  human <--> context(agent <--> mcp server)
-A2A:  human <--> context(agent <--> agent)
-MEW:  workspace(human <--> agent <--> mcp server <--> agent)
+MCP:  human --> [agent --> mcp_server]       (hidden tool use)
+A2A:  human --> [agent <--> agent]           (hidden coordination)
+MEW:  workspace(human <--> agent <--> mcp_server)  (everything visible)
 ```
 
-In MEW Protocol, humans move from **observing** to **participating** - joining agents inside shared workspaces where all operations are visible and controllable.
+In MEW Protocol, humans move from **observing** to **participating** - joining agents inside a unified context where:
+- 🎯 All messages are visible to all participants (no hidden contexts)
+- 🛡️ Untrusted agents propose, trusted participants approve
+- 📈 Trust grows through observed behavior
+- 🎮 Sub-contexts organize activity without hiding it
+- 🌐 Everything happens in one shared workspace
 
 ## 🌟 Key Features
 
