@@ -1,0 +1,34 @@
+space:
+  id: demo-space
+  name: Interactive Demo Space
+  default_participant: human
+
+participants:
+  # Human participants
+  human:
+    tokens: ["human-token"]
+    capabilities:
+      - kind: "*"  # Full access
+  
+  observer:
+    tokens: ["observer-token"]
+    capabilities:
+      - kind: "chat"  # Can only chat
+  
+  # Echo agent - repeats everything
+  echo:
+    command: "node"
+    args: ["../../tests/agents/echo.js", "--gateway", "ws://localhost:${PORT}", "--space", "${SPACE}", "--token", "${TOKEN}"]
+    tokens: ["echo-token"]
+    capabilities:
+      - kind: "chat"
+    auto_start: true
+  
+  # Calculator agent (if you have the MCP bridge working)
+  calculator:
+    command: "node"
+    args: ["../../tests/agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "${SPACE}", "--token", "${TOKEN}"]
+    tokens: ["calc-token"]
+    capabilities:
+      - kind: "mcp/response"
+    auto_start: true

@@ -280,7 +280,15 @@ space
   .option('-d, --space-dir <path>', 'Space directory', '.')
   .option('-p, --port <port>', 'Gateway port', '8080')
   .option('-l, --log-level <level>', 'Log level', 'info')
+  .option('-i, --interactive', 'Connect interactively after starting space')
+  .option('--detach', 'Run in background (default if not interactive)')
+  .option('--participant <id>', 'Connect as this participant (with --interactive)')
   .action(async (options) => {
+    // Check for incompatible flags
+    if (options.interactive && options.detach) {
+      console.error('Error: --interactive and --detach flags are mutually exclusive');
+      process.exit(1);
+    }
     const spaceDir = path.resolve(options.spaceDir);
     const configPath = path.join(spaceDir, path.basename(options.config));
     
@@ -565,6 +573,64 @@ space
     
     // Disconnect from PM2 daemon (it continues running)
     disconnectPM2();
+    
+    // If interactive flag is set, connect interactively
+    if (options.interactive) {
+      console.log('\nConnecting interactively...\n');
+      
+      // Import required modules for interactive connection
+      const WebSocket = require('ws');
+      const { resolveParticipant, getInteractiveOverrides } = require('../utils/participant-resolver');
+      const InteractiveUI = require('../utils/interactive-ui');
+      
+      try {
+        // Resolve participant
+        const participant = await resolveParticipant({
+          participantId: options.participant,
+          spaceConfig: config,
+          interactive: true
+        });
+        
+        console.log(`Connecting as participant: ${participant.id}`);
+        
+        // Get interactive overrides
+        const participantConfig = getInteractiveOverrides(participant);
+        
+        // Connect to gateway
+        const ws = new WebSocket(`ws://localhost:${options.port}`);
+        
+        ws.on('open', () => {
+          // Send join message
+          const joinMessage = {
+            protocol: 'mew/v0.3',
+            id: `join-${Date.now()}`,
+            ts: new Date().toISOString(),
+            kind: 'system/join',
+            payload: {
+              space: spaceId,
+              participant: participant.id,
+              token: participantConfig.tokens[0],
+              capabilities: participantConfig.capabilities || []
+            }
+          };
+          
+          ws.send(JSON.stringify(joinMessage));
+          
+          // Start interactive UI
+          const ui = new InteractiveUI(ws, participant.id, spaceId);
+          ui.start();
+        });
+        
+        ws.on('error', (err) => {
+          console.error('Failed to connect:', err.message);
+          process.exit(1);
+        });
+        
+      } catch (error) {
+        console.error('Failed to resolve participant:', error.message);
+        process.exit(1);
+      }
+    }
   });
 
 // Command: mew space down
@@ -1081,5 +1147,94 @@ function formatBytes(bytes) {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+// Command: mew space connect
+space
+  .command('connect')
+  .description('Connect interactively to a running space')
+  .option('-c, --config <path>', 'Path to space.yaml configuration', './space.yaml')
+  .option('-d, --space-dir <path>', 'Directory of space to connect to', '.')
+  .option('--participant <id>', 'Connect as this participant')
+  .option('--gateway <url>', 'Override gateway URL (default: from running space)')
+  .action(async (options) => {
+    const spaceDir = path.resolve(options.spaceDir);
+    const configPath = path.join(spaceDir, path.basename(options.config));
+    
+    console.log(`Connecting to space in ${spaceDir}...`);
+    
+    // Check if space is running
+    const pids = loadPidFile(spaceDir);
+    if (!pids) {
+      console.error('No running space found. Use "mew space up" first.');
+      process.exit(1);
+    }
+    
+    // Load space configuration
+    const { config } = loadSpaceConfig(configPath);
+    const spaceId = pids.spaceId;
+    const gatewayUrl = options.gateway || `ws://localhost:${pids.port}`;
+    
+    console.log(`Space: ${pids.spaceName} (${spaceId})`);
+    console.log(`Gateway: ${gatewayUrl}`);
+    
+    // Import required modules
+    const WebSocket = require('ws');
+    const { resolveParticipant, getInteractiveOverrides } = require('../utils/participant-resolver');
+    const InteractiveUI = require('../utils/interactive-ui');
+    
+    try {
+      // Resolve participant
+      const participant = await resolveParticipant({
+        participantId: options.participant,
+        spaceConfig: config,
+        interactive: true
+      });
+      
+      console.log(`Connecting as participant: ${participant.id}\n`);
+      
+      // Get interactive overrides
+      const participantConfig = getInteractiveOverrides(participant);
+      
+      // Connect to gateway
+      const ws = new WebSocket(gatewayUrl);
+      
+      ws.on('open', () => {
+        // Send join message
+        const joinMessage = {
+          protocol: 'mew/v0.3',
+          id: `join-${Date.now()}`,
+          ts: new Date().toISOString(),
+          kind: 'system/join',
+          payload: {
+            space: spaceId,
+            participant: participant.id,
+            token: participantConfig.tokens[0],
+            capabilities: participantConfig.capabilities || []
+          }
+        };
+        
+        ws.send(JSON.stringify(joinMessage));
+        
+        // Start interactive UI
+        const ui = new InteractiveUI(ws, participant.id, spaceId);
+        ui.start();
+      });
+      
+      ws.on('error', (err) => {
+        console.error('Failed to connect:', err.message);
+        console.error('Make sure the space is running with "mew space up"');
+        process.exit(1);
+      });
+      
+      ws.on('close', () => {
+        console.log('\nConnection closed');
+        process.exit(0);
+      });
+      
+    } catch (error) {
+      console.error('Failed to resolve participant:', error.message);
+      process.exit(1);
+    }
+  });
 
 module.exports = space;

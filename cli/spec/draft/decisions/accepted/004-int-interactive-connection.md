@@ -1,8 +1,8 @@
 # ADR-int: Interactive Connection Command
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-01-10  
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

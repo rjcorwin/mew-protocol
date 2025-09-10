@@ -1,8 +1,8 @@
 # ADR-iui: Interactive UI Architecture
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-01-10  
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

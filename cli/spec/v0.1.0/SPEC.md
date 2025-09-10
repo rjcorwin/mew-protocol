@@ -1,7 +1,8 @@
 # MEW CLI Specification - Minimal Test Implementation
 
-**Version:** draft (for v0.2.0)  
-**Status:** Draft  
+**Version:** 0.1.0  
+**Status:** Stable  
+**Release Date:** 2025-01-10  
 **Last Updated:** 2025-01-10
 
 ## Overview

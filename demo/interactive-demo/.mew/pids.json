@@ -1,0 +1,12 @@
+{
+  "spaceId": "demo-space",
+  "spaceName": "Interactive Demo Space",
+  "spaceDir": "/Users/rj/Git/rjcorwin/mew-protocol/demo/interactive-demo",
+  "port": "8090",
+  "gateway": 49579,
+  "agents": {
+    "echo": 49594,
+    "calculator": 49603
+  },
+  "clients": {}
+}
