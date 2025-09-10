@@ -1,7 +1,7 @@
 {
-  "name": "@meup/client",
+  "name": "@mew-protocol/client",
   "version": "0.2.0",
-  "description": "MEUP protocol client - Multi-Entity Unified-context Protocol client SDK",
+  "description": "MEW protocol client - Multi-Entity Workspace Protocol client SDK",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -22,18 +22,18 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
-    "meup",
+    "mew",
     "mcp",
     "protocol",
     "websocket",
     "client",
     "multi-entity",
-    "unified-context"
+    "workspace"
   ],
-  "author": "MEUP Working Group",
+  "author": "MEW Working Group",
   "license": "MIT",
   "dependencies": {
-    "@meup/types": "file:../types",
+    "@mew-protocol/types": "file:../types",
     "ws": "^8.18.0",
     "eventemitter3": "^5.0.1",
     "uuid": "^10.0.0"

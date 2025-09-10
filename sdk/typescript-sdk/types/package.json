@@ -1,7 +1,7 @@
 {
-  "name": "@meup/types",
+  "name": "@mew-protocol/types",
   "version": "0.2.0",
-  "description": "TypeScript type definitions for MEUP (Multi-Entity Unified-context Protocol)",
+  "description": "TypeScript type definitions for MEW (Multi-Entity Workspace Protocol)",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -19,14 +19,14 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
-    "meup",
+    "mew",
     "types",
     "typescript",
     "protocol",
     "multi-entity",
-    "unified-context"
+    "workspace"
   ],
-  "author": "MEUP Working Group",
+  "author": "MEW Working Group",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.14.0",

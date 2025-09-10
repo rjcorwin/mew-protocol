@@ -1,11 +1,11 @@
 {
-  "name": "@meup/bridge",
+  "name": "@mew-protocol/bridge",
   "version": "0.1.0",
-  "description": "MCP-MEUP Protocol Bridge",
+  "description": "MCP–MEW Protocol Bridge",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "meup-bridge": "./bin/meup-bridge.js"
+    "mew-bridge": "./bin/meup-bridge.js"
   },
   "scripts": {
     "build": "tsc",
@@ -15,8 +15,8 @@
     "test": "node test/test-bridge.js"
   },
   "dependencies": {
-    "@meup/participant": "file:../sdk/typescript-sdk/participant",
-    "@meup/types": "file:../sdk/typescript-sdk/types",
+    "@mew-protocol/participant": "file:../sdk/typescript-sdk/participant",
+    "@mew-protocol/types": "file:../sdk/typescript-sdk/types",
     "ws": "^8.16.0",
     "commander": "^11.1.0",
     "debug": "^4.3.4"
@@ -30,7 +30,7 @@
     "node": ">=14.0.0"
   },
   "keywords": [
-    "meup",
+    "mew",
     "mcp",
     "bridge",
     "protocol"

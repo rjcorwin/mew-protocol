@@ -83,7 +83,7 @@ test_mcp_request() {
 }
 
 # Test 1: List MCP tools
-REQUEST_1='{"protocol":"meup/v0.2","kind":"mcp/request","id":"test-1","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
+REQUEST_1='{"protocol":"mew/v0.2","kind":"mcp/request","id":"test-1","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
 
 test_mcp_request \
   "List MCP tools" \
@@ -96,7 +96,7 @@ RESULT_1=$?
 sleep 1
 
 # Test 2: List tools again to verify connection
-REQUEST_2='{"protocol":"meup/v0.2","kind":"mcp/request","id":"test-2","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
+REQUEST_2='{"protocol":"mew/v0.2","kind":"mcp/request","id":"test-2","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
 
 test_mcp_request \
   "List tools again" \
@@ -109,7 +109,7 @@ RESULT_2=$?
 sleep 1
 
 # Test 3: Read a file
-REQUEST_3='{"protocol":"meup/v0.2","kind":"mcp/request","id":"test-3","from":"test-client","to":["filesystem"],"payload":{"method":"tools/call","params":{"name":"read_text_file","arguments":{"path":"/private/tmp/mcp-test-files/test.txt"}}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
+REQUEST_3='{"protocol":"mew/v0.2","kind":"mcp/request","id":"test-3","from":"test-client","to":["filesystem"],"payload":{"method":"tools/call","params":{"name":"read_text_file","arguments":{"path":"/private/tmp/mcp-test-files/test.txt"}}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
 
 test_mcp_request \
   "Read file via MCP" \

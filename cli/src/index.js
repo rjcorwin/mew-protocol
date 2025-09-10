@@ -12,8 +12,8 @@ const spaceCommand = require('./commands/space');
 
 // Setup CLI
 program
-  .name('meup')
-  .description('MEUP CLI - Minimal implementation for testing')
+  .name('mew')
+  .description('MEW Protocol CLI - Minimal implementation for testing')
   .version(packageJson.version);
 
 // Add commands

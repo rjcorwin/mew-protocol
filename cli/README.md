@@ -1,6 +1,6 @@
-# @meup/cli
+# @mew-protocol/cli
 
-Command-line interface for the MEUP (Multi-Entity Unified-context Protocol).
+Command-line interface for the MEW Protocol (Multi-Entity Workspace Protocol).
 
 ## Status
 

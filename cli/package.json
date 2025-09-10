@@ -1,16 +1,16 @@
 {
-  "name": "@meup/cli",
+  "name": "@mew-protocol/cli",
   "version": "0.1.0",
-  "description": "MEUP CLI - Minimal implementation for testing",
+  "description": "MEW Protocol CLI - Minimal implementation for testing",
   "bin": {
-    "meup": "./bin/meup.js"
+    "mew": "./bin/meup.js"
   },
   "main": "src/index.js",
   "scripts": {
     "test": "node tests/run-tests.js"
   },
   "keywords": [
-    "meup",
+    "mew",
     "cli",
     "gateway",
     "client",
@@ -20,7 +20,7 @@
     "protocol",
     "testing"
   ],
-  "author": "MEUP Working Group",
+  "author": "MEW Protocol Working Group",
   "license": "MIT",
   "dependencies": {
     "commander": "^11.0.0",
@@ -36,12 +36,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjcorwin/mcpx-protocol.git",
+    "url": "https://github.com/rjcorwin/mew-protocol.git",
     "directory": "cli"
   },
-  "homepage": "https://github.com/rjcorwin/mcpx-protocol#readme",
+  "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
   "bugs": {
-    "url": "https://github.com/rjcorwin/mcpx-protocol/issues"
+    "url": "https://github.com/rjcorwin/mew-protocol/issues"
   },
   "engines": {
     "node": ">=16.0.0"

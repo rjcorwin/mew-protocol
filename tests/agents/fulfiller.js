@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * Fulfiller Agent - Auto-fulfills MCP proposals
- * For MEUP v0.2 test scenarios
+ * For MEW v0.2 test scenarios
  */
 
 const path = require('path');
 
-// Import MEUPClient from the SDK
+// Import MEWClient from the SDK
 const clientPath = path.resolve(__dirname, '../../sdk/typescript-sdk/client/dist/index.js');
-const { MEUPClient } = require(clientPath);
+const { MEWClient } = require(clientPath);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -36,8 +36,8 @@ const participantId = 'fulfiller-agent';
 // Track pending fulfillments to correlate responses
 const pendingFulfillments = new Map(); // request_id -> original_proposal_from
 
-// Create MEUP client
-const client = new MEUPClient({
+// Create MEW client
+const client = new MEWClient({
   gateway: options.gateway,
   space: options.space,
   token: options.token,

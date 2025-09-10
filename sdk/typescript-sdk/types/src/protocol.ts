@@ -1,14 +1,14 @@
 /**
- * Core MEUP Protocol Types
+ * Core MEW Protocol Types
  * 
- * These types define the Multi-Entity Unified-context Protocol v0.2
+ * These types define the Multi-Entity Workspace Protocol v0.2
  */
 
 // ============================================================================
 // Protocol Constants
 // ============================================================================
 
-export const PROTOCOL_VERSION = 'meup/v0.2';
+export const PROTOCOL_VERSION = 'mew/v0.2';
 export const MCP_VERSION = '2025-06-18';
 
 // ============================================================================
@@ -16,10 +16,10 @@ export const MCP_VERSION = '2025-06-18';
 // ============================================================================
 
 /**
- * MEUP envelope - the top-level wrapper for all messages
+ * MEW envelope - the top-level wrapper for all messages
  */
 export interface Envelope {
-  protocol: 'meup/v0.2';
+  protocol: 'mew/v0.2';
   id: string;
   ts: string;
   from: string;
@@ -127,30 +127,30 @@ export interface PresencePayload {
 export type SystemPayload = SystemWelcomePayload | SystemErrorPayload | PresencePayload;
 
 // ============================================================================
-// MEUP-specific Message Payloads
+// MEW-specific Message Payloads
 // ============================================================================
 
-export interface MeupProposalPayload {
+export interface MewProposalPayload {
   proposal: Proposal;
 }
 
-export interface MeupProposalAcceptPayload {
+export interface MewProposalAcceptPayload {
   correlation_id: string;
   accepted_by: string;
   envelope: Envelope;
 }
 
-export interface MeupProposalRejectPayload {
+export interface MewProposalRejectPayload {
   correlation_id: string;
   rejected_by: string;
   reason?: string;
 }
 
-export interface MeupCapabilityGrantPayload {
+export interface MewCapabilityGrantPayload {
   grant: CapabilityGrant;
 }
 
-export interface MeupCapabilityRevokePayload {
+export interface MewCapabilityRevokePayload {
   from: string;
   to: string;
   capabilities: string[];
@@ -184,13 +184,13 @@ export const MessageKinds = {
   MCP_RESPONSE: 'mcp/response',
   MCP_NOTIFICATION: 'mcp/notification',
   
-  // MEUP messages
-  MEUP_PROPOSAL: 'meup/proposal',
-  MEUP_PROPOSAL_ACCEPT: 'meup/proposal/accept',
-  MEUP_PROPOSAL_REJECT: 'meup/proposal/reject',
-  MEUP_CAPABILITY_GRANT: 'meup/capability/grant',
-  MEUP_CAPABILITY_REVOKE: 'meup/capability/revoke',
-  MEUP_CONTEXT: 'meup/context',
+  // MEW messages
+  MEW_PROPOSAL: 'mew/proposal',
+  MEW_PROPOSAL_ACCEPT: 'mew/proposal/accept',
+  MEW_PROPOSAL_REJECT: 'mew/proposal/reject',
+  MEW_CAPABILITY_GRANT: 'mew/capability/grant',
+  MEW_CAPABILITY_REVOKE: 'mew/capability/revoke',
+  MEW_CONTEXT: 'mew/context',
   
   // Application messages
   CHAT: 'chat',

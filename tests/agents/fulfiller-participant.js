@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Fulfiller Agent - Auto-fulfills MCP proposals using MEUPParticipant
- * For MEUP v0.2 test scenarios
+ * Fulfiller Agent - Auto-fulfills MCP proposals using MEWParticipant
+ * For MEW v0.2 test scenarios
  */
 
 const path = require('path');
 
-// Import MEUPParticipant from the SDK
+// Import MEWParticipant from the SDK
 const participantPath = path.resolve(__dirname, '../../sdk/typescript-sdk/participant/dist/index.js');
-const { MEUPParticipant } = require(participantPath);
+const { MEWParticipant } = require(participantPath);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -31,7 +31,7 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-class FulfillerAgent extends MEUPParticipant {
+class FulfillerAgent extends MEWParticipant {
   constructor(options) {
     super({
       gateway: options.gateway,
@@ -49,7 +49,7 @@ class FulfillerAgent extends MEUPParticipant {
 
     console.log(`Fulfiller agent connecting to ${options.gateway}...`);
     
-    // Register proposal handler using the MEUPParticipant system
+    // Register proposal handler using the MEWParticipant system
     this.onProposal(async (envelope) => {
       await this.handleProposal(envelope);
     });

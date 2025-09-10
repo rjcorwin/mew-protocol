@@ -1,5 +1,5 @@
 {
-  "name": "@meup/capability-matcher",
+  "name": "@mew-protocol/capability-matcher",
   "version": "0.2.0",
   "description": "Pattern matching for MEUP capability definitions (ADR-q8f implementation)",
   "main": "dist/index.js",
@@ -11,7 +11,7 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
-    "meup",
+    "mew-protocol",
     "capability",
     "pattern-matching",
     "permissions",
@@ -29,7 +29,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@meup/types": "file:../types",
+    "@mew-protocol/types": "file:../types",
     "jsonpath-plus": "^8.0.0",
     "lodash": "^4.17.21",
     "micromatch": "^4.0.5"

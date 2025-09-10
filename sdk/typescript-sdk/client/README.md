@@ -1,22 +1,22 @@
-# @meup/client
+# @mew-protocol/client
 
-TypeScript client SDK for MEUP (Multi-Entity Unified-context Protocol) v0.2.
+TypeScript client SDK for MEW (Multi-Entity Workspace Protocol) v0.2.
 
-MEUP provides a unified context where all agent-to-agent and agent-to-tool interactions are visible and controllable at the protocol layer. Unlike traditional systems where AI coordination happens in hidden contexts, MEUP broadcasts all messages within a shared space.
+MEW provides a unified context where all agent-to-agent and agent-to-tool interactions are visible and controllable at the protocol layer. Unlike traditional systems where AI coordination happens in hidden contexts, MEW broadcasts all messages within a shared space.
 
 ## Installation
 
 ```bash
-npm install @meup/client
+npm install @mew-protocol/client
 ```
 
 ## Quick Start
 
 ```typescript
-import { MEUPClient } from '@meup/client';
+import { MEWClient } from '@mew-protocol/client';
 
 // Create client
-const client = new MEUPClient({
+const client = new MEWClient({
   gateway: 'wss://gateway.example.com',
   space: 'my-space',
   token: 'your-auth-token',
@@ -63,7 +63,7 @@ const envelope = await client.propose('tools-execute', {
   payload: {
     jsonrpc: '2.0',
     method: 'tools/call',
-    params: { name: 'search', arguments: { query: 'MEUP protocol' } }
+    params: { name: 'search', arguments: { query: 'MEW protocol' } }
   }
 });
 ```
@@ -134,7 +134,7 @@ await client.resumeContext(correlationId);
 ### Constructor
 
 ```typescript
-new MEUPClient(options: ConnectionOptions)
+new MEWClient(options: ConnectionOptions)
 ```
 
 Options:
@@ -191,10 +191,10 @@ client.on('welcome', (data: SystemWelcomePayload) => {});
 client.on('message', (envelope: Envelope) => {});
 client.on('chat', (message: ChatPayload, from: string) => {});
 client.on('proposal', (proposal: Proposal, from: string) => {});
-client.on('proposal-accept', (data: MeupProposalAcceptPayload) => {});
-client.on('proposal-reject', (data: MeupProposalRejectPayload) => {});
+client.on('proposal-accept', (data: MewProposalAcceptPayload) => {});
+client.on('proposal-reject', (data: MewProposalRejectPayload) => {});
 client.on('capability-grant', (grant: CapabilityGrant) => {});
-client.on('capability-revoke', (data: MeupCapabilityRevokePayload) => {});
+client.on('capability-revoke', (data: MewCapabilityRevokePayload) => {});
 client.on('participant-joined', (participant: Participant) => {});
 client.on('participant-left', (participant: Participant) => {});
 client.on('error', (error: Error) => {});
@@ -205,7 +205,7 @@ client.on('reconnected', () => {});
 
 ## Protocol Version
 
-This SDK implements MEUP v0.2. See the [specification](https://github.com/rjcorwin/mcpx-protocol/blob/main/spec/v0.2/SPEC.md) for protocol details.
+This SDK implements MEW v0.2 (moving to v0.3). See the specification for protocol details.
 
 ## License
 

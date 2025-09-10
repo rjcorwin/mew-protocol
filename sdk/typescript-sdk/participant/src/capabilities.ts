@@ -1,4 +1,4 @@
-import { Capability, Envelope } from '@meup/types';
+import { Capability, Envelope } from '@mew-protocol/types';
 
 /**
  * Check if a message matches a capability pattern

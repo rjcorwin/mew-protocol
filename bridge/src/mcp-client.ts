@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import * as readline from 'readline';
 import Debug from 'debug';
 
-const debug = Debug('meup:mcp-client');
+const debug = Debug('mew:mcp-client');
 
 export interface MCPServerConfig {
   command: string;
@@ -111,7 +111,7 @@ export class MCPClient extends EventEmitter {
         sampling: {}
       },
       clientInfo: {
-        name: 'meup-bridge',
+        name: 'mew-bridge',
         version: '0.1.0'
       }
     });

@@ -1,12 +1,12 @@
 /**
- * MEUP (Multi-Entity Unified-context Protocol) Client SDK
+ * MEW (Multi-Entity Workspace) Client SDK
  * 
  * @packageDocumentation
  */
 
-// Main MEUP client export
+// Main MEW client export
 export { 
-  MEUPClient, 
+  MEWClient, 
   ClientEvents, 
   type ClientEventParams,
   type ChatHandler,
@@ -20,7 +20,7 @@ export {
   type CapabilityGrantHandler,
   type CapabilityRevokeHandler,
   type VoidHandler
-} from './MEUPClient';
+} from './MEWClient';
 
 // Type exports
 export * from './types';

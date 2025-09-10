@@ -1,5 +1,5 @@
 /**
- * Gateway-specific types for MEUP
+ * Gateway-specific types for MEW
  */
 
 import { WebSocket } from 'ws';
@@ -10,10 +10,10 @@ import type {
   SystemWelcomePayload,
   SystemErrorPayload,
   PresencePayload,
-} from '@meup/types';
+} from '@mew-protocol/types';
 
-// Re-export core types from @meup/types
-export * from '@meup/types';
+// Re-export core types from @mew-protocol/types
+export * from '@mew-protocol/types';
 
 // ============================================================================
 // Gateway-Specific Types
@@ -143,4 +143,5 @@ export interface GatewayEvents {
   'message:sent': (envelope: Envelope, space: Space) => void;
   'message:blocked': (envelope: Envelope, reason: string) => void;
   'error': (error: Error, client?: ConnectedClient) => void;
+  'metrics': (metrics: any) => void;
 }

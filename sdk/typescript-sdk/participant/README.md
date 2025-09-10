@@ -1,6 +1,6 @@
-# MEUPParticipant - Promise-based MEUP Agent SDK
+# MEWParticipant - Promise-based MEW Agent SDK
 
-A high-level TypeScript SDK for building MEUP participants with automatic MCP handling, capability awareness, and promise-based request/response tracking.
+A high-level TypeScript SDK for building MEW participants with automatic MCP handling, capability awareness, and promise-based request/response tracking.
 
 ## Features
 
@@ -23,9 +23,9 @@ npm run build
 ### 2. Create a Simple Agent
 
 ```javascript
-const { MEUPParticipant } = require('@meup/participant');
+const { MEWParticipant } = require('@mew-protocol/participant');
 
-class MyAgent extends MEUPParticipant {
+class MyAgent extends MEWParticipant {
   constructor(options) {
     super(options);
     
@@ -85,7 +85,7 @@ const result = await agent.request('slow-agent', 'tools/call', {
 
 ### Before (Fire-and-forget)
 ```javascript
-// Old MEUPClient way - no way to get the result
+// Old client way - no way to get the result
 client.send({
   kind: 'mcp/request',
   to: ['calculator'],
@@ -102,7 +102,7 @@ client.onMessage((envelope) => {
 
 ### After (Promise-based)
 ```javascript
-// New MEUPParticipant way - clean async/await
+// New MEWParticipant way - clean async/await
 const result = await agent.request('calculator', 'tools/call', {
   name: 'add',
   arguments: { a: 5, b: 3 }
@@ -129,7 +129,7 @@ const result = await agent.request('target', 'tools/call', { name: 'operation' }
 
 ## API Reference
 
-### MEUPParticipant
+### MEWParticipant
 
 #### Constructor
 ```typescript
@@ -167,7 +167,7 @@ try {
 
 ## Architecture
 
-MEUPParticipant builds on top of MEUPClient to provide:
+MEWParticipant builds on top of MEWClient to provide:
 
 1. **Request Tracking**: Maps outgoing request IDs to Promise resolvers
 2. **Response Matching**: Matches incoming responses by correlation_id  
@@ -175,4 +175,4 @@ MEUPParticipant builds on top of MEUPClient to provide:
 4. **Error Translation**: Converts MCP errors to Promise rejections
 5. **Capability Logic**: Smart switching between requests and proposals
 
-This gives you a much cleaner API while preserving all the transparency and capability control of MEUP.
+This gives you a much cleaner API while preserving all the transparency and capability control of MEW.

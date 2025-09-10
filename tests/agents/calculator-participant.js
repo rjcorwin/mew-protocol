@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
  * Calculator Agent - Provides MCP math tools (add, multiply, evaluate)
- * Using MEUPParticipant base class for cleaner, promise-based code
+ * Using MEWParticipant base class for cleaner, promise-based code
  */
 
 const path = require('path');
 
-// Import MEUPParticipant from the SDK
+// Import MEWParticipant from the SDK
 const participantPath = path.resolve(__dirname, '../../sdk/typescript-sdk/participant/dist/index.js');
-const { MEUPParticipant } = require(participantPath);
+const { MEWParticipant } = require(participantPath);
 
-class CalculatorAgent extends MEUPParticipant {
+class CalculatorAgent extends MEWParticipant {
   constructor(options) {
     super(options);
     
@@ -124,7 +124,7 @@ for (let i = 0; i < args.length; i++) {
 // Create and start the agent
 const agent = new CalculatorAgent(options);
 
-console.log(`Starting calculator agent with MEUPParticipant...`);
+console.log(`Starting calculator agent with MEWParticipant...`);
 console.log(`Gateway: ${options.gateway}`);
 console.log(`Space: ${options.space}`);
 

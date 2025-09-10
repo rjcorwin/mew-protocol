@@ -8,7 +8,7 @@ const http = require('http');
 const pm2 = require('pm2');
 
 const space = new Command('space')
-  .description('Manage MEUP spaces');
+  .description('Manage MEW spaces');
 
 // PM2 connection helper
 function connectPM2(spaceDir) {

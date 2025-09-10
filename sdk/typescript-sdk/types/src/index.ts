@@ -1,7 +1,7 @@
 /**
- * @meup/types
+ * @mew-protocol/types
  * 
- * Shared TypeScript type definitions for MEUP protocol
+ * Shared TypeScript type definitions for MEW protocol
  * 
  * @packageDocumentation
  */
@@ -28,12 +28,12 @@ export type {
   SystemErrorPayload,
   PresencePayload,
   
-  // MEUP payloads
-  MeupProposalPayload,
-  MeupProposalAcceptPayload,
-  MeupProposalRejectPayload,
-  MeupCapabilityGrantPayload,
-  MeupCapabilityRevokePayload,
+  // MEW payloads
+  MewProposalPayload,
+  MewProposalAcceptPayload,
+  MewProposalRejectPayload,
+  MewCapabilityGrantPayload,
+  MewCapabilityRevokePayload,
   
   // Chat
   ChatPayload,

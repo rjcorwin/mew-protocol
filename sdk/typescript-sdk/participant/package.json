@@ -1,7 +1,7 @@
 {
-  "name": "@meup/participant",
+  "name": "@mew-protocol/participant",
   "version": "0.1.0",
-  "description": "MEUP Participant base class for building agents and services",
+  "description": "MEW Participant base class for building agents and services",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -10,8 +10,8 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@meup/types": "file:../types",
-    "@meup/client": "file:../client"
+    "@mew-protocol/types": "file:../types",
+    "@mew-protocol/client": "file:../client"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

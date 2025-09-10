@@ -8,7 +8,7 @@ const client = new Command('client')
 
 client
   .command('connect')
-  .description('Connect to a MEUP gateway')
+  .description('Connect to a MEW gateway')
   .requiredOption('-g, --gateway <url>', 'WebSocket URL')
   .requiredOption('-s, --space <space>', 'Space to join')
   .option('-t, --token <token>', 'Authentication token')
@@ -38,7 +38,7 @@ client
     ws.on('open', () => {
       console.log('Connected to gateway');
       
-      // Send join message (gateway-specific, not MEUP protocol)
+      // Send join message (gateway-specific, not MEW protocol)
       ws.send(JSON.stringify({
         type: 'join',
         participantId,

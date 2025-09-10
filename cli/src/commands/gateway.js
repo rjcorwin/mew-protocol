@@ -12,7 +12,7 @@ const gateway = new Command('gateway')
 
 gateway
   .command('start')
-  .description('Start a MEUP gateway server')
+  .description('Start a MEW gateway server')
   .option('-p, --port <port>', 'Port to listen on', '8080')
   .option('-l, --log-level <level>', 'Log level (debug|info|warn|error)', 'info')
   .option('-s, --space-config <path>', 'Path to space.yaml configuration', './space.yaml')
@@ -37,7 +37,7 @@ gateway
       };
     }
     
-    console.log(`Starting MEUP gateway on port ${port}...`);
+    console.log(`Starting MEW gateway on port ${port}...`);
     
     // Load space configuration (CLI responsibility, not gateway)
     let spaceConfig = null;
@@ -257,7 +257,7 @@ gateway
       }
       
       // Protocol version check
-      if (message.protocol && message.protocol !== 'meup/v0.2') {
+      if (message.protocol && message.protocol !== 'mew/v0.2') {
         return `Invalid protocol version: ${message.protocol}`;
       }
       
@@ -290,7 +290,7 @@ gateway
           const validationError = validateMessage(message);
           if (validationError) {
             ws.send(JSON.stringify({
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.2',
               kind: 'system/error',
               payload: {
                 error: validationError,
@@ -322,9 +322,9 @@ gateway
             const capabilities = await resolveCapabilities(token, participantId, null);
             participantCapabilities.set(participantId, capabilities);
             
-            // Send welcome message per MEUP v0.2 spec
+            // Send welcome message per MEW v0.2 spec
             const welcomeMessage = {
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.2',
               id: `welcome-${Date.now()}`,
               ts: new Date().toISOString(),
               from: 'system:gateway',
@@ -348,7 +348,7 @@ gateway
             
             // Broadcast presence to others
             const presenceMessage = {
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.2',
               id: `presence-${Date.now()}`,
               ts: new Date().toISOString(),
               from: 'system:gateway',
@@ -383,7 +383,7 @@ gateway
           // Check capabilities for non-join messages
           if (!await hasCapabilityForMessage(participantId, message)) {
             const errorMessage = {
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.2',
               id: `error-${Date.now()}`,
               ts: new Date().toISOString(),
               from: 'system:gateway',
@@ -411,7 +411,7 @@ gateway
             const canGrant = await hasCapabilityForMessage(participantId, {kind: 'capability/grant'});
             if (!canGrant) {
               const errorMessage = {
-                protocol: 'meup/v0.2',
+                protocol: 'mew/v0.2',
                 id: `error-${Date.now()}`,
                 ts: new Date().toISOString(),
                 from: 'system:gateway',
@@ -450,7 +450,7 @@ gateway
               const recipientWs = space?.participants.get(recipient);
               if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
                 const ackMessage = {
-                  protocol: 'meup/v0.2',
+                  protocol: 'mew/v0.2',
                   id: `ack-${Date.now()}`,
                   ts: new Date().toISOString(),
                   from: 'system:gateway',
@@ -534,7 +534,7 @@ gateway
           
           // Add protocol envelope fields if missing
           const envelope = {
-            protocol: message.protocol || 'meup/v0.2',
+            protocol: message.protocol || 'mew/v0.2',
             id: message.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             ts: message.ts || new Date().toISOString(),
             from: participantId,
@@ -574,7 +574,7 @@ gateway
         } catch (error) {
           console.error('Error handling message:', error);
           ws.send(JSON.stringify({
-            protocol: 'meup/v0.2',
+            protocol: 'mew/v0.2',
             kind: 'system/error',
             payload: {
               error: error.message,

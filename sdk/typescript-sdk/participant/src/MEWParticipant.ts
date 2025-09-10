@@ -1,5 +1,5 @@
-import { MEUPClient, ClientEvents } from '@meup/client';
-import { Envelope, Capability } from '@meup/types';
+import { MEWClient, ClientEvents, PROTOCOL_VERSION } from '@mew-protocol/client';
+import { Envelope, Capability } from '@mew-protocol/types';
 import { 
   ParticipantOptions, 
   ParticipantInfo, 
@@ -13,8 +13,8 @@ import {
 import { canSend, matchesCapability } from './capabilities';
 import { ToolRegistry } from './mcp/tools';
 
-export class MEUPParticipant {
-  protected client: MEUPClient;
+export class MEWParticipant {
+  protected client: MEWClient;
   protected participantInfo?: ParticipantInfo;
   protected tools = new ToolRegistry();
   protected resources = new Map<string, Resource>();
@@ -26,7 +26,7 @@ export class MEUPParticipant {
   
   constructor(protected options: ParticipantOptions) {
     // Create underlying client
-    this.client = new MEUPClient({
+    this.client = new MEWClient({
       ...options,
       capabilities: [] // Will be set from welcome message
     });
@@ -97,7 +97,7 @@ export class MEUPParticipant {
       // Check if we can send direct MCP request
       if (this.canSend('mcp/request', { method, params })) {
         const envelope: Envelope = {
-          protocol: 'meup/v0.2',
+          protocol: PROTOCOL_VERSION,
           id,
           ts: new Date().toISOString(),
           from: this.options.participant_id!,
@@ -118,7 +118,7 @@ export class MEUPParticipant {
       // Fall back to proposal if we have that capability
       if (this.canSend('mcp/proposal')) {
         const envelope: Envelope = {
-          protocol: 'meup/v0.2',
+          protocol: PROTOCOL_VERSION,
           id,
           ts: new Date().toISOString(),
           from: this.options.participant_id!,
@@ -152,7 +152,7 @@ export class MEUPParticipant {
     }
     
     const envelope: Envelope = {
-      protocol: 'meup/v0.2',
+      protocol: PROTOCOL_VERSION,
       id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ts: new Date().toISOString(),
       from: this.options.participant_id!,
@@ -167,43 +167,21 @@ export class MEUPParticipant {
     this.client.send(envelope);
   }
   
-  /**
-   * Register a proposal handler
-   */
   onProposal(handler: ProposalHandler): () => void {
     this.proposalHandlers.add(handler);
     return () => this.proposalHandlers.delete(handler);
   }
   
-  /**
-   * Register a custom request handler
-   */
   onRequest(handler: RequestHandler): () => void {
     this.requestHandlers.add(handler);
     return () => this.requestHandlers.delete(handler);
   }
   
-  /**
-   * Lifecycle hook - called when connected and ready
-   */
-  protected async onReady(): Promise<void> {
-    // Override in subclass
-  }
+  protected async onReady(): Promise<void> {}
+  protected async onShutdown(): Promise<void> {}
   
-  /**
-   * Lifecycle hook - called before shutdown
-   */
-  protected async onShutdown(): Promise<void> {
-    // Override in subclass
-  }
-  
-  /**
-   * Setup lifecycle event handlers
-   */
   private setupLifecycle(): void {
-    // Handle connection
     this.client.onConnected(() => {
-      // Send join message for gateway compatibility
       if (!this.joined) {
         this.client.send({
           type: 'join',
@@ -215,32 +193,23 @@ export class MEUPParticipant {
       }
     });
     
-    // Handle welcome message
     this.client.onWelcome(async (data: any) => {
       this.participantInfo = {
         id: data.you.id,
         capabilities: data.you.capabilities
       };
-      
-      // Call ready hook
       await this.onReady();
     });
     
-    // Handle incoming messages
     this.client.onMessage(async (envelope: any) => {
-      // Handle MCP responses
       if (envelope.kind === 'mcp/response') {
         await this.handleMCPResponse(envelope);
       }
-      
-      // Handle MCP requests
       if (envelope.kind === 'mcp/request') {
         if (this.shouldHandleRequest(envelope)) {
           await this.handleMCPRequest(envelope);
         }
       }
-      
-      // Handle proposals
       if (envelope.kind === 'mcp/proposal' && envelope.from !== this.options.participant_id) {
         for (const handler of this.proposalHandlers) {
           await handler(envelope);
@@ -248,77 +217,53 @@ export class MEUPParticipant {
       }
     });
     
-    // Handle errors
-    this.client.onError((error: any) => {
-      // Error occurred
-    });
+    this.client.onError((error: any) => {});
     
-    // Handle disconnection
     this.client.onDisconnected(async () => {
-      // Reject all pending requests
       for (const [id, pendingRequest] of this.pendingRequests) {
         clearTimeout(pendingRequest.timeout);
         pendingRequest.reject(new Error('Connection closed'));
       }
       this.pendingRequests.clear();
-      
       await this.onShutdown();
     });
   }
   
-  /**
-   * Handle incoming MCP responses and resolve pending promises
-   */
   private async handleMCPResponse(envelope: Envelope): Promise<void> {
-    // Check if this response correlates to one of our pending requests
     if (envelope.correlation_id) {
-      // Handle correlation_id as either string or array
       const correlationId = Array.isArray(envelope.correlation_id) 
         ? envelope.correlation_id[0] 
         : envelope.correlation_id;
       
       const pendingRequest = this.pendingRequests.get(correlationId);
       if (pendingRequest) {
-        // Clean up
         clearTimeout(pendingRequest.timeout);
         this.pendingRequests.delete(correlationId);
         
         const payload = envelope.payload;
         
-        // Check for MCP error
         if (payload.error) {
           pendingRequest.reject(new Error(`MCP Error ${payload.error.code}: ${payload.error.message}`));
           return;
         }
         
-        // Resolve with the result
         if (payload.result) {
           pendingRequest.resolve(payload.result);
         } else {
           pendingRequest.resolve(payload);
         }
-        
         return;
       }
     }
   }
   
-  /**
-   * Check if we should handle this request
-   */
   private shouldHandleRequest(envelope: Envelope): boolean {
-    // Check if it's addressed to us
     if (envelope.to && !envelope.to.includes(this.options.participant_id!)) {
       return false;
     }
-    
-    // Check if we have mcp/response capability
     return this.canSend('mcp/response');
   }
   
-  /**
-   * Handle incoming MCP requests
-   */
   private async handleMCPRequest(envelope: Envelope): Promise<void> {
     const { method, params } = envelope.payload || {};
     const requestId = envelope.payload?.id;
@@ -326,7 +271,6 @@ export class MEUPParticipant {
     let response: MCPResponse;
     
     try {
-      // Check custom handlers first
       for (const handler of this.requestHandlers) {
         const result = await handler(envelope);
         if (result) {
@@ -335,47 +279,30 @@ export class MEUPParticipant {
         }
       }
       
-      // Built-in handlers
       if (!response!) {
         switch (method) {
           case 'tools/list':
             response = this.tools.list();
             break;
-            
           case 'tools/call':
             response = await this.tools.execute(params?.name, params?.arguments);
             break;
-            
           case 'resources/list':
             response = this.listResources();
             break;
-            
           case 'resources/read':
             response = await this.readResource(params?.uri);
             break;
-            
           default:
-            response = {
-              error: {
-                code: -32601,
-                message: `Method not found: ${method}`
-              }
-            };
+            response = { error: { code: -32601, message: `Method not found: ${method}` } };
         }
       }
     } catch (error: any) {
-      response = {
-        error: {
-          code: -32603,
-          message: error.message || 'Internal error',
-          data: error.stack
-        }
-      };
+      response = { error: { code: -32603, message: error.message || 'Internal error', data: error.stack } };
     }
     
-    // Send response
     const responseEnvelope: Envelope = {
-      protocol: 'meup/v0.2',
+      protocol: PROTOCOL_VERSION,
       id: `resp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ts: new Date().toISOString(),
       from: this.options.participant_id!,
@@ -392,9 +319,6 @@ export class MEUPParticipant {
     this.client.send(responseEnvelope);
   }
   
-  /**
-   * List resources in MCP format
-   */
   private listResources(): MCPResponse {
     const resources = Array.from(this.resources.values()).map(r => ({
       uri: r.uri,
@@ -402,30 +326,16 @@ export class MEUPParticipant {
       description: r.description,
       mimeType: r.mimeType
     }));
-    
-    return {
-      result: { resources }
-    };
+    return { result: { resources } };
   }
   
-  /**
-   * Read a resource
-   */
   private async readResource(uri: string): Promise<MCPResponse> {
     const resource = this.resources.get(uri);
-    
     if (!resource) {
-      return {
-        error: {
-          code: -32602,
-          message: `Resource not found: ${uri}`
-        }
-      };
+      return { error: { code: -32602, message: `Resource not found: ${uri}` } };
     }
-    
     try {
       const data = await resource.read();
-      
       return {
         result: {
           contents: [{
@@ -436,12 +346,8 @@ export class MEUPParticipant {
         }
       };
     } catch (error: any) {
-      return {
-        error: {
-          code: -32603,
-          message: error.message || 'Failed to read resource'
-        }
-      };
+      return { error: { code: -32603, message: error.message || 'Failed to read resource' } };
     }
   }
 }
+

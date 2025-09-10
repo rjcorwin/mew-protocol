@@ -16,9 +16,9 @@ import { SpaceManager } from './SpaceManager';
 import { CapabilityChecker } from './CapabilityChecker';
 
 /**
- * MEUP Gateway implementation
+ * MEW Gateway implementation
  */
-export class MEUPGateway extends EventEmitter {
+export class MEWGateway extends EventEmitter {
   private wss: WebSocketServer | null = null;
   private spaceManager: SpaceManager;
   private capabilityChecker: CapabilityChecker;
@@ -459,9 +459,10 @@ export class MEUPGateway extends EventEmitter {
 }
 
 // Override emit to provide typed events
-declare interface MEUPGateway {
+export declare interface MEWGateway {
   emit<K extends keyof GatewayEvents>(event: K, ...args: Parameters<GatewayEvents[K]>): boolean;
   on<K extends keyof GatewayEvents>(event: K, listener: GatewayEvents[K]): this;
   once<K extends keyof GatewayEvents>(event: K, listener: GatewayEvents[K]): this;
   off<K extends keyof GatewayEvents>(event: K, listener: GatewayEvents[K]): this;
 }
+

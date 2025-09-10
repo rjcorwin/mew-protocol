@@ -1,10 +1,8 @@
 import Debug from 'debug';
-import path from 'path';
-import { MEUPParticipant } from '@meup/participant';
-import { Envelope } from '@meup/types';
+import { MEWParticipant } from '@mew-protocol/participant';
 import { MCPClient, MCPServerConfig } from './mcp-client';
 
-const debug = Debug('meup:bridge');
+const debug = Debug('mew:bridge');
 
 export interface MCPBridgeOptions {
   gateway: string;
@@ -16,10 +14,10 @@ export interface MCPBridgeOptions {
 }
 
 /**
- * MCP Bridge using MEUPParticipant base class
- * Bridges an MCP server to the MEUP protocol as a participant
+ * MCP Bridge using MEWParticipant base class
+ * Bridges an MCP server to the MEW Protocol as a participant
  */
-export class MCPBridge extends MEUPParticipant {
+export class MCPBridge extends MEWParticipant {
   private mcpClient?: MCPClient;
   private mcpCapabilities: any[] = [];
   private initTimeout: number;
@@ -110,10 +108,10 @@ export class MCPBridge extends MEUPParticipant {
    * Start the bridge - initialize MCP server and connect to gateway
    */
   async start(): Promise<void> {
-    debug('Starting MCP-MEUP bridge with participant base class');
+    debug('Starting MCP-MEW bridge with participant base class');
     
     try {
-      // Connect to MEUP gateway
+      // Connect to MEW gateway
       await this.connect();
       
       debug('Bridge started successfully');
@@ -146,7 +144,7 @@ export class MCPBridge extends MEUPParticipant {
     this.mcpClient.on('close', () => {
       debug('MCP server closed');
       if (!this.isShuttingDown) {
-        // MEUPParticipant handles reconnection to gateway
+        // MEWParticipant handles reconnection to gateway
         // We may need to restart MCP server
         this.restartMCPServer(config);
       }
@@ -170,7 +168,7 @@ export class MCPBridge extends MEUPParticipant {
   }
   
   /**
-   * Translate MCP capabilities to MEUP capabilities
+   * Translate MCP capabilities to MEW capabilities
    */
   private translateMCPCapabilities(mcpCaps: any): any[] {
     const capabilities: any[] = [];
@@ -204,7 +202,7 @@ export class MCPBridge extends MEUPParticipant {
   }
   
   /**
-   * Register MCP tools as MEUP tools
+   * Register MCP tools as MEW tools
    */
   private async registerMCPTools(): Promise<void> {
     if (!this.mcpClient) return;
@@ -275,7 +273,7 @@ export class MCPBridge extends MEUPParticipant {
   private handleMCPNotification(notification: any): void {
     debug('MCP notification:', notification);
     
-    // Translate MCP notifications to MEUP messages if needed
+    // Translate MCP notifications to MEW messages if needed
     if (notification.method === 'notifications/message') {
       this.client.send({
         kind: 'system/log',
@@ -288,7 +286,7 @@ export class MCPBridge extends MEUPParticipant {
    * Handle MCP error
    */
   private handleMCPError(error: any): void {
-    // Send error to MEUP space
+    // Send error to MEW space
     this.client.send({
       kind: 'system/error',
       payload: {
@@ -331,7 +329,7 @@ export class MCPBridge extends MEUPParticipant {
     debug('Shutting down MCP bridge');
     this.isShuttingDown = true;
     
-    // Disconnect from MEUP gateway
+    // Disconnect from MEW gateway
     this.disconnect();
     
     // Stop MCP server

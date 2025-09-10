@@ -1,4 +1,4 @@
-export { MEUPParticipant } from './MEUPParticipant';
+export { MEWParticipant } from './MEWParticipant';
 export { ToolRegistry } from './mcp/tools';
 export { 
   matchesCapability, 

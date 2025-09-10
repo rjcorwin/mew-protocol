@@ -28,9 +28,9 @@ let isAuthenticated = false;
 ws.on('open', () => {
   console.log('WebSocket connected, sending join...');
   
-  // Send join message per MEUP v0.2 spec
+  // Send join message per MEW v0.2 spec
   ws.send(JSON.stringify({
-    protocol: 'meup/v0.2',
+    protocol: 'mew/v0.2',
     kind: 'system/join',
     id: `join-${Date.now()}`,
     from: 'test-agent',
@@ -100,7 +100,7 @@ function runTests() {
       // Test 1: List tools
       console.log('TEST 1: Listing MCP tools...');
       ws.send(JSON.stringify({
-        protocol: 'meup/v0.2',
+        protocol: 'mew/v0.2',
         kind: 'mcp/request',
         id: `test-1-${Date.now()}`,
         from: 'test-agent',
@@ -117,7 +117,7 @@ function runTests() {
       // Test 2: Call read_file tool
       console.log('TEST 2: Reading file via MCP...');
       ws.send(JSON.stringify({
-        protocol: 'meup/v0.2',
+        protocol: 'mew/v0.2',
         kind: 'mcp/request',
         id: `test-2-${Date.now()}`,
         from: 'test-agent',
@@ -139,7 +139,7 @@ function runTests() {
       // Test 3: List directory
       console.log('TEST 3: Listing directory via MCP...');
       ws.send(JSON.stringify({
-        protocol: 'meup/v0.2',
+        protocol: 'mew/v0.2',
         kind: 'mcp/request',
         id: `test-3-${Date.now()}`,
         from: 'test-agent',

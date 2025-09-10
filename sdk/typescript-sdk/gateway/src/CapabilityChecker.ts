@@ -188,8 +188,8 @@ export class CapabilityChecker {
   canExecuteProposals(capabilities: Capability[]): boolean {
     return capabilities.some(c => 
       c.kind === '*' ||
-      c.kind === 'meup/proposal/accept' ||
-      this.matchesKindPattern('meup/proposal/accept', c.kind)
+      c.kind === 'mew/proposal/accept' ||
+      this.matchesKindPattern('mew/proposal/accept', c.kind)
     );
   }
 
@@ -229,15 +229,15 @@ export class CapabilityChecker {
       case 'trusted':
         return [
           { id: 'mcp-all', kind: 'mcp/*' },
-          { id: 'meup-proposals', kind: 'meup/proposal/*' },
-          { id: 'meup-capabilities', kind: 'meup/capability/*' },
+          { id: 'mew-proposals', kind: 'mew/proposal/*' },
+          { id: 'mew-capabilities', kind: 'mew/capability/*' },
           { id: 'chat', kind: 'chat' },
         ];
         
       case 'untrusted':
         return [
           { id: 'chat', kind: 'chat' },
-          { id: 'propose', kind: 'meup/proposal' },
+          { id: 'propose', kind: 'mew/proposal' },
           { id: 'mcp-read', kind: 'mcp/request', payload: { method: 'resources/read' } },
         ];
     }

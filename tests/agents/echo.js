@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
  * Echo Agent - Echoes chat messages back with "Echo: " prefix
- * For MEUP v0.2 test scenarios
+ * For MEW v0.2 test scenarios
  * 
- * Uses MEUP SDK client for WebSocket communication
+ * Uses MEW SDK client for WebSocket communication
  */
 
-// Import the MEUP SDK client
+// Import the MEW SDK client
 const path = require('path');
 const clientPath = path.resolve(__dirname, '../../sdk/typescript-sdk/client/dist/index.js');
-const { MEUPClient, ClientEvents } = require(clientPath);
+const { MEWClient, ClientEvents } = require(clientPath);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -36,8 +36,8 @@ const participantId = 'echo-agent';
 
 console.log(`Echo agent connecting to ${options.gateway}...`);
 
-// Create MEUP client instance
-const client = new MEUPClient({
+// Create MEW client instance
+const client = new MEWClient({
   gateway: options.gateway,
   space: options.space,
   token: options.token,
@@ -55,17 +55,16 @@ client.onConnected(() => {
   
   // For compatibility with the gateway, send a join message
   if (!joined) {
-    // The MEUPClient doesn't expose the raw WebSocket, so we need to 
-    // work around this by using the internal ws property (not ideal but works for now)
-    if (client.ws && client.ws.readyState === 1) {
-      client.ws.send(JSON.stringify({
-        type: 'join',
-        participantId: participantId,
+    // Send a join envelope using the client
+    client.send({
+      kind: 'system/join',
+      payload: {
+        participantId,
         space: options.space,
         token: options.token
-      }));
-      joined = true;
-    }
+      }
+    }).catch(() => {});
+    joined = true;
   }
 });
 

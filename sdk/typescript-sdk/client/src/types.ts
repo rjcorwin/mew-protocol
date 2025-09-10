@@ -1,5 +1,5 @@
 /**
- * Client-specific types for MEUP SDK
+ * Client-specific types for MEW SDK
  */
 
 import type {
@@ -9,17 +9,37 @@ import type {
   Proposal,
   SystemWelcomePayload,
   ChatPayload,
-} from '@meup/types';
+} from '@mew-protocol/types';
 
-// Re-export commonly used types from @meup/types for convenience
-export * from '@meup/types';
+// Re-export commonly used types from the shared types package (relative path for monorepo dev)
+export type {
+  Envelope,
+  PartialEnvelope,
+  Participant,
+  Capability,
+  CapabilityGrant,
+  Proposal,
+  SystemWelcomePayload,
+  SystemErrorPayload,
+  PresencePayload,
+  ChatPayload,
+  MewProposalPayload,
+  MewProposalAcceptPayload,
+  MewProposalRejectPayload,
+  MewCapabilityGrantPayload,
+  MewCapabilityRevokePayload,
+  JsonRpcRequest,
+  JsonRpcResponse,
+  JsonRpcNotification,
+} from '@mew-protocol/types';
+export { PROTOCOL_VERSION, MCP_VERSION, MessageKinds } from '@mew-protocol/types';
 
 // ============================================================================
 // Client-Specific Types
 // ============================================================================
 
 /**
- * Connection options for MEUPClient
+ * Connection options for MEWClient
  */
 export interface ConnectionOptions {
   gateway: string;
