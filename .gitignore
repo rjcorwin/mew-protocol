@@ -88,4 +88,6 @@ examples/documents-agent/bridge-config.json
 # Supporting docs
 modelcontextprotocol
 A2A
+gemini-cli
+mew-pirate
 BACKLOG.md

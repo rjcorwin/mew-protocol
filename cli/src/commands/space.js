@@ -285,6 +285,9 @@ space
   .option('-i, --interactive', 'Connect interactively after starting space')
   .option('--detach', 'Run in background (default if not interactive)')
   .option('--participant <id>', 'Connect as this participant (with --interactive)')
+  .option('--debug', 'Use simple debug interface instead of advanced UI')
+  .option('--simple', 'Alias for --debug')
+  .option('--no-ui', 'Disable UI enhancements, use plain interface')
   .action(async (options) => {
     // Check for incompatible flags
     if (options.interactive && options.detach) {
@@ -619,7 +622,17 @@ space
         resolveParticipant,
         getInteractiveOverrides,
       } = require('../utils/participant-resolver');
-      const InteractiveUI = require('../utils/interactive-ui');
+      
+      // Determine UI mode
+      const useDebugUI = options.debug || options.simple || options.noUi;
+      
+      // Import appropriate UI module
+      const InteractiveUI = useDebugUI ? 
+        require('../utils/interactive-ui') : 
+        null;
+      const { startAdvancedInteractiveUI } = useDebugUI ? 
+        { startAdvancedInteractiveUI: null } : 
+        require('../utils/advanced-interactive-ui');
 
       try {
         // Resolve participant
@@ -655,8 +668,12 @@ space
           ws.send(JSON.stringify(joinMessage));
 
           // Start interactive UI
-          const ui = new InteractiveUI(ws, participant.id, spaceId);
-          ui.start();
+          if (useDebugUI) {
+            const ui = new InteractiveUI(ws, participant.id, spaceId);
+            ui.start();
+          } else {
+            startAdvancedInteractiveUI(ws, participant.id, spaceId);
+          }
         });
 
         ws.on('error', (err) => {
@@ -1195,6 +1212,9 @@ space
   .option('-d, --space-dir <path>', 'Directory of space to connect to', '.')
   .option('--participant <id>', 'Connect as this participant')
   .option('--gateway <url>', 'Override gateway URL (default: from running space)')
+  .option('--debug', 'Use simple debug interface instead of advanced UI')
+  .option('--simple', 'Alias for --debug')
+  .option('--no-ui', 'Disable UI enhancements, use plain interface')
   .action(async (options) => {
     const spaceDir = path.resolve(options.spaceDir);
     const configPath = path.join(spaceDir, path.basename(options.config));
@@ -1222,7 +1242,17 @@ space
       resolveParticipant,
       getInteractiveOverrides,
     } = require('../utils/participant-resolver');
-    const InteractiveUI = require('../utils/interactive-ui');
+    
+    // Determine UI mode
+    const useDebugUI = options.debug || options.simple || options.noUi;
+    
+    // Import appropriate UI module
+    const InteractiveUI = useDebugUI ? 
+      require('../utils/interactive-ui') : 
+      null;
+    const { startAdvancedInteractiveUI } = useDebugUI ? 
+      { startAdvancedInteractiveUI: null } : 
+      require('../utils/advanced-interactive-ui');
 
     try {
       // Resolve participant
@@ -1258,8 +1288,12 @@ space
         ws.send(JSON.stringify(joinMessage));
 
         // Start interactive UI
-        const ui = new InteractiveUI(ws, participant.id, spaceId);
-        ui.start();
+        if (useDebugUI) {
+          const ui = new InteractiveUI(ws, participant.id, spaceId);
+          ui.start();
+        } else {
+          startAdvancedInteractiveUI(ws, participant.id, spaceId);
+        }
       });
 
       ws.on('error', (err) => {
