@@ -36,7 +36,9 @@ This specification covers:
     ├── js-yaml           # Parse space.yaml config
     ├── commander         # CLI argument parsing
     ├── ws                # WebSocket client
-    └── readline          # Terminal UI
+    ├── ink               # React-based terminal UI (advanced mode)
+    ├── react             # UI framework for Ink
+    └── readline          # Simple terminal UI (debug mode)
 ```
 
 ## Commands
@@ -256,9 +258,14 @@ Minimal error handling for test scenarios:
 
 ## Dependencies
 
-Minimal dependencies:
+Core dependencies:
 - `ws` - WebSocket client/server
 - `commander` - Command parsing
+- `ink` - React-based terminal UI (advanced interactive mode)
+- `react` - UI framework for Ink components
+- `pm2` - Process manager (embedded library)
+- `js-yaml` - Parse space.yaml configuration
+- `readline` - Simple terminal UI (debug mode)
 - Core SDK packages (@mew/gateway, @mew/client, @mew/agent)
 
 ## Configuration
@@ -517,13 +524,16 @@ Options:
   --participant <id>      Connect as this participant
   --interactive, -i      Connect interactively after starting space
   --detach, -d            Run in background (incompatible with -i)
+  --debug                 Use simple debug interface instead of advanced UI
+  --simple                Alias for --debug
+  --no-ui                 Disable UI enhancements, use plain interface
 ```
 
 This command:
 1. Creates space-local PM2 daemon in `.mew/pm2/`
 2. Starts the gateway using PM2 for process management
 3. Starts all agents with `auto_start: true` via PM2
-4. If `-i` flag is present: Connects interactively as a participant
+4. If `-i` flag is present: Connects interactively as a participant (uses advanced UI by default, or debug UI with `--debug`)
 5. If `-d` flag is present: Runs in background without connecting
 6. If neither flag: Starts space and exits (current behavior)
 
@@ -587,6 +597,9 @@ Options:
   --participant <id>     Connect as this participant
   --space-dir <path>     Directory of space to connect to (default: .)
   --gateway <url>        Override gateway URL (default: from running space)
+  --debug                 Use simple debug interface instead of advanced UI
+  --simple                Alias for --debug
+  --no-ui                 Disable UI enhancements, use plain interface
 ```
 
 This command:
@@ -594,7 +607,7 @@ This command:
 2. Loads space configuration
 3. Resolves participant (same logic as `space up`)
 4. Connects interactively to the space
-5. Shows interactive terminal UI
+5. Shows interactive terminal UI (advanced mode by default, debug mode with `--debug`)
 
 Error handling:
 - If space not running: "No running space found. Use 'mew space up' first."
@@ -672,7 +685,71 @@ mew space clean --all --force
 
 ## Interactive Terminal Interface
 
-The interactive connection feature provides a lightweight terminal UI for sending and receiving MEW protocol messages. This is a protocol debugging tool with convenience features, not a polished chat interface.
+The CLI provides two interactive modes for different use cases:
+
+1. **Advanced Interactive Mode (default)**: Full-featured Ink-based UI with MCP operation confirmations, native terminal scrolling, and rich formatting
+2. **Debug Mode**: Simple readline-based interface for protocol debugging and testing environments
+
+### Advanced Interactive Mode (Default)
+
+The default interactive mode uses Ink (React for CLI) to provide a modern terminal interface that preserves native scrolling behavior while adding rich UI components for operation confirmations and status display.
+
+**Key Features:**
+- Native terminal scrolling for message history
+- Persistent bottom UI with input composer and status
+- MCP operation confirmation dialogs with risk assessment
+- Rich message formatting with syntax highlighting
+- Real-time participant status and typing indicators
+- Auto-approval rules for trusted operations
+
+**Architecture:**
+- Message history uses Ink's `Static` component for native scrolling
+- Persistent bottom panel stays fixed during scrolling
+- Content-aware truncation prevents UI overflow
+- Preserves terminal features (text selection, copy/paste)
+
+### Debug Mode (--debug flag)
+
+A lightweight terminal interface for protocol debugging and automated testing. This is a protocol debugging tool with convenience features, not a polished chat interface.
+
+### MCP Operation Confirmation Workflow
+
+The advanced interactive mode includes built-in confirmation dialogs for MCP (Model Context Protocol) operations that require human approval:
+
+**Confirmation Dialog Features:**
+- Risk assessment display (safe, caution, dangerous)
+- Operation details with clear parameter formatting
+- Auto-approval rules for trusted operations
+- Persistent approval for similar operations
+- Timeout handling for unattended operations
+
+**Auto-approval Rules:**
+- Read-only operations (tools/list, workspace/browse)
+- Operations from trusted participants
+- Previously approved operation patterns
+- Operations below risk threshold
+
+**Risk Assessment Criteria:**
+- File system access (read vs write)
+- Network requests (internal vs external)
+- Code execution capabilities
+- Destructive potential
+
+**Example Confirmation Dialog:**
+```
+┌─ MCP Operation Approval Required ──────────────────┐
+│ calculator wants to execute: tools/call            │
+│                                                     │
+│ Method: tools/call                                  │
+│ Tool: file_write                                   │
+│ Args: { path: "/tmp/result.txt", content: "42" }   │
+│                                                     │
+│ Risk Level: CAUTION (file system write)            │
+│                                                     │
+│ [a] Approve  [d] Deny  [r] Remember choice         │
+│ [v] View full request  [?] Help                    │
+└─────────────────────────────────────────────────────┘
+```
 
 ### Input Processing
 
@@ -774,14 +851,20 @@ The interactive connection always uses:
 
 #### Interactive Development Session
 ```bash
-# Start fresh and connect immediately
+# Start fresh and connect immediately with advanced UI
 mew space up -i
+
+# Connect with debug interface for protocol debugging
+mew space up -i --debug
 
 # In another terminal, connect as different participant
 mew space connect --participant admin
 
 # Connect to space in another directory
 mew space connect --space-dir ../other-project
+
+# Connect with simple debug interface
+mew space connect --participant debugger --debug
 
 # In another terminal, CI system connects with FIFOs for automation
 mkfifo ci-in ci-out
