@@ -1,6 +1,6 @@
 /**
  * Interactive Terminal UI
- * 
+ *
  * Provides a lightweight terminal interface for sending and receiving MEW protocol messages.
  * This is a protocol debugging tool with convenience features.
  */
@@ -17,13 +17,13 @@ class InteractiveUI {
     this.verbose = false;
     this.messageHistory = [];
     this.rl = null;
-    
+
     // Environment configuration
     this.showHeartbeat = process.env.MEW_INTERACTIVE_SHOW_HEARTBEAT === 'true';
     this.showSystem = process.env.MEW_INTERACTIVE_SHOW_SYSTEM !== 'false'; // default true
     this.useColor = process.env.MEW_INTERACTIVE_COLOR !== 'false'; // default true
   }
-  
+
   /**
    * Starts the interactive UI
    */
@@ -32,7 +32,7 @@ class InteractiveUI {
     this.setupWebSocketHandlers();
     this.showWelcome();
   }
-  
+
   /**
    * Sets up readline interface for terminal input
    */
@@ -40,14 +40,14 @@ class InteractiveUI {
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
-      prompt: this.useColor ? chalk.green('> ') : '> '
+      prompt: this.useColor ? chalk.green('> ') : '> ',
     });
-    
+
     this.rl.on('line', (input) => {
       this.processInput(input.trim());
       this.rl.prompt();
     });
-    
+
     this.rl.on('close', () => {
       console.log('\nDisconnecting...');
       if (this.ws && this.ws.readyState === 1) {
@@ -55,10 +55,10 @@ class InteractiveUI {
       }
       process.exit(0);
     });
-    
+
     this.rl.prompt();
   }
-  
+
   /**
    * Sets up WebSocket message handlers
    */
@@ -71,18 +71,18 @@ class InteractiveUI {
         console.error('Failed to parse message:', err);
       }
     });
-    
+
     this.ws.on('close', () => {
       console.log('\nConnection closed');
       this.rl.close();
     });
-    
+
     this.ws.on('error', (err) => {
       console.error('WebSocket error:', err);
       this.rl.close();
     });
   }
-  
+
   /**
    * Shows welcome message
    */
@@ -99,20 +99,20 @@ class InteractiveUI {
     }
     console.log();
   }
-  
+
   /**
    * Processes user input with smart detection
    * @param {string} input - User input
    */
   processInput(input) {
     if (!input) return;
-    
+
     // 1. Commands (start with /)
     if (input.startsWith('/')) {
       this.handleCommand(input);
       return;
     }
-    
+
     // 2. Try JSON
     try {
       const json = JSON.parse(input);
@@ -131,7 +131,7 @@ class InteractiveUI {
       this.sendChat(input);
     }
   }
-  
+
   /**
    * Handles slash commands
    * @param {string} command - Command string
@@ -139,25 +139,25 @@ class InteractiveUI {
   handleCommand(command) {
     const [cmd, ...args] = command.split(' ');
     const arg = args.join(' ');
-    
+
     switch (cmd) {
       case '/help':
         this.showHelp();
         break;
-        
+
       case '/participants':
         this.requestParticipants();
         break;
-        
+
       case '/capabilities':
         this.showCapabilities();
         break;
-        
+
       case '/verbose':
         this.verbose = !this.verbose;
         console.log(`Verbose mode: ${this.verbose ? 'ON' : 'OFF'}`);
         break;
-        
+
       case '/json':
         if (arg) {
           try {
@@ -170,7 +170,7 @@ class InteractiveUI {
           console.log('Usage: /json <message>');
         }
         break;
-        
+
       case '/chat':
         if (arg) {
           this.sendChat(arg);
@@ -178,24 +178,24 @@ class InteractiveUI {
           console.log('Usage: /chat <text>');
         }
         break;
-        
+
       case '/replay':
         this.replayMessages(parseInt(args[0]) || 10);
         break;
-        
+
       case '/clear':
         console.clear();
         break;
-        
+
       case '/exit':
         this.rl.close();
         break;
-        
+
       default:
         console.log(`Unknown command: ${cmd}. Type /help for available commands.`);
     }
   }
-  
+
   /**
    * Shows help message
    */
@@ -212,7 +212,7 @@ class InteractiveUI {
     console.log('  /exit              Disconnect and exit');
     console.log();
   }
-  
+
   /**
    * Sends a chat message
    * @param {string} text - Chat text
@@ -220,11 +220,11 @@ class InteractiveUI {
   sendChat(text) {
     const message = {
       kind: 'chat',
-      payload: { text }
+      payload: { text },
     };
     this.sendMessage(this.wrapEnvelope(message));
   }
-  
+
   /**
    * Sends a message to the WebSocket
    * @param {Object} message - Message to send
@@ -234,12 +234,12 @@ class InteractiveUI {
       console.error('WebSocket is not connected');
       return;
     }
-    
+
     this.ws.send(JSON.stringify(message));
     this.displayMessage(message, true);
     this.messageHistory.push({ message, sent: true, timestamp: new Date() });
   }
-  
+
   /**
    * Handles incoming WebSocket message
    * @param {Object} message - Received message
@@ -249,33 +249,36 @@ class InteractiveUI {
     if (!this.showHeartbeat && message.kind === 'system/heartbeat') {
       return;
     }
-    
-    if (!this.showSystem && message.kind?.startsWith('system/') && 
-        message.kind !== 'system/error') {
+
+    if (
+      !this.showSystem &&
+      message.kind?.startsWith('system/') &&
+      message.kind !== 'system/error'
+    ) {
       return;
     }
-    
+
     this.displayMessage(message, false);
     this.messageHistory.push({ message, sent: false, timestamp: new Date() });
   }
-  
+
   /**
    * Displays a message in the terminal
    * @param {Object} message - Message to display
    * @param {boolean} sent - Whether this was sent by us
    */
   displayMessage(message, sent) {
-    const timestamp = new Date().toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit' 
+    const timestamp = new Date().toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
     });
-    
+
     const direction = sent ? '→' : '←';
-    const participant = sent ? 'you' : (message.from || 'system');
+    const participant = sent ? 'you' : message.from || 'system';
     const kind = message.kind || 'unknown';
-    
+
     if (this.verbose) {
       // Verbose mode - show full JSON
       const header = `[${timestamp}] ${direction} ${participant} ${kind}`;
@@ -284,7 +287,7 @@ class InteractiveUI {
     } else {
       // Normal mode - show summary
       const header = `[${timestamp}] ${direction} ${participant} ${kind}`;
-      
+
       // Color based on message type
       let headerColor = (text) => text;
       if (this.useColor) {
@@ -300,9 +303,9 @@ class InteractiveUI {
           headerColor = chalk.cyan;
         }
       }
-      
+
       console.log(headerColor(header));
-      
+
       // Show payload preview
       if (message.payload) {
         const preview = this.getPayloadPreview(message.payload, kind);
@@ -311,7 +314,7 @@ class InteractiveUI {
     }
     console.log();
   }
-  
+
   /**
    * Gets a preview string for a payload
    * @param {*} payload - Message payload
@@ -322,7 +325,7 @@ class InteractiveUI {
     if (kind === 'chat' && payload.text) {
       return `"${payload.text}"`;
     }
-    
+
     if (kind === 'mcp/request' && payload.method) {
       let preview = `method: "${payload.method}"`;
       if (payload.params?.name) {
@@ -333,7 +336,7 @@ class InteractiveUI {
       }
       return preview;
     }
-    
+
     if (kind === 'mcp/response') {
       if (payload.result) {
         if (Array.isArray(payload.result)) {
@@ -349,7 +352,7 @@ class InteractiveUI {
         return `error: ${payload.error.message || payload.error}`;
       }
     }
-    
+
     // Generic preview
     if (typeof payload === 'string') {
       return `"${payload}"`;
@@ -360,13 +363,13 @@ class InteractiveUI {
     if (typeof payload === 'object') {
       const keys = Object.keys(payload);
       if (keys.length <= 3) {
-        return keys.map(k => `${k}: ${JSON.stringify(payload[k])}`).join(', ');
+        return keys.map((k) => `${k}: ${JSON.stringify(payload[k])}`).join(', ');
       }
       return `{${keys.slice(0, 2).join(', ')}... +${keys.length - 2} more}`;
     }
     return String(payload);
   }
-  
+
   /**
    * Replays recent messages
    * @param {number} count - Number of messages to replay
@@ -377,17 +380,17 @@ class InteractiveUI {
       console.log('No messages to replay');
       return;
     }
-    
+
     console.log(`\n=== Replaying last ${messages.length} messages ===\n`);
     messages.forEach(({ message, sent, timestamp }) => {
-      const time = timestamp.toLocaleTimeString('en-US', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        second: '2-digit' 
+      const time = timestamp.toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
       });
       const direction = sent ? '→' : '←';
-      const participant = sent ? 'you' : (message.from || 'system');
+      const participant = sent ? 'you' : message.from || 'system';
       console.log(`[${time}] ${direction} ${participant} ${message.kind}`);
       if (this.verbose) {
         console.log(JSON.stringify(message, null, 2));
@@ -395,7 +398,7 @@ class InteractiveUI {
     });
     console.log('\n=== End replay ===\n');
   }
-  
+
   /**
    * Requests participant list
    */
@@ -405,7 +408,7 @@ class InteractiveUI {
     console.log('Requesting participant list...');
     // TODO: Implement when system/participants message is supported
   }
-  
+
   /**
    * Shows current capabilities
    */
@@ -417,20 +420,16 @@ class InteractiveUI {
     console.log('  - mcp/*');
     // TODO: Get actual capabilities from connection
   }
-  
+
   /**
    * Checks if an object is a valid MEW envelope
    * @param {Object} obj - Object to check
    * @returns {boolean}
    */
   isValidEnvelope(obj) {
-    return obj && 
-           obj.protocol === 'mew/v0.3' &&
-           obj.id && 
-           obj.ts && 
-           obj.kind;
+    return obj && obj.protocol === 'mew/v0.3' && obj.id && obj.ts && obj.kind;
   }
-  
+
   /**
    * Wraps a partial message into a full MEW envelope
    * @param {Object} message - Partial message
@@ -444,7 +443,7 @@ class InteractiveUI {
       from: this.participantId,
       kind: message.kind,
       payload: message.payload,
-      ...message
+      ...message,
     };
   }
 }

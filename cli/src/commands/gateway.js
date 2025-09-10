@@ -7,8 +7,7 @@ const yaml = require('js-yaml');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const gateway = new Command('gateway')
-  .description('Gateway server management');
+const gateway = new Command('gateway').description('Gateway server management');
 
 gateway
   .command('start')
@@ -18,27 +17,27 @@ gateway
   .option('-s, --space-config <path>', 'Path to space.yaml configuration', './space.yaml')
   .action(async (options) => {
     const port = parseInt(options.port);
-    
+
     // If we're running as a detached process, redirect console output to a log file
     if (process.env.GATEWAY_LOG_FILE) {
       const fs = require('fs');
       const logStream = fs.createWriteStream(process.env.GATEWAY_LOG_FILE, { flags: 'a' });
       const originalLog = console.log;
       const originalError = console.error;
-      
-      console.log = function(...args) {
+
+      console.log = function (...args) {
         const message = args.join(' ');
         logStream.write(`[${new Date().toISOString()}] ${message}\n`);
       };
-      
-      console.error = function(...args) {
+
+      console.error = function (...args) {
         const message = args.join(' ');
         logStream.write(`[${new Date().toISOString()}] ERROR: ${message}\n`);
       };
     }
-    
+
     console.log(`Starting MEW gateway on port ${port}...`);
-    
+
     // Load space configuration (CLI responsibility, not gateway)
     let spaceConfig = null;
     try {
@@ -52,77 +51,80 @@ gateway
       console.error(`Failed to load space configuration: ${error.message}`);
       console.log('Continuing with default configuration...');
     }
-    
+
     // Create Express app for health endpoint
     const app = express();
     app.use(express.json());
-    
+
     // Health endpoint
     app.get('/health', (req, res) => {
       res.json({
         status: 'ok',
         spaces: spaces.size,
-        clients: Array.from(spaces.values()).reduce((sum, space) => sum + space.participants.size, 0),
+        clients: Array.from(spaces.values()).reduce(
+          (sum, space) => sum + space.participants.size,
+          0,
+        ),
         uptime: process.uptime(),
-        features: ['capabilities', 'context', 'validation']
+        features: ['capabilities', 'context', 'validation'],
       });
     });
-    
+
     // Create HTTP server
     const server = http.createServer(app);
-    
+
     // Create WebSocket server
     const wss = new WebSocket.Server({ server });
-    
+
     // Track spaces and participants
     const spaces = new Map(); // spaceId -> { participants: Map(participantId -> ws) }
-    
+
     // Track participant info
     const participantTokens = new Map(); // participantId -> token
     const participantCapabilities = new Map(); // participantId -> capabilities array
     const runtimeCapabilities = new Map(); // participantId -> Map(grantId -> capabilities)
-    
+
     // Track spawned processes
     const spawnedProcesses = new Map(); // participantId -> ChildProcess
-    
+
     // Gateway hooks for external configuration
     let capabilityResolver = null;
     let participantJoinedCallback = null;
     let authorizationHook = null;
-    
+
     // Set capability resolver hook
-    gateway.setCapabilityResolver = function(resolver) {
+    gateway.setCapabilityResolver = function (resolver) {
       capabilityResolver = resolver;
     };
-    
+
     // Set participant joined callback
-    gateway.onParticipantJoined = function(callback) {
+    gateway.onParticipantJoined = function (callback) {
       participantJoinedCallback = callback;
     };
-    
+
     // Set authorization hook
-    gateway.setAuthorizationHook = function(hook) {
+    gateway.setAuthorizationHook = function (hook) {
       authorizationHook = hook;
     };
-    
+
     // Default capability resolver using space.yaml
     async function defaultCapabilityResolver(token, participantId, messageKind) {
       if (!spaceConfig) {
         // Fallback to basic defaults
-        return [{kind: 'chat'}];
+        return [{ kind: 'chat' }];
       }
-      
+
       // Find participant by token
       for (const [pid, config] of Object.entries(spaceConfig.participants)) {
         if (config.tokens && config.tokens.includes(token)) {
           return config.capabilities || spaceConfig.defaults?.capabilities || [];
         }
       }
-      
+
       // Return default capabilities if no match
-      return spaceConfig.defaults?.capabilities || [{kind: 'chat'}];
+      return spaceConfig.defaults?.capabilities || [{ kind: 'chat' }];
     }
-    
+
     // Use custom resolver if set, otherwise use default
     async function resolveCapabilities(token, participantId, messageKind) {
       if (capabilityResolver) {
@@ -130,12 +132,12 @@ gateway
       }
       return await defaultCapabilityResolver(token, participantId, messageKind);
     }
-    
+
     // Check if message matches capability pattern
     function matchesCapability(message, capability) {
       // Simple kind matching first
       if (capability.kind === '*') return true;
-      
+
       // Wildcard pattern matching
       if (capability.kind && capability.kind.endsWith('/*')) {
         const prefix = capability.kind.slice(0, -2);
@@ -147,7 +149,7 @@ gateway
           return true;
         }
       }
-      
+
       // Exact kind match
       if (capability.kind === message.kind) {
         // If capability has payload pattern, it must match
@@ -157,14 +159,14 @@ gateway
         // No payload pattern means any payload is allowed
         return true;
       }
-      
+
       return false;
     }
-    
+
     // Match payload patterns (simplified version)
     function matchesPayloadPattern(payload, pattern) {
       if (!payload || !pattern) return false;
-      
+
       for (const [key, value] of Object.entries(pattern)) {
         if (typeof value === 'string') {
           // Handle wildcards in strings
@@ -183,63 +185,63 @@ gateway
           }
         }
       }
-      
+
       return true;
     }
-    
+
     // Check if participant has capability for message
     async function hasCapabilityForMessage(participantId, message) {
       // Get static capabilities from config
       const staticCapabilities = participantCapabilities.get(participantId) || [];
-      
+
       // Get runtime capabilities (granted dynamically)
       const runtimeCaps = runtimeCapabilities.get(participantId);
       const dynamicCapabilities = runtimeCaps ? Array.from(runtimeCaps.values()).flat() : [];
-      
+
       // Merge static and dynamic capabilities
       const allCapabilities = [...staticCapabilities, ...dynamicCapabilities];
-      
+
       if (options.logLevel === 'debug' && dynamicCapabilities.length > 0) {
         console.log(`Checking capabilities for ${participantId}:`, {
           static: staticCapabilities,
           dynamic: dynamicCapabilities,
-          message: {kind: message.kind, payload: message.payload}
+          message: { kind: message.kind, payload: message.payload },
         });
       }
-      
+
       // Check each capability pattern
       for (const cap of allCapabilities) {
         if (matchesCapability(message, cap)) {
           return true;
         }
       }
-      
+
       return false;
     }
-    
+
     // Auto-start agents with auto_start: true
     function autoStartAgents() {
       if (!spaceConfig || !spaceConfig.participants) return;
-      
+
       for (const [participantId, config] of Object.entries(spaceConfig.participants)) {
         if (config.auto_start && config.command) {
           console.log(`Auto-starting agent: ${participantId}`);
-          
+
           const child = spawn(config.command, config.args || [], {
             env: { ...process.env, ...config.env },
-            stdio: 'inherit'
+            stdio: 'inherit',
           });
-          
+
           spawnedProcesses.set(participantId, child);
-          
+
           child.on('error', (error) => {
             console.error(`Failed to start ${participantId}:`, error);
           });
-          
+
           child.on('exit', (code, signal) => {
             console.log(`${participantId} exited with code ${code}, signal ${signal}`);
             spawnedProcesses.delete(participantId);
-            
+
             // Handle restart policy
             if (config.restart_policy === 'on-failure' && code !== 0) {
               console.log(`Restarting ${participantId} due to failure...`);
@@ -249,79 +251,85 @@ gateway
         }
       }
     }
-    
+
     // Validate message structure
     function validateMessage(message) {
       if (!message || typeof message !== 'object') {
         return 'Message must be an object';
       }
-      
+
       // Protocol version check
       if (message.protocol && message.protocol !== 'mew/v0.3') {
         return `Invalid protocol version: ${message.protocol}`;
       }
-      
+
       // Check required fields based on kind
       if (message.kind === 'chat' && !message.payload?.text) {
         return 'Chat message requires payload.text';
       }
-      
+
       if (message.kind === 'mcp/request' && !message.payload?.method) {
         return 'MCP request requires payload.method';
       }
-      
+
       return null; // Valid
     }
-    
+
     // Handle WebSocket connections
     wss.on('connection', (ws, req) => {
       let participantId = null;
       let spaceId = null;
-      
+
       if (options.logLevel === 'debug') {
         console.log('New WebSocket connection');
       }
-      
+
       ws.on('message', async (data) => {
         try {
           const message = JSON.parse(data.toString());
-          
+
           // Validate message
           const validationError = validateMessage(message);
           if (validationError) {
-            ws.send(JSON.stringify({
-              protocol: 'mew/v0.3',
-              kind: 'system/error',
-              payload: {
-                error: validationError,
-                code: 'VALIDATION_ERROR'
-              }
-            }));
+            ws.send(
+              JSON.stringify({
+                protocol: 'mew/v0.3',
+                kind: 'system/error',
+                payload: {
+                  error: validationError,
+                  code: 'VALIDATION_ERROR',
+                },
+              }),
+            );
             return;
           }
-          
+
           // Handle join (special case - before capability check)
           if (message.kind === 'system/join' || message.type === 'join') {
-            participantId = message.participantId || message.payload?.participantId || `participant-${Date.now()}`;
-            spaceId = message.space || message.payload?.space || spaceConfig?.space?.id || 'default';
+            participantId =
+              message.participantId ||
+              message.payload?.participantId ||
+              `participant-${Date.now()}`;
+            spaceId =
+              message.space || message.payload?.space || spaceConfig?.space?.id || 'default';
             const token = message.token || message.payload?.token;
-            
+
             // Create space if it doesn't exist
             if (!spaces.has(spaceId)) {
               spaces.set(spaceId, { participants: new Map() });
             }
-            
+
             // Add participant to space
             const space = spaces.get(spaceId);
             space.participants.set(participantId, ws);
             ws.participantId = participantId;
             ws.spaceId = spaceId;
-            
+
             // Store token and resolve capabilities
             participantTokens.set(participantId, token);
             const capabilities = await resolveCapabilities(token, participantId, null);
             participantCapabilities.set(participantId, capabilities);
-            
+
             // Send welcome message per MEW v0.2 spec
             const welcomeMessage = {
               protocol: 'mew/v0.3',
@@ -333,19 +341,19 @@ gateway
               payload: {
                 you: {
                   id: participantId,
-                  capabilities: capabilities
+                  capabilities: capabilities,
                 },
                 participants: Array.from(space.participants.keys())
-                  .filter(pid => pid !== participantId)
-                  .map(pid => ({
+                  .filter((pid) => pid !== participantId)
+                  .map((pid) => ({
                     id: pid,
-                    capabilities: participantCapabilities.get(pid) || []
-                  }))
-              }
+                    capabilities: participantCapabilities.get(pid) || [],
+                  })),
+              },
             };
-            
+
             ws.send(JSON.stringify(welcomeMessage));
-            
+
             // Broadcast presence to others
             const presenceMessage = {
               protocol: 'mew/v0.3',
@@ -357,31 +365,31 @@ gateway
                 event: 'join',
                 participant: {
                   id: participantId,
-                  capabilities: capabilities
-                }
-              }
+                  capabilities: capabilities,
+                },
+              },
             };
-            
+
             for (const [pid, pws] of space.participants.entries()) {
               if (pid !== participantId && pws.readyState === WebSocket.OPEN) {
                 pws.send(JSON.stringify(presenceMessage));
               }
             }
-            
+
             // Call participant joined callback if set
             if (participantJoinedCallback) {
               await participantJoinedCallback(participantId, token, {
                 space: spaceId,
-                capabilities: capabilities
+                capabilities: capabilities,
               });
             }
-            
+
             console.log(`${participantId} joined space ${spaceId} with token ${token || 'none'}`);
             return;
           }
-          
+
           // Check capabilities for non-join messages
-          if (!await hasCapabilityForMessage(participantId, message)) {
+          if (!(await hasCapabilityForMessage(participantId, message))) {
             const errorMessage = {
               protocol: 'mew/v0.3',
               id: `error-${Date.now()}`,
@@ -393,22 +401,24 @@ gateway
               payload: {
                 error: 'capability_violation',
                 attempted_kind: message.kind,
-                your_capabilities: participantCapabilities.get(participantId) || []
-              }
+                your_capabilities: participantCapabilities.get(participantId) || [],
+              },
             };
-            
+
             ws.send(JSON.stringify(errorMessage));
-            
+
             if (options.logLevel === 'debug') {
               console.log(`Capability denied for ${participantId}: ${message.kind}`);
             }
             return;
           }
-          
+
           // Handle capability management messages
           if (message.kind === 'capability/grant') {
             // Check if sender has capability to grant capabilities
-            const canGrant = await hasCapabilityForMessage(participantId, {kind: 'capability/grant'});
+            const canGrant = await hasCapabilityForMessage(participantId, {
+              kind: 'capability/grant',
+            });
             if (!canGrant) {
               const errorMessage = {
                 protocol: 'mew/v0.3',
@@ -421,30 +431,35 @@ gateway
                 payload: {
                   error: 'capability_violation',
                   message: 'You do not have permission to grant capabilities',
-                  attempted_kind: message.kind
-                }
+                  attempted_kind: message.kind,
+                },
               };
               ws.send(JSON.stringify(errorMessage));
               return;
             }
-            
+
             const recipient = message.payload?.recipient;
             const grantCapabilities = message.payload?.capabilities || [];
             const grantId = message.id || `grant-${Date.now()}`;
-            
+
             if (recipient && grantCapabilities.length > 0) {
               // Initialize runtime capabilities for recipient if needed
               if (!runtimeCapabilities.has(recipient)) {
                 runtimeCapabilities.set(recipient, new Map());
               }
-              
+
               // Store the granted capabilities
               const recipientCaps = runtimeCapabilities.get(recipient);
               recipientCaps.set(grantId, grantCapabilities);
-              
-              console.log(`Granted capabilities to ${recipient}: ${JSON.stringify(grantCapabilities)}`);
-              console.log(`Runtime capabilities for ${recipient}:`, Array.from(recipientCaps.entries()));
-              
+
+              console.log(
+                `Granted capabilities to ${recipient}: ${JSON.stringify(grantCapabilities)}`,
+              );
+              console.log(
+                `Runtime capabilities for ${recipient}:`,
+                Array.from(recipientCaps.entries()),
+              );
+
               // Send acknowledgment to recipient
               const space = spaces.get(spaceId);
               const recipientWs = space?.participants.get(recipient);
@@ -460,15 +475,17 @@ gateway
                   payload: {
                     status: 'accepted',
                     grant_id: grantId,
-                    capabilities: grantCapabilities
-                  }
+                    capabilities: grantCapabilities,
+                  },
                 };
                 recipientWs.send(JSON.stringify(ackMessage));
               }
             }
           } else if (message.kind === 'capability/revoke') {
             // Check if sender has capability to revoke capabilities
-            const canRevoke = await hasCapabilityForMessage(participantId, {kind: 'capability/revoke'});
+            const canRevoke = await hasCapabilityForMessage(participantId, {
+              kind: 'capability/revoke',
+            });
             if (!canRevoke) {
               const errorMessage = {
                 protocol: 'mew/v0.3',
@@ -481,20 +498,20 @@ gateway
                 payload: {
                   error: 'capability_violation',
                   message: 'You do not have permission to revoke capabilities',
-                  attempted_kind: message.kind
-                }
+                  attempted_kind: message.kind,
+                },
               };
               ws.send(JSON.stringify(errorMessage));
               return;
             }
-            
+
             const recipient = message.payload?.recipient;
             const grantIdToRevoke = message.payload?.grant_id;
             const capabilitiesToRevoke = message.payload?.capabilities;
-            
+
             if (recipient) {
               const recipientCaps = runtimeCapabilities.get(recipient);
-              
+
               if (recipientCaps) {
                 if (grantIdToRevoke) {
                   // Revoke by grant ID
@@ -505,7 +522,7 @@ gateway
                 } else if (capabilitiesToRevoke) {
                   // Revoke by capability patterns - remove all matching grants
                   for (const [grantId, caps] of recipientCaps.entries()) {
-                    const remainingCaps = caps.filter(cap => {
+                    const remainingCaps = caps.filter((cap) => {
                       // Check if this capability should be revoked
                       for (const revokePattern of capabilitiesToRevoke) {
                         if (JSON.stringify(cap) === JSON.stringify(revokePattern)) {
@@ -514,16 +531,18 @@ gateway
                       }
                       return true; // Keep this capability
                     });
-                    
+
                     if (remainingCaps.length === 0) {
                       recipientCaps.delete(grantId);
                     } else {
                       recipientCaps.set(grantId, remainingCaps);
                     }
                   }
-                  console.log(`Revoked capabilities from ${recipient}: ${JSON.stringify(capabilitiesToRevoke)}`);
+                  console.log(
+                    `Revoked capabilities from ${recipient}: ${JSON.stringify(capabilitiesToRevoke)}`,
+                  );
                 }
-                
+
                 // Clean up empty entries
                 if (recipientCaps.size === 0) {
                   runtimeCapabilities.delete(recipient);
@@ -531,25 +550,25 @@ gateway
               }
             }
           }
-          
+
           // Add protocol envelope fields if missing
           const envelope = {
             protocol: message.protocol || 'mew/v0.3',
             id: message.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             ts: message.ts || new Date().toISOString(),
             from: participantId,
-            ...message
+            ...message,
           };
-          
+
           // Ensure correlation_id is always an array if present
           if (envelope.correlation_id && !Array.isArray(envelope.correlation_id)) {
             envelope.correlation_id = [envelope.correlation_id];
           }
-          
+
           // Route message based on 'to' field
           if (spaceId && spaces.has(spaceId)) {
             const space = spaces.get(spaceId);
-            
+
             if (envelope.to && Array.isArray(envelope.to)) {
               // Send to specific participants
               for (const targetId of envelope.to) {
@@ -566,28 +585,30 @@ gateway
                 }
               }
             }
-            
+
             if (options.logLevel === 'debug') {
               console.log(`Message from ${participantId} in ${spaceId}:`, message.kind);
             }
           }
         } catch (error) {
           console.error('Error handling message:', error);
-          ws.send(JSON.stringify({
-            protocol: 'mew/v0.3',
-            kind: 'system/error',
-            payload: {
-              error: error.message,
-              code: 'PROCESSING_ERROR'
-            }
-          }));
+          ws.send(
+            JSON.stringify({
+              protocol: 'mew/v0.3',
+              kind: 'system/error',
+              payload: {
+                error: error.message,
+                code: 'PROCESSING_ERROR',
+              },
+            }),
+          );
         }
       });
-      
+
       ws.on('error', (error) => {
         console.error('WebSocket error:', error);
       });
-      
+
       ws.on('close', () => {
         if (participantId && spaceId && spaces.has(spaceId)) {
           const space = spaces.get(spaceId);
@@ -595,7 +616,7 @@ gateway
           participantTokens.delete(participantId);
           participantCapabilities.delete(participantId);
           runtimeCapabilities.delete(participantId);
-          
+
           // Broadcast leave presence
           const presenceMessage = {
             protocol: 'mew/v0.3',
@@ -606,24 +627,24 @@ gateway
             payload: {
               event: 'leave',
               participant: {
-                id: participantId
-              }
-            }
+                id: participantId,
+              },
+            },
           };
-          
+
           for (const [pid, pws] of space.participants.entries()) {
             if (pws.readyState === WebSocket.OPEN) {
               pws.send(JSON.stringify(presenceMessage));
             }
           }
-          
+
           if (options.logLevel === 'debug') {
             console.log(`${participantId} disconnected from ${spaceId}`);
           }
         }
       });
     });
-    
+
     // Start server
     server.listen(port, () => {
       console.log(`Gateway listening on port ${port}`);
@@ -632,21 +653,21 @@ gateway
       if (spaceConfig) {
         console.log(`Space configuration loaded: ${spaceConfig.space.name}`);
       }
-      
+
       // Auto-start agents
       autoStartAgents();
     });
-    
+
     // Graceful shutdown
     process.on('SIGTERM', () => {
       console.log('Shutting down gateway...');
-      
+
       // Stop spawned processes
       for (const [pid, child] of spawnedProcesses.entries()) {
         console.log(`Stopping ${pid}...`);
         child.kill('SIGTERM');
       }
-      
+
       // Close WebSocket server
       wss.close(() => {
         server.close(() => {
@@ -654,17 +675,17 @@ gateway
         });
       });
     });
-    
+
     // Handle SIGINT (Ctrl+C) as well
     process.on('SIGINT', () => {
       console.log('\nShutting down gateway...');
-      
+
       // Stop spawned processes
       for (const [pid, child] of spawnedProcesses.entries()) {
         console.log(`Stopping ${pid}...`);
         child.kill('SIGTERM');
       }
-      
+
       // Close WebSocket server
       wss.close(() => {
         server.close(() => {
@@ -672,7 +693,7 @@ gateway
         });
       });
     });
-    
+
     // Keep the process alive
     // The server.listen() callback doesn't prevent Node from exiting
     // When spawned with detached and stdio: ['ignore'], stdin is closed
@@ -680,10 +701,10 @@ gateway
     const keepAlive = setInterval(() => {
       // This empty function keeps the event loop active
     }, 2147483647); // Maximum 32-bit signed integer (~24.8 days)
-    
+
     // Make sure the interval is not optimized away
     keepAlive.unref = () => {};
-    
+
     // Return a promise that never resolves to keep the process alive
     // This is needed when the gateway is started as a detached process
     return new Promise(() => {

@@ -1,4 +1,4 @@
-# ADR-iui: Interactive UI Architecture
+# ADR-005: Simple Interactive UI for Debug Mode
 
 **Status:** Accepted  
 **Date:** 2025-01-10  
@@ -6,13 +6,20 @@
 
 ## Context
 
-The interactive connection feature needs a user interface for sending and receiving MEW protocol messages. The goal is to create a dead-simple implementation that:
-- Shows all protocol messages (sent and received)
-- Provides lightweight helpers for common tasks
-- Remains useful for debugging even after better UIs are created
-- Requires minimal dependencies and complexity
+While the advanced Ink-based UI (ADR-007) provides the default interactive experience, we need a simple fallback mode for:
+- Protocol debugging and troubleshooting
+- Automated testing scenarios  
+- Environments where Ink might not work properly
+- Developers who prefer minimal interfaces
+- CI/CD environments and headless testing
 
-This is explicitly NOT trying to be a polished chat interface or sophisticated client. It's a protocol debugging tool with convenience features.
+This debug mode should be:
+- Extremely simple and reliable
+- Focus on showing raw protocol messages
+- Lightweight with minimal dependencies
+- Available via `--debug`, `--simple`, or `--no-ui` flags
+
+**This is explicitly a protocol debugging tool, NOT the primary user interface.** The default interactive mode uses the Ink-based advanced UI (ADR-007).
 
 ## Options Considered
 
@@ -279,7 +286,7 @@ Status line shows:
 2. **Phase 2**: Add command system
 3. **Phase 3**: Add message formatting and colors
 4. **Phase 4**: Add filtering and shortcuts
-5. **Future**: Keep as debug tool, build separate production UI
+5. **Future**: Maintain as debug/fallback tool alongside advanced Ink-based UI
 
 ## Examples
 
@@ -378,11 +385,7 @@ Active participants:
    - Participant filtering
    - Time-based filtering
 
-4. **Separate production UI**:
-   - Full chat interface
-   - Rich formatting
-   - File uploads
-   - Keep this as debug tool
+**Note:** This remains a debug/testing tool. Advanced UI features are implemented in the default Ink-based interactive mode (ADR-007).
 
 ## Testing Requirements
 

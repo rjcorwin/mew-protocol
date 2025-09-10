@@ -2,7 +2,7 @@
 
 /**
  * MEW Protocol CLI - Minimal implementation for testing
- * 
+ *
  * Commands:
  * - mew gateway start    - Start a gateway server
  * - mew client connect   - Connect to gateway with FIFO mode
@@ -11,11 +11,3 @@
  */
 
 require('../src/index.js');
-
-
-
-
-
-
-
-

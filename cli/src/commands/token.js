@@ -1,7 +1,6 @@
 const { Command } = require('commander');
 
-const token = new Command('token')
-  .description('Token management');
+const token = new Command('token').description('Token management');
 
 token
   .command('create')
@@ -11,7 +10,7 @@ token
   .action((options) => {
     // For now, just return a simple token (participant-id:capabilities)
     // In production, this would create a proper JWT
-    
+
     let capabilities;
     try {
       capabilities = JSON.parse(options.capabilities);
@@ -19,14 +18,16 @@ token
       console.error('Invalid capabilities JSON:', error.message);
       process.exit(1);
     }
-    
+
     // Simple token format for testing
-    const token = Buffer.from(JSON.stringify({
-      participantId: options.participantId,
-      capabilities: capabilities,
-      createdAt: new Date().toISOString()
-    })).toString('base64');
-    
+    const token = Buffer.from(
+      JSON.stringify({
+        participantId: options.participantId,
+        capabilities: capabilities,
+        createdAt: new Date().toISOString(),
+      }),
+    ).toString('base64');
+
     console.log(token);
   });
 
