@@ -160,7 +160,7 @@ meup token create \
 
 ## FIFO Message Format
 
-Messages sent to/from FIFOs use MEUP v0.2 protocol format.
+Messages sent to/from FIFOs use MEW v0.3 protocol format.
 
 **Input (to fifo-in):**
 Simplified format - CLI adds protocol envelope fields:
@@ -174,10 +174,10 @@ Simplified format - CLI adds protocol envelope fields:
 ```
 
 **Output (from fifo-out):**
-Full MEUP v0.2 envelope:
+Full MEW v0.3 envelope:
 ```json
 {
-  "protocol": "meup/v0.2",
+  "protocol": "mew/v0.3",
   "id": "msg-123",
   "ts": "2025-01-05T12:00:00Z",
   "from": "other-agent",
@@ -292,7 +292,7 @@ defaults:
 
 #### Capability Patterns
 
-Capabilities use JSON pattern matching as defined in MEUP v0.2:
+Capabilities use JSON pattern matching as defined in MEW v0.3:
 
 **Simple patterns:**
 ```yaml

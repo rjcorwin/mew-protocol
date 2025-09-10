@@ -6,7 +6,7 @@
 
 ## Context
 
-The current FIFO implementation in `meup space` has revealed a critical blocking issue that prevents test automation:
+The current FIFO implementation in `mew space` has revealed a critical blocking issue that prevents test automation:
 
 1. **Blocking Problem**: When `auto_connect: true` is set with `fifo: true`, the client connects and writes to the output FIFO. If nothing is reading from it, the process blocks indefinitely, hanging the entire test.
 

@@ -1,4 +1,4 @@
-# ADR-pmg: Process Manager for MEUP CLI
+# ADR-pmg: Process Manager for MEW CLI
 
 **Status:** Proposed
 **Date:** 2025-01-07
@@ -6,11 +6,11 @@
 
 ## Context
 
-The MEUP CLI needs to manage long-running processes (gateway, agents, clients) as part of the `meup space up/down` commands. Currently, when spawning the gateway process using Node.js `child_process.spawn()` with `detached: true` and `unref()`, the gateway process dies immediately, even though it stays alive when run directly.
+The MEW CLI needs to manage long-running processes (gateway, agents, clients) as part of the `mew space up/down` commands. Currently, when spawning the gateway process using Node.js `child_process.spawn()` with `detached: true` and `unref()`, the gateway process dies immediately, even though it stays alive when run directly.
 
 Investigation has revealed:
 - The gateway works perfectly when run directly via command line
-- The gateway dies when spawned by `meup space up`, regardless of stdio configuration
+- The gateway dies when spawned by `mew space up`, regardless of stdio configuration
 - Various attempts to keep the process alive (setInterval, never-resolving promises) have failed
 - The issue appears to be related to process group management and signal handling when the parent process exits
 
@@ -35,7 +35,7 @@ Continue trying to fix the current approach with various spawn configurations an
 
 ### Option 2: Implement a Lightweight Process Manager
 
-Create an internal process manager service that runs as a daemon and manages all MEUP processes.
+Create an internal process manager service that runs as a daemon and manages all MEW processes.
 
 **Pros:**
 - Full control over process lifecycle
@@ -122,7 +122,7 @@ Rationale: PM2 is a battle-tested solution that already solves all the process m
    
    // Each space gets its own PM2 daemon instance
    // PM2_HOME set to space directory to keep everything local
-   process.env.PM2_HOME = path.join(spaceDir, '.meup/pm2');
+   process.env.PM2_HOME = path.join(spaceDir, '.mew/pm2');
    
    // Connect to space-specific PM2 daemon
    pm2.connect((err) => {
@@ -131,7 +131,7 @@ Rationale: PM2 is a battle-tested solution that already solves all the process m
    ```
 
 2. **Space-Contained Process Management**
-   - Each space has its own `.meup/pm2/` directory
+   - Each space has its own `.mew/pm2/` directory
    - PM2 daemon, logs, and PIDs all contained within space folder
    - No global PM2 installation or configuration required
    - Users don't need to know PM2 is being used
@@ -141,7 +141,7 @@ Rationale: PM2 is a battle-tested solution that already solves all the process m
    ```
    CLI Command → PM2 Library → Space-local PM2 Daemon → Spawned Process
                       ↓
-              .meup/pm2/ (local to space directory)
+              .mew/pm2/ (local to space directory)
                  ├── pm2.log
                  ├── pm2.pid
                  └── pids/
@@ -152,14 +152,14 @@ Rationale: PM2 is a battle-tested solution that already solves all the process m
    // Programmatic PM2 configuration (no ecosystem file needed)
    pm2.start({
      name: `${spaceId}-gateway`,
-     script: path.resolve(__dirname, '../bin/meup.js'),
+     script: path.resolve(__dirname, '../bin/mew.js'),
      args: ['gateway', 'start', '--port', port],
      cwd: spaceDir,
      autorestart: false,  // We handle restart logic
      max_memory_restart: '500M',
      error_file: path.join(spaceDir, 'logs/gateway-error.log'),
      out_file: path.join(spaceDir, 'logs/gateway-out.log'),
-     pid_file: path.join(spaceDir, '.meup/pm2/pids/gateway.pid')
+     pid_file: path.join(spaceDir, '.mew/pm2/pids/gateway.pid')
    }, callback);
    ```
 
@@ -204,9 +204,9 @@ Rationale: PM2 is a battle-tested solution that already solves all the process m
 ### Migration Path
 
 1. **Phase 1**: Add PM2 as npm dependency, implement space-local daemon
-2. **Phase 2**: Update `meup space up` to use PM2 API with PM2_HOME isolation
-3. **Phase 3**: Update `meup space down` to cleanly shutdown PM2 daemon
-4. **Phase 4**: Add `meup space logs` and `meup space restart` commands leveraging PM2
+2. **Phase 2**: Update `mew space up` to use PM2 API with PM2_HOME isolation
+3. **Phase 3**: Update `mew space down` to cleanly shutdown PM2 daemon
+4. **Phase 4**: Add `mew space logs` and `mew space restart` commands leveraging PM2
 
 ### Testing Strategy
 

@@ -7,7 +7,7 @@
 ## Context
 
 During development and testing, spaces accumulate various artifacts:
-- Process information in `.meup/` directory
+- Process information in `.mew/` directory
 - Log files in `logs/` directory
 - FIFO pipes in `fifos/` directory
 - PM2 daemon state (currently in default PM2_HOME)
@@ -16,19 +16,19 @@ During development and testing, spaces accumulate various artifacts:
 Currently, cleanup is handled by:
 - Manual `rm -rf` commands
 - Test teardown scripts
-- `meup space down` (only stops processes)
+- `mew space down` (only stops processes)
 
 We need a formalized cleanup command that provides consistent, reliable cleanup of space artifacts while giving users control over what to preserve.
 
 ## Options Considered
 
-### Option 1: Extend `meup space down` with cleanup flags
+### Option 1: Extend `mew space down` with cleanup flags
 
 Add flags to the existing `down` command:
 ```bash
-meup space down --clean        # Stop and clean everything
-meup space down --clean-logs   # Stop and clean logs
-meup space down --clean-all    # Stop and clean everything including PM2
+mew space down --clean        # Stop and clean everything
+mew space down --clean-logs   # Stop and clean logs
+mew space down --clean-all    # Stop and clean everything including PM2
 ```
 
 **Pros:**
@@ -41,13 +41,13 @@ meup space down --clean-all    # Stop and clean everything including PM2
 - Can't clean without stopping
 - Unclear what happens if space is already stopped
 
-### Option 2: New `meup space clean` command
+### Option 2: New `mew space clean` command
 
 Create a dedicated cleanup command:
 ```bash
-meup space clean              # Clean default artifacts (logs, fifos)
-meup space clean --all        # Clean everything including .meup
-meup space clean --logs-only  # Clean only logs
+mew space clean              # Clean default artifacts (logs, fifos)
+mew space clean --all        # Clean everything including .mew
+mew space clean --logs-only  # Clean only logs
 ```
 
 **Pros:**
@@ -60,12 +60,12 @@ meup space clean --logs-only  # Clean only logs
 - Additional command to learn
 - Might clean while space is running (dangerous)
 
-### Option 3: New `meup space reset` command
+### Option 3: New `mew space reset` command
 
 Reset implies both stopping and cleaning:
 ```bash
-meup space reset              # Stop everything and clean
-meup space reset --preserve-logs  # Stop and clean but keep logs
+mew space reset              # Stop everything and clean
+mew space reset --preserve-logs  # Stop and clean but keep logs
 ```
 
 **Pros:**
@@ -80,9 +80,9 @@ meup space reset --preserve-logs  # Stop and clean but keep logs
 ### Option 4: Multiple specific commands
 
 ```bash
-meup space stop               # Just stop processes
-meup space clean              # Just clean artifacts
-meup space purge              # Nuclear option - clean everything
+mew space stop               # Just stop processes
+mew space clean              # Just clean artifacts
+mew space purge              # Nuclear option - clean everything
 ```
 
 **Pros:**
@@ -96,7 +96,7 @@ meup space purge              # Nuclear option - clean everything
 
 ## Decision
 
-Implement **Option 2: `meup space clean` command** with safety checks.
+Implement **Option 2: `mew space clean` command** with safety checks.
 
 This provides the best balance of flexibility and safety while maintaining clear separation of concerns.
 
@@ -104,10 +104,10 @@ This provides the best balance of flexibility and safety while maintaining clear
 
 #### Command Structure
 ```bash
-meup space clean [options]
+mew space clean [options]
 
 Options:
-  --all                 Clean everything including .meup directory
+  --all                 Clean everything including .mew directory
   --logs                Clean only log files
   --fifos               Clean only FIFO pipes
   --force               Skip confirmation prompts
@@ -118,7 +118,7 @@ Options:
 - Clean logs/* (except current session if running)
 - Clean fifos/*
 - Clean temporary files
-- Preserve .meup/ directory (contains state)
+- Preserve .mew/ directory (contains state)
 
 #### Safety Checks
 1. **Running Space Detection**
@@ -134,21 +134,21 @@ Options:
    ```
 
 3. **Preserve Important Files**
-   - Keep .meup/pids.json if space is running
+   - Keep .mew/pids.json if space is running
    - Option to preserve recent logs (--keep-recent)
    - Never delete space.yaml or agent files
 
 #### What Gets Cleaned
 
-**Default (`meup space clean`):**
+**Default (`mew space clean`):**
 - `logs/*.log` - All log files
 - `fifos/*` - All FIFO pipes (if not in use)
 - Temporary response files
-- Old PM2 logs in .meup/pm2/logs/
+- Old PM2 logs in .mew/pm2/logs/
 
 **With `--all`:**
 - Everything from default
-- `.meup/` directory entirely
+- `.mew/` directory entirely
 - PM2 daemon for this space (if using space-local PM2)
 
 **With `--logs`:**
@@ -161,16 +161,16 @@ Options:
 
 ```bash
 # Common workflow
-meup space down          # Stop the space
-meup space clean         # Clean artifacts
-meup space up            # Start fresh
+mew space down          # Stop the space
+mew space clean         # Clean artifacts
+mew space up            # Start fresh
 
 # Or more aggressive
-meup space down
-meup space clean --all   # Complete cleanup
+mew space down
+mew space clean --all   # Complete cleanup
 
 # During development
-meup space clean --logs  # Just clear logs while running
+mew space clean --logs  # Just clear logs while running
 ```
 
 ## Consequences
@@ -205,8 +205,8 @@ meup space clean --logs  # Just clear logs while running
 
 3. **Selective preservation**
    ```bash
-   meup space clean --keep-errors  # Keep error logs
-   meup space clean --keep-recent   # Keep last hour of logs
+   mew space clean --keep-errors  # Keep error logs
+   mew space clean --keep-recent   # Keep last hour of logs
    ```
 
 ## Examples
@@ -214,31 +214,31 @@ meup space clean --logs  # Just clear logs while running
 ### Development Workflow
 ```bash
 # After debugging session
-meup space clean --logs     # Clear cluttered logs
+mew space clean --logs     # Clear cluttered logs
 
 # Before running tests
-meup space clean --all      # Start completely fresh
+mew space clean --all      # Start completely fresh
 
 # CI/CD cleanup
-meup space down
-meup space clean --all --force  # No prompts
+mew space down
+mew space clean --all --force  # No prompts
 ```
 
 ### Safety Examples
 ```bash
-$ meup space clean
+$ mew space clean
 Space "my-space" is currently running.
 Warning: This will clean logs and fifos while space is active.
-Use 'meup space down' first, or use --force to proceed anyway.
+Use 'mew space down' first, or use --force to proceed anyway.
 
-$ meup space clean --dry-run
+$ mew space clean --dry-run
 Would clean:
   - 47 log files (230 MB)
   - 2 FIFO pipes (inactive)
   - 3 temporary files
 Total: 230 MB would be freed
 
-$ meup space clean --all
+$ mew space clean --all
 This will remove ALL space artifacts including configuration.
 Are you sure? (y/N): n
 Aborted.
