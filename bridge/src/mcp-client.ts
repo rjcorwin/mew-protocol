@@ -55,11 +55,11 @@ export class MCPClient extends EventEmitter {
       const env = { ...process.env, ...this.config.env };
 
       debug(`Starting MCP server: ${this.config.command} ${args.join(' ')}`);
-      
+
       this.process = spawn(this.config.command, args, {
         env,
         cwd: this.config.cwd,
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
 
       this.process.on('error', (error) => {
@@ -79,7 +79,7 @@ export class MCPClient extends EventEmitter {
       // Set up readline interface for JSON-RPC
       this.rl = readline.createInterface({
         input: this.process.stdout!,
-        crlfDelay: Infinity
+        crlfDelay: Infinity,
       });
 
       this.rl.on('line', (line) => {
@@ -106,21 +106,21 @@ export class MCPClient extends EventEmitter {
       protocolVersion: '0.1.0',
       capabilities: {
         roots: {
-          listChanged: true
+          listChanged: true,
         },
-        sampling: {}
+        sampling: {},
       },
       clientInfo: {
         name: 'mew-bridge',
-        version: '0.1.0'
-      }
+        version: '0.1.0',
+      },
     });
 
     this.serverInfo = result;
-    
+
     // Send initialized notification
     this.notify('notifications/initialized', {});
-    
+
     this.isInitialized = true;
     return this.serverInfo;
   }
@@ -131,18 +131,18 @@ export class MCPClient extends EventEmitter {
       jsonrpc: '2.0',
       id,
       method,
-      params
+      params,
     };
 
     debug(`Sending MCP request ${id}:`, method);
-    
+
     return new Promise((resolve, reject) => {
       // Store pending request
       this.pendingRequests.set(id, {
         resolve,
         reject,
         method,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       // Send request
@@ -163,9 +163,9 @@ export class MCPClient extends EventEmitter {
     const notification = {
       jsonrpc: '2.0',
       method,
-      params
+      params,
     };
-    
+
     debug(`Sending MCP notification:`, method);
     this.send(notification);
   }
@@ -174,7 +174,7 @@ export class MCPClient extends EventEmitter {
     if (!this.process?.stdin) {
       throw new Error('MCP process not started');
     }
-    
+
     const json = JSON.stringify(message);
     debug('MCP -> Server:', json);
     this.process.stdin.write(json + '\n');
@@ -188,12 +188,12 @@ export class MCPClient extends EventEmitter {
       const pending = this.pendingRequests.get(message.id);
       if (pending) {
         this.pendingRequests.delete(message.id);
-        
+
         if (message.error) {
           debug(`Rejecting request ${message.id} with error:`, message.error);
           pending.reject(new Error(message.error.message || 'MCP error'));
         } else {
-          debug(`Resolving request ${message.id} with result`);  
+          debug(`Resolving request ${message.id} with result`);
           pending.resolve(message.result);
         }
       }
@@ -207,7 +207,7 @@ export class MCPClient extends EventEmitter {
       const response = {
         jsonrpc: '2.0',
         id: message.id,
-        result: this.handleServerRequest(message.method, message.params)
+        result: this.handleServerRequest(message.method, message.params),
       };
       this.send(response);
       return;
@@ -220,7 +220,7 @@ export class MCPClient extends EventEmitter {
     }
   }
 
-  private handleServerRequest(method: string, params: any): any {
+  private handleServerRequest(method: string, _params: any): any {
     // Handle server requests
     switch (method) {
       case 'roots/list':
@@ -233,16 +233,16 @@ export class MCPClient extends EventEmitter {
 
   async shutdown(): Promise<void> {
     debug('Shutting down MCP client');
-    
+
     if (this.rl) {
       this.rl.close();
     }
-    
+
     if (this.process) {
       this.process.kill();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    
+
     this.pendingRequests.clear();
     this.isInitialized = false;
   }

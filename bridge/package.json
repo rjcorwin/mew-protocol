@@ -12,18 +12,29 @@
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
     "prepare": "npm run build",
-    "test": "node test/test-bridge.js"
+    "test": "node test/test-bridge.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\" \"bin/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\" \"bin/**/*.js\"",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mew-protocol/participant": "file:../sdk/typescript-sdk/participant",
     "@mew-protocol/types": "file:../sdk/typescript-sdk/types",
-    "ws": "^8.16.0",
     "commander": "^11.1.0",
-    "debug": "^4.3.4"
+    "debug": "^4.3.4",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.35.0",
     "@types/debug": "^4.1.12",
     "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
     "typescript": "^5.0.0"
   },
   "engines": {
