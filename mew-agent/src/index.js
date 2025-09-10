@@ -92,7 +92,10 @@ const client = new MEWClient({
   capabilities: [
     { kind: 'chat' },
     { kind: 'mcp/request' },
-    { kind: 'mcp/response' }
+    { kind: 'mcp/response' },
+    { kind: 'reasoning/start' },
+    { kind: 'reasoning/thought' },
+    { kind: 'reasoning/conclusion' }
   ],
   reconnect: true
 });
@@ -156,29 +159,65 @@ client.on(ClientEvents.MESSAGE, async (envelope) => {
       conversationContext.messages = conversationContext.messages.slice(-25);
     }
     
+    // Send reasoning/start to indicate beginning of reasoning
+    const reasoningStartId = `reason-start-${Date.now()}`;
+    client.send({
+      kind: 'reasoning/start',
+      id: reasoningStartId,
+      correlation_id: [envelope.id],
+      payload: {
+        message: `Analyzing request: "${text}"`
+      }
+    });
+    
+    // Set up reasoning context for the agent
+    const reasoningContext = {
+      ...conversationContext,
+      reasoningStartId,
+      mewClient: client
+    };
+    
     try {
       // Process through ReAct loop
-      const result = await agent.process(text, conversationContext);
+      const result = await agent.process(text, reasoningContext);
       
-      // Send response based on result
+      // Send reasoning/conclusion before the response
+      client.send({
+        kind: 'reasoning/conclusion',
+        context: reasoningStartId,
+        payload: {
+          message: result.summary || 'Reasoning complete'
+        }
+      });
+      
+      // Always send a response based on result
+      let responseText = null;
+      
       if (result.type === 'message' && result.content) {
+        responseText = result.content;
+      } else if (result.type === 'tool_result') {
+        // Tool was executed but no final message - shouldn't happen with updated prompts
+        responseText = `I've completed the task using ${result.tool}. ${result.result ? 'The operation was successful.' : ''}`;
+      } else if (result.type === 'incomplete') {
+        responseText = result.message || 'I need more information to complete this task.';
+      } else {
+        // Fallback - should not happen
+        responseText = 'I processed your request. Let me know if you need anything else.';
+      }
+      
+      // Send the chat response
+      if (responseText) {
         client.send({
           kind: 'chat',
-          payload: { text: result.content }
+          correlation_id: [envelope.id],
+          payload: { text: responseText }
         });
         
         // Add our response to history
         conversationContext.messages.push({
           from: participantId,
-          text: result.content,
+          text: responseText,
           timestamp: new Date().toISOString()
-        });
-      } else if (result.type === 'tool_result') {
-        // Handle tool execution results
-        const response = `Tool ${result.tool} executed: ${result.result}`;
-        client.send({
-          kind: 'chat',
-          payload: { text: response }
         });
       }
     } catch (error) {

@@ -60,8 +60,19 @@ class ReActAgent extends EventEmitter {
    * Reason about what action to take
    */
   async reason(input, context = {}) {
+    // Create serializable context by excluding non-serializable fields
+    const serializableContext = {
+      messages: context.messages,
+      participants: context.participants,
+      memory: context.memory,
+      iteration: context.iteration,
+      lastAction: context.lastAction,
+      lastOutcome: context.lastOutcome,
+      lastReflection: context.lastReflection
+    };
+    
     const reasoningPrompt = this.prompts.reason
-      .replace('{context}', JSON.stringify(context))
+      .replace('{context}', JSON.stringify(serializableContext))
       .replace('{input}', input);
     
     this.logger.debug(`Reasoning with prompt: ${reasoningPrompt}`);
@@ -84,6 +95,17 @@ class ReActAgent extends EventEmitter {
           action: response.action || this.determineAction(input, context),
           confidence: response.confidence || 0.8
         };
+        
+        // Emit reasoning/thought if we have a MEW client in context
+        if (context.mewClient && context.reasoningStartId) {
+          context.mewClient.send({
+            kind: 'reasoning/thought',
+            context: context.reasoningStartId,
+            payload: {
+              message: reasoning.thought
+            }
+          });
+        }
         
         this.logger.info(`Reasoning complete: ${reasoning.thought}`);
         return reasoning;
@@ -155,7 +177,7 @@ class ReActAgent extends EventEmitter {
   /**
    * Reflect on the action and outcome
    */
-  async reflect(action, outcome) {
+  async reflect(action, outcome, context = {}) {
     const reflectionPrompt = this.prompts.reflect
       .replace('{action}', JSON.stringify(action))
       .replace('{outcome}', JSON.stringify(outcome));
@@ -177,6 +199,17 @@ class ReActAgent extends EventEmitter {
         });
         
         learning = completion.choices[0].message.content;
+        
+        // Emit reasoning/thought for reflection if we have MEW client
+        if (context.mewClient && context.reasoningStartId) {
+          context.mewClient.send({
+            kind: 'reasoning/thought',
+            context: context.reasoningStartId,
+            payload: {
+              message: `Reflection: ${learning}`
+            }
+          });
+        }
       } catch (error) {
         this.logger.error(`OpenAI reflection error: ${error.message}`);
         learning = this.extractLearning(action, outcome);
@@ -229,7 +262,7 @@ class ReActAgent extends EventEmitter {
         const outcome = await this.act(reasoning.action);
         
         // Reflect phase
-        const reflection = await this.reflect(reasoning.action, outcome);
+        const reflection = await this.reflect(reasoning.action, outcome, context);
         
         // Check if we should continue or return
         if (this.shouldComplete(outcome, reflection)) {
@@ -255,8 +288,14 @@ class ReActAgent extends EventEmitter {
     if (!finalResult) {
       finalResult = {
         type: 'incomplete',
-        message: `Reached maximum iterations (${this.maxIterations})`
+        message: `Reached maximum iterations (${this.maxIterations})`,
+        summary: 'Processing incomplete - reached iteration limit'
       };
+    }
+    
+    // Add summary to final result if not present
+    if (!finalResult.summary) {
+      finalResult.summary = finalResult.content || finalResult.message || 'Processing complete';
     }
     
     this.logger.info(`Processing complete after ${iterations} iterations`);
@@ -365,6 +404,7 @@ class ReActAgent extends EventEmitter {
    */
   shouldComplete(outcome, reflection) {
     // Complete if we've sent a message or encountered an error
+    // Don't complete on tool_result - need to generate a response
     return outcome.type === 'message' || outcome.error;
   }
   

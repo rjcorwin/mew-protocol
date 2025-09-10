@@ -23,6 +23,9 @@ participants:
       - kind: "chat"
       - kind: "mcp/request"
       - kind: "mcp/response"
+      - kind: "reasoning/start"
+      - kind: "reasoning/thought"
+      - kind: "reasoning/conclusion"
   
   # MCP Bridge for file system access
   mcp-fs-bridge:

@@ -33,6 +33,8 @@ prompts:
     - query: Ask for more information
     - wait: Pause processing
     
+    IMPORTANT: After completing any task with tools, you MUST generate a final "respond" action to inform the user of what was accomplished.
+    
     For tool actions, use format:
     {
       "thought": "your reasoning",
@@ -43,6 +45,18 @@ prompts:
       },
       "confidence": 0.9
     }
+    
+    For respond actions (to send a message to the user):
+    {
+      "thought": "Task completed, informing user",
+      "action": {
+        "type": "respond",
+        "content": "I've successfully changed the background to pink in todo_app.html"
+      },
+      "confidence": 1.0
+    }
+    
+    If you just completed a tool action in the previous iteration, generate a respond action to tell the user what you did.
     
     Return JSON with: thought (your reasoning), action (object with type and params), confidence (0-1)
     
