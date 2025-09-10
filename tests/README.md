@@ -1,6 +1,6 @@
-# MEUP Protocol Tests
+# MEW Protocol Tests
 
-This directory contains the test suite for the MEUP (Multiplexed Extensible Unified Protocol) v0.2 implementation.
+This directory contains the test suite for the MEW (Multi-Entity Workspace) Protocol v0.3 implementation.
 
 ## Running Tests
 
@@ -55,7 +55,7 @@ All test scenarios are located in this directory. Each scenario is self-containe
 ## Test Agents
 
 The `/agents/` directory contains reusable test agents used across scenarios:
-- `calculator-participant.js` - Simple calculator agent for MCP testing using MEUPParticipant
+- `calculator-participant.js` - Simple calculator agent for MCP testing using MEWParticipant
 - `fulfiller.js` - Agent that fulfills proposals
 - `proposer.js` - Agent that creates proposals
 - `requester.js` - Agent that makes various requests
@@ -80,9 +80,9 @@ To debug a failing test:
 
 ## Architecture
 
-Tests use PM2 for process management and the MEUP CLI to start spaces. Each test:
+Tests use PM2 for process management and the MEW CLI to start spaces. Each test:
 1. Sets up a space with a gateway and participants
-2. Runs test agents that interact via MEUP messages
+2. Runs test agents that interact via MEW messages
 3. Verifies expected outcomes
 4. Cleans up all processes and artifacts
 
