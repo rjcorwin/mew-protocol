@@ -209,15 +209,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   return React.createElement(Box, { flexDirection: "column", height: "100%" },
-    // Header
-    React.createElement(Box, { borderStyle: "round", borderColor: "cyan", paddingX: 1 },
-      React.createElement(Text, { color: "cyan" },
-        `MEW Interactive - Space: ${spaceId} | Participant: ${participantId}`
-      )
-    ),
-    
-    // Message History with Native Scrolling
-    React.createElement(Box, { flexGrow: 1, flexDirection: "column", marginY: 1 },
+    // Message History with Native Scrolling (no header box)
+    React.createElement(Box, { flexGrow: 1, flexDirection: "column", marginTop: 1 },
       React.createElement(Static, { items: messages }, (item) =>
         React.createElement(MessageDisplay, {
           key: item.id,
@@ -274,7 +267,9 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       connected: ws?.readyState === 1,
       messageCount: messages.length,
       verbose: verbose,
-      pendingOperation: !!pendingOperation
+      pendingOperation: !!pendingOperation,
+      spaceId: spaceId,
+      participantId: participantId
     })
   );
 }
@@ -392,13 +387,14 @@ function HelpModal({ onClose }) {
  * Reasoning Status Component
  */
 function ReasoningStatus({ reasoning }) {
-  const [dots, setDots] = useState('');
+  const [spinnerIndex, setSpinnerIndex] = useState(0);
+  const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   
-  // Animate the thinking indicator
+  // Animate the thinking indicator with a rotating spinner
   useEffect(() => {
     const interval = setInterval(() => {
-      setDots(prev => prev.length >= 3 ? '' : prev + '.');
-    }, 500);
+      setSpinnerIndex(prev => (prev + 1) % spinnerChars.length);
+    }, 100);
     return () => clearInterval(interval);
   }, []);
   
@@ -410,19 +406,20 @@ function ReasoningStatus({ reasoning }) {
     paddingX: 1,
     marginBottom: 1
   },
-    React.createElement(Box, { justifyContent: "space-between" },
+    React.createElement(Box, { justifyContent: "space-between", width: "100%" },
       React.createElement(Box, null,
-        React.createElement(Text, { color: "cyan", bold: true }, "🤔 "),
-        React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`),
-        React.createElement(Text, { color: "gray" }, dots)
+        React.createElement(Text, { color: "cyan", bold: true }, spinnerChars[spinnerIndex] + " "),
+        React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`)
       ),
-      React.createElement(Text, { color: "gray" }, 
-        `${elapsedTime}s | ${reasoning.thoughtCount} thoughts`
+      React.createElement(Box, null,
+        React.createElement(Text, { color: "gray" }, 
+          `${elapsedTime}s | ${reasoning.thoughtCount} thoughts`
+        )
       )
     ),
     reasoning.message && React.createElement(Box, { marginTop: 0 },
-      React.createElement(Text, { color: "gray", italic: true }, 
-        `"${reasoning.message.slice(0, 80)}${reasoning.message.length > 80 ? '...' : ''}"`
+      React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" }, 
+        `"${reasoning.message.slice(0, 300)}${reasoning.message.length > 300 ? '...' : ''}"`
       )
     )
   );
@@ -452,7 +449,7 @@ function InputComposer({ value, onChange, onSubmit }) {
 /**
  * Status Bar Component
  */
-function StatusBar({ connected, messageCount, verbose, pendingOperation }) {
+function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId }) {
   const status = connected ? 'Connected' : 'Disconnected';
   const statusColor = connected ? 'green' : 'red';
 
@@ -460,9 +457,13 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation }) {
     React.createElement(Text, null,
       React.createElement(Text, { color: statusColor }, status),
       " | ",
-      React.createElement(Text, null, `${messageCount} messages`),
+      React.createElement(Text, { color: "cyan" }, spaceId),
+      " | ",
+      React.createElement(Text, { color: "blue" }, participantId),
+      " | ",
+      React.createElement(Text, null, `${messageCount} msgs`),
       verbose && " | Verbose",
-      pendingOperation && React.createElement(Text, { color: "yellow" }, " | Pending Operation")
+      pendingOperation && React.createElement(Text, { color: "yellow" }, " | Pending Op")
     ),
     React.createElement(Text, { color: "gray" }, "Ctrl+C to exit")
   );
