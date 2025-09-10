@@ -78,11 +78,11 @@ function disconnectPM2() {
 // Get path to store running spaces info
 function getSpacesFilePath() {
   const homeDir = process.env.HOME || process.env.USERPROFILE;
-  const meupDir = path.join(homeDir, '.meup');
-  if (!fs.existsSync(meupDir)) {
-    fs.mkdirSync(meupDir, { recursive: true });
+  const mewDir = path.join(homeDir, '.mew');
+  if (!fs.existsSync(mewDir)) {
+    fs.mkdirSync(mewDir, { recursive: true });
   }
-  return path.join(meupDir, 'running-spaces.json');
+  return path.join(mewDir, 'running-spaces.json');
 }
 
 // Load running spaces from file
@@ -181,7 +181,7 @@ function loadSpaceConfig(configPath) {
  * Create PID file for space
  */
 function savePidFile(spaceDir, pids) {
-  const pidDir = path.join(spaceDir, '.meup');
+  const pidDir = path.join(spaceDir, '.mew');
   if (!fs.existsSync(pidDir)) {
     fs.mkdirSync(pidDir, { recursive: true });
   }
@@ -195,7 +195,7 @@ function savePidFile(spaceDir, pids) {
  * Load PID file for space
  */
 function loadPidFile(spaceDir) {
-  const pidFile = path.join(spaceDir, '.meup', 'pids.json');
+  const pidFile = path.join(spaceDir, '.mew', 'pids.json');
   if (!fs.existsSync(pidFile)) {
     return null;
   }
@@ -213,7 +213,7 @@ function loadPidFile(spaceDir) {
  * Remove PID file
  */
 function removePidFile(spaceDir) {
-  const pidFile = path.join(spaceDir, '.meup', 'pids.json');
+  const pidFile = path.join(spaceDir, '.mew', 'pids.json');
   if (fs.existsSync(pidFile)) {
     fs.unlinkSync(pidFile);
   }
@@ -272,7 +272,7 @@ function cleanupFifos(spaceDir) {
   }
 }
 
-// Command: meup space up
+// Command: mew space up
 space
   .command('up')
   .description('Start a space with gateway and configured participants')
@@ -296,7 +296,7 @@ space
     // Check if space is already running
     const existingPids = loadPidFile(spaceDir);
     if (existingPids && existingPids.gateway && isProcessRunning(existingPids.gateway)) {
-      console.error('Space is already running. Run "meup space down" first.');
+      console.error('Space is already running. Run "mew space down" first.');
       process.exit(1);
     }
     
@@ -339,7 +339,7 @@ space
     try {
       const gatewayApp = await startPM2Process({
         name: `${spaceId}-gateway`,
-        script: path.join(__dirname, '../../bin/meup.js'),
+        script: path.join(__dirname, '../../bin/mew.js'),
         args: [
           'gateway',
           'start',
@@ -424,7 +424,7 @@ space
         
         try {
           // Find the bridge executable
-          const bridgePath = path.resolve(__dirname, '..', '..', '..', 'bridge', 'bin', 'meup-bridge.js');
+          const bridgePath = path.resolve(__dirname, '..', '..', '..', 'bridge', 'bin', 'mew-bridge.js');
           
           const bridgeApp = await startPM2Process({
             name: `mcp_bridge_${participantId}`,
@@ -532,7 +532,7 @@ space
           try {
             const clientApp = await startPM2Process({
               name: `${spaceId}-${participantId}-client`,
-              script: path.join(__dirname, '../../bin/meup.js'),
+              script: path.join(__dirname, '../../bin/mew.js'),
               args: clientArgs,
               cwd: spaceDir,
               autorestart: false,
@@ -556,7 +556,7 @@ space
     console.log(`\n✓ Space is up! (PID file: ${pidFile})`);
     console.log(`\nGateway: ws://localhost:${options.port}`);
     console.log(`Space ID: ${spaceId}`);
-    console.log(`\nTo stop: meup space down`);
+    console.log(`\nTo stop: mew space down`);
     
     // Store running space info
     const runningSpaces = loadRunningSpaces();
@@ -567,7 +567,7 @@ space
     disconnectPM2();
   });
 
-// Command: meup space down
+// Command: mew space down
 space
   .command('down')
   .description('Stop a running space')
@@ -635,7 +635,7 @@ space
     disconnectPM2();
     
     // Clean up PM2 directory
-    const pm2Dir = path.join(spaceDir, '.meup', 'pm2');
+    const pm2Dir = path.join(spaceDir, '.mew', 'pm2');
     if (fs.existsSync(pm2Dir)) {
       try {
         fs.rmSync(pm2Dir, { recursive: true, force: true });
@@ -662,7 +662,7 @@ space
     process.exit(0);
   });
 
-// Command: meup space status
+// Command: mew space status
 space
   .command('status')
   .description('Show status of running spaces')
@@ -787,11 +787,11 @@ space
     }
   });
 
-// Command: meup space clean
+// Command: mew space clean
 space
   .command('clean')
   .description('Clean up space artifacts (logs, fifos, temporary files)')
-  .option('--all', 'Clean everything including .meup directory')
+  .option('--all', 'Clean everything including .mew directory')
   .option('--logs', 'Clean only log files')
   .option('--fifos', 'Clean only FIFO pipes')
   .option('--force', 'Skip confirmation prompts')
@@ -814,14 +814,14 @@ space
     const itemsToClean = {
       logs: [],
       fifos: [],
-      meup: false,
+      mew: false,
       pm2: false
     };
     
     // Determine what to clean based on options
     const cleanLogs = options.logs || (!options.fifos && !options.all) || options.all;
     const cleanFifos = options.fifos || (!options.logs && !options.all) || options.all;
-    const cleanMeup = options.all;
+    const cleanMew = options.all;
     
     // Collect log files
     if (cleanLogs) {
@@ -872,13 +872,13 @@ space
       }
     }
     
-    // Check .meup directory
-    if (cleanMeup) {
-      const meupDir = path.join(spaceDir, '.meup');
-      if (fs.existsSync(meupDir)) {
-        itemsToClean.meup = true;
+    // Check .mew directory
+    if (cleanMew) {
+      const mewDir = path.join(spaceDir, '.mew');
+      if (fs.existsSync(mewDir)) {
+        itemsToClean.mew = true;
         // Check for PM2 directory
-        const pm2Dir = path.join(meupDir, 'pm2');
+        const pm2Dir = path.join(mewDir, 'pm2');
         if (fs.existsSync(pm2Dir)) {
           itemsToClean.pm2 = true;
         }
@@ -918,8 +918,8 @@ space
         }
       }
       
-      if (itemsToClean.meup) {
-        console.log('  - .meup directory (including process state)');
+      if (itemsToClean.mew) {
+        console.log('  - .mew directory (including process state)');
         if (itemsToClean.pm2) {
           console.log('    - PM2 daemon and logs');
         }
@@ -936,14 +936,14 @@ space
     if (isRunning && !options.force) {
       console.log(`Space "${pids.spaceName}" is currently running.`);
       
-      if (cleanMeup) {
-        console.error('Error: Cannot clean .meup directory while space is running.');
-        console.error('Use "meup space down" first, or remove --all flag.');
+      if (cleanMew) {
+        console.error('Error: Cannot clean .mew directory while space is running.');
+        console.error('Use "mew space down" first, or remove --all flag.');
         process.exit(1);
       }
       
       console.log('Warning: This will clean artifacts while space is active.');
-      console.log('Use "meup space down" first, or use --force to proceed anyway.');
+      console.log('Use "mew space down" first, or use --force to proceed anyway.');
       
       const readline = require('readline');
       const rl = readline.createInterface({
@@ -963,7 +963,7 @@ space
     }
     
     // Confirm destructive operations
-    if (cleanMeup && !options.force) {
+    if (cleanMew && !options.force) {
       console.log('This will remove ALL space artifacts including configuration.');
       
       const readline = require('readline');
@@ -1023,10 +1023,10 @@ space
       }
     }
     
-    // Clean .meup directory
-    if (itemsToClean.meup) {
-      console.log('Cleaning .meup directory...');
-      const meupDir = path.join(spaceDir, '.meup');
+    // Clean .mew directory
+    if (itemsToClean.mew) {
+      console.log('Cleaning .mew directory...');
+      const mewDir = path.join(spaceDir, '.mew');
       
       // If PM2 daemon is running, try to kill it first
       if (itemsToClean.pm2 && !isRunning) {
@@ -1046,10 +1046,10 @@ space
       
       // Remove the directory
       try {
-        fs.rmSync(meupDir, { recursive: true, force: true });
-        console.log('✓ Cleaned .meup directory');
+        fs.rmSync(mewDir, { recursive: true, force: true });
+        console.log('✓ Cleaned .mew directory');
       } catch (error) {
-        errors.push(`Failed to clean .meup directory: ${error.message}`);
+        errors.push(`Failed to clean .mew directory: ${error.message}`);
       }
     }
     
@@ -1061,7 +1061,7 @@ space
       }
     }
     
-    if (cleanedCount > 0 || itemsToClean.meup) {
+    if (cleanedCount > 0 || itemsToClean.mew) {
       console.log(`\n✓ Cleanup complete! ${totalSize > 0 ? `Freed ${formatBytes(totalSize)}` : ''}`);
     } else {
       console.log('\nNothing to clean.');

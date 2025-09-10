@@ -20,8 +20,8 @@ if [ -z "$TEST_DIR" ]; then
   export OUTPUT_LOG="$TEST_DIR/logs/proposer-output.log"
   
   # Try to detect port from running space
-  if [ -f "$TEST_DIR/.meup/pids.json" ]; then
-    export TEST_PORT=$(grep -o '"port":[[:space:]]*"[0-9]*"' "$TEST_DIR/.meup/pids.json" | grep -o '[0-9]*')
+  if [ -f "$TEST_DIR/.mew/pids.json" ]; then
+    export TEST_PORT=$(grep -o '"port":[[:space:]]*"[0-9]*"' "$TEST_DIR/.mew/pids.json" | grep -o '[0-9]*')
   fi
   
   if [ -z "$TEST_PORT" ]; then

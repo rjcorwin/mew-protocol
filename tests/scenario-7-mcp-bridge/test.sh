@@ -4,7 +4,7 @@ set -e
 echo "=== Scenario 7: MCP Bridge Test (FIFO) ==="
 
 # Clean up any previous runs
-../../cli/bin/meup.js space clean --all --force 2>/dev/null || true
+../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
 
 # Setup test files
 mkdir -p /tmp/mcp-test-files
@@ -23,14 +23,14 @@ mkdir -p logs
 # Start space with random port
 PORT=$((9700 + RANDOM % 100))
 echo "Starting space on port $PORT..."
-../../cli/bin/meup.js space up --port $PORT > logs/space-up.log 2>&1
+../../cli/bin/mew.js space up --port $PORT > logs/space-up.log 2>&1
 
-# Wait for MCP bridge to initialize
+# Wait for MCP bridge to initialize (filesystem server takes time)
 echo "Waiting for MCP bridge to initialize..."
-sleep 5
+sleep 15
 
 # Check that space is running
-if ! ../../cli/bin/meup.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
+if ! ../../cli/bin/mew.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
   echo "✗ Space failed to start"
   cat logs/space-up.log
   exit 1
@@ -83,7 +83,7 @@ test_mcp_request() {
 }
 
 # Test 1: List MCP tools
-REQUEST_1='{"protocol":"mew/v0.2","kind":"mcp/request","id":"test-1","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
+REQUEST_1='{"protocol":"mew/v0.3","kind":"mcp/request","id":"test-1","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
 
 test_mcp_request \
   "List MCP tools" \
@@ -96,7 +96,7 @@ RESULT_1=$?
 sleep 1
 
 # Test 2: List tools again to verify connection
-REQUEST_2='{"protocol":"mew/v0.2","kind":"mcp/request","id":"test-2","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
+REQUEST_2='{"protocol":"mew/v0.3","kind":"mcp/request","id":"test-2","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
 
 test_mcp_request \
   "List tools again" \
@@ -109,7 +109,7 @@ RESULT_2=$?
 sleep 1
 
 # Test 3: Read a file
-REQUEST_3='{"protocol":"mew/v0.2","kind":"mcp/request","id":"test-3","from":"test-client","to":["filesystem"],"payload":{"method":"tools/call","params":{"name":"read_text_file","arguments":{"path":"/private/tmp/mcp-test-files/test.txt"}}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
+REQUEST_3='{"protocol":"mew/v0.3","kind":"mcp/request","id":"test-3","from":"test-client","to":["filesystem"],"payload":{"method":"tools/call","params":{"name":"read_text_file","arguments":{"path":"/private/tmp/mcp-test-files/test.txt"}}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
 
 test_mcp_request \
   "Read file via MCP" \
@@ -124,7 +124,7 @@ TOTAL_RESULT=$((RESULT_1 + RESULT_2 + RESULT_3))
 # Always clean up
 echo ""
 echo "Stopping space..."
-../../cli/bin/meup.js space down
+../../cli/bin/mew.js space down
 rm -rf /tmp/mcp-test-files
 
 if [ $TOTAL_RESULT -eq 0 ]; then

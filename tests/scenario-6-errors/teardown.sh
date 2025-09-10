@@ -17,13 +17,13 @@ cd "$TEST_DIR"
 
 # Stop the space
 echo "Stopping space..."
-../../cli/bin/meup.js space down > /dev/null 2>&1
+../../cli/bin/mew.js space down > /dev/null 2>&1
 
 # Give processes time to exit
 sleep 2
 
 # Force kill any remaining processes
-pkill -f "meup.*gateway" 2>/dev/null || true
+pkill -f "mew.*gateway" 2>/dev/null || true
 
 # Clean up FIFOs (important to prevent blocking)
 if [ -d fifos ]; then
@@ -32,8 +32,8 @@ if [ -d fifos ]; then
 fi
 
 # Clean up PID file
-if [ -f .meup/pids.json ]; then
-  rm -f .meup/pids.json
+if [ -f .mew/pids.json ]; then
+  rm -f .mew/pids.json
   echo "✓ Removed PID file"
 fi
 

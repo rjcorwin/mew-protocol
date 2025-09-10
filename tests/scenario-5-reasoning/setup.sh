@@ -46,11 +46,11 @@ cleanup() {
     echo "✓ Cleaned $FIFO_COUNT FIFO pipes"
   fi
   
-  # Clean .meup directory
-  if [ -d .meup ]; then
-    echo "Cleaning .meup directory..."
-    rm -rf .meup
-    echo "✓ Cleaned .meup directory"
+  # Clean .mew directory
+  if [ -d .mew ]; then
+    echo "Cleaning .mew directory..."
+    rm -rf .mew
+    echo "✓ Cleaned .mew directory"
   fi
   
   # Calculate size freed
@@ -62,9 +62,9 @@ cleanup() {
 # Run cleanup
 cleanup
 
-# Start the space using meup CLI
+# Start the space using mew CLI
 echo "Starting space on port $TEST_PORT..."
-PORT=$TEST_PORT ../../cli/bin/meup.js space up \
+PORT=$TEST_PORT ../../cli/bin/mew.js space up \
   --config ./space.yaml \
   --port $TEST_PORT \
   --log-level debug \

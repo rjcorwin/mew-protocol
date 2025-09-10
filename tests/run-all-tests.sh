@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run all MEUP v0.2 test scenarios from test-spaces
+# Run all MEW v0.2 test scenarios from test-spaces
 
 set -e
 
@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}================================================${NC}"
-echo -e "${BLUE}        MEUP v0.2 Test Suite Runner             ${NC}"
+echo -e "${BLUE}        MEW v0.2 Test Suite Runner              ${NC}"
 echo -e "${BLUE}================================================${NC}"
 echo ""
 
@@ -22,7 +22,7 @@ FAILED_TESTS=""
 
 # Create test results log
 TEST_RESULTS_LOG="./test-results.log"
-echo "MEUP v0.2 Test Suite Results - $(date)" > "$TEST_RESULTS_LOG"
+echo "MEW v0.2 Test Suite Results - $(date)" > "$TEST_RESULTS_LOG"
 echo "================================================" >> "$TEST_RESULTS_LOG"
 
 # Function to run a test
@@ -51,7 +51,7 @@ run_test() {
         echo -e "${RED}❌ $test_name TIMEOUT${NC}"
         echo "Status: TIMEOUT" >> "../../$TEST_RESULTS_LOG"
         # Cleanup any hanging processes
-        pkill -f "meup.js" 2>/dev/null || true
+        pkill -f "mew.js" 2>/dev/null || true
         pkill -f "node.*agents" 2>/dev/null || true
       else
         echo -e "${RED}❌ $test_name FAILED${NC}"
@@ -71,10 +71,10 @@ run_test() {
   fi
   
   # Clean up any processes from this test
-  pkill -f "meup" 2>/dev/null || true
+  pkill -f "mew" 2>/dev/null || true
   pkill -f "pm2" 2>/dev/null || true
   pkill -f "calculator-participant.js" 2>/dev/null || true
-  pkill -f "meup-bridge" 2>/dev/null || true
+  pkill -f "mew-bridge" 2>/dev/null || true
   pkill -f "@modelcontextprotocol" 2>/dev/null || true
   sleep 1
   
@@ -83,10 +83,10 @@ run_test() {
 
 # Clean up any leftover processes before starting
 echo -e "${YELLOW}Cleaning up any existing test processes...${NC}"
-pkill -f "meup" 2>/dev/null || true
+pkill -f "mew" 2>/dev/null || true
 pkill -f "pm2" 2>/dev/null || true
 pkill -f "calculator-participant.js" 2>/dev/null || true
-pkill -f "meup-bridge" 2>/dev/null || true
+pkill -f "mew-bridge" 2>/dev/null || true
 pkill -f "@modelcontextprotocol" 2>/dev/null || true
 sleep 2
 
@@ -131,7 +131,7 @@ echo ""
 
 # Cleanup any lingering processes
 echo -e "${YELLOW}Cleaning up any lingering processes...${NC}"
-pkill -f "meup.js gateway" 2>/dev/null || true
+pkill -f "mew.js gateway" 2>/dev/null || true
 pkill -f "node.*agents" 2>/dev/null || true
 
 echo -e "${GREEN}Test run complete!${NC}"

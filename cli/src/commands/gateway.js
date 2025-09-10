@@ -257,7 +257,7 @@ gateway
       }
       
       // Protocol version check
-      if (message.protocol && message.protocol !== 'mew/v0.2') {
+      if (message.protocol && message.protocol !== 'mew/v0.3') {
         return `Invalid protocol version: ${message.protocol}`;
       }
       
@@ -290,7 +290,7 @@ gateway
           const validationError = validateMessage(message);
           if (validationError) {
             ws.send(JSON.stringify({
-              protocol: 'mew/v0.2',
+              protocol: 'mew/v0.3',
               kind: 'system/error',
               payload: {
                 error: validationError,
@@ -324,7 +324,7 @@ gateway
             
             // Send welcome message per MEW v0.2 spec
             const welcomeMessage = {
-              protocol: 'mew/v0.2',
+              protocol: 'mew/v0.3',
               id: `welcome-${Date.now()}`,
               ts: new Date().toISOString(),
               from: 'system:gateway',
@@ -348,7 +348,7 @@ gateway
             
             // Broadcast presence to others
             const presenceMessage = {
-              protocol: 'mew/v0.2',
+              protocol: 'mew/v0.3',
               id: `presence-${Date.now()}`,
               ts: new Date().toISOString(),
               from: 'system:gateway',
@@ -383,7 +383,7 @@ gateway
           // Check capabilities for non-join messages
           if (!await hasCapabilityForMessage(participantId, message)) {
             const errorMessage = {
-              protocol: 'mew/v0.2',
+              protocol: 'mew/v0.3',
               id: `error-${Date.now()}`,
               ts: new Date().toISOString(),
               from: 'system:gateway',
@@ -411,7 +411,7 @@ gateway
             const canGrant = await hasCapabilityForMessage(participantId, {kind: 'capability/grant'});
             if (!canGrant) {
               const errorMessage = {
-                protocol: 'mew/v0.2',
+                protocol: 'mew/v0.3',
                 id: `error-${Date.now()}`,
                 ts: new Date().toISOString(),
                 from: 'system:gateway',
@@ -450,7 +450,7 @@ gateway
               const recipientWs = space?.participants.get(recipient);
               if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
                 const ackMessage = {
-                  protocol: 'mew/v0.2',
+                  protocol: 'mew/v0.3',
                   id: `ack-${Date.now()}`,
                   ts: new Date().toISOString(),
                   from: 'system:gateway',
@@ -471,7 +471,7 @@ gateway
             const canRevoke = await hasCapabilityForMessage(participantId, {kind: 'capability/revoke'});
             if (!canRevoke) {
               const errorMessage = {
-                protocol: 'meup/v0.2',
+                protocol: 'mew/v0.3',
                 id: `error-${Date.now()}`,
                 ts: new Date().toISOString(),
                 from: 'system:gateway',
@@ -534,7 +534,7 @@ gateway
           
           // Add protocol envelope fields if missing
           const envelope = {
-            protocol: message.protocol || 'mew/v0.2',
+            protocol: message.protocol || 'mew/v0.3',
             id: message.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             ts: message.ts || new Date().toISOString(),
             from: participantId,
@@ -574,7 +574,7 @@ gateway
         } catch (error) {
           console.error('Error handling message:', error);
           ws.send(JSON.stringify({
-            protocol: 'mew/v0.2',
+            protocol: 'mew/v0.3',
             kind: 'system/error',
             payload: {
               error: error.message,
@@ -598,7 +598,7 @@ gateway
           
           // Broadcast leave presence
           const presenceMessage = {
-            protocol: 'meup/v0.2',
+            protocol: 'mew/v0.3',
             id: `presence-${Date.now()}`,
             ts: new Date().toISOString(),
             from: 'system:gateway',

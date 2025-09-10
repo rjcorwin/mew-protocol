@@ -23,14 +23,14 @@ echo ""
 
 cd "$TEST_DIR"
 
-# Stop the space using meup space down
+# Stop the space using mew space down
 echo "Stopping space..."
-../../cli/bin/meup.js space down 2>/dev/null || true
+../../cli/bin/mew.js space down 2>/dev/null || true
 
 # Additional cleanup for any orphaned processes
-if [ -f ".meup/pids.json" ]; then
+if [ -f ".mew/pids.json" ]; then
   # Extract PIDs and kill them if still running
-  PIDS=$(grep -o '"pid":[0-9]*' .meup/pids.json 2>/dev/null | cut -d: -f2 || true)
+  PIDS=$(grep -o '"pid":[0-9]*' .mew/pids.json 2>/dev/null | cut -d: -f2 || true)
   for pid in $PIDS; do
     if kill -0 $pid 2>/dev/null; then
       echo "Killing orphaned process $pid"
@@ -39,22 +39,22 @@ if [ -f ".meup/pids.json" ]; then
   done
 fi
 
-# Clean up test artifacts using meup space clean
+# Clean up test artifacts using mew space clean
 if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
   echo "Cleaning test artifacts..."
   
-  # Use the new meup space clean command
-  ../../cli/bin/meup.js space clean --all --force 2>/dev/null || {
+  # Use the new mew space clean command
+  ../../cli/bin/mew.js space clean --all --force 2>/dev/null || {
     # Fallback to manual cleanup if clean command fails
     echo "Clean command failed, using manual cleanup..."
-    rm -rf logs fifos .meup 2>/dev/null || true
+    rm -rf logs fifos .mew 2>/dev/null || true
   }
   
   echo -e "${GREEN}✓ Test artifacts removed${NC}"
 else
   echo -e "${YELLOW}Preserving logs (PRESERVE_LOGS=true)${NC}"
-  # Clean only fifos and .meup, preserve logs
-  ../../cli/bin/meup.js space clean --fifos --force 2>/dev/null || true
+  # Clean only fifos and .mew, preserve logs
+  ../../cli/bin/mew.js space clean --fifos --force 2>/dev/null || true
 fi
 
 echo -e "${GREEN}✓ Cleanup complete${NC}"

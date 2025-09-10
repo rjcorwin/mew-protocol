@@ -8,12 +8,12 @@ const gateway = new Command('gateway')
 
 gateway
   .command('start')
-  .description('Start a MEUP gateway server')
+  .description('Start a MEW gateway server')
   .option('-p, --port <port>', 'Port to listen on', '8080')
   .option('-l, --log-level <level>', 'Log level (debug|info|warn|error)', 'info')
   .action(async (options) => {
     const port = parseInt(options.port);
-    console.log(`Starting Enhanced MEUP gateway on port ${port}...`);
+    console.log(`Starting Enhanced MEW gateway on port ${port}...`);
     
     // Create Express app for health endpoint
     const app = express();
@@ -99,7 +99,7 @@ gateway
       }
       
       // Protocol version check
-      if (message.protocol && message.protocol !== 'meup/v0.2') {
+      if (message.protocol && message.protocol !== 'mew/v0.3') {
         return `Invalid protocol version: ${message.protocol}`;
       }
       
@@ -132,7 +132,7 @@ gateway
           const validationError = validateMessage(message);
           if (validationError) {
             ws.send(JSON.stringify({
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.3',
               kind: 'system/error',
               payload: {
                 error: validationError,
@@ -168,7 +168,7 @@ gateway
             
             // Send welcome message with capabilities
             ws.send(JSON.stringify({
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.3',
               kind: 'system/welcome',
               payload: {
                 participantId,
@@ -185,7 +185,7 @@ gateway
           const requiredCapability = getRequiredCapability(message.kind);
           if (requiredCapability && !hasCapability(participantId, requiredCapability)) {
             ws.send(JSON.stringify({
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.3',
               kind: 'system/error',
               payload: {
                 error: `Insufficient capability: ${requiredCapability} required`,
@@ -227,7 +227,7 @@ gateway
               : message.correlation_id;
             
             const envelope = {
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.3',
               id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               ts: new Date().toISOString(),
               from: participantId,
@@ -253,7 +253,7 @@ gateway
         } catch (error) {
           console.error('Error handling message:', error);
           ws.send(JSON.stringify({
-            protocol: 'meup/v0.2',
+            protocol: 'mew/v0.3',
             kind: 'system/error',
             payload: {
               error: error.message,
@@ -295,7 +295,7 @@ function handleCapabilityGrant(message, ws, fromParticipant, spaces, capabilitie
   // Check admin permission
   if (!hasCapability(fromParticipant, 'capability/admin')) {
     ws.send(JSON.stringify({
-      protocol: 'meup/v0.2',
+      protocol: 'mew/v0.3',
       kind: 'system/error',
       payload: {
         error: 'Not authorized to grant capabilities',
@@ -320,7 +320,7 @@ function handleCapabilityGrant(message, ws, fromParticipant, spaces, capabilitie
     const targetWs = space.participants.get(targetParticipant);
     if (targetWs && targetWs.readyState === WebSocket.OPEN) {
       targetWs.send(JSON.stringify({
-        protocol: 'meup/v0.2',
+        protocol: 'mew/v0.3',
         kind: 'capability/granted',
         from: fromParticipant,
         payload: {
@@ -341,7 +341,7 @@ function handleCapabilityRevoke(message, ws, fromParticipant, spaces, capabiliti
   // Check admin permission
   if (!hasCapability(fromParticipant, 'capability/admin')) {
     ws.send(JSON.stringify({
-      protocol: 'meup/v0.2',
+      protocol: 'mew/v0.3',
       kind: 'system/error',
       payload: {
         error: 'Not authorized to revoke capabilities',
@@ -367,7 +367,7 @@ function handleCapabilityRevoke(message, ws, fromParticipant, spaces, capabiliti
     const targetWs = space.participants.get(targetParticipant);
     if (targetWs && targetWs.readyState === WebSocket.OPEN) {
       targetWs.send(JSON.stringify({
-        protocol: 'meup/v0.2',
+        protocol: 'mew/v0.3',
         kind: 'capability/revoked',
         from: fromParticipant,
         payload: {
@@ -399,7 +399,7 @@ function handleContextPush(message, ws, participantId, contextStacks, spaces, op
   if (ws.spaceId && spaces.has(ws.spaceId)) {
     const space = spaces.get(ws.spaceId);
     const envelope = {
-      protocol: 'meup/v0.2',
+      protocol: 'mew/v0.3',
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ts: new Date().toISOString(),
       from: participantId,
@@ -426,7 +426,7 @@ function handleContextPop(message, ws, participantId, contextStacks, spaces, opt
   
   if (stack.length === 0) {
     ws.send(JSON.stringify({
-      protocol: 'meup/v0.2',
+      protocol: 'mew/v0.3',
       kind: 'system/error',
       payload: {
         error: 'No context to pop',
@@ -442,7 +442,7 @@ function handleContextPop(message, ws, participantId, contextStacks, spaces, opt
   if (ws.spaceId && spaces.has(ws.spaceId)) {
     const space = spaces.get(ws.spaceId);
     const envelope = {
-      protocol: 'meup/v0.2',
+      protocol: 'mew/v0.3',
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ts: new Date().toISOString(),
       from: participantId,

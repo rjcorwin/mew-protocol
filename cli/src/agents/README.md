@@ -3,7 +3,7 @@
 These agents are built into the CLI for testing and development. They can be launched with:
 
 ```bash
-meup agent start --type <agent-type>
+mew agent start --type <agent-type>
 ```
 
 ## Available Agents
@@ -25,7 +25,7 @@ Automatically fulfills any proposal it observes.
 
 ## Implementation
 
-These agents are implemented using the `@meup/agent` SDK and are embedded in the CLI package. They demonstrate proper MEUP protocol implementation and serve as:
+These agents are implemented using the `@mew/agent` SDK and are embedded in the CLI package. They demonstrate proper MEW protocol implementation and serve as:
 
 1. **Test fixtures** - For integration testing
 2. **Examples** - Showing how to build agents
@@ -36,7 +36,7 @@ These agents are implemented using the `@meup/agent` SDK and are embedded in the
 Users can also provide custom agent handlers:
 
 ```bash
-meup agent start --type custom --handler ./my-agent.js
+mew agent start --type custom --handler ./my-agent.js
 ```
 
 The handler file should export:

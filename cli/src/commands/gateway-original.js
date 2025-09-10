@@ -8,12 +8,12 @@ const gateway = new Command('gateway')
 
 gateway
   .command('start')
-  .description('Start a MEUP gateway server')
+  .description('Start a MEW gateway server')
   .option('-p, --port <port>', 'Port to listen on', '8080')
   .option('-l, --log-level <level>', 'Log level (debug|info|warn|error)', 'info')
   .action(async (options) => {
     const port = parseInt(options.port);
-    console.log(`Starting MEUP gateway on port ${port}...`);
+    console.log(`Starting MEW gateway on port ${port}...`);
     
     // Create Express app for health endpoint
     const app = express();
@@ -71,7 +71,7 @@ gateway
             
             // Send welcome message
             ws.send(JSON.stringify({
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.3',
               kind: 'system/welcome',
               payload: {
                 participantId,
@@ -88,7 +88,7 @@ gateway
           if (spaceId && spaces.has(spaceId)) {
             const space = spaces.get(spaceId);
             const envelope = {
-              protocol: 'meup/v0.2',
+              protocol: 'mew/v0.3',
               id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               ts: new Date().toISOString(),
               from: participantId,
@@ -109,7 +109,7 @@ gateway
         } catch (error) {
           console.error('Error handling message:', error);
           ws.send(JSON.stringify({
-            protocol: 'meup/v0.2',
+            protocol: 'mew/v0.3',
             kind: 'system/error',
             payload: {
               error: error.message
