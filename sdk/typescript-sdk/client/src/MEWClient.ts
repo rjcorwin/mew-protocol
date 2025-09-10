@@ -135,11 +135,12 @@ export class MEWClient {
 
   private async doConnect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const url = `${this.options.gateway}/spaces/${this.options.space}`;
+      const url = this.options.gateway;
       this.ws = new WebSocket(url, {
         headers: {
           Authorization: `Bearer ${this.options.token}`,
           'X-Participant-ID': this.participantId!,
+          'X-Space-ID': this.options.space,
         },
       });
       const timeout = setTimeout(() => {
@@ -149,6 +150,23 @@ export class MEWClient {
       this.ws.once('open', () => {
         clearTimeout(timeout);
         this.reconnectAttempts = 0;
+        
+        // Send join message to authenticate
+        const joinMessage = {
+          protocol: 'mew/v0.3',
+          kind: 'system/join',
+          participantId: this.participantId,
+          space: this.options.space,
+          token: this.options.token,
+          payload: {
+            participantId: this.participantId,
+            space: this.options.space,
+            token: this.options.token,
+            capabilities: this.capabilities
+          }
+        };
+        this.ws!.send(JSON.stringify(joinMessage));
+        
         this.startHeartbeat();
         this.emit('connected');
         resolve();

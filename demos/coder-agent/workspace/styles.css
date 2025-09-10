@@ -1,0 +1,24 @@
+/* Basic styles that could use improvements */
+
+body {
+  font-family: Arial;
+  margin: 0;
+  padding: 0;
+}
+
+/* TODO: Add responsive design */
+.container {
+  width: 1200px;
+  margin: 0 auto;
+}
+
+/* TODO: Improve button styles */
+button {
+  padding: 5px;
+  background: gray;
+  color: white;
+}
+
+/* TODO: Add dark mode support */
+
+/* TODO: Improve accessibility (focus states, contrast ratios) */

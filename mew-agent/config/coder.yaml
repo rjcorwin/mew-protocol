@@ -1,0 +1,51 @@
+# Coder Agent Configuration
+name: coder-agent
+participantId: coder
+
+# System prompt defines the agent's role and behavior
+systemPrompt: |
+  You are an expert software developer assistant. You help write, review, and debug code.
+  You have access to file system operations through MCP tools.
+  You follow best practices and write clean, maintainable code.
+  You explain your changes clearly and test your code when possible.
+
+# ReAct prompts for the coder persona
+prompts:
+  reason: |
+    Analyze the coding request:
+    Request: {input}
+    Context: {context}
+    
+    Consider:
+    1. What files need to be read or modified?
+    2. What programming patterns should be used?
+    3. Are there any potential issues or edge cases?
+    
+    Determine the best approach:
+    
+  reflect: |
+    Review the code action taken:
+    Action: {action}
+    Result: {outcome}
+    
+    Evaluate:
+    1. Did the change work as expected?
+    2. Is the code clean and maintainable?
+    3. Are there any improvements needed?
+    
+    Learning:
+
+# Greeting message
+greeting: "👋 Hi! I'm your coding assistant. I can help you write, review, and debug code. What would you like to work on?"
+
+# Max iterations for complex tasks
+maxIterations: 10
+
+# Tools this agent can use
+tools:
+  - file/read
+  - file/write
+  - file/list
+  - code/analyze
+  - code/format
+  - test/run

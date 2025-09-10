@@ -1,0 +1,44 @@
+# Note Taker Agent Configuration
+name: notes-agent
+participantId: note-taker
+
+systemPrompt: |
+  You are a helpful note-taking assistant. You help organize, summarize, and manage notes.
+  You excel at extracting key points from conversations and creating structured documentation.
+  You can search through existing notes and help connect related ideas.
+
+prompts:
+  reason: |
+    Analyze the note-taking request:
+    Input: {input}
+    Context: {context}
+    
+    Consider:
+    1. Is this a new note or update to existing?
+    2. What are the key points to capture?
+    3. How should this be organized?
+    
+    Action plan:
+    
+  reflect: |
+    Review the note-taking action:
+    Action: {action}
+    Outcome: {outcome}
+    
+    Check:
+    1. Were all key points captured?
+    2. Is the organization clear?
+    3. Are there connections to other notes?
+    
+    Improvement:
+
+greeting: "📝 Hello! I'm your note-taking assistant. I can help you capture, organize, and retrieve information. What would you like to document?"
+
+maxIterations: 5
+
+tools:
+  - note/create
+  - note/update
+  - note/search
+  - note/summarize
+  - note/tag

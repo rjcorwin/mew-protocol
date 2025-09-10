@@ -1,0 +1,29 @@
+{
+  "name": "mew-agent",
+  "version": "0.1.0",
+  "description": "Configurable ReAct agent for MEW Protocol",
+  "main": "src/index.js",
+  "bin": {
+    "mew-agent": "./bin/mew-agent.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js --debug"
+  },
+  "dependencies": {
+    "mew-sdk": "file:../sdk/typescript-sdk/client",
+    "commander": "^11.0.0",
+    "js-yaml": "^4.1.0",
+    "winston": "^3.10.0",
+    "openai": "^4.20.0"
+  },
+  "keywords": [
+    "mew",
+    "agent",
+    "react",
+    "ai",
+    "configurable"
+  ],
+  "author": "",
+  "license": "MIT"
+}

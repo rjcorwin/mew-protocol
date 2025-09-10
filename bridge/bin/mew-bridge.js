@@ -34,13 +34,22 @@ if (options.mcpEnv) {
   });
 }
 
-// Create bridge instance
+// Prepare MCP server config
+const mcpConfig = {
+  command: options.mcpCommand,
+  args: mcpArgs,
+  env: Object.keys(mcpEnv).length > 0 ? mcpEnv : undefined,
+  cwd: options.mcpCwd,
+};
+
+// Create bridge instance with MCP server config
 const bridge = new MCPBridge({
   gateway: options.gateway,
   space: options.space,
   participantId: options.participantId,
   token: options.token,
   initTimeout: parseInt(options.initTimeout),
+  mcpServer: mcpConfig,
 });
 
 // Start the bridge
@@ -49,22 +58,11 @@ async function start() {
     console.log(`Starting MCP bridge for ${options.participantId}...`);
     console.log(`Connecting to gateway: ${options.gateway}`);
     console.log(`Space: ${options.space}`);
+    console.log(`MCP server: ${options.mcpCommand} ${mcpArgs.join(' ')}`);
 
     // Connect to gateway
     await bridge.connect();
     console.log('Connected to gateway');
-
-    // Start MCP server
-    const mcpConfig = {
-      command: options.mcpCommand,
-      args: mcpArgs,
-      env: Object.keys(mcpEnv).length > 0 ? mcpEnv : undefined,
-      cwd: options.mcpCwd,
-    };
-
-    console.log(`Starting MCP server: ${options.mcpCommand} ${mcpArgs.join(' ')}`);
-    await bridge.startMCPServer(mcpConfig);
-    console.log('MCP server started and initialized');
 
     // Keep the process alive
     process.on('SIGINT', async () => {

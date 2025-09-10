@@ -1,0 +1,27 @@
+# Simple Coder Agent Demo Space (without MCP)
+space:
+  id: simple-coder
+  name: "Simple Coder Demo"
+  description: "Basic coder agent without MCP bridge"
+  default_participant: human
+
+participants:
+  human:
+    tokens: 
+      - human-token
+    capabilities:
+      - kind: "*"
+      
+  coder:
+    type: local
+    command: "node"
+    args: ["../../mew-agent/src/index.js", "--gateway", "ws://localhost:8080", "--space", "simple-coder", "--token", "coder-token"]
+    auto_start: true
+    tokens:
+      - coder-token
+    capabilities:
+      - kind: "chat"
+
+defaults:
+  capabilities:
+    - kind: "chat"
