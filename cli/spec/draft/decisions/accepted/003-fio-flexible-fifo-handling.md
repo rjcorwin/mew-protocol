@@ -1,8 +1,8 @@
 # ADR-003: Simple FIFO Input with Log Output
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-01-07  
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

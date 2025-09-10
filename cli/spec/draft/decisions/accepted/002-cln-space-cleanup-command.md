@@ -1,8 +1,8 @@
 # ADR-cln: Space Cleanup Command
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-01-07
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete
 
 ## Context
 

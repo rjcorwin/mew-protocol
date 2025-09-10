@@ -1,6 +1,6 @@
 # ADR-pmg: Process Manager for MEW CLI
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-01-07
 **Incorporation:** Complete
 

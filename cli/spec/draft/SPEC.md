@@ -1,4 +1,4 @@
-# MEUP CLI Specification - Minimal Test Implementation
+# MEW CLI Specification - Minimal Test Implementation
 
 **Version:** draft (for v0.1.0)  
 **Status:** Draft  
@@ -6,7 +6,7 @@
 
 ## Overview
 
-The MEUP CLI (`@meup/cli`) provides minimal command-line tools needed to execute the test plan in `/tests/TEST_PLAN.md`. This is a focused implementation that prioritizes getting tests running.
+The MEW CLI (`@mew/cli`) provides minimal command-line tools needed to execute the test plan in `/tests/TEST_PLAN.md`. This is a focused implementation that prioritizes getting tests running.
 
 ## Scope
 
@@ -20,17 +20,17 @@ This specification covers:
 ## Architecture
 
 ```
-@meup/cli
+@mew/cli
 ├── Commands
 │   ├── gateway.js    # Start gateway server
 │   ├── client.js     # Connect as client (interactive or FIFO)
 │   ├── space.js      # Space management (up/down/status)
 │   └── token.js      # Generate test tokens
 ├── SDK Dependencies
-│   ├── @meup/gateway
-│   ├── @meup/client
-│   ├── @meup/agent
-│   └── @meup/capability-matcher
+│   ├── @mew/gateway
+│   ├── @mew/client
+│   ├── @mew/agent
+│   └── @mew/capability-matcher
 └── External Dependencies
     ├── pm2               # Process manager (embedded library)
     ├── js-yaml           # Parse space.yaml config
@@ -41,12 +41,12 @@ This specification covers:
 
 ## Commands
 
-### `meup gateway start`
+### `mew gateway start`
 
 Starts a gateway server.
 
 ```bash
-meup gateway start [options]
+mew gateway start [options]
 
 Options:
   --port <port>          Port to listen on (default: 8080)
@@ -56,15 +56,15 @@ Options:
 
 **Example:**
 ```bash
-meup gateway start --port 8080 --space-config ./space.yaml --log-level debug
+mew gateway start --port 8080 --space-config ./space.yaml --log-level debug
 ```
 
-### `meup client connect`
+### `mew client connect`
 
 Connects to a gateway as a client. Supports interactive mode (default) or FIFO mode for automation.
 
 ```bash
-meup client connect [options]
+mew client connect [options]
 
 Options:
   --gateway <url>        WebSocket URL (required)
@@ -93,14 +93,14 @@ Options:
 **Examples:**
 ```bash
 # Interactive mode (default)
-meup client connect \
+mew client connect \
   --gateway ws://localhost:8080 \
   --space test-space \
   --participant-id human-user
 
 # FIFO mode for automation
 mkfifo cli-in cli-out
-meup client connect \
+mew client connect \
   --gateway ws://localhost:8080 \
   --space test-space \
   --participant-id test-client \
@@ -138,12 +138,12 @@ participants:
     tokens: ["echo-token"]
 ```
 
-### `meup token create`
+### `mew token create`
 
 Creates a simple test token.
 
 ```bash
-meup token create [options]
+mew token create [options]
 
 Options:
   --participant-id <id>  Participant ID (required)
@@ -152,7 +152,7 @@ Options:
 
 **Example:**
 ```bash
-meup token create \
+mew token create \
   --participant-id echo-agent \
   --capabilities '[{"kind":"chat"}]'
 ```
@@ -194,7 +194,7 @@ The test plan uses the CLI as follows:
 
 1. **Start Gateway (with space config):**
    ```bash
-   meup gateway start --port 8080 --space-config ./space.yaml > gateway.log 2>&1 &
+   mew gateway start --port 8080 --space-config ./space.yaml > gateway.log 2>&1 &
    ```
 
 2. **Start Agents (if not auto-started):**
@@ -207,7 +207,7 @@ The test plan uses the CLI as follows:
 3. **Connect Test Clients with FIFOs:**
    ```bash
    mkfifo cli-in cli-out
-   meup client connect \
+   mew client connect \
      --gateway ws://localhost:8080 \
      --space test-space \
      --fifo-in cli-in \
@@ -259,7 +259,7 @@ Minimal error handling for test scenarios:
 Minimal dependencies:
 - `ws` - WebSocket client/server
 - `commander` - Command parsing
-- Core SDK packages (@meup/gateway, @meup/client, @meup/agent)
+- Core SDK packages (@mew/gateway, @mew/client, @mew/agent)
 
 ## Configuration
 
@@ -449,12 +449,12 @@ This architecture enables:
 
 The CLI loads space configuration in order of precedence:
 1. Command-line flag: `--space-config path/to/space.yaml`
-2. Environment variable: `MEUP_SPACE_CONFIG`
+2. Environment variable: `MEW_SPACE_CONFIG`
 3. Default location: `./space.yaml`
 
 Example:
 ```bash
-meup gateway start --port 8080 --space-config ./configs/production.yaml
+mew gateway start --port 8080 --space-config ./configs/production.yaml
 ```
 
 ## Process Management
@@ -467,7 +467,7 @@ PM2 is used programmatically as a library, not as a global tool:
 
 ```javascript
 // Each space gets its own isolated PM2 daemon
-process.env.PM2_HOME = path.join(spaceDir, '.meup/pm2');
+process.env.PM2_HOME = path.join(spaceDir, '.mew/pm2');
 
 // Connect to space-specific PM2 daemon
 const pm2 = require('pm2');
@@ -483,7 +483,7 @@ Each space maintains complete isolation:
 ```
 space-directory/
 ├── space.yaml           # Space configuration
-├── .meup/              
+├── .mew/              
 │   ├── pm2/            # PM2 daemon for this space only
 │   │   ├── pm2.log     # PM2 daemon logs
 │   │   ├── pm2.pid     # Daemon process ID
@@ -504,12 +504,12 @@ Benefits of this approach:
 
 ## Space Management
 
-### `meup space up`
+### `mew space up`
 
 Brings up all components of a space based on space.yaml configuration, optionally connecting interactively as a participant.
 
 ```bash
-meup space up [options]
+mew space up [options]
 
 Options:
   --space-config <path>   Path to space.yaml (default: ./space.yaml)
@@ -518,7 +518,7 @@ Options:
 ```
 
 This command:
-1. Creates space-local PM2 daemon in `.meup/pm2/`
+1. Creates space-local PM2 daemon in `.mew/pm2/`
 2. Starts the gateway using PM2 for process management
 3. Starts all agents with `auto_start: true` via PM2
 4. Optionally connects you as a participant (see Participant Resolution below)
@@ -553,12 +553,12 @@ participants:
     tokens: [...]
 ```
 
-### `meup space status`
+### `mew space status`
 
 Shows the status of running space processes.
 
 ```bash
-meup space status [options]
+mew space status [options]
 
 Options:
   --space-config <path>   Path to space.yaml (default: ./space.yaml)
@@ -571,12 +571,12 @@ This command:
 3. Shows gateway health check results
 4. Displays connected participants
 
-### `meup space down`
+### `mew space down`
 
 Stops all components of a running space.
 
 ```bash
-meup space down [options]
+mew space down [options]
 
 Options:
   --space-config <path>   Path to space.yaml (default: ./space.yaml)
@@ -590,15 +590,15 @@ This command:
 4. Cleans up FIFOs and temporary files
 5. Preserves logs for debugging
 
-### `meup space clean`
+### `mew space clean`
 
 Cleans up space artifacts such as logs, FIFOs, and temporary files. Provides safety checks to prevent accidental data loss.
 
 ```bash
-meup space clean [options]
+mew space clean [options]
 
 Options:
-  --all                 Clean everything including .meup directory
+  --all                 Clean everything including .mew directory
   --logs                Clean only log files
   --fifos               Clean only FIFO pipes
   --force               Skip confirmation prompts
@@ -609,11 +609,11 @@ Options:
 - Cleans `logs/*` (except current session if running)
 - Cleans `fifos/*` (except active pipes)
 - Cleans temporary response files
-- Preserves `.meup/` directory (contains process state)
+- Preserves `.mew/` directory (contains process state)
 
 **With `--all`:**
 - Everything from default cleaning
-- Removes `.meup/` directory entirely
+- Removes `.mew/` directory entirely
 - Stops PM2 daemon for this space
 
 **Safety features:**
@@ -626,18 +626,18 @@ Options:
 **Examples:**
 ```bash
 # Clean logs after debugging session
-meup space clean --logs
+mew space clean --logs
 
 # Start completely fresh for testing
-meup space down
-meup space clean --all
+mew space down
+mew space clean --all
 
 # Check what would be cleaned
-meup space clean --dry-run
+mew space clean --dry-run
 
 # CI/CD cleanup (no prompts)
-meup space down
-meup space clean --all --force
+mew space down
+mew space clean --all --force
 ```
 
 ### Terminal Interface
@@ -647,7 +647,7 @@ meup space clean --all --force
 The terminal interface uses smart detection to handle both simple chat and full protocol messages:
 
 1. **Commands** (start with `/`): Execute special actions
-2. **JSON envelopes** (valid MEUP JSON): Send as-is for full protocol access  
+2. **JSON envelopes** (valid MEW JSON): Send as-is for full protocol access  
 3. **Plain text**: Automatically wrapped as chat messages
 
 Examples:
@@ -676,11 +676,11 @@ Special commands available when connected interactively:
 #### Developer Review Session
 ```bash
 # Bring up space and connect as developer
-meup space up --space-config ./code-review.yaml --participant developer
+mew space up --space-config ./code-review.yaml --participant developer
 
 # In another terminal, CI system connects with FIFOs for automation
 mkfifo ci-in ci-out
-meup client connect \
+mew client connect \
   --gateway ws://localhost:8080 \
   --space code-review \
   --participant ci-bot \
@@ -691,11 +691,11 @@ meup client connect \
 #### Test Automation Session
 ```bash
 # Bring up the space in background
-meup space up --detach
+mew space up --detach
 
 # Connect test clients with FIFOs
 mkfifo client1-in client1-out
-meup client connect \
+mew client connect \
   --gateway ws://localhost:8080 \
   --space test-space \
   --participant test-client-1 \
