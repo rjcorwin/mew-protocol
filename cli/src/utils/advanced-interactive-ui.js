@@ -22,6 +22,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [pendingOperation, setPendingOperation] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [verbose, setVerbose] = useState(false);
+  const [activeReasoning, setActiveReasoning] = useState(null); // Track active reasoning sessions
   const { exit } = useApp();
 
   // Environment configuration
@@ -74,6 +75,25 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       message.kind !== 'system/error'
     ) {
       return;
+    }
+
+    // Handle reasoning messages
+    if (message.kind === 'reasoning/start') {
+      setActiveReasoning({
+        id: message.id,
+        from: message.from,
+        message: message.payload?.message || 'Thinking...',
+        startTime: new Date(),
+        thoughtCount: 0
+      });
+    } else if (message.kind === 'reasoning/thought') {
+      setActiveReasoning(prev => prev ? {
+        ...prev,
+        message: message.payload?.message || prev.message,
+        thoughtCount: prev.thoughtCount + 1
+      } : null);
+    } else if (message.kind === 'reasoning/conclusion') {
+      setActiveReasoning(null);
     }
 
     // Check if this is an MCP proposal requiring confirmation
@@ -234,6 +254,11 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       onClose: () => setShowHelp(false)
     }),
     
+    // Reasoning Status
+    activeReasoning && React.createElement(ReasoningStatus, {
+      reasoning: activeReasoning
+    }),
+    
     // Input Composer
     React.createElement(InputComposer, {
       value: inputValue,
@@ -358,6 +383,46 @@ function HelpModal({ onClose }) {
       React.createElement(Text, null, "/exit              Exit application"),
       React.createElement(Box, { marginTop: 1 },
         React.createElement(Text, { color: "gray" }, "Press Esc or 'q' to close")
+      )
+    )
+  );
+}
+
+/**
+ * Reasoning Status Component
+ */
+function ReasoningStatus({ reasoning }) {
+  const [dots, setDots] = useState('');
+  
+  // Animate the thinking indicator
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? '' : prev + '.');
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+  
+  const elapsedTime = Math.floor((Date.now() - reasoning.startTime) / 1000);
+  
+  return React.createElement(Box, { 
+    borderStyle: "round",
+    borderColor: "cyan",
+    paddingX: 1,
+    marginBottom: 1
+  },
+    React.createElement(Box, { justifyContent: "space-between" },
+      React.createElement(Box, null,
+        React.createElement(Text, { color: "cyan", bold: true }, "🤔 "),
+        React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`),
+        React.createElement(Text, { color: "gray" }, dots)
+      ),
+      React.createElement(Text, { color: "gray" }, 
+        `${elapsedTime}s | ${reasoning.thoughtCount} thoughts`
+      )
+    ),
+    reasoning.message && React.createElement(Box, { marginTop: 0 },
+      React.createElement(Text, { color: "gray", italic: true }, 
+        `"${reasoning.message.slice(0, 80)}${reasoning.message.length > 80 ? '...' : ''}"`
       )
     )
   );
