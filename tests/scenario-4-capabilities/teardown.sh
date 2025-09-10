@@ -23,7 +23,7 @@ echo "Stopping space..."
 sleep 2
 
 # Force kill any remaining processes
-pkill -f "mew.*gateway" 2>/dev/null || true
+pkill -f "mew.js.*gateway|mew-bridge.*gateway" 2>/dev/null || true
 pkill -f "calculator-participant.js" 2>/dev/null || true
 
 # Clean up FIFOs (important to prevent blocking)

@@ -51,8 +51,8 @@ run_test() {
         echo -e "${RED}❌ $test_name TIMEOUT${NC}"
         echo "Status: TIMEOUT" >> "../../$TEST_RESULTS_LOG"
         # Cleanup any hanging processes
-        pkill -f "mew.js" 2>/dev/null || true
-        pkill -f "node.*agents" 2>/dev/null || true
+        pkill -f "mew.js|mew-bridge" 2>/dev/null || true
+        pkill -f "node.*calculator-participant" 2>/dev/null || true
       else
         echo -e "${RED}❌ $test_name FAILED${NC}"
         echo "Status: FAILED (exit code: $EXIT_CODE)" >> "../../$TEST_RESULTS_LOG"
@@ -71,8 +71,8 @@ run_test() {
   fi
   
   # Clean up any processes from this test
-  pkill -f "mew" 2>/dev/null || true
-  pkill -f "pm2" 2>/dev/null || true
+  pkill -f "mew.js|mew-bridge" 2>/dev/null || true
+  pkill -f "pm2.*daemon" 2>/dev/null || true
   pkill -f "calculator-participant.js" 2>/dev/null || true
   pkill -f "mew-bridge" 2>/dev/null || true
   pkill -f "@modelcontextprotocol" 2>/dev/null || true
@@ -83,8 +83,8 @@ run_test() {
 
 # Clean up any leftover processes before starting
 echo -e "${YELLOW}Cleaning up any existing test processes...${NC}"
-pkill -f "mew" 2>/dev/null || true
-pkill -f "pm2" 2>/dev/null || true
+pkill -f "mew.js|mew-bridge" 2>/dev/null || true
+pkill -f "pm2.*daemon" 2>/dev/null || true
 pkill -f "calculator-participant.js" 2>/dev/null || true
 pkill -f "mew-bridge" 2>/dev/null || true
 pkill -f "@modelcontextprotocol" 2>/dev/null || true
