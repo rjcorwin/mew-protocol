@@ -1,13 +1,13 @@
 /**
  * MEW (Multi-Entity Workspace) Client SDK
- * 
+ *
  * @packageDocumentation
  */
 
 // Main MEW client export
-export { 
-  MEWClient, 
-  ClientEvents, 
+export {
+  MEWClient,
+  ClientEvents,
   type ClientEventParams,
   type ChatHandler,
   type ErrorHandler,
@@ -19,7 +19,7 @@ export {
   type ProposalRejectHandler,
   type CapabilityGrantHandler,
   type CapabilityRevokeHandler,
-  type VoidHandler
+  type VoidHandler,
 } from './MEWClient';
 
 // Type exports

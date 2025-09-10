@@ -84,8 +84,16 @@ export type ClientEventMap = {
   message: (envelope: Envelope) => void;
   chat: (message: ChatPayload, from: string) => void;
   proposal: (proposal: Proposal, from: string) => void;
-  'proposal-accept': (data: { correlation_id: string; accepted_by: string; envelope: Envelope }) => void;
-  'proposal-reject': (data: { correlation_id: string; rejected_by: string; reason?: string }) => void;
+  'proposal-accept': (data: {
+    correlation_id: string;
+    accepted_by: string;
+    envelope: Envelope;
+  }) => void;
+  'proposal-reject': (data: {
+    correlation_id: string;
+    rejected_by: string;
+    reason?: string;
+  }) => void;
   'capability-grant': (grant: { from: string; to: string; capabilities: Capability[] }) => void;
   'capability-revoke': (data: { from: string; to: string; capabilities: string[] }) => void;
   'participant-joined': (participant: Participant) => void;
