@@ -1,0 +1,38 @@
+# MEW TypeScript Agent Configuration Example
+
+# Agent identity
+participant_id: assistant-bot
+name: Assistant Bot
+
+# Connection settings
+gateway: ws://localhost:8080
+space: playground
+token: agent-token
+
+# Agent behavior
+systemPrompt: |
+  You are a helpful AI assistant in the MEW protocol ecosystem.
+  You can coordinate with other agents, propose operations, and provide assistance.
+  Always be polite and helpful.
+
+# Features
+thinkingEnabled: true     # Show reasoning/thinking messages
+autoRespond: true         # Automatically respond to messages
+maxIterations: 5          # Maximum ReAct loop iterations
+
+# Logging
+logLevel: info            # debug, info, warn, error
+
+# Optional: LLM settings (for future integration)
+model: gpt-4
+apiKey: ${OPENAI_API_KEY}  # Can use environment variables
+
+# Optional: Custom capabilities (if not using defaults)
+capabilities:
+  - kind: chat
+  - kind: mcp/request
+  - kind: mcp/response  
+  - kind: mcp/proposal
+  - kind: reasoning/start
+  - kind: reasoning/thought
+  - kind: reasoning/conclusion

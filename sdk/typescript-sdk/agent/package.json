@@ -1,0 +1,46 @@
+{
+  "name": "@mew-protocol/agent",
+  "version": "0.3.0",
+  "description": "TypeScript agent for MEW Protocol",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mew-agent": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "dependencies": {
+    "@mew-protocol/client": "file:../client",
+    "@mew-protocol/participant": "file:../participant",
+    "@mew-protocol/types": "file:../types",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.5",
+    "@types/node": "^20.0.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "mew",
+    "protocol",
+    "agent",
+    "ai",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "config.example.yaml"
+  ]
+}
