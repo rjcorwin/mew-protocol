@@ -1,0 +1,78 @@
+space:
+  id: scenario-9
+  name: "Multi-Agent Coordination Test"
+  description: "Test multiple TypeScript agents coordinating tasks"
+
+participants:
+  # TypeScript coordinator agent
+  coordinator-agent:
+    tokens: ["coordinator-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "mcp/proposal"
+      - kind: "reasoning/*"
+      - kind: "system/*"
+    auto_start: true
+    command: "node"
+    args: 
+      - "../../sdk/typescript-sdk/agent/dist/index.js"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "scenario-9"
+      - "--token"
+      - "coordinator-token"
+      - "--id"
+      - "coordinator-agent"
+    
+  # TypeScript worker agent
+  worker-agent:
+    tokens: ["worker-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "reasoning/*"
+      - kind: "system/*"
+    auto_start: true
+    command: "node"
+    args: 
+      - "../../sdk/typescript-sdk/agent/dist/index.js"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "scenario-9"
+      - "--token"
+      - "worker-token"
+      - "--id"
+      - "worker-agent"
+    
+  # Calculator agent (from previous scenarios)
+  calculator-agent:
+    tokens: ["calculator-token"]
+    capabilities:
+      - kind: mcp/response
+      - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "scenario-9", "--token", "calculator-token"]
+    
+  # Test client for coordinating tests
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "mcp/proposal"
+      - kind: "system/*"
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true

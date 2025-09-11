@@ -92,13 +92,36 @@ export class MEWAgent extends MEWParticipant {
     const text = envelope.payload?.text;
     if (!text) return;
 
-    // Check if message is directed at us
-    const isDirected =
-      envelope.to?.includes(this.config.participant_id!) ||
-      text.toLowerCase().includes(this.config.name?.toLowerCase() || '') ||
-      envelope.to?.length === 0; // Broadcast message
+    // Don't respond to other agents' responses to avoid infinite loops
+    const fromAgent = envelope.from.endsWith('-agent');
+    const isResponse = text.includes('I understand your request') || 
+                      text.includes('How can I assist you') ||
+                      text.includes('I\'ve asked') ||
+                      text.includes('The response should appear');
+    
+    if (fromAgent && isResponse && !envelope.to?.includes(this.config.participant_id!)) {
+      // This is an agent responding to someone else, ignore it
+      return;
+    }
 
-    if (!isDirected && !this.config.autoRespond) {
+    // Check if message is directed at us or is a broadcast we should respond to
+    const isBroadcast = !envelope.to || envelope.to.length === 0;
+    const isDirectedToUs = envelope.to?.includes(this.config.participant_id!);
+    const mentionsUs = text.toLowerCase().includes(this.config.name?.toLowerCase() || '');
+    const mentionsAllAgents = text.toLowerCase().includes('all agents');
+    
+    // Respond if:
+    // 1. Directed specifically to us
+    // 2. Mentions us by name
+    // 3. It's a broadcast from a non-agent that mentions "all agents"
+    // 4. It's a broadcast from a non-agent and autoRespond is true
+    const shouldRespond = 
+      isDirectedToUs ||
+      mentionsUs ||
+      (isBroadcast && !fromAgent && mentionsAllAgents) ||
+      (isBroadcast && !fromAgent && this.config.autoRespond);
+
+    if (!shouldRespond) {
       return;
     }
 
@@ -219,6 +242,32 @@ export class MEWAgent extends MEWParticipant {
     // For now, return a mock thought process
 
     if (previousThoughts.length === 0) {
+      // Check if this is a delegation request
+      const lowerInput = input.toLowerCase();
+      if (lowerInput.includes('ask') && lowerInput.includes('agent') && lowerInput.includes('tools')) {
+        // Extract target agent name
+        const agentMatch = input.match(/(\w+-agent)/i);
+        const targetAgent = agentMatch ? agentMatch[1] : 'worker-agent';
+        
+        return {
+          thought: `I need to ask ${targetAgent} to list its tools`,
+          action: 'delegate',
+          actionInput: { target: targetAgent, method: 'tools/list' },
+        };
+      }
+      
+      // Check if this is a simple math question
+      const sumMatch = input.match(/sum\s+of\s+(\d+)\s+and\s+(\d+)/i);
+      if (sumMatch) {
+        const a = parseInt(sumMatch[1]);
+        const b = parseInt(sumMatch[2]);
+        return {
+          thought: `I need to calculate the sum of ${a} and ${b}`,
+          action: 'calculate',
+          actionInput: { operation: 'sum', a, b },
+        };
+      }
+      
       return {
         thought: `I need to understand what the user is asking: "${input}"`,
         action: 'analyze',
@@ -228,10 +277,32 @@ export class MEWAgent extends MEWParticipant {
 
     const lastThought = previousThoughts[previousThoughts.length - 1];
     if (lastThought.action === 'analyze') {
+      // Don't re-embed the input to avoid infinite loops
+      const cleanInput = input.length > 100 ? input.substring(0, 100) + '...' : input;
       return {
         thought: 'I should provide a helpful response based on my analysis',
         action: 'respond',
-        actionInput: `I understand you're asking about "${input}". As an AI assistant in the MEW protocol, I can help coordinate with other agents and tools. How can I assist you specifically?`,
+        actionInput: `I understand your request about "${cleanInput}". As an AI assistant in the MEW protocol, I can help coordinate with other agents and tools. How can I assist you specifically?`,
+      };
+    }
+
+    if (lastThought.action === 'calculate') {
+      // After calculation, prepare response with result
+      const { a, b, operation } = lastThought.actionInput;
+      const result = operation === 'sum' ? a + b : 0;
+      return {
+        thought: `The sum is ${result}`,
+        action: 'respond',
+        actionInput: `The sum of ${a} and ${b} is ${result}.`,
+      };
+    }
+
+    if (lastThought.action === 'delegate') {
+      // After delegation, prepare response
+      return {
+        thought: 'I have sent the request to the other agent',
+        action: 'respond',
+        actionInput: `I've asked ${lastThought.actionInput.target} to ${lastThought.actionInput.method}. The response should appear shortly.`,
       };
     }
 
@@ -252,8 +323,20 @@ export class MEWAgent extends MEWParticipant {
         return `Search results for: ${input}`;
 
       case 'calculate':
-        // Could call a calculator tool
+        // Perform calculation
+        if (input && input.operation === 'sum') {
+          const result = input.a + input.b;
+          return `Calculated sum: ${input.a} + ${input.b} = ${result}`;
+        }
         return `Calculation result: ${input}`;
+
+      case 'delegate':
+        // Send MCP request to another agent
+        if (input.target && input.method) {
+          await this.sendMCPRequest(input.target, input.method);
+          return `Sent ${input.method} request to ${input.target}`;
+        }
+        return 'Invalid delegation parameters';
 
       case 'respond':
         return 'Response prepared';
@@ -407,6 +490,24 @@ export class MEWAgent extends MEWParticipant {
     };
 
     this.client.send(envelope);
+  }
+
+  private async sendMCPRequest(target: string, method: string, params?: any): Promise<void> {
+    const request: Envelope = {
+      protocol: PROTOCOL_VERSION,
+      id: `mcp-req-${Date.now()}`,
+      ts: new Date().toISOString(),
+      from: this.config.participant_id!,
+      to: [target],
+      kind: 'mcp/request',
+      payload: {
+        method,
+        params: params || {},
+      },
+    };
+
+    this.client.send(request);
+    this.log('info', `Sent MCP request ${method} to ${target}`);
   }
 
   private async fulfillProposal(proposal: Envelope): Promise<void> {
