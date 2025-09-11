@@ -31,6 +31,5 @@ participants:
       - kind: mcp/request
       - kind: mcp/response
       - kind: chat
-    fifo: true
     output_log: "./logs/test-client-output.log"
     auto_connect: true

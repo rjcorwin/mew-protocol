@@ -27,8 +27,8 @@ echo -e "${BLUE}Scenario: TypeScript Agent Proposals Only${NC}"
 echo ""
 
 # Set up paths
-FIFO_IN="${FIFO_IN:-$TEST_DIR/fifos/test-client-in}"
 OUTPUT_LOG="${OUTPUT_LOG:-$TEST_DIR/logs/test-client-output.log}"
+TEST_PORT="${TEST_PORT:-8080}"
 
 # Check if space is running
 if [ -z "$SPACE_RUNNING" ]; then
@@ -37,7 +37,7 @@ fi
 
 # Test 1: Check agents connected and capabilities
 echo -e "${BLUE}Test 1: Verifying agents connected with correct capabilities${NC}"
-if timeout $TIMEOUT grep -q "typescript-agent.*joined" "$OUTPUT_LOG"; then
+if timeout $TIMEOUT grep -q '"id":"typescript-agent"' "$OUTPUT_LOG"; then
   echo -e "${GREEN}✓ TypeScript agent connected successfully${NC}"
 else
   echo -e "${RED}✗ TypeScript agent did not connect${NC}"
@@ -45,7 +45,7 @@ else
   exit 1
 fi
 
-if timeout $TIMEOUT grep -q "fulfiller-agent.*joined" "$OUTPUT_LOG"; then
+if timeout $TIMEOUT grep -q '"id":"fulfiller-agent"' "$OUTPUT_LOG"; then
   echo -e "${GREEN}✓ Fulfiller agent connected successfully${NC}"
 else
   echo -e "${RED}✗ Fulfiller agent did not connect${NC}"
@@ -77,7 +77,7 @@ echo '{
     "text": "Can you list your tools for me?",
     "format": "plain"
   }
-}' > "$FIFO_IN"
+}' > /dev/null
 
 sleep 3
 
@@ -100,16 +100,19 @@ echo "--- Test 4 Start ---" >> "$OUTPUT_LOG"
 
 # The TypeScript agent's request method should create a proposal
 # We'll trigger this by asking it to use its tools
-echo '{
-  "kind": "mcp/request",
-  "to": ["typescript-agent"],
-  "payload": {
-    "jsonrpc": "2.0",
-    "id": 100,
-    "method": "tools/list",
-    "params": {}
-  }
-}' > "$FIFO_IN"
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "mcp/request",
+    "to": ["typescript-agent"],
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 100,
+      "method": "tools/list",
+      "params": {}
+    }
+  }' > /dev/null
 
 sleep 2
 
@@ -138,7 +141,7 @@ echo '{
     "text": "Please ask the fulfiller-agent to list its tools",
     "format": "plain"
   }
-}' > "$FIFO_IN"
+}' > /dev/null
 
 sleep 3
 
@@ -154,17 +157,20 @@ if grep -A 20 "Test 5 Start" "$OUTPUT_LOG" | grep -q '"kind":"mcp/proposal".*"to
   echo -e "${BLUE}  Fulfilling the proposal...${NC}"
   echo "--- Test 5 Fulfillment ---" >> "$OUTPUT_LOG"
   
-  echo "{
-    \"kind\": \"mcp/request\",
-    \"to\": [\"fulfiller-agent\"],
-    \"correlation_id\": \"$PROPOSAL_ID\",
-    \"payload\": {
-      \"jsonrpc\": \"2.0\",
-      \"id\": 200,
-      \"method\": \"tools/list\",
-      \"params\": {}
-    }
-  }" > "$FIFO_IN"
+  curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+    -H "Authorization: Bearer test-token" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"kind\": \"mcp/request\",
+      \"to\": [\"fulfiller-agent\"],
+      \"correlation_id\": \"$PROPOSAL_ID\",
+      \"payload\": {
+        \"jsonrpc\": \"2.0\",
+        \"id\": 200,
+        \"method\": \"tools/list\",
+        \"params\": {}
+      }
+    }" > /dev/null
   
   sleep 2
   
@@ -192,7 +198,7 @@ echo '{
     "text": "Can you do something that requires a proposal?",
     "format": "plain"
   }
-}' > "$FIFO_IN"
+}' > /dev/null
 
 sleep 3
 
@@ -202,14 +208,17 @@ if grep -A 20 "Test 6 Start" "$OUTPUT_LOG" | grep -q '"kind":"mcp/proposal"'; th
   echo "  Proposal ID to reject: $PROPOSAL_ID"
   
   # Send rejection
-  echo "{
-    \"kind\": \"mcp/reject\",
-    \"to\": [\"typescript-agent\"],
-    \"correlation_id\": \"$PROPOSAL_ID\",
-    \"payload\": {
-      \"reason\": \"unsafe\"
-    }
-  }" > "$FIFO_IN"
+  curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+    -H "Authorization: Bearer test-token" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"kind\": \"mcp/reject\",
+      \"to\": [\"typescript-agent\"],
+      \"correlation_id\": \"$PROPOSAL_ID\",
+      \"payload\": {
+        \"reason\": \"unsafe\"
+      }
+    }" > /dev/null
   
   sleep 2
   

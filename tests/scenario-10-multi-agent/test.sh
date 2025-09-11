@@ -1,5 +1,5 @@
 #!/bin/bash
-# Main test runner for Scenario 9: Multi-Agent Coordination Test
+# Main test runner for Scenario 10: Multi-Agent Coordination Test
 
 # Colors for output
 RED='\033[0;31m'
@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== Scenario 9: Multi-Agent Coordination Test ===${NC}"
+echo -e "${YELLOW}=== Scenario 10: Multi-Agent Coordination Test ===${NC}"
 echo -e "${BLUE}Testing multiple TypeScript agents coordinating tasks${NC}"
 
 # Get directory of this script
@@ -167,9 +167,9 @@ RESULT_5=$?
 TOTAL_RESULT=$((RESULT_1 + RESULT_2 + RESULT_3 + RESULT_4 + RESULT_5))
 
 if [ $TOTAL_RESULT -eq 0 ]; then
-  echo -e "\n${GREEN}✓ Scenario 9 PASSED${NC}"
+  echo -e "\n${GREEN}✓ Scenario 10 PASSED${NC}"
 else
-  echo -e "\n${RED}✗ Scenario 9 FAILED${NC}"
+  echo -e "\n${RED}✗ Scenario 10 FAILED${NC}"
   echo "Failed tests: $TOTAL_RESULT out of 5"
 fi
 

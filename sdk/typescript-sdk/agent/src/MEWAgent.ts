@@ -27,6 +27,7 @@ export class MEWAgent extends MEWParticipant {
   private conversationHistory: Envelope[] = [];
   private activeRequests = new Map<string, { from: string; method: string }>();
   private thinkingContext: string | null = null;
+  private hasGreeted: boolean = false;
 
   constructor(config: AgentConfig) {
     super(config);
@@ -49,8 +50,9 @@ export class MEWAgent extends MEWParticipant {
         `Agent ${this.config.participant_id} joined with capabilities:`,
         welcomeData.you.capabilities,
       );
-      if (this.config.autoRespond) {
+      if (this.config.autoRespond && !this.hasGreeted) {
         this.sendChat('Hello! I am an AI assistant ready to help. What can I do for you?');
+        this.hasGreeted = true;
       }
     });
 

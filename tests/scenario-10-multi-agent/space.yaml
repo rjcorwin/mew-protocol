@@ -1,5 +1,5 @@
 space:
-  id: scenario-9
+  id: scenario-10
   name: "Multi-Agent Coordination Test"
   description: "Test multiple TypeScript agents coordinating tasks"
 
@@ -23,7 +23,7 @@ participants:
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
-      - "scenario-9"
+      - "scenario-10"
       - "--token"
       - "coordinator-token"
       - "--id"
@@ -47,7 +47,7 @@ participants:
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
-      - "scenario-9"
+      - "scenario-10"
       - "--token"
       - "worker-token"
       - "--id"
@@ -61,7 +61,7 @@ participants:
       - kind: system/*
     auto_start: true
     command: "node"
-    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "scenario-9", "--token", "calculator-token"]
+    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "scenario-10", "--token", "calculator-token"]
     
   # Test client for coordinating tests
   test-client:

@@ -152,6 +152,7 @@ export class MEWClient {
         this.reconnectAttempts = 0;
         
         // Send join message to authenticate
+        // TODO: Should use the type. Consider a factory function for messages.
         const joinMessage = {
           protocol: 'mew/v0.3',
           kind: 'system/join',
@@ -196,6 +197,7 @@ export class MEWClient {
   }
 
   private handleEnvelope(envelope: Envelope): void {
+    // TODO: These emits are not type checked. Can we improve that?
     this.emit('message', envelope);
     if (envelope.kind === 'system/welcome') {
       const payload = envelope.payload as SystemWelcomePayload;
@@ -225,11 +227,13 @@ export class MEWClient {
       this.emit('chat', envelope.payload as ChatPayload, envelope.from);
       return;
     }
+    // Supposed to be "mcp/prososal"/"mcp/accept"/"mcp/reject". 
     if (envelope.kind === 'mew/proposal') {
       const payload = envelope.payload as MewProposalPayload;
       this.emit('proposal', payload.proposal, envelope.from);
       return;
     }
+    // TODO: According to spec, this is an invalid type. But maybe it should be.
     if (envelope.kind === 'mew/proposal/accept') {
       const payload = envelope.payload as MewProposalAcceptPayload;
       const pending = this.pendingProposals.get(payload.correlation_id);
