@@ -41,6 +41,10 @@ tests/*/logs/
 tests/*/fifos/
 tests/test-results.log
 
+# MEW runtime directories
+.mew/
+**/.mew/
+
 # IDE
 .vscode/
 .idea/
