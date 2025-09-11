@@ -1,0 +1,36 @@
+space:
+  id: test-space
+  name: "Scenario 9 - TypeScript Agent Proposals Only"
+  description: "Test TypeScript agent with proposal-only permissions, requiring fulfillment by test client"
+
+participants:
+  typescript-agent:
+    tokens: ["ts-agent-token"]
+    capabilities:
+      - kind: mcp/proposal
+      - kind: mcp/response
+      - kind: chat
+      - kind: reasoning/*
+    auto_start: true
+    command: "node"
+    args: ["../../sdk/typescript-sdk/agent/dist/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "ts-agent-token", "--id", "typescript-agent"]
+    
+  fulfiller-agent:
+    tokens: ["fulfiller-token"]
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: chat
+    auto_start: true
+    command: "node"
+    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "fulfiller-token", "--id", "fulfiller-agent"]
+    
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: chat
+    fifo: true
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true

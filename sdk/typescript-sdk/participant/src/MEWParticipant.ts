@@ -1,5 +1,5 @@
 import { MEWClient, ClientEvents, PROTOCOL_VERSION } from '@mew-protocol/client';
-import { Envelope, Capability } from '@mew-protocol/types';
+import { Envelope, PartialEnvelope, Capability } from '@mew-protocol/types';
 import { 
   ParticipantOptions, 
   ParticipantInfo, 
@@ -117,17 +117,29 @@ export class MEWParticipant {
       
       // Fall back to proposal if we have that capability
       if (this.canSend('mcp/proposal')) {
+        // Create the envelope that would be sent if approved
+        const proposedEnvelope: PartialEnvelope = {
+          to,
+          kind: 'mcp/request',
+          payload: {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method,
+            params
+          }
+        };
+        
         const envelope: Envelope = {
           protocol: PROTOCOL_VERSION,
           id,
           ts: new Date().toISOString(),
           from: this.options.participant_id!,
-          to,
           kind: 'mcp/proposal',
           payload: {
             proposal: {
-              method,
-              params
+              correlation_id: id,
+              capability: 'mcp/request',
+              envelope: proposedEnvelope
             }
           }
         };
@@ -215,6 +227,10 @@ export class MEWParticipant {
           await handler(envelope);
         }
       }
+      // Handle proposal rejection for our proposals
+      if (envelope.kind === 'mcp/reject') {
+        await this.handleProposalReject(envelope);
+      }
     });
     
     this.client.onError((error: any) => {});
@@ -253,6 +269,20 @@ export class MEWParticipant {
           pendingRequest.resolve(payload);
         }
         return;
+      }
+    }
+  }
+  
+  private async handleProposalReject(envelope: Envelope): Promise<void> {
+    const correlationId = envelope.payload?.correlation_id;
+    if (correlationId) {
+      const pendingRequest = this.pendingRequests.get(correlationId);
+      if (pendingRequest) {
+        clearTimeout(pendingRequest.timeout);
+        this.pendingRequests.delete(correlationId);
+        
+        const reason = envelope.payload?.reason || 'Proposal rejected';
+        pendingRequest.reject(new Error(`Proposal rejected: ${reason}`));
       }
     }
   }
@@ -301,14 +331,32 @@ export class MEWParticipant {
       response = { error: { code: -32603, message: error.message || 'Internal error', data: error.stack } };
     }
     
+    // If the request had a correlation_id (fulfilling a proposal), preserve it
+    // Otherwise use the request's ID as correlation_id
+    const correlationId = envelope.correlation_id || envelope.id;
+    
+    // For proposal fulfillments (has correlation_id), broadcast the response
+    // Otherwise, send to the requester
+    let recipients: string[] | undefined;
+    if (envelope.correlation_id) {
+      // This is a proposal fulfillment - broadcast so the original proposer gets it
+      recipients = undefined; // undefined means broadcast to all
+    } else {
+      // Normal request - respond to sender
+      recipients = [envelope.from];
+      if (envelope.to && Array.isArray(envelope.to)) {
+        recipients.push(...envelope.to.filter(id => id !== this.options.participant_id));
+      }
+    }
+    
     const responseEnvelope: Envelope = {
       protocol: PROTOCOL_VERSION,
       id: `resp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ts: new Date().toISOString(),
       from: this.options.participant_id!,
-      to: [envelope.from],
+      to: recipients,
       kind: 'mcp/response',
-      correlation_id: envelope.id,
+      correlation_id: correlationId,
       payload: {
         jsonrpc: '2.0',
         id: requestId,

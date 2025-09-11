@@ -1,10 +1,22 @@
 #!/bin/bash
-set -e
+# Main test runner for Scenario 7: MCP Bridge Test
 
-echo "=== Scenario 7: MCP Bridge Test (FIFO) ==="
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}=== Scenario 7: MCP Bridge Test (HTTP) ===${NC}"
+echo -e "${BLUE}Testing MCP server integration via bridge using HTTP API${NC}"
+
+# Get directory of this script
+TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$TEST_DIR"
 
 # Clean up any previous runs
-../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
+./teardown.sh 2>/dev/null || true
 
 # Setup test files
 mkdir -p /tmp/mcp-test-files
@@ -16,40 +28,25 @@ echo "Nested file" > /tmp/mcp-test-files/subdir/nested.txt
 echo "Test files created in /tmp/mcp-test-files"
 ls -la /tmp/mcp-test-files
 
-# Clean up logs
-rm -rf logs
-mkdir -p logs
+# Generate random port
+export TEST_PORT=$((9700 + RANDOM % 100))
 
-# Start space with random port
-PORT=$((9700 + RANDOM % 100))
-echo "Starting space on port $PORT..."
-../../cli/bin/mew.js space up --port $PORT > logs/space-up.log 2>&1
-
-# Wait for MCP bridge to initialize (filesystem server takes time)
-echo "Waiting for MCP bridge to initialize..."
-sleep 15
-
-# Check that space is running
-if ! ../../cli/bin/mew.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
-  echo "✗ Space failed to start"
-  cat logs/space-up.log
+# Run setup with the port
+echo -e "\n${YELLOW}Step 1: Setting up space...${NC}"
+./setup.sh
+if [ $? -ne 0 ]; then
+  echo -e "${RED}✗ Setup failed${NC}"
   exit 1
 fi
 
-# Get the FIFO path
-FIFO_IN="./fifos/test-client-in"
-OUTPUT_LOG="./logs/test-client-output.log"
+# Export the paths that tests need
+export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
 
-# Check that FIFO exists
-if [ ! -p "$FIFO_IN" ]; then
-  echo "✗ FIFO not created at $FIFO_IN"
-  exit 1
-fi
+# Wait for MCP bridge to fully initialize
+echo -e "\n${YELLOW}Step 2: Waiting for MCP bridge to initialize...${NC}"
+sleep 10
 
-echo "FIFO ready at: $FIFO_IN"
-echo "Output log at: $OUTPUT_LOG"
-
-# Function to send MCP request and check response
+# Function to send MCP request via HTTP and check response
 test_mcp_request() {
   local test_name="$1"
   local request="$2"
@@ -61,82 +58,114 @@ test_mcp_request() {
   # Clear output log
   > "$OUTPUT_LOG"
   
-  # Send request (non-blocking with subshell)
-  echo "Sending request to FIFO..." >&2
-  (echo "$request" > "$FIFO_IN" &)
-  echo "Request sent" >&2
+  # Start monitoring output
+  tail -f "$OUTPUT_LOG" > /tmp/mcp-response.txt &
+  TAIL_PID=$!
+  
+  # Send request via HTTP API
+  echo "Sending request via HTTP API..."
+  curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+    -H "Authorization: Bearer test-token" \
+    -H "Content-Type: application/json" \
+    -d "$request" > /dev/null
   
   # Wait for response
   sleep 5
   
+  # Stop monitoring
+  kill $TAIL_PID 2>/dev/null || true
+  
   # Check for response
-  if grep -q "$expected_pattern" "$OUTPUT_LOG" 2>/dev/null; then
-    echo "✓ $test_name passed"
+  if grep -q "$expected_pattern" /tmp/mcp-response.txt 2>/dev/null; then
+    echo -e "${GREEN}✓${NC} $test_name passed"
     return 0
   else
-    echo "✗ $test_name failed"
+    echo -e "${RED}✗${NC} $test_name failed"
     echo "Expected pattern: $expected_pattern"
-    echo "Output log contents:"
-    cat "$OUTPUT_LOG"
+    echo "Response received:"
+    cat /tmp/mcp-response.txt
     return 1
   fi
 }
 
+echo -e "\n${YELLOW}Step 3: Running MCP bridge tests...${NC}"
+
 # Test 1: List MCP tools
-REQUEST_1='{"protocol":"mew/v0.3","kind":"mcp/request","id":"test-1","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
+REQUEST_1='{
+  "kind": "mcp/request",
+  "id": "test-1",
+  "to": ["filesystem"],
+  "payload": {
+    "method": "tools/list",
+    "params": {}
+  }
+}'
 
 test_mcp_request \
   "List MCP tools" \
   "$REQUEST_1" \
-  "tools.*read_file"
+  "read_text_file"
 
 RESULT_1=$?
 
-# Small delay between tests
-sleep 1
-
-# Test 2: List tools again to verify connection
-REQUEST_2='{"protocol":"mew/v0.3","kind":"mcp/request","id":"test-2","from":"test-client","to":["filesystem"],"payload":{"method":"tools/list","params":{}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
-
-test_mcp_request \
-  "List tools again" \
-  "$REQUEST_2" \
-  "read_text_file"
-
-RESULT_2=$?
-
-# Small delay between tests
-sleep 1
-
-# Test 3: Read a file
-REQUEST_3='{"protocol":"mew/v0.3","kind":"mcp/request","id":"test-3","from":"test-client","to":["filesystem"],"payload":{"method":"tools/call","params":{"name":"read_text_file","arguments":{"path":"/private/tmp/mcp-test-files/test.txt"}}},"ts":"'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"}'
+# Test 2: Read a file via MCP
+REQUEST_2='{
+  "kind": "mcp/request",
+  "id": "test-2",
+  "to": ["filesystem"],
+  "payload": {
+    "method": "tools/call",
+    "params": {
+      "name": "read_text_file",
+      "arguments": {
+        "path": "/private/tmp/mcp-test-files/test.txt"
+      }
+    }
+  }
+}'
 
 test_mcp_request \
   "Read file via MCP" \
-  "$REQUEST_3" \
+  "$REQUEST_2" \
   "Test content"
+
+RESULT_2=$?
+
+# Test 3: List directory via MCP
+REQUEST_3='{
+  "kind": "mcp/request",
+  "id": "test-3",
+  "to": ["filesystem"],
+  "payload": {
+    "method": "tools/call",
+    "params": {
+      "name": "list_directory",
+      "arguments": {
+        "path": "/private/tmp/mcp-test-files"
+      }
+    }
+  }
+}'
+
+test_mcp_request \
+  "List directory via MCP" \
+  "$REQUEST_3" \
+  "hello.txt"
 
 RESULT_3=$?
 
 # Calculate total result
 TOTAL_RESULT=$((RESULT_1 + RESULT_2 + RESULT_3))
 
-# Always clean up
-echo ""
-echo "Stopping space..."
-../../cli/bin/mew.js space down
+if [ $TOTAL_RESULT -eq 0 ]; then
+  echo -e "\n${GREEN}✓ Scenario 7 PASSED${NC}"
+else
+  echo -e "\n${RED}✗ Scenario 7 FAILED${NC}"
+fi
+
+# Cleanup
+echo -e "\nCleaning up..."
+./teardown.sh
 rm -rf /tmp/mcp-test-files
 
-if [ $TOTAL_RESULT -eq 0 ]; then
-  echo ""
-  echo "✓ Scenario 7: MCP Bridge test PASSED"
-  exit 0
-else
-  echo ""
-  echo "✗ Scenario 7: MCP Bridge test FAILED"
-  echo "Check logs for details:"
-  echo "  - logs/gateway.log"
-  echo "  - logs/filesystem-bridge.log"
-  echo "  - logs/test-client-output.log"
-  exit 1
-fi
+exit $TOTAL_RESULT

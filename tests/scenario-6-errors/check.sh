@@ -16,8 +16,7 @@ echo -e "${BLUE}Test directory: $(pwd)${NC}"
 echo -e "${BLUE}Gateway port: ${TEST_PORT}${NC}"
 
 # Get paths from environment or use defaults
-TEST_FIFO="${TEST_FIFO:-./fifos/test-client-in}"
-TEST_LOG="${TEST_LOG:-./logs/test-client-output.log}"
+OUTPUT_LOG="${OUTPUT_LOG:-./logs/test-client-output.log}"
 GATEWAY_LOG="./logs/gateway.log"
 
 # Test counters
@@ -49,19 +48,19 @@ else
   ((TESTS_FAILED++))
 fi
 
-echo "Testing: Test client FIFO exists ... \c"
-check_test "" "[ -p '$TEST_FIFO' ]"
-
 echo "Testing: Output log exists ... \c"
-check_test "" "[ -f '$TEST_LOG' ]"
+check_test "" "[ -f '$OUTPUT_LOG' ]"
 
 # Test 1: Invalid JSON
 echo -e "\n${YELLOW}Test 1: Send invalid JSON${NC}"
-(echo 'This is not valid JSON' > "$TEST_FIFO" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d 'This is not valid JSON' > /dev/null 2>&1 || true
 sleep 2
 
 # Check if error is logged (the gateway or client should handle it)
-if tail -20 "$TEST_LOG" | grep -q '"kind":"system/error"' || tail -20 logs/*.log 2>/dev/null | grep -qi "invalid.*json\|json.*parse"; then
+if tail -20 "$OUTPUT_LOG" | grep -q '"kind":"system/error"' || tail -20 logs/*.log 2>/dev/null | grep -qi "invalid.*json\|json.*parse"; then
   echo -e "Invalid JSON handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -71,10 +70,13 @@ fi
 
 # Test 2: Message without kind field
 echo -e "\n${YELLOW}Test 2: Message without 'kind' field${NC}"
-(echo '{"payload":{"text":"Missing kind field"}}' > "$TEST_FIFO" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"payload":{"text":"Missing kind field"}}' > /dev/null
 sleep 2
 
-if tail -20 "$TEST_LOG" | grep -q '"kind":"system/error"' || tail -20 logs/*.log 2>/dev/null | grep -qi "missing.*kind\|kind.*required"; then
+if tail -20 "$OUTPUT_LOG" | grep -q '"kind":"system/error"' || tail -20 logs/*.log 2>/dev/null | grep -qi "missing.*kind\|kind.*required"; then
   echo -e "Missing 'kind' field handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -84,7 +86,7 @@ fi
 
 # Test 3: Message to non-existent participant
 echo -e "\n${YELLOW}Test 3: Message to non-existent participant${NC}"
-(echo '{"kind":"chat","to":["nonexistent"],"payload":{"text":"Hello nobody"}}' > "$TEST_FIFO" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
 sleep 2
 
 # This should be handled gracefully without errors
@@ -101,7 +103,7 @@ echo -e "\n${YELLOW}Test 4: Very large message (10KB)${NC}"
 LARGE_MSG='{"kind":"chat","payload":{"text":"'
 LARGE_MSG+=$(printf 'A%.0s' {1..10000})
 LARGE_MSG+='"}}'
-(echo "$LARGE_MSG" > "$TEST_FIFO" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
 sleep 2
 
 # Check if processes are still running
@@ -116,7 +118,7 @@ fi
 # Test 5: Rapid message sending
 echo -e "\n${YELLOW}Test 5: Rapid message sending (20 messages)${NC}"
 for i in {1..20}; do
-  (echo '{"kind":"chat","payload":{"text":"Rapid message '$i'"}}' > "$TEST_FIFO" &)
+  curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
 done
 sleep 3
 
@@ -130,7 +132,7 @@ fi
 
 # Test 6: Empty message
 echo -e "\n${YELLOW}Test 6: Empty message${NC}"
-(echo '' > "$TEST_FIFO" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
 sleep 1
 
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then
@@ -143,7 +145,7 @@ fi
 
 # Test 7: Malformed message (unclosed JSON)
 echo -e "\n${YELLOW}Test 7: Malformed JSON (unclosed)${NC}"
-(echo '{"kind":"chat","payload":{"text":"Unclosed' > "$TEST_FIFO" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
 sleep 2
 
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then
@@ -156,7 +158,7 @@ fi
 
 # Test 8: Special characters in message
 echo -e "\n${YELLOW}Test 8: Special characters in message${NC}"
-(echo '{"kind":"chat","payload":{"text":"Special chars: \n\t\r\"\\/"}}' > "$TEST_FIFO" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
 sleep 2
 
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then

@@ -19,7 +19,6 @@ participants:
       - kind: capability/grant
       - kind: capability/revoke
       - kind: system/*
-    fifo: true
     output_log: "./logs/coordinator-output.log"
     auto_connect: true
     
@@ -27,6 +26,5 @@ participants:
     tokens: ["limited-token"]
     capabilities:
       - kind: system/*
-    fifo: true
     output_log: "./logs/limited-agent-output.log"
     auto_connect: true

@@ -842,9 +842,73 @@ The gateway:
 
 The capabilities in the welcome message constitute the authoritative list of what operations the participant can perform. Participants SHOULD use this list to understand their allowed operations.
 
-### 5.3 Message Filtering
+### 5.3 Alternative I/O Mechanisms
 
-For each incoming message from a participant:
+In addition to WebSocket connections, gateways MAY support alternative I/O mechanisms for participant communication:
+
+#### 5.3.1 HTTP REST API
+Gateways MAY expose HTTP endpoints for message injection:
+
+```
+POST /participants/{participant_id}/messages
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "kind": "chat",
+  "payload": {
+    "text": "Hello world"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "id": "msg-123",
+  "status": "accepted",
+  "timestamp": "2025-01-09T10:00:00Z"
+}
+```
+
+**Message Retrieval (optional):**
+```
+GET /participants/{participant_id}/messages?since={timestamp}
+Authorization: Bearer {token}
+```
+
+Returns array of messages addressed to this participant since the given timestamp.
+
+#### 5.3.2 Standard I/O (stdio)
+Gateways MAY spawn participant processes and communicate via standard input/output:
+
+- Messages TO participant: Written to process stdin as JSON lines
+- Messages FROM participant: Read from process stdout as JSON lines
+- Process stderr: Used for logging/debugging (not protocol messages)
+
+**Configuration example:**
+```yaml
+participants:
+  my-agent:
+    command: "./my-agent"
+    args: ["--mode", "stdio"]
+    io: stdio  # Uses stdin/stdout instead of WebSocket
+```
+
+#### 5.3.3 I/O Mechanism Selection
+The I/O mechanism for a participant is determined by:
+1. Explicit configuration in space definition (`io` field)
+2. Connection method (WebSocket connection vs HTTP POST)
+3. Gateway spawning the process (stdio)
+
+All I/O mechanisms MUST:
+- Deliver complete MEW Protocol envelopes
+- Enforce the same capability model
+- Provide the same message ordering guarantees (best-effort)
+
+### 5.4 Message Filtering
+
+For each incoming message from a participant (regardless of I/O mechanism):
 
 ```python
 if not matches_any_capability(message, participant.capabilities):

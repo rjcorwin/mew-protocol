@@ -16,7 +16,6 @@ NC='\033[0m' # No Color
 # If TEST_DIR not set, we're running standalone
 if [ -z "$TEST_DIR" ]; then
   export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-  export FIFO_IN="$TEST_DIR/fifos/test-client-in"
   export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
   
   # Try to detect port from running space
@@ -62,13 +61,15 @@ RESPONSE_FILE="$OUTPUT_LOG"
 # Test 1: Gateway health check
 run_test "Gateway is running" "curl -s http://localhost:$TEST_PORT/health | grep -q 'ok'"
 
-# Test 2: Check input FIFO and output log exist
-run_test "Input FIFO exists" "[ -p '$FIFO_IN' ]"
+# Test 2: Check output log exists
 run_test "Output log exists" "[ -f '$OUTPUT_LOG' ]"
 
 # Test 3: List available tools
 echo -e "\n${YELLOW}Test: List available tools${NC}"
-(echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > /dev/null
 sleep 2
 
 if grep -q '"kind":"mcp/response"' "$RESPONSE_FILE" && grep -q '"tools":\[' "$RESPONSE_FILE"; then
@@ -81,7 +82,10 @@ fi
 
 # Test 4: Call add tool
 echo -e "\n${YELLOW}Test: Call add tool (5 + 3)${NC}"
-(echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > /dev/null
 sleep 2
 
 if grep -q '"text":"8"' "$RESPONSE_FILE"; then
@@ -94,7 +98,10 @@ fi
 
 # Test 5: Call multiply tool
 echo -e "\n${YELLOW}Test: Call multiply tool (7 × 9)${NC}"
-(echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":9}}}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":9}}}}' > /dev/null
 sleep 2
 
 if grep -q '"text":"63"' "$RESPONSE_FILE"; then
@@ -107,7 +114,10 @@ fi
 
 # Test 6: Call evaluate tool for division
 echo -e "\n${YELLOW}Test: Call evaluate tool (20 ÷ 4)${NC}"
-(echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"20 / 4"}}}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"20 / 4"}}}}' > /dev/null
 sleep 2
 
 if grep -q '"text":"5"' "$RESPONSE_FILE"; then
@@ -120,7 +130,10 @@ fi
 
 # Test 7: Handle division by zero
 echo -e "\n${YELLOW}Test: Handle division by zero${NC}"
-(echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"10 / 0"}}}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"10 / 0"}}}}' > /dev/null
 sleep 2
 
 if grep -q 'Infinity' "$RESPONSE_FILE" || grep -q 'division by zero' "$RESPONSE_FILE" || grep -q '"kind":"mcp/error"' "$RESPONSE_FILE"; then
@@ -133,7 +146,10 @@ fi
 
 # Test 8: Invalid tool name
 echo -e "\n${YELLOW}Test: Call non-existent tool${NC}"
-(echo '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"invalid","arguments":{}}}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"invalid","arguments":{}}}}' > /dev/null
 sleep 2
 
 if grep -q 'Unknown tool: invalid' "$RESPONSE_FILE" || grep -q '"kind":"mcp/error"' "$RESPONSE_FILE"; then

@@ -16,7 +16,6 @@ NC='\033[0m' # No Color
 # If TEST_DIR not set, we're running standalone
 if [ -z "$TEST_DIR" ]; then
   export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-  export FIFO_IN="$TEST_DIR/fifos/test-client-in"
   export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
   
   # Try to detect port from running space
@@ -62,14 +61,16 @@ RESPONSE_FILE="$OUTPUT_LOG"
 # Test 1: Gateway health check
 run_test "Gateway is running" "curl -s http://localhost:$TEST_PORT/health | grep -q 'ok'"
 
-# Test 2: Check input FIFO and output log exist
-run_test "Input FIFO exists" "[ -p '$FIFO_IN' ]"
+# Test 2: Check output log exists
 run_test "Output log exists" "[ -f '$OUTPUT_LOG' ]"
 
 # Test 3: Send simple chat message
 echo -e "\n${YELLOW}Test: Simple chat message${NC}"
-# Write to FIFO in background to avoid blocking
-(echo '{"kind":"chat","payload":{"text":"Hello, echo!"}}' > "$FIFO_IN" &)
+# Use gateway HTTP API to send message
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"chat","payload":{"text":"Hello, echo!"}}' > /dev/null
 sleep 2
 
 if grep -q '"text":"Echo: Hello, echo!"' "$RESPONSE_FILE" 2>/dev/null; then
@@ -82,7 +83,10 @@ fi
 
 # Test 4: Send message with ID (correlation)
 echo -e "\n${YELLOW}Test: Message with correlation ID${NC}"
-(echo '{"id":"msg-123","kind":"chat","payload":{"text":"Test with ID"}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"msg-123","kind":"chat","payload":{"text":"Test with ID"}}' > /dev/null
 sleep 2
 
 if grep -q 'correlation_id.*msg-123' "$RESPONSE_FILE" 2>/dev/null; then
@@ -95,11 +99,20 @@ fi
 
 # Test 5: Send multiple messages
 echo -e "\n${YELLOW}Test: Multiple messages${NC}"
-(echo '{"kind":"chat","payload":{"text":"Message 1"}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"chat","payload":{"text":"Message 1"}}' > /dev/null
 sleep 0.5
-(echo '{"kind":"chat","payload":{"text":"Message 2"}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"chat","payload":{"text":"Message 2"}}' > /dev/null
 sleep 0.5
-(echo '{"kind":"chat","payload":{"text":"Message 3"}}' > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"chat","payload":{"text":"Message 3"}}' > /dev/null
 sleep 2
 
 MSG_COUNT=$(grep -c '"text":"Echo: Message' "$RESPONSE_FILE" 2>/dev/null || echo 0)
@@ -114,7 +127,10 @@ fi
 # Test 6: Large message
 echo -e "\n${YELLOW}Test: Large message handling${NC}"
 LARGE_TEXT=$(printf 'A%.0s' {1..1000})
-(echo "{\"kind\":\"chat\",\"payload\":{\"text\":\"$LARGE_TEXT\"}}" > "$FIFO_IN" &)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d "{\"kind\":\"chat\",\"payload\":{\"text\":\"$LARGE_TEXT\"}}" > /dev/null
 sleep 2
 
 if grep -q "Echo: $LARGE_TEXT" "$RESPONSE_FILE" 2>/dev/null; then
@@ -125,10 +141,13 @@ else
   ((TESTS_FAILED++))
 fi
 
-# Test 7: Rapid messages (test FIFO buffering fix)
+# Test 7: Rapid messages
 echo -e "\n${YELLOW}Test: Rapid message handling${NC}"
 for i in 1 2 3 4 5; do
-  (echo "{\"kind\":\"chat\",\"payload\":{\"text\":\"Rapid $i\"}}" > "$FIFO_IN" &)
+  curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+    -H "Authorization: Bearer test-token" \
+    -H "Content-Type: application/json" \
+    -d "{\"kind\":\"chat\",\"payload\":{\"text\":\"Rapid $i\"}}" > /dev/null
   sleep 0.1
 done
 sleep 2

@@ -19,24 +19,24 @@ export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Use random port to avoid conflicts
 export TEST_PORT=$((8000 + RANDOM % 1000))
 
-echo -e "${YELLOW}=== Scenario 1: Basic Message Flow Test ===${NC}"
-echo -e "${BLUE}Testing basic echo functionality and message routing${NC}"
+echo -e "${YELLOW}=== Scenario 8: TypeScript Agent MCP Requests Test ===${NC}"
+echo -e "${BLUE}Testing TypeScript agent with full MCP permissions${NC}"
 echo ""
 
-# Ensure cleanup happens on exit
+# Cleanup function (no trap, will call explicitly)
 cleanup() {
   echo ""
   echo "Cleaning up..."
   ./teardown.sh
 }
-trap cleanup EXIT
 
 # Step 1: Setup the space
 echo -e "${YELLOW}Step 1: Setting up space...${NC}"
 # Run setup in subprocess but capture the environment it sets
-./setup.sh
+./setup.sh </dev/null
 
 # Export the paths that check.sh needs
+export FIFO_IN="$TEST_DIR/fifos/test-client-in"
 export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
 
 # Step 2: Run checks
@@ -48,9 +48,13 @@ TEST_RESULT=$?
 # Step 3: Report results
 echo ""
 if [ $TEST_RESULT -eq 0 ]; then
-  echo -e "${GREEN}✓ Scenario 1 PASSED${NC}"
-  exit 0
+  echo -e "${GREEN}✓ Scenario 8 PASSED${NC}"
 else
-  echo -e "${RED}✗ Scenario 1 FAILED${NC}"
-  exit 1
+  echo -e "${RED}✗ Scenario 8 FAILED${NC}"
 fi
+
+# Always cleanup before exiting
+cleanup
+
+# Exit with the test result
+exit $TEST_RESULT

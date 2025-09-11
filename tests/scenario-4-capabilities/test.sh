@@ -27,8 +27,6 @@ if [ $? -ne 0 ]; then
 fi
 
 # Export the paths that check.sh needs
-export COORD_FIFO="$TEST_DIR/fifos/coordinator-in"
-export LIMITED_FIFO="$TEST_DIR/fifos/limited-agent-in"
 export COORD_LOG="$TEST_DIR/logs/coordinator-output.log"
 export LIMITED_LOG="$TEST_DIR/logs/limited-agent-output.log"
 

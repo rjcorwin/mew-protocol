@@ -18,7 +18,7 @@ if [ -z "$TEST_DIR" ]; then
 fi
 
 echo -e "${YELLOW}=== Setting up Test Space ===${NC}"
-echo -e "${BLUE}Scenario: Error Handling${NC}"
+echo -e "${BLUE}Scenario: MCP Bridge${NC}"
 echo -e "${BLUE}Directory: $TEST_DIR${NC}"
 echo ""
 

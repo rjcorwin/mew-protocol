@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# Fix scenario 5 check.sh to use HTTP API
+
+cat > scenario-5-reasoning/check.sh << 'EOF'
+#!/bin/bash
 # Check script for Scenario 5: Reasoning with Context Field
 
 set -e
@@ -151,12 +156,12 @@ else
   ((TESTS_FAILED++))
 fi
 
-# Check MCP responses (context is preserved in requests, not responses)
-if grep -q '"kind":"mcp/response"' /tmp/reasoning-response.txt && grep -q '"context":"'$REASON_ID'"' /tmp/reasoning-response.txt; then
-  echo -e "MCP responses and context preserved: ${GREEN}✓${NC}"
+# Check MCP responses with context
+if grep -q '"kind":"mcp/response".*"context":"'$REASON_ID'"' /tmp/reasoning-response.txt; then
+  echo -e "MCP responses with context: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
-  echo -e "MCP responses and context preserved: ${RED}✗${NC}"
+  echo -e "MCP responses with context: ${RED}✗${NC}"
   ((TESTS_FAILED++))
 fi
 
@@ -182,3 +187,7 @@ else
   echo -e "\n${RED}✗ Some tests failed${NC}"
   exit 1
 fi
+EOF
+
+chmod +x scenario-5-reasoning/check.sh
+echo "Fixed scenario 5"

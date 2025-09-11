@@ -1,5 +1,9 @@
 #!/bin/bash
-# Teardown script for Scenario 6: Error Recovery and Edge Cases
+# Teardown script - Cleans up the test space
+#
+# Can be run after manual testing or called by test.sh
+
+set -e
 
 # Colors for output
 RED='\033[0;31m'
@@ -8,33 +12,49 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== Cleaning up Test Space ===${NC}"
-echo -e "${BLUE}Directory: $(pwd)${NC}"
+# If TEST_DIR not set, we're running standalone
+if [ -z "$TEST_DIR" ]; then
+  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 
-# Get directory of this script
-TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
+echo -e "${YELLOW}=== Cleaning up Test Space ===${NC}"
+echo -e "${BLUE}Directory: $TEST_DIR${NC}"
+echo ""
+
 cd "$TEST_DIR"
 
-# Stop the space
+# Stop the space using mew space down
 echo "Stopping space..."
-../../cli/bin/mew.js space down > /dev/null 2>&1
+../../cli/bin/mew.js space down 2>/dev/null || true
 
-# Give processes time to exit
-sleep 2
-
-# Force kill any remaining processes
-pkill -f "mew.*gateway" 2>/dev/null || true
-
-# Clean up FIFOs (important to prevent blocking)
-if [ -d fifos ]; then
-  echo "✓ Cleaned up FIFOs"
-  rm -rf fifos/*
+# Additional cleanup for any orphaned processes
+if [ -f ".mew/pids.json" ]; then
+  # Extract PIDs and kill them if still running
+  PIDS=$(grep -o '"pid":[0-9]*' .mew/pids.json 2>/dev/null | cut -d: -f2 || true)
+  for pid in $PIDS; do
+    if kill -0 $pid 2>/dev/null; then
+      echo "Killing orphaned process $pid"
+      kill -TERM $pid 2>/dev/null || true
+    fi
+  done
 fi
 
-# Clean up PID file
-if [ -f .mew/pids.json ]; then
-  rm -f .mew/pids.json
-  echo "✓ Removed PID file"
+# Clean up test artifacts using mew space clean
+if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
+  echo "Cleaning test artifacts..."
+  
+  # Use the new mew space clean command
+  ../../cli/bin/mew.js space clean --all --force 2>/dev/null || {
+    # Fallback to manual cleanup if clean command fails
+    echo "Clean command failed, using manual cleanup..."
+    rm -rf logs fifos .mew 2>/dev/null || true
+  }
+  
+  echo -e "${GREEN}✓ Test artifacts removed${NC}"
+else
+  echo -e "${YELLOW}Preserving logs (PRESERVE_LOGS=true)${NC}"
+  # Clean only fifos and .mew, preserve logs
+  ../../cli/bin/mew.js space clean --fifos --force 2>/dev/null || true
 fi
 
-echo -e "\n✓ Space stopped successfully!"
+echo -e "${GREEN}✓ Cleanup complete${NC}"

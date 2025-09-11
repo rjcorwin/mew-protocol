@@ -35,6 +35,5 @@ participants:
     capabilities:
       - kind: mcp/proposal
       - kind: system/*
-    fifo: true
     output_log: "./logs/proposer-output.log"
     auto_connect: true

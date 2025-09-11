@@ -55,25 +55,22 @@ echo "Waiting for components to initialize..."
 sleep 3
 
 # Export paths for check.sh to use
-export FIFO_IN="$TEST_DIR/fifos/test-client-in"
 export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
 
-# Verify input FIFO exists (output log will be created when client writes to it)
-if [ ! -p "$FIFO_IN" ]; then
-  echo -e "${RED}✗ Input FIFO not created${NC}"
-  exit 1
-fi
+# Create output log file if it doesn't exist
+mkdir -p "$(dirname "$OUTPUT_LOG")"
+touch "$OUTPUT_LOG"
 
 echo -e "${GREEN}✓ Setup complete${NC}"
 echo ""
 echo "Gateway running on: ws://localhost:$TEST_PORT"
-echo "Test client I/O:"
-echo "  Input FIFO: $FIFO_IN"
+echo "HTTP API available for test-client"
+echo "  Endpoint: http://localhost:$TEST_PORT/participants/test-client/messages"
 echo "  Output Log: $OUTPUT_LOG"
 echo ""
 echo "You can now:"
 echo "  - Run tests with: ./check.sh"
-echo "  - Send MCP requests: echo '{\"kind\":\"mcp/request\",\"to\":[\"calculator-agent\"],\"payload\":{\"method\":\"tools/list\",\"params\":{}}}' > $FIFO_IN"
+echo "  - Send messages: curl -X POST http://localhost:$TEST_PORT/participants/test-client/messages -H 'Authorization: Bearer test-token' -H 'Content-Type: application/json' -d '{\"kind\":\"chat\",\"payload\":{\"text\":\"Hello\"}}'"
 echo "  - Read responses: tail -f $OUTPUT_LOG"
 
 # Set flag for check.sh

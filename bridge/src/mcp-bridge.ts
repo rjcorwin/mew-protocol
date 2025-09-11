@@ -39,7 +39,15 @@ export class MCPBridge extends MEWParticipant {
       console.log('Bridge: Custom handler called for:', envelope.kind);
 
       if (envelope.kind === 'mcp/request') {
-        const { method, params } = envelope.payload || {};
+        // Handle both direct format and JSON-RPC format
+        let method, params;
+        if (envelope.payload?.jsonrpc === '2.0') {
+          // JSON-RPC format from MEWParticipant
+          ({ method, params } = envelope.payload);
+        } else {
+          // Direct format
+          ({ method, params } = envelope.payload || {});
+        }
         console.log(`Bridge: Processing MCP request - method: ${method} from ${envelope.from}`);
 
         // Check if MCP client is ready

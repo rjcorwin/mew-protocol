@@ -1,0 +1,26 @@
+space:
+  id: test-space
+  name: "Scenario 8 - TypeScript Agent MCP Requests"
+  description: "Test TypeScript agent with full MCP permissions handling calculator requests"
+
+participants:
+  typescript-agent:
+    tokens: ["ts-agent-token"]
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: chat
+      - kind: reasoning/*
+    auto_start: true
+    command: "node"
+    args: ["../../sdk/typescript-sdk/agent/dist/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "ts-agent-token", "--id", "typescript-agent"]
+    
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: chat
+    fifo: true
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true

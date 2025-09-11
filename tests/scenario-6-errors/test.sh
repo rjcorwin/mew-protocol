@@ -27,8 +27,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Export the paths that check.sh needs
-export TEST_FIFO="$TEST_DIR/fifos/test-client-in"
-export TEST_LOG="$TEST_DIR/logs/test-client-output.log"
+export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
 
 # Run checks
 echo -e "\n${YELLOW}Step 2: Running test checks...${NC}"

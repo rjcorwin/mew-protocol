@@ -19,6 +19,5 @@ participants:
     capabilities:
       - kind: chat
       - kind: system/*
-    fifo: true  # Create input FIFO
-    output_log: "./logs/test-client-output.log"  # Output to file instead of FIFO
-    auto_connect: true  # Auto-connect when space starts
+    output_log: "./logs/test-client-output.log"  # Output to file
+    auto_connect: true  # Auto-connect via WebSocket to receive messages

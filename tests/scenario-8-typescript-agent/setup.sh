@@ -18,10 +18,19 @@ if [ -z "$TEST_DIR" ]; then
 fi
 
 echo -e "${YELLOW}=== Setting up Test Space ===${NC}"
-echo -e "${BLUE}Scenario: Error Handling${NC}"
+echo -e "${BLUE}Scenario: TypeScript Agent MCP Requests${NC}"
 echo -e "${BLUE}Directory: $TEST_DIR${NC}"
 echo ""
 
+cd "$TEST_DIR"
+
+# Build the TypeScript agent if needed
+echo "Building TypeScript agent..."
+cd ../../sdk/typescript-sdk/agent
+if [ ! -d "dist" ]; then
+  npm install
+  npm run build
+fi
 cd "$TEST_DIR"
 
 # Clean up any previous runs
@@ -55,22 +64,26 @@ echo "Waiting for components to initialize..."
 sleep 3
 
 # Export paths for check.sh to use
+export FIFO_IN="$TEST_DIR/fifos/test-client-in"
 export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
 
-# Create output log file if it doesn't exist
-mkdir -p "$(dirname "$OUTPUT_LOG")"
-touch "$OUTPUT_LOG"
+# Verify input FIFO exists (output log will be created when client writes to it)
+if [ ! -p "$FIFO_IN" ]; then
+  echo -e "${RED}✗ Input FIFO not created${NC}"
+  exit 1
+fi
 
 echo -e "${GREEN}✓ Setup complete${NC}"
 echo ""
 echo "Gateway running on: ws://localhost:$TEST_PORT"
-echo "HTTP API available for test-client"
-echo "  Endpoint: http://localhost:$TEST_PORT/participants/test-client/messages"
+echo "Test client I/O:"
+echo "  Input FIFO: $FIFO_IN"
 echo "  Output Log: $OUTPUT_LOG"
 echo ""
 echo "You can now:"
 echo "  - Run tests with: ./check.sh"
-echo "  - Send messages: curl -X POST http://localhost:$TEST_PORT/participants/test-client/messages -H 'Authorization: Bearer test-token' -H 'Content-Type: application/json' -d '{\"kind\":\"chat\",\"payload\":{\"text\":\"Hello\"}}'"
+echo "  - Send MCP requests to agent: echo '{\"kind\":\"mcp/request\",\"to\":[\"typescript-agent\"],\"payload\":{\"method\":\"tools/list\",\"params\":{}}}' > $FIFO_IN"
+echo "  - Test calculator: echo '{\"kind\":\"mcp/request\",\"to\":[\"typescript-agent\"],\"payload\":{\"method\":\"tools/call\",\"params\":{\"name\":\"calculate\",\"arguments\":{\"operation\":\"add\",\"a\":5,\"b\":3}}}}' > $FIFO_IN"
 echo "  - Read responses: tail -f $OUTPUT_LOG"
 
 # Set flag for check.sh

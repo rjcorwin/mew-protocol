@@ -36,7 +36,6 @@ echo -e "${YELLOW}Step 1: Setting up space...${NC}"
 ./setup.sh
 
 # Export the paths that check.sh needs
-export FIFO_IN="$TEST_DIR/fifos/proposer-in"
 export OUTPUT_LOG="$TEST_DIR/logs/proposer-output.log"
 
 # Step 2: Run checks

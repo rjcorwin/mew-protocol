@@ -22,6 +22,5 @@ participants:
           method: tools/*
       - kind: chat
       - kind: system/*
-    fifo: true
     output_log: "./logs/research-agent-output.log"
     auto_connect: true

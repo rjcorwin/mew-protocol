@@ -66,8 +66,84 @@ gateway
           0,
         ),
         uptime: process.uptime(),
-        features: ['capabilities', 'context', 'validation'],
+        features: ['capabilities', 'context', 'validation', 'http-io'],
       });
+    });
+
+    // HTTP API for message injection
+    app.post('/participants/:participantId/messages', (req, res) => {
+      const { participantId } = req.params;
+      const authHeader = req.headers.authorization;
+      const spaceName = req.query.space || 'default';
+      
+      // Extract token from Authorization header
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing or invalid authorization header' });
+      }
+      
+      const token = authHeader.substring(7);
+      
+      // Verify token matches participant
+      const expectedToken = participantTokens.get(participantId);
+      if (!expectedToken || expectedToken !== token) {
+        return res.status(403).json({ error: 'Invalid token for participant' });
+      }
+      
+      // Use configured space ID as default, or fallback to query param
+      const actualSpaceName = spaceName === 'default' && spaceConfig?.space?.id 
+        ? spaceConfig.space.id 
+        : spaceName;
+      
+      // Get or create space
+      let space = spaces.get(actualSpaceName);
+      if (!space) {
+        space = { participants: new Map() };
+        spaces.set(actualSpaceName, space);
+      }
+      
+      // Build complete envelope
+      const envelope = {
+        protocol: 'mew/v0.3',
+        id: `http-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        ts: new Date().toISOString(),
+        from: participantId,
+        ...req.body
+      };
+      
+      // Validate capabilities (skip for now - participant is already authenticated)
+      // TODO: Implement capability check for HTTP-injected messages
+      
+      // Broadcast message to space
+      const envelopeStr = JSON.stringify(envelope);
+      for (const [pid, ws] of space.participants) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(envelopeStr);
+        }
+      }
+      
+      res.json({
+        id: envelope.id,
+        status: 'accepted',
+        timestamp: envelope.ts
+      });
+    });
+    
+    // List participants endpoint
+    app.get('/participants', (req, res) => {
+      const spaceName = req.query.space || 'default';
+      const space = spaces.get(spaceName);
+      
+      if (!space) {
+        return res.json({ participants: [] });
+      }
+      
+      const participants = Array.from(space.participants.keys()).map(id => ({
+        id,
+        connected: space.participants.get(id).readyState === WebSocket.OPEN,
+        capabilities: participantCapabilities.get(id) || []
+      }));
+      
+      res.json({ participants });
     });
 
     // Create HTTP server
@@ -219,6 +295,73 @@ gateway
       return false;
     }
 
+    // Register HTTP-only participants from config
+    function registerHttpParticipants() {
+      if (!spaceConfig || !spaceConfig.participants) return;
+      
+      for (const [participantId, config] of Object.entries(spaceConfig.participants)) {
+        // Register tokens and capabilities for HTTP participants
+        if (config.tokens && config.tokens.length > 0) {
+          const token = config.tokens[0]; // Use first token
+          participantTokens.set(participantId, token);
+          participantCapabilities.set(participantId, config.capabilities || []);
+          
+          if (config.io === 'http') {
+            console.log(`Registered HTTP participant: ${participantId}`);
+          }
+          
+          // Auto-connect participants with output_log
+          if (config.output_log && config.auto_connect) {
+            console.log(`Auto-connecting participant with output log: ${participantId}`);
+            autoConnectOutputLogParticipant(participantId, config);
+          }
+        }
+      }
+    }
+    
+    // Auto-connect a participant that writes to output_log
+    function autoConnectOutputLogParticipant(participantId, config) {
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Resolve output log path
+      const outputPath = path.resolve(process.cwd(), config.output_log);
+      const outputDir = path.dirname(outputPath);
+      
+      // Ensure directory exists
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+      
+      // Create a virtual WebSocket connection for this participant
+      const virtualWs = {
+        send: (data) => {
+          // Write received messages to output log
+          try {
+            const message = typeof data === 'string' ? JSON.parse(data) : data;
+            // Append to output log
+            fs.appendFileSync(outputPath, JSON.stringify(message) + '\n');
+          } catch (error) {
+            console.error(`Error writing to output log for ${participantId}:`, error);
+          }
+        },
+        readyState: WebSocket.OPEN,
+        close: () => {},
+      };
+      
+      // Get or create space - use the configured space ID
+      const spaceId = spaceConfig.space.id || 'default';
+      if (!spaces.has(spaceId)) {
+        spaces.set(spaceId, { participants: new Map() });
+      }
+      
+      // Register this virtual connection in the space
+      const space = spaces.get(spaceId);
+      space.participants.set(participantId, virtualWs);
+      
+      console.log(`${participantId} auto-connected with output to ${config.output_log}`);
+    }
+
     // Auto-start agents with auto_start: true
     function autoStartAgents() {
       if (!spaceConfig || !spaceConfig.participants) return;
@@ -227,8 +370,13 @@ gateway
         if (config.auto_start && config.command) {
           console.log(`Auto-starting agent: ${participantId}`);
 
-          const child = spawn(config.command, config.args || [], {
-            env: { ...process.env, ...config.env },
+          // Substitute ${PORT} in args
+          const args = (config.args || []).map(arg => 
+            arg.replace('${PORT}', port.toString())
+          );
+
+          const child = spawn(config.command, args, {
+            env: { ...process.env, PORT: port.toString(), ...config.env },
             stdio: 'inherit',
           });
 
@@ -649,12 +797,14 @@ gateway
     server.listen(port, () => {
       console.log(`Gateway listening on port ${port}`);
       console.log(`Health endpoint: http://localhost:${port}/health`);
+      console.log(`HTTP API: http://localhost:${port}/participants/{id}/messages`);
       console.log(`WebSocket endpoint: ws://localhost:${port}`);
       if (spaceConfig) {
         console.log(`Space configuration loaded: ${spaceConfig.space.name}`);
       }
 
-      // Auto-start agents
+      // Register HTTP participants and auto-start agents
+      registerHttpParticipants();
       autoStartAgents();
     });
 
