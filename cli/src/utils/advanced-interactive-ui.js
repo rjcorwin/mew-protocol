@@ -225,18 +225,34 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     pendingOperation && React.createElement(OperationConfirmation, {
       operation: pendingOperation,
       onApprove: () => {
-        // Send approval
-        sendMessage({
-          kind: 'mcp/approval',
-          payload: { operationId: pendingOperation.id, approved: true }
-        });
+        // Fulfill the proposal by sending the actual MCP request
+        // According to MEW spec, approval is done by fulfillment with correlation_id
+        if (pendingOperation.operation) {
+          // Extract the method and params from the proposal payload
+          const { method, params } = pendingOperation.operation;
+          
+          // Send the MCP request with correlation_id pointing to the proposal
+          sendMessage({
+            kind: 'mcp/request',
+            correlation_id: [pendingOperation.id],
+            payload: {
+              jsonrpc: '2.0',
+              id: Date.now(), // Generate a unique request ID
+              method: method,
+              params: params
+            }
+          });
+        }
         setPendingOperation(null);
       },
       onDeny: () => {
-        // Send denial
+        // Send rejection according to MEW spec
         sendMessage({
-          kind: 'mcp/approval',
-          payload: { operationId: pendingOperation.id, approved: false }
+          kind: 'mcp/reject',
+          correlation_id: pendingOperation.id,
+          payload: {
+            reason: 'disagree'
+          }
         });
         setPendingOperation(null);
       }
