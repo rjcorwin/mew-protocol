@@ -455,6 +455,7 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId
 
   return React.createElement(Box, { justifyContent: "space-between", paddingX: 1 },
     React.createElement(Text, null,
+      "🐱 | ",
       React.createElement(Text, { color: statusColor }, status),
       " | ",
       React.createElement(Text, { color: "cyan" }, spaceId),
