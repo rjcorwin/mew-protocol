@@ -28,6 +28,11 @@ export class MEWAgent extends MEWParticipant {
   private activeRequests = new Map<string, { from: string; method: string }>();
   private thinkingContext: string | null = null;
   private hasGreeted: boolean = false;
+  private pendingProposals = new Map<string, { 
+    originalRequest: Envelope;
+    method: string;
+    from: string;
+  }>();
 
   constructor(config: AgentConfig) {
     super(config);
@@ -86,6 +91,10 @@ export class MEWAgent extends MEWParticipant {
 
       case 'mcp/response':
         await this.handleAgentMCPResponse(envelope);
+        break;
+        
+      case 'mcp/reject':
+        await this.handleProposalRejection(envelope);
         break;
     }
   }
@@ -147,8 +156,21 @@ export class MEWAgent extends MEWParticipant {
     const { method, params, id } = envelope.payload || {};
     this.log('info', `Received MCP request: ${method}`);
 
+    // Check if this is a fulfillment of our proposal
+    // Note: When someone fulfills our proposal, they execute the request themselves
+    // We don't need to handle it unless we're the target of the fulfilled request
+
     // Store request for correlation
     this.activeRequests.set(envelope.id, { from: envelope.from, method });
+
+    // Check if we have capability to respond to this specific method
+    // The capability matcher will check the payload.method pattern
+    if (!this.canSend('mcp/response', { method: method })) {
+      // We cannot respond to this specific method, create a proposal
+      this.log('info', `No capability to respond to ${method}, creating proposal`);
+      await this.createProposal(envelope);
+      return;
+    }
 
     // Handle based on method
     switch (method) {
@@ -188,9 +210,28 @@ export class MEWAgent extends MEWParticipant {
   private async handleAgentMCPResponse(envelope: Envelope): Promise<void> {
     // Check if this is a response to our request
     const correlationId = envelope.correlation_id;
-    if (correlationId && this.activeRequests.has(correlationId)) {
-      const request = this.activeRequests.get(correlationId);
-      this.activeRequests.delete(correlationId);
+    if (!correlationId) return;
+    
+    const corrId = Array.isArray(correlationId) ? correlationId[0] : correlationId;
+    
+    // Check if this is a response to a fulfilled proposal
+    const proposal = this.pendingProposals.get(corrId);
+    if (proposal) {
+      // This is a response to our proposal that was fulfilled
+      this.log('info', `Received response for fulfilled proposal ${corrId}`);
+      
+      // Send the response back to the original requester
+      await this.sendMCPResponse(proposal.originalRequest, envelope.payload?.result || envelope.payload);
+      
+      // Clean up
+      this.pendingProposals.delete(corrId);
+      return;
+    }
+    
+    // Check if this is a response to our direct request
+    if (this.activeRequests.has(corrId)) {
+      const request = this.activeRequests.get(corrId);
+      this.activeRequests.delete(corrId);
 
       this.log('info', `Received response for ${request?.method}:`, envelope.payload);
 
@@ -461,7 +502,7 @@ export class MEWAgent extends MEWParticipant {
       from: this.config.participant_id!,
       to: [request.from],
       kind: 'mcp/response',
-      correlation_id: request.id,
+      correlation_id: [request.id],
       payload: {
         jsonrpc: '2.0',
         id: request.payload?.id,
@@ -480,7 +521,7 @@ export class MEWAgent extends MEWParticipant {
       from: this.config.participant_id!,
       to: [request.from],
       kind: 'mcp/response',
-      correlation_id: request.id,
+      correlation_id: [request.id],
       payload: {
         jsonrpc: '2.0',
         id: request.payload?.id,
@@ -521,7 +562,7 @@ export class MEWAgent extends MEWParticipant {
       ts: new Date().toISOString(),
       from: this.config.participant_id!,
       kind: 'mcp/request',
-      correlation_id: proposal.id,
+      correlation_id: [proposal.id],
       payload: {
         jsonrpc: '2.0',
         id: Date.now(),
@@ -575,5 +616,124 @@ export class MEWAgent extends MEWParticipant {
   public stop(): void {
     this.log('info', `Stopping MEW Agent: ${this.config.participant_id}`);
     this.disconnect();
+  }
+  
+  // Create a proposal when we don't have mcp/response capability
+  private async createProposal(request: Envelope): Promise<void> {
+    const { method, params } = request.payload || {};
+    const proposalId = `prop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Store the proposal for tracking
+    this.pendingProposals.set(proposalId, {
+      originalRequest: request,
+      method,
+      from: request.from
+    });
+    
+    // Create proposal envelope
+    const proposal: Envelope = {
+      protocol: PROTOCOL_VERSION,
+      id: proposalId,
+      ts: new Date().toISOString(),
+      from: this.config.participant_id!,
+      to: undefined, // Broadcast to all who can fulfill
+      kind: 'mcp/proposal',
+      payload: {
+        method,
+        params
+      }
+    };
+    
+    this.client.send(proposal);
+    this.log('info', `Created proposal ${proposalId} for ${method} request`);
+  }
+  
+  // Handle when our proposal is fulfilled
+  private async handleFulfilledProposal(fulfillment: Envelope, proposal: any): Promise<void> {
+    const { method } = proposal;
+    const { params } = fulfillment.payload || {};
+    
+    this.log('info', `Handling fulfilled proposal for ${method}`);
+    
+    // Execute the actual method and get result
+    let result;
+    let error;
+    
+    try {
+      switch (method) {
+        case 'tools/list':
+          result = this.tools.list().result;
+          break;
+          
+        case 'tools/call':
+          result = await this.tools.execute(params?.name, params?.arguments);
+          break;
+          
+        case 'resources/list':
+          result = {
+            resources: Array.from(this.resources.values()).map((r) => ({
+              uri: r.uri,
+              name: r.name,
+              description: r.description,
+              mimeType: r.mimeType,
+            }))
+          };
+          break;
+          
+        case 'resources/read':
+          const resource = this.resources.get(params?.uri);
+          if (!resource) {
+            error = { code: -32602, message: `Resource not found: ${params?.uri}` };
+          } else {
+            result = { contents: await resource.read() };
+          }
+          break;
+          
+        default:
+          error = { code: -32601, message: `Unsupported method: ${method}` };
+      }
+    } catch (e: any) {
+      error = { code: -32603, message: e.message };
+    }
+    
+    // Send response to fulfiller
+    const response: Envelope = {
+      protocol: PROTOCOL_VERSION,
+      id: `resp-${Date.now()}`,
+      ts: new Date().toISOString(),
+      from: this.config.participant_id!,
+      to: [fulfillment.from],
+      kind: 'mcp/response',
+      correlation_id: [fulfillment.id],
+      payload: {
+        jsonrpc: '2.0',
+        id: fulfillment.payload?.id,
+        ...(error ? { error } : { result })
+      }
+    };
+    
+    this.client.send(response);
+  }
+  
+  // Handle proposal rejection
+  private async handleProposalRejection(envelope: Envelope): Promise<void> {
+    const correlationId = envelope.correlation_id;
+    if (!correlationId) return;
+    
+    const corrId = Array.isArray(correlationId) ? correlationId[0] : correlationId;
+    const proposal = this.pendingProposals.get(corrId);
+    
+    if (proposal) {
+      this.log('info', `Proposal ${corrId} was rejected: ${envelope.payload?.reason}`);
+      
+      // Send error response to original requester
+      await this.sendMCPError(
+        proposal.originalRequest, 
+        `Proposal rejected: ${envelope.payload?.reason || 'Unknown reason'}`
+      );
+      
+      // Clean up
+      this.pendingProposals.delete(corrId);
+    }
   }
 }

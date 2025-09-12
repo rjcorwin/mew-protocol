@@ -11,3 +11,4 @@
  */
 
 require('../src/index.js');
+

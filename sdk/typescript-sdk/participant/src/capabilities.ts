@@ -1,22 +1,16 @@
 import { Capability, Envelope } from '@mew-protocol/types';
+import { PatternMatcher } from '@mew-protocol/capability-matcher';
+
+// Create a global pattern matcher instance
+const matcher = new PatternMatcher();
 
 /**
  * Check if a message matches a capability pattern
- * Supports wildcards (*) and nested object matching
+ * Supports wildcards (*), negative patterns (!pattern), and nested object matching
  */
 export function matchesCapability(capability: Capability, envelope: Partial<Envelope>): boolean {
-  // Check kind match
-  if (!matchesPattern(capability.kind, envelope.kind)) {
-    return false;
-  }
-  
-  // If capability has no payload constraint, it matches
-  if (!capability.payload) {
-    return true;
-  }
-  
-  // Check payload constraints
-  return matchesObject(capability.payload, envelope.payload);
+  // Use the pattern matcher for full support of patterns including negative patterns
+  return matcher.matchesCapability(capability as any, envelope as any);
 }
 
 /**

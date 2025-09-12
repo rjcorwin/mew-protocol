@@ -7,16 +7,17 @@ const net = require('net');
 const http = require('http');
 const pm2 = require('pm2');
 
-const space = new Command('space').description('Manage MEW spaces');
+const space = new Command('space')
+  .description('Manage MEUP spaces');
 
 // PM2 connection helper
 function connectPM2(spaceDir) {
   return new Promise((resolve, reject) => {
     // For now, use default PM2 home to avoid issues
     // TODO: Investigate why custom PM2_HOME causes hanging
-
+    
     console.log('Connecting to PM2 (using default PM2_HOME)...');
-
+    
     // Connect to PM2 daemon (will start if not running)
     pm2.connect((err) => {
       if (err) {
@@ -77,11 +78,11 @@ function disconnectPM2() {
 // Get path to store running spaces info
 function getSpacesFilePath() {
   const homeDir = process.env.HOME || process.env.USERPROFILE;
-  const mewDir = path.join(homeDir, '.mew');
-  if (!fs.existsSync(mewDir)) {
-    fs.mkdirSync(mewDir, { recursive: true });
+  const meupDir = path.join(homeDir, '.meup');
+  if (!fs.existsSync(meupDir)) {
+    fs.mkdirSync(meupDir, { recursive: true });
   }
-  return path.join(mewDir, 'running-spaces.json');
+  return path.join(meupDir, 'running-spaces.json');
 }
 
 // Load running spaces from file
@@ -118,8 +119,7 @@ function isProcessRunning(pid) {
 // Check if port is available
 function isPortAvailable(port) {
   return new Promise((resolve) => {
-    const tester = net
-      .createServer()
+    const tester = net.createServer()
       .once('error', () => resolve(false))
       .once('listening', () => {
         tester.once('close', () => resolve(true)).close();
@@ -133,15 +133,13 @@ async function waitForGateway(port, maxRetries = 30) {
   for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await new Promise((resolve, reject) => {
-        http
-          .get(`http://localhost:${port}/health`, (res) => {
-            let data = '';
-            res.on('data', (chunk) => (data += chunk));
-            res.on('end', () => resolve(data));
-          })
-          .on('error', reject);
+        http.get(`http://localhost:${port}/health`, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => resolve(data));
+        }).on('error', reject);
       });
-
+      
       const health = JSON.parse(response);
       if (health.status === 'ok') {
         return true;
@@ -149,7 +147,7 @@ async function waitForGateway(port, maxRetries = 30) {
     } catch (error) {
       // Gateway not ready yet
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
   return false;
 }
@@ -183,11 +181,11 @@ function loadSpaceConfig(configPath) {
  * Create PID file for space
  */
 function savePidFile(spaceDir, pids) {
-  const pidDir = path.join(spaceDir, '.mew');
+  const pidDir = path.join(spaceDir, '.meup');
   if (!fs.existsSync(pidDir)) {
     fs.mkdirSync(pidDir, { recursive: true });
   }
-
+  
   const pidFile = path.join(pidDir, 'pids.json');
   fs.writeFileSync(pidFile, JSON.stringify(pids, null, 2));
   return pidFile;
@@ -197,11 +195,11 @@ function savePidFile(spaceDir, pids) {
  * Load PID file for space
  */
 function loadPidFile(spaceDir) {
-  const pidFile = path.join(spaceDir, '.mew', 'pids.json');
+  const pidFile = path.join(spaceDir, '.meup', 'pids.json');
   if (!fs.existsSync(pidFile)) {
     return null;
   }
-
+  
   try {
     const content = fs.readFileSync(pidFile, 'utf8');
     return JSON.parse(content);
@@ -215,7 +213,7 @@ function loadPidFile(spaceDir) {
  * Remove PID file
  */
 function removePidFile(spaceDir) {
-  const pidFile = path.join(spaceDir, '.mew', 'pids.json');
+  const pidFile = path.join(spaceDir, '.meup', 'pids.json');
   if (fs.existsSync(pidFile)) {
     fs.unlinkSync(pidFile);
   }
@@ -230,15 +228,15 @@ function createFifos(spaceDir, participantId, createOutputFifo = true) {
   if (!fs.existsSync(fifoDir)) {
     fs.mkdirSync(fifoDir, { recursive: true });
   }
-
+  
   const inFifo = path.join(fifoDir, `${participantId}-in`);
   const outFifo = path.join(fifoDir, `${participantId}-out`);
-
+  
   // Create FIFOs if they don't exist
   if (!hasMkfifo()) {
     throw new Error('mkfifo command not found. FIFOs are required for this participant.');
   }
-
+  
   try {
     // Always create input FIFO
     if (!fs.existsSync(inFifo)) {
@@ -252,7 +250,7 @@ function createFifos(spaceDir, participantId, createOutputFifo = true) {
     console.error(`Failed to create FIFOs: ${error.message}`);
     throw error;
   }
-
+  
   return { inFifo, outFifo: createOutputFifo ? outFifo : null };
 }
 
@@ -274,7 +272,7 @@ function cleanupFifos(spaceDir) {
   }
 }
 
-// Command: mew space up
+// Command: meup space up
 space
   .command('up')
   .description('Start a space with gateway and configured participants')
@@ -282,44 +280,33 @@ space
   .option('-d, --space-dir <path>', 'Space directory', '.')
   .option('-p, --port <port>', 'Gateway port', '8080')
   .option('-l, --log-level <level>', 'Log level', 'info')
-  .option('-i, --interactive', 'Connect interactively after starting space')
-  .option('--detach', 'Run in background (default if not interactive)')
-  .option('--participant <id>', 'Connect as this participant (with --interactive)')
-  .option('--debug', 'Use simple debug interface instead of advanced UI')
-  .option('--simple', 'Alias for --debug')
-  .option('--no-ui', 'Disable UI enhancements, use plain interface')
   .action(async (options) => {
-    // Check for incompatible flags
-    if (options.interactive && options.detach) {
-      console.error('Error: --interactive and --detach flags are mutually exclusive');
-      process.exit(1);
-    }
     const spaceDir = path.resolve(options.spaceDir);
     const configPath = path.join(spaceDir, path.basename(options.config));
-
+    
     console.log(`Starting space in ${spaceDir}...`);
-
+    
     // Load space configuration
     const { config } = loadSpaceConfig(configPath);
     const spaceName = config.space?.name || 'unnamed-space';
     const spaceId = config.space?.id || 'space-' + Date.now();
-
+    
     console.log(`Space: ${spaceName} (${spaceId})`);
-
+    
     // Check if space is already running
     const existingPids = loadPidFile(spaceDir);
     if (existingPids && existingPids.gateway && isProcessRunning(existingPids.gateway)) {
-      console.error('Space is already running. Run "mew space down" first.');
+      console.error('Space is already running. Run "meup space down" first.');
       process.exit(1);
     }
-
+    
     // Check if port is available
     const portAvailable = await isPortAvailable(options.port);
     if (!portAvailable) {
       console.error(`Port ${options.port} is already in use. Choose a different port.`);
       process.exit(1);
     }
-
+    
     const pids = {
       spaceId,
       spaceName,
@@ -327,15 +314,15 @@ space
       port: options.port,
       gateway: null,
       agents: {},
-      clients: {},
+      clients: {}
     };
-
+    
     // Create logs directory
     const logsDir = path.join(spaceDir, 'logs');
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
-
+    
     // Connect to PM2 with space-local daemon
     console.log('Initializing PM2 daemon...');
     try {
@@ -344,11 +331,11 @@ space
       console.error(`Failed to connect to PM2: ${error.message}`);
       process.exit(1);
     }
-
+    
     // Start gateway using PM2
     console.log(`Starting gateway on port ${options.port}...`);
     const gatewayLogPath = path.join(logsDir, 'gateway.log');
-
+    
     try {
       const gatewayApp = await startPM2Process({
         name: `${spaceId}-gateway`,
@@ -356,12 +343,9 @@ space
         args: [
           'gateway',
           'start',
-          '--port',
-          options.port,
-          '--log-level',
-          options.logLevel,
-          '--space-config',
-          configPath,
+          '--port', options.port,
+          '--log-level', options.logLevel,
+          '--space-config', configPath
         ],
         cwd: spaceDir,
         autorestart: false,
@@ -369,9 +353,9 @@ space
         error_file: path.join(logsDir, 'gateway-error.log'),
         out_file: gatewayLogPath,
         merge_logs: true,
-        time: true,
+        time: true
       });
-
+      
       pids.gateway = gatewayApp.pid || gatewayApp.pm2_env?.pm_id || 'unknown';
       console.log(`✓ Gateway started via PM2 (PID: ${pids.gateway})`);
     } catch (error) {
@@ -379,7 +363,7 @@ space
       disconnectPM2();
       process.exit(1);
     }
-
+    
     // Wait for gateway to be ready
     console.log('Waiting for gateway to be ready...');
     const gatewayReady = await waitForGateway(options.port);
@@ -390,48 +374,41 @@ space
       process.exit(1);
     }
     console.log('✓ Gateway is ready');
-
+    
     // Start agents and bridges with auto_start: true
     for (const [participantId, participant] of Object.entries(config.participants || {})) {
       // Handle MCP bridge participants
       if (participant.type === 'mcp-bridge' && participant.auto_start && participant.mcp_server) {
         console.log(`Starting MCP bridge: ${participantId}...`);
-
+        
         const bridgeLogPath = path.join(logsDir, `${participantId}-bridge.log`);
         const mcpServer = participant.mcp_server;
-
+        
         // Build bridge arguments
         const bridgeArgs = [
-          '--gateway',
-          `ws://localhost:${options.port}`,
-          '--space',
-          spaceId,
-          '--participant-id',
-          participantId,
-          '--token',
-          participant.tokens?.[0] || 'token',
-          '--mcp-command',
-          mcpServer.command,
+          '--gateway', `ws://localhost:${options.port}`,
+          '--space', spaceId,
+          '--participant-id', participantId,
+          '--token', participant.tokens?.[0] || 'token',
+          '--mcp-command', mcpServer.command,
         ];
-
+        
         // Add MCP args if present
         if (mcpServer.args && mcpServer.args.length > 0) {
           bridgeArgs.push('--mcp-args', mcpServer.args.join(','));
         }
-
+        
         // Add MCP env if present
         if (mcpServer.env) {
-          const envPairs = Object.entries(mcpServer.env)
-            .map(([k, v]) => `${k}=${v}`)
-            .join(',');
+          const envPairs = Object.entries(mcpServer.env).map(([k, v]) => `${k}=${v}`).join(',');
           bridgeArgs.push('--mcp-env', envPairs);
         }
-
+        
         // Add MCP cwd if present
         if (mcpServer.cwd) {
           bridgeArgs.push('--mcp-cwd', mcpServer.cwd);
         }
-
+        
         // Add bridge config options if present
         if (participant.bridge_config) {
           if (participant.bridge_config.init_timeout) {
@@ -441,25 +418,14 @@ space
             bridgeArgs.push('--reconnect', participant.bridge_config.reconnect.toString());
           }
           if (participant.bridge_config.max_reconnects) {
-            bridgeArgs.push(
-              '--max-reconnects',
-              participant.bridge_config.max_reconnects.toString(),
-            );
+            bridgeArgs.push('--max-reconnects', participant.bridge_config.max_reconnects.toString());
           }
         }
-
+        
         try {
           // Find the bridge executable
-          const bridgePath = path.resolve(
-            __dirname,
-            '..',
-            '..',
-            '..',
-            'bridge',
-            'bin',
-            'mew-bridge.js',
-          );
-
+          const bridgePath = path.resolve(__dirname, '..', '..', '..', 'bridge', 'bin', 'meup-bridge.js');
+          
           const bridgeApp = await startPM2Process({
             name: `mcp_bridge_${participantId}`,
             script: bridgePath,
@@ -473,14 +439,12 @@ space
             time: true,
             env: {
               ...process.env,
-              NODE_ENV: process.env.NODE_ENV || 'production',
-            },
+              NODE_ENV: process.env.NODE_ENV || 'production'
+            }
           });
-
+          
           pids.agents[participantId] = bridgeApp.pid || bridgeApp.pm2_env?.pm_id || 'unknown';
-          console.log(
-            `✓ MCP bridge ${participantId} started via PM2 (PID: ${pids.agents[participantId]})`,
-          );
+          console.log(`✓ MCP bridge ${participantId} started via PM2 (PID: ${pids.agents[participantId]})`);
         } catch (error) {
           console.error(`Failed to start MCP bridge ${participantId}: ${error.message}`);
         }
@@ -488,18 +452,17 @@ space
       // Handle regular agent participants
       else if (participant.auto_start && participant.command) {
         console.log(`Starting agent: ${participantId}...`);
-
+        
         const agentLogPath = path.join(logsDir, `${participantId}.log`);
         const agentArgs = participant.args || [];
-
+        
         // Replace placeholders in args
-        const processedArgs = agentArgs.map((arg) =>
-          arg
-            .replace('${PORT}', options.port)
-            .replace('${SPACE}', spaceId)
-            .replace('${TOKEN}', participant.tokens?.[0] || 'token'),
+        const processedArgs = agentArgs.map(arg => 
+          arg.replace('${PORT}', options.port)
+             .replace('${SPACE}', spaceId)
+             .replace('${TOKEN}', participant.tokens?.[0] || 'token')
         );
-
+        
         try {
           const agentApp = await startPM2Process({
             name: `${spaceId}-${participantId}`,
@@ -512,54 +475,47 @@ space
             out_file: agentLogPath,
             merge_logs: true,
             time: true,
-            env: participant.env || {},
+            env: participant.env || {}
           });
-
+          
           pids.agents[participantId] = agentApp.pid || agentApp.pm2_env?.pm_id || 'unknown';
           console.log(`✓ ${participantId} started via PM2 (PID: ${pids.agents[participantId]})`);
         } catch (error) {
           console.error(`Failed to start ${participantId}: ${error.message}`);
         }
       }
-
+      
       // Create FIFOs for participants with fifo: true
       if (participant.fifo === true) {
         // Determine if we need output FIFO (not needed if output_log is set)
         const createOutputFifo = !participant.output_log;
-
+        
         console.log(`Creating FIFOs for ${participantId}...`);
         const { inFifo, outFifo } = createFifos(spaceDir, participantId, createOutputFifo);
-
+        
         if (createOutputFifo) {
           console.log(`✓ FIFOs created: ${participantId}-in, ${participantId}-out`);
         } else {
-          console.log(
-            `✓ FIFO created: ${participantId}-in (output goes to ${participant.output_log})`,
-          );
+          console.log(`✓ FIFO created: ${participantId}-in (output goes to ${participant.output_log})`);
         }
-
+        
         // If auto_connect is true, connect the participant
         if (participant.auto_connect === true) {
           console.log(`Connecting ${participantId}...`);
-
+          
           const clientLogPath = path.join(logsDir, `${participantId}-client.log`);
-
+          
           // Build client arguments
           const clientArgs = [
             'client',
             'connect',
-            '--gateway',
-            `ws://localhost:${options.port}`,
-            '--space',
-            spaceId,
-            '--participant-id',
-            participantId,
-            '--token',
-            participant.tokens?.[0] || 'token',
-            '--fifo-in',
-            inFifo,
+            '--gateway', `ws://localhost:${options.port}`,
+            '--space', spaceId,
+            '--participant-id', participantId,
+            '--token', participant.tokens?.[0] || 'token',
+            '--fifo-in', inFifo
           ];
-
+          
           // Add output configuration
           if (participant.output_log) {
             // Ensure logs directory exists
@@ -572,141 +528,65 @@ space
           } else {
             clientArgs.push('--fifo-out', outFifo);
           }
-
+          
           try {
             const clientApp = await startPM2Process({
               name: `${spaceId}-${participantId}-client`,
-              script: path.join(__dirname, '../../bin/mew.js'),
+              script: path.join(__dirname, '../../bin/meup.js'),
               args: clientArgs,
               cwd: spaceDir,
               autorestart: false,
               error_file: path.join(logsDir, `${participantId}-client-error.log`),
               out_file: clientLogPath,
               merge_logs: true,
-              time: true,
+              time: true
             });
-
+            
             pids.clients[participantId] = clientApp.pid || clientApp.pm2_env?.pm_id || 'unknown';
-            console.log(
-              `✓ ${participantId} connected via PM2 (PID: ${pids.clients[participantId]})`,
-            );
+            console.log(`✓ ${participantId} connected via PM2 (PID: ${pids.clients[participantId]})`);
           } catch (error) {
             console.error(`Failed to connect ${participantId}: ${error.message}`);
           }
         }
       }
     }
-
+    
     // Save PID file
     const pidFile = savePidFile(spaceDir, pids);
     console.log(`\n✓ Space is up! (PID file: ${pidFile})`);
     console.log(`\nGateway: ws://localhost:${options.port}`);
     console.log(`Space ID: ${spaceId}`);
-    console.log(`\nTo stop: mew space down`);
-
+    console.log(`\nTo stop: meup space down`);
+    
     // Store running space info
     const runningSpaces = loadRunningSpaces();
     runningSpaces.set(spaceDir, pids);
     saveRunningSpaces(runningSpaces);
-
+    
     // Disconnect from PM2 daemon (it continues running)
     disconnectPM2();
-
-    // If interactive flag is set, connect interactively
-    if (options.interactive) {
-      console.log('\nConnecting interactively...\n');
-
-      // Import required modules for interactive connection
-      const WebSocket = require('ws');
-      const {
-        resolveParticipant,
-        getInteractiveOverrides,
-      } = require('../utils/participant-resolver');
-      
-      // Determine UI mode
-      const useDebugUI = options.debug || options.simple || options.noUi;
-      
-      // Import appropriate UI module
-      const InteractiveUI = useDebugUI ? 
-        require('../utils/interactive-ui') : 
-        null;
-      const { startAdvancedInteractiveUI } = useDebugUI ? 
-        { startAdvancedInteractiveUI: null } : 
-        require('../utils/advanced-interactive-ui');
-
-      try {
-        // Resolve participant
-        const participant = await resolveParticipant({
-          participantId: options.participant,
-          spaceConfig: config,
-          interactive: true,
-        });
-
-        console.log(`Connecting as participant: ${participant.id}`);
-
-        // Get interactive overrides
-        const participantConfig = getInteractiveOverrides(participant);
-
-        // Connect to gateway
-        const ws = new WebSocket(`ws://localhost:${options.port}`);
-
-        ws.on('open', () => {
-          // Send join message
-          const joinMessage = {
-            protocol: 'mew/v0.3',
-            id: `join-${Date.now()}`,
-            ts: new Date().toISOString(),
-            kind: 'system/join',
-            payload: {
-              space: spaceId,
-              participant: participant.id,
-              token: participantConfig.tokens[0],
-              capabilities: participantConfig.capabilities || [],
-            },
-          };
-
-          ws.send(JSON.stringify(joinMessage));
-
-          // Start interactive UI
-          if (useDebugUI) {
-            const ui = new InteractiveUI(ws, participant.id, spaceId);
-            ui.start();
-          } else {
-            startAdvancedInteractiveUI(ws, participant.id, spaceId);
-          }
-        });
-
-        ws.on('error', (err) => {
-          console.error('Failed to connect:', err.message);
-          process.exit(1);
-        });
-      } catch (error) {
-        console.error('Failed to resolve participant:', error.message);
-        process.exit(1);
-      }
-    }
   });
 
-// Command: mew space down
+// Command: meup space down
 space
   .command('down')
   .description('Stop a running space')
   .option('-d, --space-dir <path>', 'Space directory', '.')
   .action(async (options) => {
     const spaceDir = path.resolve(options.spaceDir);
-
+    
     console.log(`Stopping space in ${spaceDir}...`);
-
+    
     // Load PID file
     const pids = loadPidFile(spaceDir);
     if (!pids) {
       console.error('No running space found in this directory.');
       process.exit(1);
     }
-
+    
     const spaceId = pids.spaceId;
     console.log(`Stopping ${pids.spaceName} (${spaceId})...`);
-
+    
     // Connect to PM2
     try {
       await connectPM2(spaceDir);
@@ -714,7 +594,7 @@ space
       console.error(`Failed to connect to PM2: ${error.message}`);
       console.log('Space may have been stopped manually.');
     }
-
+    
     // Stop all PM2 processes for this space
     try {
       // Stop clients first
@@ -722,19 +602,19 @@ space
         await deletePM2Process(`${spaceId}-${participantId}-client`);
         console.log(`✓ Stopped client: ${participantId}`);
       }
-
+      
       // Stop agents
       for (const participantId of Object.keys(pids.agents || {})) {
         await deletePM2Process(`${spaceId}-${participantId}`);
         console.log(`✓ Stopped agent: ${participantId}`);
       }
-
+      
       // Stop gateway
       if (pids.gateway) {
         await deletePM2Process(`${spaceId}-gateway`);
         console.log(`✓ Stopped gateway`);
       }
-
+      
       // Kill PM2 daemon for this space
       try {
         await new Promise((resolve, reject) => {
@@ -750,12 +630,12 @@ space
     } catch (error) {
       console.error(`Error stopping processes: ${error.message}`);
     }
-
+    
     // Disconnect from PM2
     disconnectPM2();
-
+    
     // Clean up PM2 directory
-    const pm2Dir = path.join(spaceDir, '.mew', 'pm2');
+    const pm2Dir = path.join(spaceDir, '.meup', 'pm2');
     if (fs.existsSync(pm2Dir)) {
       try {
         fs.rmSync(pm2Dir, { recursive: true, force: true });
@@ -764,25 +644,25 @@ space
         console.error(`Failed to clean PM2 directory: ${error.message}`);
       }
     }
-
+    
     // Clean up FIFOs
     cleanupFifos(spaceDir);
     console.log('✓ Cleaned up FIFOs');
-
+    
     // Remove PID file
     removePidFile(spaceDir);
     console.log('✓ Removed PID file');
-
+    
     // Remove from running spaces
     const runningSpaces = loadRunningSpaces();
     runningSpaces.delete(spaceDir);
     saveRunningSpaces(runningSpaces);
-
+    
     console.log('\n✓ Space stopped successfully!');
     process.exit(0);
   });
 
-// Command: mew space status
+// Command: meup space status
 space
   .command('status')
   .description('Show status of running spaces')
@@ -792,25 +672,25 @@ space
       // Show status for specific space
       const spaceDir = path.resolve(options.spaceDir);
       const pids = loadPidFile(spaceDir);
-
+      
       if (!pids) {
         console.log('No running space found in this directory.');
         return;
       }
-
+      
       const spaceId = pids.spaceId;
       console.log(`Space: ${pids.spaceName} (${spaceId})`);
       console.log(`Directory: ${pids.spaceDir}`);
       console.log(`Gateway: ws://localhost:${pids.port}`);
-
+      
       // Connect to PM2 to get process status
       try {
         await connectPM2(spaceDir);
         const processes = await listPM2Processes();
-
+        
         // Filter processes for this space
-        const spaceProcesses = processes.filter((p) => p.name && p.name.startsWith(spaceId));
-
+        const spaceProcesses = processes.filter(p => p.name && p.name.startsWith(spaceId));
+        
         if (spaceProcesses.length > 0) {
           console.log('\nProcesses (via PM2):');
           for (const proc of spaceProcesses) {
@@ -819,12 +699,12 @@ space
             console.log(`  - ${proc.name}: ${status} (PID: ${proc.pid}, Memory: ${memory})`);
           }
         }
-
+        
         disconnectPM2();
       } catch (error) {
         // Fall back to PID checking if PM2 connection fails
         console.log('\nProcesses (PID check):');
-
+        
         if (pids.gateway) {
           try {
             process.kill(pids.gateway, 0);
@@ -833,7 +713,7 @@ space
             console.log(`  - Gateway: stopped (PID: ${pids.gateway})`);
           }
         }
-
+        
         for (const [id, pid] of Object.entries(pids.agents || {})) {
           try {
             process.kill(pid, 0);
@@ -842,7 +722,7 @@ space
             console.log(`  - ${id}: stopped (PID: ${pid})`);
           }
         }
-
+        
         for (const [id, pid] of Object.entries(pids.clients || {})) {
           try {
             process.kill(pid, 0);
@@ -852,7 +732,7 @@ space
           }
         }
       }
-
+      
       // Check for FIFOs
       const fifoDir = path.join(spaceDir, 'fifos');
       if (fs.existsSync(fifoDir)) {
@@ -875,9 +755,9 @@ space
     } else {
       // Show all running spaces
       console.log('Running spaces:\n');
-
+      
       let foundAny = false;
-
+      
       // Check current directory
       const currentPids = loadPidFile('.');
       if (currentPids) {
@@ -886,7 +766,7 @@ space
         console.log(`  Gateway: ws://localhost:${currentPids.port}`);
         foundAny = true;
       }
-
+      
       // Check saved running spaces
       const runningSpaces = loadRunningSpaces();
       if (runningSpaces.size > 0) {
@@ -900,18 +780,18 @@ space
           }
         }
       }
-
+      
       if (!foundAny) {
         console.log('No running spaces found.');
       }
     }
   });
 
-// Command: mew space clean
+// Command: meup space clean
 space
   .command('clean')
   .description('Clean up space artifacts (logs, fifos, temporary files)')
-  .option('--all', 'Clean everything including .mew directory')
+  .option('--all', 'Clean everything including .meup directory')
   .option('--logs', 'Clean only log files')
   .option('--fifos', 'Clean only FIFO pipes')
   .option('--force', 'Skip confirmation prompts')
@@ -919,30 +799,30 @@ space
   .action(async (options) => {
     const spaceDir = process.cwd();
     const spaceConfigPath = path.join(spaceDir, 'space.yaml');
-
+    
     // Check if this is a valid space directory
     if (!fs.existsSync(spaceConfigPath)) {
       console.error('Error: space.yaml not found in current directory');
       process.exit(1);
     }
-
+    
     // Check if space is running
     const pids = loadPidFile(spaceDir);
     const isRunning = pids && pids.gateway && isProcessRunning(pids.gateway);
-
+    
     // Collect items to clean
     const itemsToClean = {
       logs: [],
       fifos: [],
-      mew: false,
-      pm2: false,
+      meup: false,
+      pm2: false
     };
-
+    
     // Determine what to clean based on options
     const cleanLogs = options.logs || (!options.fifos && !options.all) || options.all;
     const cleanFifos = options.fifos || (!options.logs && !options.all) || options.all;
-    const cleanMew = options.all;
-
+    const cleanMeup = options.all;
+    
     // Collect log files
     if (cleanLogs) {
       const logsDir = path.join(spaceDir, 'logs');
@@ -955,13 +835,13 @@ space
             itemsToClean.logs.push({
               path: filePath,
               size: stats.size,
-              name: file,
+              name: file
             });
           }
         }
       }
     }
-
+    
     // Collect FIFO pipes
     if (cleanFifos) {
       const fifosDir = path.join(spaceDir, 'fifos');
@@ -985,39 +865,39 @@ space
             itemsToClean.fifos.push({
               path: filePath,
               name: file,
-              inUse,
+              inUse
             });
           }
         }
       }
     }
-
-    // Check .mew directory
-    if (cleanMew) {
-      const mewDir = path.join(spaceDir, '.mew');
-      if (fs.existsSync(mewDir)) {
-        itemsToClean.mew = true;
+    
+    // Check .meup directory
+    if (cleanMeup) {
+      const meupDir = path.join(spaceDir, '.meup');
+      if (fs.existsSync(meupDir)) {
+        itemsToClean.meup = true;
         // Check for PM2 directory
-        const pm2Dir = path.join(mewDir, 'pm2');
+        const pm2Dir = path.join(meupDir, 'pm2');
         if (fs.existsSync(pm2Dir)) {
           itemsToClean.pm2 = true;
         }
       }
     }
-
+    
     // Calculate total size
     let totalSize = 0;
     let totalFiles = 0;
-
+    
     for (const log of itemsToClean.logs) {
       totalSize += log.size;
       totalFiles++;
     }
-
+    
     // Show what will be cleaned
     if (options.dryRun) {
       console.log('Would clean:\n');
-
+      
       if (itemsToClean.logs.length > 0) {
         console.log(`  - ${itemsToClean.logs.length} log files (${formatBytes(totalSize)})`);
         if (options.verbose) {
@@ -1026,10 +906,10 @@ space
           }
         }
       }
-
+      
       if (itemsToClean.fifos.length > 0) {
-        const activeFifos = itemsToClean.fifos.filter((f) => f.inUse);
-        const inactiveFifos = itemsToClean.fifos.filter((f) => !f.inUse);
+        const activeFifos = itemsToClean.fifos.filter(f => f.inUse);
+        const inactiveFifos = itemsToClean.fifos.filter(f => !f.inUse);
         if (inactiveFifos.length > 0) {
           console.log(`  - ${inactiveFifos.length} FIFO pipes (inactive)`);
         }
@@ -1037,76 +917,76 @@ space
           console.log(`  - ${activeFifos.length} FIFO pipes (ACTIVE - will be skipped)`);
         }
       }
-
-      if (itemsToClean.mew) {
-        console.log('  - .mew directory (including process state)');
+      
+      if (itemsToClean.meup) {
+        console.log('  - .meup directory (including process state)');
         if (itemsToClean.pm2) {
           console.log('    - PM2 daemon and logs');
         }
       }
-
+      
       if (totalFiles > 0) {
         console.log(`\nTotal: ${formatBytes(totalSize)} would be freed`);
       }
-
+      
       return;
     }
-
+    
     // Warn if space is running
     if (isRunning && !options.force) {
       console.log(`Space "${pids.spaceName}" is currently running.`);
-
-      if (cleanMew) {
-        console.error('Error: Cannot clean .mew directory while space is running.');
-        console.error('Use "mew space down" first, or remove --all flag.');
+      
+      if (cleanMeup) {
+        console.error('Error: Cannot clean .meup directory while space is running.');
+        console.error('Use "meup space down" first, or remove --all flag.');
         process.exit(1);
       }
-
+      
       console.log('Warning: This will clean artifacts while space is active.');
-      console.log('Use "mew space down" first, or use --force to proceed anyway.');
-
+      console.log('Use "meup space down" first, or use --force to proceed anyway.');
+      
       const readline = require('readline');
       const rl = readline.createInterface({
         input: process.stdin,
-        output: process.stdout,
+        output: process.stdout
       });
-
-      const answer = await new Promise((resolve) => {
+      
+      const answer = await new Promise(resolve => {
         rl.question('Continue? (y/N): ', resolve);
       });
       rl.close();
-
+      
       if (answer.toLowerCase() !== 'y') {
         console.log('Aborted.');
         process.exit(0);
       }
     }
-
+    
     // Confirm destructive operations
-    if (cleanMew && !options.force) {
+    if (cleanMeup && !options.force) {
       console.log('This will remove ALL space artifacts including configuration.');
-
+      
       const readline = require('readline');
       const rl = readline.createInterface({
         input: process.stdin,
-        output: process.stdout,
+        output: process.stdout
       });
-
-      const answer = await new Promise((resolve) => {
+      
+      const answer = await new Promise(resolve => {
         rl.question('Are you sure? (y/N): ', resolve);
       });
       rl.close();
-
+      
       if (answer.toLowerCase() !== 'y') {
         console.log('Aborted.');
         process.exit(0);
       }
     }
-
+    
     // Perform cleaning
     let cleanedCount = 0;
     let errors = [];
-
+    
     // Clean logs
     if (itemsToClean.logs.length > 0) {
       console.log('Cleaning logs...');
@@ -1120,10 +1000,10 @@ space
       }
       console.log(`✓ Cleaned ${itemsToClean.logs.length} log files`);
     }
-
+    
     // Clean FIFOs (skip active ones)
     if (itemsToClean.fifos.length > 0) {
-      const inactiveFifos = itemsToClean.fifos.filter((f) => !f.inUse);
+      const inactiveFifos = itemsToClean.fifos.filter(f => !f.inUse);
       if (inactiveFifos.length > 0) {
         console.log('Cleaning FIFOs...');
         for (const fifo of inactiveFifos) {
@@ -1136,18 +1016,18 @@ space
         }
         console.log(`✓ Cleaned ${inactiveFifos.length} FIFO pipes`);
       }
-
-      const activeFifos = itemsToClean.fifos.filter((f) => f.inUse);
+      
+      const activeFifos = itemsToClean.fifos.filter(f => f.inUse);
       if (activeFifos.length > 0) {
         console.log(`⚠ Skipped ${activeFifos.length} active FIFO pipes`);
       }
     }
-
-    // Clean .mew directory
-    if (itemsToClean.mew) {
-      console.log('Cleaning .mew directory...');
-      const mewDir = path.join(spaceDir, '.mew');
-
+    
+    // Clean .meup directory
+    if (itemsToClean.meup) {
+      console.log('Cleaning .meup directory...');
+      const meupDir = path.join(spaceDir, '.meup');
+      
       // If PM2 daemon is running, try to kill it first
       if (itemsToClean.pm2 && !isRunning) {
         try {
@@ -1163,16 +1043,16 @@ space
           // Daemon might already be dead
         }
       }
-
+      
       // Remove the directory
       try {
-        fs.rmSync(mewDir, { recursive: true, force: true });
-        console.log('✓ Cleaned .mew directory');
+        fs.rmSync(meupDir, { recursive: true, force: true });
+        console.log('✓ Cleaned .meup directory');
       } catch (error) {
-        errors.push(`Failed to clean .mew directory: ${error.message}`);
+        errors.push(`Failed to clean .meup directory: ${error.message}`);
       }
     }
-
+    
     // Report results
     if (errors.length > 0) {
       console.log('\n⚠ Some items could not be cleaned:');
@@ -1180,15 +1060,13 @@ space
         console.log(`  - ${error}`);
       }
     }
-
-    if (cleanedCount > 0 || itemsToClean.mew) {
-      console.log(
-        `\n✓ Cleanup complete! ${totalSize > 0 ? `Freed ${formatBytes(totalSize)}` : ''}`,
-      );
+    
+    if (cleanedCount > 0 || itemsToClean.meup) {
+      console.log(`\n✓ Cleanup complete! ${totalSize > 0 ? `Freed ${formatBytes(totalSize)}` : ''}`);
     } else {
       console.log('\nNothing to clean.');
     }
-
+    
     // Disconnect from PM2 if we connected
     if (itemsToClean.pm2) {
       disconnectPM2();
@@ -1203,113 +1081,5 @@ function formatBytes(bytes) {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
-
-// Command: mew space connect
-space
-  .command('connect')
-  .description('Connect interactively to a running space')
-  .option('-c, --config <path>', 'Path to space.yaml configuration', './space.yaml')
-  .option('-d, --space-dir <path>', 'Directory of space to connect to', '.')
-  .option('--participant <id>', 'Connect as this participant')
-  .option('--gateway <url>', 'Override gateway URL (default: from running space)')
-  .option('--debug', 'Use simple debug interface instead of advanced UI')
-  .option('--simple', 'Alias for --debug')
-  .option('--no-ui', 'Disable UI enhancements, use plain interface')
-  .action(async (options) => {
-    const spaceDir = path.resolve(options.spaceDir);
-    const configPath = path.join(spaceDir, path.basename(options.config));
-
-    console.log(`Connecting to space in ${spaceDir}...`);
-
-    // Check if space is running
-    const pids = loadPidFile(spaceDir);
-    if (!pids) {
-      console.error('No running space found. Use "mew space up" first.');
-      process.exit(1);
-    }
-
-    // Load space configuration
-    const { config } = loadSpaceConfig(configPath);
-    const spaceId = pids.spaceId;
-    const gatewayUrl = options.gateway || `ws://localhost:${pids.port}`;
-
-    console.log(`Space: ${pids.spaceName} (${spaceId})`);
-    console.log(`Gateway: ${gatewayUrl}`);
-
-    // Import required modules
-    const WebSocket = require('ws');
-    const {
-      resolveParticipant,
-      getInteractiveOverrides,
-    } = require('../utils/participant-resolver');
-    
-    // Determine UI mode
-    const useDebugUI = options.debug || options.simple || options.noUi;
-    
-    // Import appropriate UI module
-    const InteractiveUI = useDebugUI ? 
-      require('../utils/interactive-ui') : 
-      null;
-    const { startAdvancedInteractiveUI } = useDebugUI ? 
-      { startAdvancedInteractiveUI: null } : 
-      require('../utils/advanced-interactive-ui');
-
-    try {
-      // Resolve participant
-      const participant = await resolveParticipant({
-        participantId: options.participant,
-        spaceConfig: config,
-        interactive: true,
-      });
-
-      console.log(`Connecting as participant: ${participant.id}\n`);
-
-      // Get interactive overrides
-      const participantConfig = getInteractiveOverrides(participant);
-
-      // Connect to gateway
-      const ws = new WebSocket(gatewayUrl);
-
-      ws.on('open', () => {
-        // Send join message
-        const joinMessage = {
-          protocol: 'mew/v0.3',
-          id: `join-${Date.now()}`,
-          ts: new Date().toISOString(),
-          kind: 'system/join',
-          payload: {
-            space: spaceId,
-            participant: participant.id,
-            token: participantConfig.tokens[0],
-            capabilities: participantConfig.capabilities || [],
-          },
-        };
-
-        ws.send(JSON.stringify(joinMessage));
-
-        // Start interactive UI
-        if (useDebugUI) {
-          const ui = new InteractiveUI(ws, participant.id, spaceId);
-          ui.start();
-        } else {
-          startAdvancedInteractiveUI(ws, participant.id, spaceId);
-        }
-      });
-
-      ws.on('error', (err) => {
-        console.error('Failed to connect:', err.message);
-        console.error('Make sure the space is running with "mew space up"');
-        process.exit(1);
-      });
-
-      ws.on('close', () => {
-        console.log('\nConnection closed');
-        process.exit(0);
-      });
-    } catch (error) {
-      console.error('Failed to resolve participant:', error.message);
-      process.exit(1);
-    }
-  });
 
 module.exports = space;

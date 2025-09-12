@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@mew-protocol/types": "file:../types",
-    "@mew-protocol/client": "file:../client"
+    "@mew-protocol/client": "file:../client",
+    "@mew-protocol/capability-matcher": "file:../capability-matcher"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -209,7 +209,8 @@ export class MEWClient {
     }
     if (envelope.kind === 'system/error') {
       const payload = envelope.payload as SystemErrorPayload;
-      this.emit('error', new Error(payload.message));
+      const errorMessage = payload?.message || JSON.stringify(payload) || 'Unknown error';
+      this.emit('error', new Error(`System error: ${errorMessage}`));
       return;
     }
     if (envelope.kind === 'system/presence') {
@@ -271,15 +272,23 @@ export class MEWClient {
       return;
     }
     if (envelope.kind === 'mcp/response' && envelope.correlation_id) {
-      const pending = this.pendingRequests.get(envelope.correlation_id);
-      if (pending) {
-        const response = envelope.payload as JsonRpcResponse;
-        if (response.error) {
-          pending.reject(new Error(response.error.message));
-        } else {
-          pending.resolve(response.result);
+      // Handle both string and string[] for correlation_id
+      const correlationIds = Array.isArray(envelope.correlation_id) 
+        ? envelope.correlation_id 
+        : [envelope.correlation_id];
+      
+      for (const corrId of correlationIds) {
+        const pending = this.pendingRequests.get(corrId);
+        if (pending) {
+          const response = envelope.payload as JsonRpcResponse;
+          if (response.error) {
+            pending.reject(new Error(response.error.message));
+          } else {
+            pending.resolve(response.result);
+          }
+          this.pendingRequests.delete(corrId);
+          break; // Only handle the first matching request
         }
-        this.pendingRequests.delete(envelope.correlation_id);
       }
       return;
     }

@@ -1,5 +1,22 @@
 # TODO
 
+- [x] [TD0.0] Fix TypeScript agent to support proposal-only mode ✅
+    - [x] [TD0.0.1] Update MEWAgent.ts to check capabilities before responding to MCP requests
+        - Use the capability matcher SDK package to check if agent has 'mcp/response' capability
+        - If it has 'mcp/response', respond directly as it currently does
+        - If it only has 'mcp/proposal' but not 'mcp/response':
+            - Create an 'mcp/proposal' envelope instead of trying to respond
+            - Store the proposal ID and original request for correlation
+            - Note: Proposals are for operations the agent wants to perform on others,
+              not for responding to requests about its own capabilities
+    - [x] [TD0.0.2] Add proposal tracking to MEWAgent
+        - Track pending proposals with their original requests
+        - Note: An agent without mcp/response capability cannot respond to requests,
+              even about its own tools/resources
+    - [x] [TD0.0.3] Test scenario-9-typescript-proposals with proposal-only agent
+        - Verify agent creates proposals instead of responding directly
+        - Updated test to understand that proposal-only agents cannot respond to requests
+
 - [x] RENAME EVERYTHING FROM MEUP TO MEW ✅
 
 - [x] [TD0.0.1] Clean up tests structure
@@ -64,15 +81,22 @@
         - [ ] [TD2.4.8] Use MEWClient for WebSocket connection
         - [ ] [TD2.4.9] Readline-based interface for terminal interaction
     - [ ] [TD2.5] Advanced TUI with confirmation support
-    
+
+
+- [x] mew-agent immediately starts with a reasoning message, then puts the reasoning in the context of that reasoning/start, then issues a reasoning/end. 
+- [x] ui support for showing "Thinking..."'
+- [x] ui support for showing preview of reasoning
+
 - [ ] [TD3] Create `mew-agent` package
     - [ ] [TD3.1] Base agent class using sdk participant
-    - [ ] [TD3.2] Agent templates for common patterns
-    - [ ] [TD3.3] CLI for creating new agents from templates
 
 
 - [ ] [TD4] `mew init [template]` command
     - [ ] [TD4.1] `mew` by itself launches init if not init'ed, other wise it's up with interactive. if not init'ed, prompts user to pick template, then launches on choice. One of templates will be `coding`, another is `notes`,
+    - [ ] [TD4.2] Agent templates for common patterns
+    - [ ] [TD4.3] CLI for creating new agents from templates
+
+
 
 - [ ] [TD5] Support for streams in mew protocol (see proposed ADR)
 

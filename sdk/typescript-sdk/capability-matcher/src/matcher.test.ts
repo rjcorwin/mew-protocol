@@ -137,6 +137,60 @@ describe('PatternMatcher', () => {
       expect(matcher.matchesCapability(capability, allowedMessage)).toBe(true);
       expect(matcher.matchesCapability(capability, blockedMessage)).toBe(false);
     });
+
+    it('should allow any MCP operation except tools/call', () => {
+      const capability: CapabilityPattern = {
+        kind: 'mcp.request',
+        payload: {
+          method: '!tools/call'
+        }
+      };
+      
+      const allowedMessages: Message[] = [
+        {
+          kind: 'mcp.request',
+          payload: {
+            method: 'resources/list'
+          }
+        },
+        {
+          kind: 'mcp.request',
+          payload: {
+            method: 'resources/read',
+            params: { uri: 'file:///example.txt' }
+          }
+        },
+        {
+          kind: 'mcp.request',
+          payload: {
+            method: 'prompts/list'
+          }
+        },
+        {
+          kind: 'mcp.request',
+          payload: {
+            method: 'prompts/get',
+            params: { name: 'example_prompt' }
+          }
+        }
+      ];
+      
+      const blockedMessage: Message = {
+        kind: 'mcp.request',
+        payload: {
+          method: 'tools/call',
+          params: { name: 'any_tool' }
+        }
+      };
+      
+      // All non-tools/call operations should be allowed
+      for (const message of allowedMessages) {
+        expect(matcher.matchesCapability(capability, message)).toBe(true);
+      }
+      
+      // tools/call should be blocked
+      expect(matcher.matchesCapability(capability, blockedMessage)).toBe(false);
+    });
   });
 
   describe('Regex patterns', () => {

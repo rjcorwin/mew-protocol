@@ -1,9 +1,11 @@
 import { Capability, Envelope, CapabilityCheckResult } from './types';
+import { PatternMatcher } from '@mew-protocol/capability-matcher';
 
 /**
  * Checks if operations are allowed based on capabilities
  */
 export class CapabilityChecker {
+  private matcher = new PatternMatcher();
   /**
    * Check if an envelope matches a capability
    */
@@ -12,7 +14,12 @@ export class CapabilityChecker {
     capabilities: Capability[]
   ): CapabilityCheckResult {
     // System messages are always allowed from gateway
-    if (envelope.from === 'system') {
+    if (envelope.from === 'system' || envelope.from?.startsWith('system:')) {
+      return { allowed: true };
+    }
+    
+    // System heartbeat messages are always allowed
+    if (envelope.kind === 'system/heartbeat') {
       return { allowed: true };
     }
 
@@ -36,26 +43,27 @@ export class CapabilityChecker {
    * Check if envelope matches a specific capability
    */
   private matchesCapability(envelope: Envelope, capability: Capability): boolean {
-    // Check kind pattern
-    if (!this.matchesKindPattern(envelope.kind, capability.kind)) {
-      return false;
+    // Use the capability matcher for advanced pattern matching
+    // Convert types to match the capability matcher interface
+    const message = {
+      kind: envelope.kind,
+      payload: envelope.payload
+    };
+    
+    const capabilityPattern = {
+      kind: capability.kind,
+      payload: capability.payload
+    };
+    
+    // Use the matcher for the main capability check
+    const matches = this.matcher.matchesCapability(capabilityPattern, message);
+    
+    // Additionally check target restrictions if specified
+    if (matches && capability.to && envelope.to) {
+      return this.matchesTargetPattern(envelope.to, capability.to);
     }
-
-    // Check target restrictions
-    if (capability.to && envelope.to) {
-      if (!this.matchesTargetPattern(envelope.to, capability.to)) {
-        return false;
-      }
-    }
-
-    // Check payload pattern if specified
-    if (capability.payload) {
-      if (!this.matchesPayloadPattern(envelope.payload, capability.payload)) {
-        return false;
-      }
-    }
-
-    return true;
+    
+    return matches;
   }
 
   /**

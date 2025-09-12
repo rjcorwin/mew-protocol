@@ -241,10 +241,20 @@ gateway
 
     // Match payload patterns (simplified version)
     function matchesPayloadPattern(payload, pattern) {
-      if (!payload || !pattern) return false;
+      if (!pattern) return true; // No pattern means any payload is allowed
+      if (!payload) return false; // Pattern exists but no payload
 
       for (const [key, value] of Object.entries(pattern)) {
         if (typeof value === 'string') {
+          // Handle negative patterns
+          if (value.startsWith('!')) {
+            const negativePattern = value.slice(1);
+            if (payload[key] === negativePattern) {
+              return false; // Explicitly excluded value
+            }
+            continue; // Pattern matches anything except the negated value
+          }
+          
           // Handle wildcards in strings
           if (value.endsWith('*')) {
             const prefix = value.slice(0, -1);
@@ -267,6 +277,11 @@ gateway
 
     // Check if participant has capability for message
     async function hasCapabilityForMessage(participantId, message) {
+      // Always allow heartbeat messages
+      if (message.kind === 'system/heartbeat') {
+        return true;
+      }
+      
       // Get static capabilities from config
       const staticCapabilities = participantCapabilities.get(participantId) || [];
 

@@ -9,6 +9,8 @@ participants:
     capabilities:
       - kind: mcp/proposal
       - kind: mcp/response
+        payload:
+          method: "!tools/call"
       - kind: chat
       - kind: reasoning/*
     auto_start: true
