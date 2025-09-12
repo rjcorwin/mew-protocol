@@ -1,5 +1,5 @@
 import Debug from 'debug';
-import { MEWParticipant } from '@mew-protocol/participant';
+import { MEWParticipant } from '../../sdk/typescript-sdk/participant/dist/index.js';
 import { MCPClient, MCPServerConfig } from './mcp-client';
 
 const debug = Debug('mew:bridge');
@@ -34,79 +34,7 @@ export class MCPBridge extends MEWParticipant {
 
     this.initTimeout = options.initTimeout || 30000;
 
-    // Set up request handler for MCP requests
-    this.onRequest(async (envelope) => {
-      console.log('Bridge: Custom handler called for:', envelope.kind);
-
-      if (envelope.kind === 'mcp/request') {
-        // Handle both direct format and JSON-RPC format
-        let method, params;
-        if (envelope.payload?.jsonrpc === '2.0') {
-          // JSON-RPC format from MEWParticipant
-          ({ method, params } = envelope.payload);
-        } else {
-          // Direct format
-          ({ method, params } = envelope.payload || {});
-        }
-        console.log(`Bridge: Processing MCP request - method: ${method} from ${envelope.from}`);
-
-        // Check if MCP client is ready
-        if (!this.mcpClient) {
-          console.error('Bridge: MCP client not initialized yet');
-          return {
-            error: {
-              code: -32603,
-              message: 'MCP server not ready',
-            },
-          };
-        }
-
-        if (!this.mcpClient.isInitialized) {
-          console.error('Bridge: MCP server not yet initialized');
-          return {
-            error: {
-              code: -32603,
-              message: 'MCP server not initialized',
-            },
-          };
-        }
-
-        try {
-          // Send to MCP server
-          console.log(`Bridge: Sending request to MCP server: ${method}`);
-          const result = await this.mcpClient.request(method, params);
-          console.log(`Bridge: Got result from MCP server for ${method}`);
-          console.log(
-            'Bridge: MCP response from server (truncated):',
-            JSON.stringify(result).substring(0, 200),
-          );
-
-          // Return in the format MEUPParticipant expects
-          // The base class will wrap this in the proper envelope
-          const response = {
-            result: result,
-          };
-
-          console.log('Bridge: Custom handler returning response');
-          return response;
-        } catch (error: any) {
-          console.error('Bridge: Error calling MCP server:', error);
-          // Return error in MCP format
-          return {
-            error: {
-              code: error.code || -32603,
-              message: error.message || 'Internal error',
-              data: error.data,
-            },
-          };
-        }
-      }
-
-      // Let base class handle other requests - return null means we don't handle it
-      return null as any;
-    });
-
-    console.log('Bridge: Request handler registered in constructor');
+    console.log('Bridge: Using MEWParticipant base class for MCP request handling');
 
     // Start MCP server after constructor
     this.startMCPServer(options.mcpServer).catch((error) => {
@@ -277,7 +205,7 @@ export class MCPBridge extends MEWParticipant {
     };
 
     debug('Sending registration with MCP capabilities:', envelope);
-    this.client.send(envelope);
+    this.send(envelope);
   }
 
   /**
@@ -288,7 +216,7 @@ export class MCPBridge extends MEWParticipant {
 
     // Translate MCP notifications to MEW messages if needed
     if (notification.method === 'notifications/message') {
-      this.client.send({
+      this.send({
         kind: 'system/log',
         payload: notification.params,
       });
@@ -300,7 +228,7 @@ export class MCPBridge extends MEWParticipant {
    */
   private handleMCPError(error: any): void {
     // Send error to MEW space
-    this.client.send({
+    this.send({
       kind: 'system/error',
       payload: {
         error: error.message,

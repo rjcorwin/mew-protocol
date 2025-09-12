@@ -1,246 +1,86 @@
-# MCP-MEUP Bridge Specification
+# MEW-MCP Bridge Specification
 
-**Version:** draft (for v0.1.0)  
+**Version:** draft  
 **Status:** Draft  
-**Last Updated:** 2025-01-08
+**Last Updated:** 2025-09-12
 
 ## Overview
 
-The MCP-MEUP Bridge (`@meup/bridge`) enables MCP (Model Context Protocol) servers to participate in MEUP spaces. It acts as a translation layer between the MCP protocol (JSON-RPC over stdio/SSE) and the MEUP protocol (message-oriented over WebSocket), allowing existing MCP servers to be seamlessly integrated into MEUP spaces without modification.
+The MEW-MCP Bridge (`@mew-protocol/bridge`) enables MCP (Model Context Protocol) servers to participate in MEW Protocol spaces. It acts as a translation layer between the MCP protocol (JSON-RPC over stdio) and the MEW Protocol (message-oriented over WebSocket), allowing existing MCP servers to be seamlessly integrated into MEW spaces without modification.
+
+The bridge leverages the MEWParticipant base class from the MEW SDK to provide automatic tool registration and MCP request handling, making MCP servers appear as native MEW participants.
 
 ## Scope
 
 This specification covers:
-- Bridge process that translates between MCP and MEUP protocols
+- Bridge process that translates between MCP and MEW protocols
 - Configuration of MCP servers in space.yaml
 - Automatic lifecycle management of MCP server processes
-- Capability mapping from MCP server capabilities to MEUP capabilities
+- Capability mapping from MCP server capabilities to MEW capabilities
+- Tool discovery and registration
 - Message translation and routing
+- Error handling and recovery
 
 Out of scope:
 - Modification of existing MCP servers
-- MCP client functionality (bridge acts as MCP client, MEUP participant)
+- MCP client functionality for external use
 - Custom MCP transports beyond stdio
+- Direct MCP-to-MCP communication
 
 ## Architecture
 
+### System Overview
+
 ```
-MEUP Space
+MEW Space
     │
     ├── Gateway (WebSocket)
-    │      ↕ MEUP Protocol
+    │      ↕ MEW Protocol v0.3
     │
-    ├── MCP Bridge Process (@meup/bridge)
-    │      ↕ stdio (JSON-RPC)
+    ├── MCP Bridge Process (@mew-protocol/bridge)
+    │   ├── MEWParticipant (SDK base class)
+    │   │    └── Automatic tool/resource handling
+    │   └── MCPClient (stdio manager)
+    │        ↕ stdio (JSON-RPC)
     │
     └── MCP Server Process (any MCP server)
 ```
 
+### Component Responsibilities
+
+#### MCP Bridge (MCPBridge class)
+- **Extends MEWParticipant**: Inherits WebSocket connection, message handling, and tool registration
+- **MCP Server Management**: Spawns and manages MCP server subprocess lifecycle
+- **Tool Discovery**: Queries MCP server for available tools and registers them with MEWParticipant
+- **Resource Discovery**: Queries MCP server for available resources (if supported)
+- **Capability Translation**: Maps MCP capabilities to MEW capabilities
+- **Error Recovery**: Handles MCP server crashes and attempts restart
+
+#### MCPClient
+- **Process Management**: Spawns MCP server process with configured command/args
+- **JSON-RPC Communication**: Handles stdio-based JSON-RPC protocol
+- **Message Correlation**: Tracks request/response pairs with IDs
+- **Initialization**: Performs MCP handshake sequence
+- **Event Emission**: Emits notifications, errors, and lifecycle events
+
 ### Component Flow
 
-1. **Startup**: CLI reads space.yaml, identifies MCP bridge participants
-2. **Bridge Launch**: CLI spawns bridge process with MCP server configuration
-3. **MCP Server Launch**: Bridge spawns and manages MCP server subprocess
-4. **Initialization**: Bridge performs MCP handshake, discovers server capabilities
-5. **Registration**: Bridge connects to MEUP gateway, registers with translated capabilities
-6. **Operation**: Bridge translates messages bidirectionally
-7. **Shutdown**: Bridge manages graceful shutdown of MCP server
+1. **Startup**: Gateway reads space.yaml, identifies MCP bridge participants
+2. **Bridge Launch**: Gateway spawns bridge process with MCP server configuration
+3. **MEW Connection**: Bridge connects to gateway as MEWParticipant
+4. **MCP Server Launch**: Bridge spawns MCP server subprocess
+5. **MCP Initialization**: Bridge performs MCP handshake, discovers capabilities
+6. **Tool Registration**: Bridge registers discovered MCP tools as MEWParticipant tools
+7. **Ready State**: Bridge signals ready, begins handling requests
+8. **Message Flow**: 
+   - Incoming MCP requests automatically handled by MEWParticipant base class
+   - Base class routes to registered tool executors
+   - Tool executors forward to MCP server via MCPClient
+9. **Shutdown**: Bridge manages graceful shutdown of MCP server
 
 ## Configuration
 
 ### Space Configuration (space.yaml)
-
-MCP servers are configured as participants with type `mcp-bridge`:
-
-```yaml
-space:
-  id: my-space
-  name: "Space with MCP Server"
-  
-participants:
-  # Standard MCP server from npm/github
-  mcp-filesystem:
-    type: mcp-bridge
-    mcp_server:
-      command: "npx"
-      args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
-    auto_start: true
-    tokens: ["filesystem-token"]
-    
-  # Local MCP server
-  my-local-mcp:
-    type: mcp-bridge
-    mcp_server:
-      command: "node"
-      args: ["./my-mcp-server/index.js"]
-      env:
-        CONFIG_PATH: "./config.json"
-    auto_start: true
-    tokens: ["local-mcp-token"]
-    
-  # Python MCP server
-  python-mcp:
-    type: mcp-bridge
-    mcp_server:
-      command: "python"
-      args: ["./mcp_server.py"]
-    auto_start: true
-    tokens: ["python-token"]
-```
-
-### Bridge Configuration Options
-
-```yaml
-participants:
-  mcp-server-id:
-    type: mcp-bridge
-    
-    # MCP server configuration (required)
-    mcp_server:
-      command: "string"           # Command to execute
-      args: ["array", "of", "args"] # Command arguments
-      env:                        # Environment variables (optional)
-        KEY: "value"
-      cwd: "./path"              # Working directory (optional)
-      
-    # Bridge behavior (optional)
-    bridge_config:
-      init_timeout: 30000        # MCP init timeout in ms (default: 30000)
-      reconnect: true           # Auto-reconnect on failure (default: true)
-      max_reconnects: 5         # Max reconnection attempts (default: 5)
-      
-    # Standard participant options
-    auto_start: true            # Start with space (default: false)
-    tokens: ["token1"]          # Authentication tokens
-    
-    # Capability overrides (optional, normally auto-discovered)
-    capabilities:
-      - kind: "mcp/request"
-        payload:
-          method: "tools/*"
-```
-
-## Bridge Process
-
-### Startup Sequence
-
-1. **Parse Arguments**: Bridge receives configuration from CLI
-2. **Start MCP Server**: Spawn subprocess with stdio pipes
-3. **MCP Handshake**: 
-   - Send `initialize` request
-   - Receive server capabilities
-   - Send `initialized` notification
-4. **Connect to MEUP**: Establish WebSocket connection to gateway
-5. **Register Capabilities**: Translate and register MCP capabilities as MEUP capabilities
-
-### Capability Translation
-
-MCP capabilities are automatically translated to MEUP capabilities:
-
-| MCP Capability | MEUP Capability |
-|---------------|-----------------|
-| `tools` (server has tools) | `mcp/response` |
-| `tools` (can call tools) | `mcp/request` with `method: "tools/*"` |
-| `resources` | `mcp/response` |
-| `prompts` | `mcp/response` |
-| `logging` | `system/log` |
-
-### Message Translation
-
-#### MEUP → MCP
-
-```javascript
-// MEUP mcp/request message
-{
-  "kind": "mcp/request",
-  "id": "msg-123",
-  "from": "client-1",
-  "to": ["mcp-filesystem"],
-  "payload": {
-    "method": "tools/list",
-    "params": {}
-  }
-}
-
-// Translated to MCP JSON-RPC
-{
-  "jsonrpc": "2.0",
-  "id": "bridge-req-1",
-  "method": "tools/list",
-  "params": {}
-}
-```
-
-#### MCP → MEUP
-
-```javascript
-// MCP JSON-RPC response
-{
-  "jsonrpc": "2.0",
-  "id": "bridge-req-1",
-  "result": {
-    "tools": [...]
-  }
-}
-
-// Translated to MEUP mcp/response
-{
-  "kind": "mcp/response",
-  "id": "resp-456",
-  "from": "mcp-filesystem",
-  "to": ["client-1"],
-  "correlation_id": ["msg-123"],
-  "payload": {
-    "jsonrpc": "2.0",
-    "result": {
-      "tools": [...]
-    }
-  }
-}
-```
-
-### Error Handling
-
-- **MCP Server Crash**: Bridge reports error to MEUP, attempts reconnection
-- **Invalid JSON-RPC**: Bridge returns MEUP error message
-- **Timeout**: Bridge enforces timeouts on MCP operations
-- **Capability Violation**: Bridge validates before forwarding to MCP
-
-## Implementation
-
-### Bridge Executable
-
-The bridge is provided as an executable that can be spawned by the CLI:
-
-```bash
-meup-bridge \
-  --gateway ws://localhost:8080 \
-  --space my-space \
-  --participant-id mcp-filesystem \
-  --token filesystem-token \
-  --mcp-command "npx" \
-  --mcp-args "-y,@modelcontextprotocol/server-filesystem,/path"
-```
-
-### Process Management
-
-The bridge is managed by PM2 (via the CLI) along with other space participants:
-
-1. CLI reads space.yaml
-2. For each `type: mcp-bridge` participant:
-   - Spawns bridge process via PM2
-   - Bridge spawns MCP server as subprocess
-   - Bridge manages MCP server lifecycle
-
-### Logging
-
-- Bridge logs to `logs/{participant-id}-bridge.log`
-- MCP server stdout/stderr captured in `logs/{participant-id}-mcp.log`
-- Structured logging with levels: debug, info, warn, error
-
-## Examples
-
-### Example 1: File System MCP Server
 
 ```yaml
 participants:
@@ -248,87 +88,356 @@ participants:
     type: mcp-bridge
     mcp_server:
       command: "npx"
-      args: ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/documents"]
+      args: 
+        - "-y"
+        - "@modelcontextprotocol/server-filesystem"
+        - "/path/to/files"
+      env:
+        DEBUG: "mcp:*"
+      cwd: "/working/directory"
     auto_start: true
-    tokens: ["fs-token"]
+    tokens: ["filesystem-token"]
+    capabilities:
+      - kind: "mcp/response"
+      - kind: "system/*"
+    bridge_config:
+      init_timeout: 30000
+      reconnect: true
+      max_reconnects: 3
 ```
 
-This configuration:
-1. Installs and runs the filesystem MCP server
-2. Provides file access to `/home/user/documents`
-3. Exposes file operations as MCP tools in the MEUP space
+### Configuration Fields
 
-### Example 2: Custom Python MCP Server
+#### `type: mcp-bridge`
+Identifies this participant as an MCP bridge (required for gateway to use bridge launcher).
 
-```yaml
-participants:
-  data-analyzer:
-    type: mcp-bridge
-    mcp_server:
-      command: "python"
-      args: ["./mcp_servers/analyzer.py"]
-      env:
-        PYTHONPATH: "./lib"
-        DATA_DIR: "./data"
-    auto_start: true
-    tokens: ["analyzer-token"]
+#### `mcp_server` (required)
+- `command`: Executable to run the MCP server
+- `args`: Array of command-line arguments
+- `env`: Environment variables (optional)
+- `cwd`: Working directory (optional)
+
+#### `bridge_config` (optional)
+- `init_timeout`: Maximum time to wait for MCP initialization (default: 30000ms)
+- `reconnect`: Whether to reconnect on disconnect (default: true)
+- `max_reconnects`: Maximum reconnection attempts (default: 3)
+
+#### Standard MEW Participant Fields
+- `tokens`: Authentication tokens for gateway
+- `capabilities`: MEW capabilities (typically includes `mcp/response`)
+- `auto_start`: Whether to start automatically
+- `output_log`: Path to output log file
+
+## Protocol Translation
+
+### MCP to MEW Capability Mapping
+
+| MCP Capability | MEW Capability |
+|----------------|----------------|
+| `tools` | `mcp/response` (automatic via tool registration) |
+| `resources` | `mcp/response` (automatic via resource registration) |
+| `prompts` | Not yet mapped |
+| `logging` | `system/log` (notifications) |
+
+### Message Translation Examples
+
+#### Tools List Request
+```javascript
+// MEW Request (incoming)
+{
+  "protocol": "mew/v0.3",
+  "id": "req-123",
+  "from": "client",
+  "to": ["filesystem"],
+  "kind": "mcp/request",
+  "payload": {
+    "method": "tools/list",
+    "params": {}
+  }
+}
+
+// Handled automatically by MEWParticipant base class
+// Returns registered tools without forwarding to MCP server
 ```
 
-### Example 3: Multiple MCP Servers
+#### Tool Call Request
+```javascript
+// MEW Request (incoming)
+{
+  "protocol": "mew/v0.3",
+  "id": "req-456",
+  "from": "client",
+  "to": ["filesystem"],
+  "kind": "mcp/request",
+  "payload": {
+    "method": "tools/call",
+    "params": {
+      "name": "read_text_file",
+      "arguments": { "path": "/tmp/test.txt" }
+    }
+  }
+}
 
-```yaml
-participants:
-  # GitHub MCP server
-  github:
-    type: mcp-bridge
-    mcp_server:
-      command: "npx"
-      args: ["-y", "@modelcontextprotocol/server-github"]
-      env:
-        GITHUB_TOKEN: "${GITHUB_TOKEN}"
-    auto_start: true
-    tokens: ["github-token"]
+// MCP Request (bridge to server)
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "read_text_file",
+    "arguments": { "path": "/tmp/test.txt" }
+  }
+}
+
+// MCP Response (server to bridge)
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "File contents..." }]
+  }
+}
+
+// MEW Response (automatic from MEWParticipant)
+{
+  "protocol": "mew/v0.3",
+  "id": "resp-789",
+  "from": "filesystem",
+  "to": ["client"],
+  "correlation_id": ["req-456"],
+  "kind": "mcp/response",
+  "payload": {
+    "result": {
+      "content": [{ "type": "text", "text": "File contents..." }]
+    }
+  }
+}
+```
+
+## Lifecycle Management
+
+### Startup Sequence
+
+1. **Bridge Process Start**
+   - Parse command-line arguments
+   - Create MCPBridge instance with configuration
+   - Bridge extends MEWParticipant, initializes connection options
+
+2. **MEW Connection**
+   - Connect to gateway WebSocket
+   - Send join message with space and token
+   - Wait for welcome message
+
+3. **MCP Server Initialization**
+   - Spawn MCP server subprocess
+   - Send `initialize` request
+   - Receive server capabilities
+   - Send `initialized` notification
+
+4. **Tool Discovery and Registration**
+   - Send `tools/list` request to MCP server
+   - For each tool returned:
+     - Register with MEWParticipant using `registerTool()`
+     - Create executor function that forwards to MCP server
+   
+5. **Ready State**
+   - `onReady()` callback triggered
+   - Bridge operational, handling requests
+
+### Shutdown Sequence
+
+1. **Shutdown Trigger** (SIGINT/SIGTERM or error)
+2. **MCP Server Shutdown**
+   - Send shutdown notification if supported
+   - Terminate MCP server process
+   - Wait for process exit
+3. **MEW Disconnection**
+   - Disconnect from gateway
+   - Clean up resources
+4. **Process Exit**
+
+### Error Recovery
+
+#### MCP Server Crash
+1. Detect process exit via `close` event
+2. If not shutting down:
+   - Log error
+   - Attempt restart (if within max_reconnects)
+   - Re-initialize and re-register tools
+3. If max reconnects exceeded:
+   - Send error to MEW space
+   - Enter error state
+
+#### Gateway Disconnection
+- MEWParticipant base class handles reconnection automatically
+- MCP server remains running
+- Requests queued during reconnection
+
+## Implementation Details
+
+### Class Structure
+
+```typescript
+// Main bridge class
+class MCPBridge extends MEWParticipant {
+  private mcpClient?: MCPClient;
+  private mcpCapabilities: any[] = [];
+  
+  constructor(options: MCPBridgeOptions) {
+    // Initialize MEWParticipant base
+    super({
+      gateway: options.gateway,
+      space: options.space,
+      participant_id: options.participantId,
+      token: options.token
+    });
     
-  # Postgres MCP server  
-  postgres:
-    type: mcp-bridge
-    mcp_server:
-      command: "npx"
-      args: ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"]
-    auto_start: true
-    tokens: ["postgres-token"]
+    // Start MCP server
+    this.startMCPServer(options.mcpServer);
+  }
+  
+  // Tool registration via base class
+  private async registerMCPTools() {
+    const tools = await this.mcpClient.request('tools/list');
+    for (const tool of tools) {
+      this.registerTool({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        execute: async (args) => {
+          return await this.mcpClient.request('tools/call', {
+            name: tool.name,
+            arguments: args
+          });
+        }
+      });
+    }
+  }
+}
 ```
+
+### Key Design Decisions
+
+1. **Extends MEWParticipant**: Leverages existing SDK functionality for tool handling
+2. **Automatic Tool Registration**: Tools discovered from MCP server are registered with base class
+3. **No Custom Request Handler**: Base class handles all MCP requests automatically
+4. **Stateless Bridge**: Bridge doesn't maintain state beyond connection status
+5. **Process Lifecycle Tied**: MCP server lifecycle tied to bridge process
 
 ## Security Considerations
 
-1. **Process Isolation**: Each MCP server runs in separate process
-2. **Token Validation**: Bridge validates tokens before connecting
-3. **Capability Enforcement**: Bridge respects MEUP capability model
-4. **Resource Limits**: Bridge can enforce limits on MCP operations
-5. **Sandboxing**: MCP servers can be run with restricted permissions
+### Process Isolation
+- MCP servers run as separate processes
+- Communication only via stdio
+- No shared memory or file descriptors
+
+### Capability Enforcement
+- Bridge inherits MEW capability system
+- Gateway enforces capabilities on all messages
+- MCP servers cannot bypass MEW security
+
+### Authentication
+- Bridge authenticates to gateway with tokens
+- MCP servers have no direct gateway access
+- All communication proxied through bridge
+
+## Error Handling
+
+### MCP Server Errors
+- JSON-RPC errors translated to MEW error responses
+- Server crashes trigger recovery attempts
+- Persistent failures reported to space
+
+### Protocol Errors
+- Invalid JSON-RPC handled gracefully
+- Malformed messages logged and dropped
+- Request timeouts configurable
+
+### Resource Limits
+- Maximum message size enforced
+- Process memory limits via OS
+- Connection limits at gateway level
 
 ## Testing
 
-Test scenarios should include:
-1. Basic MCP server integration
-2. Multiple concurrent MCP servers
-3. MCP server crash recovery
-4. Capability translation verification
-5. Message translation accuracy
-6. Performance with high message volume
+### Unit Tests
+- MCPClient: Mock stdio streams
+- MCPBridge: Mock MCPClient and MEWParticipant
+- Message translation validation
+
+### Integration Tests
+- Real MCP servers (filesystem, memory)
+- End-to-end message flow
+- Error recovery scenarios
+- Tool discovery and registration
+
+### Test Scenarios
+- Scenario 7: Basic MCP bridge functionality
+- Tool listing and execution
+- File operations via filesystem server
+- Error handling and recovery
 
 ## Future Enhancements
 
-Potential future additions:
-- Support for MCP SSE transport
-- Direct stdio mode (bypass WebSocket for local use)
-- MCP server discovery/registry
-- Capability caching and optimization
-- Advanced error recovery strategies
-- Monitoring and metrics
+### Planned Features
+1. **Resource Support**: Full resource discovery and serving
+2. **Prompt Support**: MCP prompt template handling
+3. **Streaming Responses**: Support for MCP streaming
+4. **Multiple MCP Servers**: Single bridge managing multiple servers
+5. **Dynamic Tool Updates**: Re-registration on capability changes
+
+### Potential Optimizations
+1. **Connection Pooling**: Reuse MCP server processes
+2. **Response Caching**: Cache immutable responses
+3. **Batch Operations**: Group multiple requests
+4. **Lazy Initialization**: Defer MCP start until first use
+
+## Appendix A: MCP Server Examples
+
+### Filesystem Server
+```yaml
+filesystem:
+  type: mcp-bridge
+  mcp_server:
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+```
+
+### Memory Server
+```yaml
+memory:
+  type: mcp-bridge
+  mcp_server:
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-memory"]
+```
+
+### Custom Server
+```yaml
+custom:
+  type: mcp-bridge
+  mcp_server:
+    command: "python"
+    args: ["my-mcp-server.py"]
+    env:
+      API_KEY: "${MY_API_KEY}"
+```
+
+## Appendix B: Debug Logging
+
+Enable debug logging:
+```bash
+DEBUG=mew:bridge npm start
+```
+
+Log categories:
+- `mew:bridge` - Main bridge operations
+- `mew:bridge:mcp` - MCP client operations
+- `mew:bridge:msg` - Message translation
 
 ## References
 
-- [Model Context Protocol Specification](https://modelcontextprotocol.io/docs)
-- [MEUP v0.2 Protocol Specification](../../protocol-spec/spec/v0.2/SPEC.md)
-- [MEUP CLI Specification](../../cli/spec/draft/SPEC.md)
+- [MEW Protocol Specification v0.3](../../spec/v0.3/SPEC.md)
+- [MCP Specification](https://modelcontextprotocol.org)
+- [MEW SDK Documentation](../../sdk/spec/draft/SPEC.md)
+- [Test Scenarios](../../tests/scenario-7-mcp-bridge/)
