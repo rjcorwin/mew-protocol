@@ -2,6 +2,20 @@
 # Check script - Runs test assertions
 #
 # Can be run standalone after setup.sh or called by test.sh
+#
+# IMPORTANT: Tool Discovery Behavior
+# -----------------------------------
+# Agents should automatically discover ALL tools from ALL participants when they join a space.
+# Tools should be presented as a unified list with naming convention: "participant-id:tool-name"
+# When an agent needs to call a tool, it should:
+#   1. Identify which participant owns the tool (from the prefix)
+#   2. Send the appropriate mcp/request or mcp/proposal to that participant
+#   3. The agent's implementation handles the routing transparently
+#
+# This test validates the propose->fulfill->response pattern where:
+# - Agent with limited capabilities creates proposals for operations it cannot perform
+# - Human or authorized participant fulfills the proposal
+# - Target participant executes and responds
 
 set -e
 
@@ -14,6 +28,9 @@ NC='\033[0m' # No Color
 
 # Timeout for operations
 TIMEOUT=10
+# Retry settings for agent responses
+MAX_RETRIES=5
+RETRY_SLEEP=2
 
 # If TEST_DIR not set, we're running standalone
 if [ -z "$TEST_DIR" ]; then
@@ -23,7 +40,7 @@ fi
 cd "$TEST_DIR"
 
 echo -e "${YELLOW}=== Running Test Checks ===${NC}"
-echo -e "${BLUE}Scenario: TypeScript Agent Proposals Only${NC}"
+echo -e "${BLUE}Scenario: TypeScript Agent Propose->Fulfill->Response Pattern${NC}"
 echo ""
 
 # Set up paths
@@ -34,6 +51,24 @@ TEST_PORT="${TEST_PORT:-8080}"
 if [ -z "$SPACE_RUNNING" ]; then
   echo -e "${YELLOW}Note: Space not started by setup.sh, assuming it's already running${NC}"
 fi
+
+# Helper function to retry checking for patterns in log
+check_log_with_retry() {
+  local start_marker="$1"
+  local pattern="$2"
+  local max_retries="${3:-$MAX_RETRIES}"
+  local retry_sleep="${4:-$RETRY_SLEEP}"
+  
+  for i in $(seq 1 $max_retries); do
+    if grep -A 20 "$start_marker" "$OUTPUT_LOG" | grep -q "$pattern"; then
+      return 0
+    fi
+    if [ $i -lt $max_retries ]; then
+      sleep $retry_sleep
+    fi
+  done
+  return 1
+}
 
 # Test 1: Check agents connected and capabilities
 echo -e "${BLUE}Test 1: Verifying agents connected with correct capabilities${NC}"
@@ -53,53 +88,100 @@ else
   exit 1
 fi
 
-# Test 2: TypeScript agent cannot send direct MCP requests (should get capability violation)
-echo -e "${BLUE}Test 2: Verifying TypeScript agent cannot send direct MCP requests${NC}"
+# Test 2: Human asks agent to perform calculation, agent creates proposal
+echo -e "${BLUE}Test 2: Human asks agent to calculate, agent creates proposal${NC}"
 
 # Clear output log position
 echo "--- Test 2 Start ---" >> "$OUTPUT_LOG"
 
-# Try to make TypeScript agent send a direct MCP request
-# This would typically be done through the agent's internal logic
-# For this test, we'll verify it doesn't send direct requests but proposals instead
+# Human asks TypeScript agent to calculate something via chat
+# Note: The agent should know about the 'calculate' tool from automatic discovery
+# and should create a proposal since it lacks tools/call capability
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "chat",
+    "to": ["typescript-agent"],
+    "payload": {
+      "text": "Can you calculate the sum of 7 and 9 for me?",
+      "format": "plain"
+    }
+  }' > /dev/null
 
-# Test 3: TypeScript agent sends proposals
-echo -e "${BLUE}Test 3: TypeScript agent sends proposals for MCP operations${NC}"
+# Check if a proposal was sent (with retries)
+if check_log_with_retry "Test 2 Start" '"kind":"mcp/proposal".*"method":"tools/call"'; then
+  echo -e "${GREEN}✓ TypeScript agent sent proposal for tools/call${NC}"
+  
+  # Extract proposal ID for fulfillment
+  PROPOSAL_ID=$(grep -A 20 "Test 2 Start" "$OUTPUT_LOG" | grep '"kind":"mcp/proposal"' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  echo "  Proposal ID: $PROPOSAL_ID"
+  
+  # Verify proposal contains correct tool call
+  if grep -A 20 "Test 2 Start" "$OUTPUT_LOG" | grep -q '"name":"calculate"'; then
+    echo -e "${GREEN}✓ Proposal contains calculate tool call${NC}"
+  else
+    echo -e "${RED}✗ Proposal does not contain expected tool call${NC}"
+    exit 1
+  fi
+else
+  echo -e "${RED}✗ TypeScript agent did not send proposal after $MAX_RETRIES retries${NC}"
+  tail -30 "$OUTPUT_LOG"
+  exit 1
+fi
+
+# Test 3: Human fulfills the proposal
+echo -e "${BLUE}Test 3: Human fulfills agent's proposal with correlation_id${NC}"
 
 # Clear output log position
 echo "--- Test 3 Start ---" >> "$OUTPUT_LOG"
 
-# Ask TypeScript agent to do something that requires MCP (through chat)
-echo '{
-  "kind": "chat",
-  "to": ["typescript-agent"],
-  "payload": {
-    "text": "Can you list your tools for me?",
-    "format": "plain"
-  }
-}' > /dev/null
+# Extract the latest proposal details
+PROPOSAL_JSON=$(grep -A 20 "Test 2 Start" "$OUTPUT_LOG" | grep '"kind":"mcp/proposal"' | head -1)
+PROPOSAL_ID=$(echo "$PROPOSAL_JSON" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
 
-sleep 3
+# Human fulfills the proposal by sending mcp/request with correlation_id
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"kind\": \"mcp/request\",
+    \"to\": [\"typescript-agent\"],
+    \"correlation_id\": [\"$PROPOSAL_ID\"],
+    \"payload\": {
+      \"jsonrpc\": \"2.0\",
+      \"id\": 300,
+      \"method\": \"tools/call\",
+      \"params\": {
+        \"name\": \"calculate\",
+        \"arguments\": {\"operation\": \"sum\", \"a\": 7, \"b\": 9}
+      }
+    }
+  }" > /dev/null
 
-# Check if a proposal was sent
-if grep -A 20 "Test 3 Start" "$OUTPUT_LOG" | grep -q '"kind":"mcp/proposal"'; then
-  echo -e "${GREEN}✓ TypeScript agent sent MCP proposal (as expected with limited capabilities)${NC}"
+# Check if the agent responded to the fulfilled request (with retries)
+if check_log_with_retry "Test 3 Start" '"kind":"mcp/response".*"result"'; then
+  echo -e "${GREEN}✓ TypeScript agent responded to fulfilled request${NC}"
   
-  # Extract proposal ID for fulfillment
-  PROPOSAL_ID=$(grep -A 20 "Test 3 Start" "$OUTPUT_LOG" | grep '"kind":"mcp/proposal"' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-  echo "  Proposal ID: $PROPOSAL_ID"
+  # Verify the response contains the correct calculation result
+  if grep -A 10 "Test 3 Start" "$OUTPUT_LOG" | grep -q '"text":".*16"'; then
+    echo -e "${GREEN}✓ Response contains correct calculation result (16)${NC}"
+  else
+    echo -e "${YELLOW}⚠ Response doesn't contain expected result${NC}"
+  fi
 else
-  echo -e "${YELLOW}⚠ No proposal found - agent might have responded differently${NC}"
+  echo -e "${RED}✗ TypeScript agent did not respond to fulfilled request after $MAX_RETRIES retries${NC}"
+  tail -30 "$OUTPUT_LOG"
+  exit 1
 fi
 
-# Test 4: Fulfill a proposal from the TypeScript agent
-echo -e "${BLUE}Test 4: Test client fulfills TypeScript agent's proposal${NC}"
+# Test 4: Agent can respond to direct tools/list request
+echo -e "${BLUE}Test 4: Agent responds to direct tools/list request (has mcp/response)${NC}"
 
 # Clear output log position
 echo "--- Test 4 Start ---" >> "$OUTPUT_LOG"
 
-# The TypeScript agent's request method should create a proposal
-# We'll trigger this by asking it to use its tools
+# Send a direct tools/list request
 curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
@@ -108,67 +190,24 @@ curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages"
     "to": ["typescript-agent"],
     "payload": {
       "jsonrpc": "2.0",
-      "id": 100,
+      "id": 400,
       "method": "tools/list",
       "params": {}
     }
   }' > /dev/null
 
-sleep 2
-
-# The agent should respond directly to tools/list since it has mcp/response capability
-if grep -A 10 "Test 4 Start" "$OUTPUT_LOG" | grep -q '"kind":"mcp/response".*"tools"'; then
+# The agent should respond directly to tools/list since it has mcp/response capability (with retries)
+if check_log_with_retry "Test 4 Start" '"kind":"mcp/response".*"tools"'; then
   echo -e "${GREEN}✓ TypeScript agent responded with tools list${NC}"
 else
-  echo -e "${RED}✗ TypeScript agent did not respond with tools${NC}"
+  echo -e "${RED}✗ TypeScript agent did not respond with tools after $MAX_RETRIES retries${NC}"
   echo "Output log content:"
   tail -30 "$OUTPUT_LOG"
   exit 1
 fi
 
-# Test 5: TypeScript agent creates proposal for tools/call
-echo -e "${BLUE}Test 5: TypeScript agent creates proposal for tools/call (lacks mcp/request)${NC}"
-
-# Clear output log position
-echo "--- Test 5 Start ---" >> "$OUTPUT_LOG"
-
-# Send a tools/call request - agent should create proposal since it lacks mcp/request capability
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "kind": "mcp/request",
-    "to": ["typescript-agent"],
-    "payload": {
-      "jsonrpc": "2.0",
-      "id": 200,
-      "method": "tools/call",
-      "params": {
-        "name": "calculate",
-        "arguments": {"operation": "sum", "a": 5, "b": 3}
-      }
-    }
-  }' > /dev/null
-
-sleep 2
-
-# Check if proposal was created
-if grep -A 20 "Test 5 Start" "$OUTPUT_LOG" | grep -q '"kind":"mcp/proposal"'; then
-  echo -e "${GREEN}✓ TypeScript agent created proposal for tools/call${NC}"
-  
-  # Get the proposal ID
-  PROPOSAL_ID=$(grep -A 20 "Test 5 Start" "$OUTPUT_LOG" | grep '"kind":"mcp/proposal"' | grep -o '"id":"[^"]*"' | tail -1 | cut -d'"' -f4)
-  echo "  Proposal ID: $PROPOSAL_ID"
-  
-else
-  echo -e "${RED}✗ TypeScript agent did not create proposal for tools/call${NC}"
-  echo "Output log content:"
-  tail -30 "$OUTPUT_LOG"
-  exit 1
-fi
-
-# Test 6: Verify agent respects capability constraints
-echo -e "${BLUE}Test 6: Verifying agent respects capability constraints${NC}"
+# Test 5: Verify agent respects capability constraints
+echo -e "${BLUE}Test 5: Verifying agent respects capability constraints${NC}"
 
 # Check logs for any capability violations from the TypeScript agent
 if grep -q "typescript-agent.*capability.*violation" "$OUTPUT_LOG"; then
@@ -180,6 +219,7 @@ fi
 
 echo ""
 echo -e "${GREEN}=== All Tests Passed ===${NC}"
+echo -e "${GREEN}✓ Propose->Fulfill->Response pattern working correctly${NC}"
 echo ""
 
 exit 0

@@ -7,11 +7,15 @@ participants:
   typescript-agent:
     tokens: ["ts-agent-token"]
     capabilities:
-      - kind: mcp/proposal
-      - kind: mcp/response
+      # Can request any mcp method except tools/call
+      - kind: mcp/request
         payload:
           method: "!tools/call"
+      # Instead of doing an mcp request with method tools/call, it can create a proposal with method tools/call
+      - kind: mcp/proposal
+      - kind: mcp/response
       - kind: chat
+      # When reasoning capability is enabled, the agent will automatically expose its thought process between tool calls by sending reasoning/start, reasoning/thought, and reasoning/conclusion messages
       - kind: reasoning/*
     auto_start: true
     command: "node"
