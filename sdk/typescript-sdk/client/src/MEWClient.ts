@@ -178,16 +178,16 @@ export class MEWClient extends EventEmitter {
    * Handle incoming messages
    */
   private handleMessage(message: any): void {
-    // Handle welcome message
-    if (message.type === 'welcome') {
+    // Handle system welcome message
+    if (message.kind === 'system/welcome') {
       this.state = 'ready';
-      this.emit('welcome', message);
+      this.emit('welcome', message.payload);
       return;
     }
 
     // Handle error messages
-    if (message.type === 'error') {
-      this.emit('error', new Error(message.message || 'Unknown error'));
+    if (message.type === 'error' || message.kind === 'error') {
+      this.emit('error', new Error(message.message || message.payload?.message || 'Unknown error'));
       return;
     }
 

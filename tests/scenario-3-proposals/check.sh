@@ -77,7 +77,7 @@ echo -e "\n${YELLOW}Test: Send proposal for calculation${NC}"
 curl -sf -X POST "http://localhost:$TEST_PORT/participants/proposer/messages" \
   -H "Authorization: Bearer proposer-token" \
   -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/proposal","payload":{"proposal":{"type":"calculation","operation":"add","arguments":{"a":10,"b":5}}}}' > /dev/null
+  -d '{"kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":10,"b":5}}}}' > /dev/null
 sleep 3
 
 # Check if fulfiller received and processed the proposal
@@ -94,7 +94,7 @@ echo -e "\n${YELLOW}Test: Complex calculation proposal${NC}"
 curl -sf -X POST "http://localhost:$TEST_PORT/participants/proposer/messages" \
   -H "Authorization: Bearer proposer-token" \
   -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/proposal","payload":{"proposal":{"type":"calculation","operation":"multiply","arguments":{"a":7,"b":8}}}}' > /dev/null
+  -d '{"kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":8}}}}' > /dev/null
 sleep 3
 
 if tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q '"text":"56"' || tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q '"result":56' || tail -50 logs/*.log 2>/dev/null | grep -q '56'; then
@@ -110,10 +110,10 @@ echo -e "\n${YELLOW}Test: Invalid proposal handling${NC}"
 curl -sf -X POST "http://localhost:$TEST_PORT/participants/proposer/messages" \
   -H "Authorization: Bearer proposer-token" \
   -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/proposal","payload":{"proposal":{"type":"invalid"}}}' > /dev/null
+  -d '{"kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"invalid_tool","arguments":{}}}}' > /dev/null
 sleep 2
 
-if tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q 'Unknown proposal type' || tail -50 logs/*.log 2>/dev/null | grep -qi 'unknown.*proposal\|invalid.*proposal\|error'; then
+if tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q 'Tool not found' || tail -50 logs/*.log 2>/dev/null | grep -qi 'tool not found\|invalid.*tool\|error'; then
   echo -e "Invalid proposal handled: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else

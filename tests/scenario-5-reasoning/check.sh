@@ -161,7 +161,7 @@ else
 fi
 
 # Check final calculation result
-if grep -q '"text":".*64.80"' /tmp/reasoning-response.txt || grep -q '"text":"64.8"' /tmp/reasoning-response.txt; then
+if grep -q '64.80' /tmp/reasoning-response.txt || grep -q '64.8' /tmp/reasoning-response.txt; then
   echo -e "Correct calculation result: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else

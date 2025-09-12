@@ -63,7 +63,7 @@ client.onConnected(() => {
         space: options.space,
         token: options.token
       }
-    }).catch(() => {});
+    });
     joined = true;
   }
 });
@@ -88,9 +88,8 @@ client.onMessage((envelope) => {
         text: `Echo: ${text}`,
         format: 'plain'
       }
-    }).then(() => {
-      console.log(`Echoed: "${text}"`);
-    }).catch(console.error);
+    });
+    console.log(`Echoed: "${text}"`);
   }
 });
 

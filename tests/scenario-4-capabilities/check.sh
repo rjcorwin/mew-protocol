@@ -113,7 +113,7 @@ curl -sf -X POST "http://localhost:$TEST_PORT/participants/limited-agent/message
 sleep 3
 kill $TAIL_PID 2>/dev/null || true
 
-if grep -q '"kind":"mcp/response"' /tmp/test-response.txt && grep -q '"text":"8"' /tmp/test-response.txt; then
+if grep -q '"kind":"mcp/response"' /tmp/test-response.txt && grep -q '"result":8' /tmp/test-response.txt; then
   echo -e "Tool called successfully: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else

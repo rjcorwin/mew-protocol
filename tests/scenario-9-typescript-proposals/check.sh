@@ -94,8 +94,8 @@ echo -e "${BLUE}Test 2: Human asks agent to calculate, agent creates proposal${N
 # Clear output log position
 echo "--- Test 2 Start ---" >> "$OUTPUT_LOG"
 
-# Human asks TypeScript agent to calculate something via chat
-# Note: The agent should know about the 'calculate' tool from automatic discovery
+# Human asks TypeScript agent to add two numbers via chat
+# Note: The agent should know about the 'add' tool from automatic discovery
 # and should create a proposal since it lacks tools/call capability
 curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
@@ -104,7 +104,7 @@ curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages"
     "kind": "chat",
     "to": ["typescript-agent"],
     "payload": {
-      "text": "Can you calculate the sum of 7 and 9 for me?",
+      "text": "Can you add 7 and 9 for me?",
       "format": "plain"
     }
   }' > /dev/null
@@ -118,8 +118,8 @@ if check_log_with_retry "Test 2 Start" '"kind":"mcp/proposal".*"method":"tools/c
   echo "  Proposal ID: $PROPOSAL_ID"
   
   # Verify proposal contains correct tool call
-  if grep -A 20 "Test 2 Start" "$OUTPUT_LOG" | grep -q '"name":"calculate"'; then
-    echo -e "${GREEN}✓ Proposal contains calculate tool call${NC}"
+  if grep -A 20 "Test 2 Start" "$OUTPUT_LOG" | grep -q '"name":"add"'; then
+    echo -e "${GREEN}✓ Proposal contains add tool call${NC}"
   else
     echo -e "${RED}✗ Proposal does not contain expected tool call${NC}"
     exit 1
@@ -141,36 +141,42 @@ PROPOSAL_JSON=$(grep -A 20 "Test 2 Start" "$OUTPUT_LOG" | grep '"kind":"mcp/prop
 PROPOSAL_ID=$(echo "$PROPOSAL_JSON" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
 
 # Human fulfills the proposal by sending mcp/request with correlation_id
+# The request should go to fulfiller-agent which has the calculate tool
 curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
   -d "{
     \"kind\": \"mcp/request\",
-    \"to\": [\"typescript-agent\"],
+    \"to\": [\"fulfiller-agent\"],
     \"correlation_id\": [\"$PROPOSAL_ID\"],
     \"payload\": {
       \"jsonrpc\": \"2.0\",
       \"id\": 300,
       \"method\": \"tools/call\",
       \"params\": {
-        \"name\": \"calculate\",
-        \"arguments\": {\"operation\": \"sum\", \"a\": 7, \"b\": 9}
+        \"name\": \"add\",
+        \"arguments\": {\"a\": 7, \"b\": 9}
       }
     }
   }" > /dev/null
 
-# Check if the agent responded to the fulfilled request (with retries)
+# Check if the fulfiller responded with the calculation result (with retries)
 if check_log_with_retry "Test 3 Start" '"kind":"mcp/response".*"result"'; then
-  echo -e "${GREEN}✓ TypeScript agent responded to fulfilled request${NC}"
+  echo -e "${GREEN}✓ Fulfiller agent responded to fulfilled request${NC}"
   
   # Verify the response contains the correct calculation result
-  if grep -A 10 "Test 3 Start" "$OUTPUT_LOG" | grep -q '"text":".*16"'; then
+  # The result should be in the response: 7 + 9 = 16
+  if grep -A 10 "Test 3 Start" "$OUTPUT_LOG" | grep -q '"result":.*16'; then
     echo -e "${GREEN}✓ Response contains correct calculation result (16)${NC}"
   else
-    echo -e "${YELLOW}⚠ Response doesn't contain expected result${NC}"
+    echo -e "${RED}✗ Response doesn't contain expected result (16)${NC}"
+    echo "Expected the fulfiller to respond with the calculation result containing 16"
+    echo "Output after Test 3:"
+    grep -A 30 "Test 3 Start" "$OUTPUT_LOG"
+    exit 1
   fi
 else
-  echo -e "${RED}✗ TypeScript agent did not respond to fulfilled request after $MAX_RETRIES retries${NC}"
+  echo -e "${RED}✗ Fulfiller agent did not respond to request after $MAX_RETRIES retries${NC}"
   tail -30 "$OUTPUT_LOG"
   exit 1
 fi

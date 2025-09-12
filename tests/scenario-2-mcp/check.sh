@@ -88,7 +88,7 @@ curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages"
   -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > /dev/null
 sleep 2
 
-if grep -q '"text":"8"' "$RESPONSE_FILE"; then
+if grep -q '"result":8' "$RESPONSE_FILE"; then
   echo -e "Add tool result: ${GREEN}✓ (8)${NC}"
   ((TESTS_PASSED++))
 else
@@ -104,7 +104,7 @@ curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages"
   -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":9}}}}' > /dev/null
 sleep 2
 
-if grep -q '"text":"63"' "$RESPONSE_FILE"; then
+if grep -q '"result":63' "$RESPONSE_FILE"; then
   echo -e "Multiply tool result: ${GREEN}✓ (63)${NC}"
   ((TESTS_PASSED++))
 else
@@ -120,7 +120,7 @@ curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages"
   -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"20 / 4"}}}}' > /dev/null
 sleep 2
 
-if grep -q '"text":"5"' "$RESPONSE_FILE"; then
+if grep -q '"result":5' "$RESPONSE_FILE"; then
   echo -e "Evaluate tool result: ${GREEN}✓ (5)${NC}"
   ((TESTS_PASSED++))
 else
@@ -136,7 +136,7 @@ curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages"
   -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"10 / 0"}}}}' > /dev/null
 sleep 2
 
-if grep -q 'Infinity' "$RESPONSE_FILE" || grep -q 'division by zero' "$RESPONSE_FILE" || grep -q '"kind":"mcp/error"' "$RESPONSE_FILE"; then
+if grep -q '"result":"Infinity"' "$RESPONSE_FILE" || grep -q '"result":null' "$RESPONSE_FILE" || grep -q 'division by zero' "$RESPONSE_FILE"; then
   echo -e "Division by zero handling: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
@@ -152,7 +152,7 @@ curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages"
   -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"invalid","arguments":{}}}}' > /dev/null
 sleep 2
 
-if grep -q 'Unknown tool: invalid' "$RESPONSE_FILE" || grep -q '"kind":"mcp/error"' "$RESPONSE_FILE"; then
+if grep -q 'Tool not found: invalid' "$RESPONSE_FILE" || grep -q '"error":{' "$RESPONSE_FILE"; then
   echo -e "Invalid tool handling: ${GREEN}✓${NC}"
   ((TESTS_PASSED++))
 else
