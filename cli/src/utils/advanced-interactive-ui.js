@@ -102,6 +102,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       setPendingOperation({
         id: message.id,
         from: message.from,
+        to: message.to,  // Capture the target participant(s)
         operation: message.payload,
         timestamp: new Date(),
         correlationId: message.correlation_id,
@@ -232,7 +233,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
           const { method, params } = pendingOperation.operation;
           
           // Send the MCP request with correlation_id pointing to the proposal
-          sendMessage({
+          // IMPORTANT: Send to the participant specified in the proposal's 'to' field
+          const message = {
             kind: 'mcp/request',
             correlation_id: [pendingOperation.id],
             payload: {
@@ -241,7 +243,14 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
               method: method,
               params: params
             }
-          });
+          };
+          
+          // If the proposal specified a target participant, send to them
+          if (pendingOperation.to && pendingOperation.to.length > 0) {
+            message.to = pendingOperation.to;
+          }
+          
+          sendMessage(message);
         }
         setPendingOperation(null);
       },

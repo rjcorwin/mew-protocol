@@ -85,8 +85,10 @@ export class MCPClient extends EventEmitter {
       this.rl.on('line', (line) => {
         try {
           const message = JSON.parse(line);
+          console.log('MCP Server -> Client:', JSON.stringify(message));
           this.handleMessage(message);
         } catch (error) {
+          console.error('Failed to parse MCP message:', line, error);
           debug('Failed to parse MCP message:', line, error);
         }
       });
@@ -176,6 +178,7 @@ export class MCPClient extends EventEmitter {
     }
 
     const json = JSON.stringify(message);
+    console.log('MCP Client -> Server:', json);
     debug('MCP -> Server:', json);
     this.process.stdin.write(json + '\n');
   }
@@ -238,9 +241,23 @@ export class MCPClient extends EventEmitter {
       this.rl.close();
     }
 
-    if (this.process) {
-      this.process.kill();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    if (this.process && !this.process.killed) {
+      // First try SIGTERM for graceful shutdown
+      this.process.kill('SIGTERM');
+      
+      // Wait up to 5 seconds for process to exit
+      let waited = 0;
+      while (this.process.exitCode === null && waited < 5000) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        waited += 100;
+      }
+      
+      // Force kill if still running
+      if (this.process.exitCode === null) {
+        debug('Process did not exit gracefully, sending SIGKILL');
+        this.process.kill('SIGKILL');
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     }
 
     this.pendingRequests.clear();

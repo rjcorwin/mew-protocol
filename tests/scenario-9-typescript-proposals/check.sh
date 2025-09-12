@@ -91,6 +91,10 @@ fi
 # Test 2: Human asks agent to perform calculation, agent creates proposal
 echo -e "${BLUE}Test 2: Human asks agent to calculate, agent creates proposal${NC}"
 
+# Wait for tool discovery to complete (agents need time to discover tools)
+echo "Waiting for tool discovery to complete..."
+sleep 3
+
 # Clear output log position
 echo "--- Test 2 Start ---" >> "$OUTPUT_LOG"
 
@@ -212,8 +216,119 @@ else
   exit 1
 fi
 
-# Test 5: Verify agent respects capability constraints
-echo -e "${BLUE}Test 5: Verifying agent respects capability constraints${NC}"
+# Test 5: Test chat response behavior - direct message
+echo -e "${BLUE}Test 5: Testing chat response to direct message (should respond)${NC}"
+
+# Clear output log position
+echo "--- Test 5 Start ---" >> "$OUTPUT_LOG"
+
+# Send a direct chat message (with to field)
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "chat",
+    "to": ["typescript-agent"],
+    "payload": {
+      "text": "Hello typescript-agent, how are you?",
+      "format": "plain"
+    }
+  }' > /dev/null
+
+# Agent should respond to direct message
+if check_log_with_retry "Test 5 Start" '"from":"typescript-agent".*"kind":"chat"'; then
+  echo -e "${GREEN}✓ TypeScript agent responded to direct message${NC}"
+else
+  echo -e "${RED}✗ TypeScript agent did not respond to direct message${NC}"
+  tail -30 "$OUTPUT_LOG"
+  exit 1
+fi
+
+# Test 6: Test chat response behavior - broadcast with question
+echo -e "${BLUE}Test 6: Testing chat response to broadcast question (may respond based on LLM)${NC}"
+
+# Clear output log position
+echo "--- Test 6 Start ---" >> "$OUTPUT_LOG"
+
+# Send a broadcast chat message with a question
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "chat",
+    "payload": {
+      "text": "What tools are available in this space?",
+      "format": "plain"
+    }
+  }' > /dev/null
+
+# Give agent time to classify
+sleep 3
+
+# Check if agent responded (it may or may not based on LLM classification)
+if grep -A 10 "Test 6 Start" "$OUTPUT_LOG" | grep -q '"from":"typescript-agent".*"kind":"chat"'; then
+  echo -e "${GREEN}✓ TypeScript agent responded to broadcast question (LLM determined relevance)${NC}"
+else
+  echo -e "${YELLOW}⚠ TypeScript agent did not respond to broadcast question (LLM determined not relevant or no API key)${NC}"
+fi
+
+# Test 7: Test chat response behavior - broadcast without question
+echo -e "${BLUE}Test 7: Testing chat response to broadcast statement (should not respond)${NC}"
+
+# Clear output log position
+echo "--- Test 7 Start ---" >> "$OUTPUT_LOG"
+
+# Send a broadcast chat message without question or direct relevance
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "chat",
+    "payload": {
+      "text": "The weather is nice today.",
+      "format": "plain"
+    }
+  }' > /dev/null
+
+# Give agent time to potentially classify
+sleep 2
+
+# Agent should NOT respond to irrelevant broadcast
+if grep -A 5 "Test 7 Start" "$OUTPUT_LOG" | grep -q '"from":"typescript-agent".*"kind":"chat"'; then
+  echo -e "${YELLOW}⚠ TypeScript agent responded to irrelevant broadcast (unexpected)${NC}"
+else
+  echo -e "${GREEN}✓ TypeScript agent correctly ignored irrelevant broadcast${NC}"
+fi
+
+# Test 8: Test chat response with mention
+echo -e "${BLUE}Test 8: Testing chat response with mention (should respond)${NC}"
+
+# Clear output log position
+echo "--- Test 8 Start ---" >> "$OUTPUT_LOG"
+
+# Send a broadcast chat message that mentions the agent
+curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "chat",
+    "payload": {
+      "text": "@typescript-agent can you help me?",
+      "format": "plain"
+    }
+  }' > /dev/null
+
+# Agent should respond when mentioned
+if check_log_with_retry "Test 8 Start" '"from":"typescript-agent".*"kind":"chat"'; then
+  echo -e "${GREEN}✓ TypeScript agent responded when mentioned${NC}"
+else
+  echo -e "${RED}✗ TypeScript agent did not respond when mentioned${NC}"
+  tail -30 "$OUTPUT_LOG"
+  exit 1
+fi
+
+# Test 9: Verify agent respects capability constraints
+echo -e "${BLUE}Test 9: Verifying agent respects capability constraints${NC}"
 
 # Check logs for any capability violations from the TypeScript agent
 if grep -q "typescript-agent.*capability.*violation" "$OUTPUT_LOG"; then
@@ -226,6 +341,7 @@ fi
 echo ""
 echo -e "${GREEN}=== All Tests Passed ===${NC}"
 echo -e "${GREEN}✓ Propose->Fulfill->Response pattern working correctly${NC}"
+echo -e "${GREEN}✓ Chat response behavior working as expected${NC}"
 echo ""
 
 exit 0

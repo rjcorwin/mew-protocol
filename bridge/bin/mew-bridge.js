@@ -76,6 +76,19 @@ async function start() {
       await bridge.shutdown();
       process.exit(0);
     });
+
+    // Handle uncaught exceptions to prevent zombies
+    process.on('uncaughtException', async (error) => {
+      console.error('Uncaught exception:', error);
+      await bridge.shutdown();
+      process.exit(1);
+    });
+
+    process.on('unhandledRejection', async (reason, promise) => {
+      console.error('Unhandled rejection at:', promise, 'reason:', reason);
+      await bridge.shutdown();
+      process.exit(1);
+    });
   } catch (error) {
     console.error('Failed to start bridge:', error);
     process.exit(1);

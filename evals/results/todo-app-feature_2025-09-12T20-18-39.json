@@ -1,0 +1,44 @@
+{
+  "scenario": {
+    "id": "todo-app-feature",
+    "name": "Add Priority Feature to Todo App"
+  },
+  "evaluation": {
+    "scenarioId": "todo-app-feature",
+    "timestamp": "2025-09-12T20:18:39.794Z",
+    "scores": {
+      "taskCompletion": 0.9617336496836326,
+      "protocolCompliance": 0.8346770027998874,
+      "fileOperations": 0.8173872633311933,
+      "multiStepHandling": 0.9956325381777166
+    },
+    "details": {},
+    "passed": true,
+    "overallScore": 0.9023576134981075,
+    "report": "{\"score\":0.8797765614036314,\"completed\":true,\"reasoning\":\"Mock evaluation - replace with actual LLM\"}"
+  },
+  "messages": [
+    {
+      "protocol": "mew/v0.3",
+      "id": "error-1757708318793",
+      "ts": "2025-09-12T20:18:38.793Z",
+      "from": "system:gateway",
+      "to": [
+        null
+      ],
+      "kind": "system/error",
+      "correlation_id": [
+        "c6f57874-6074-4a95-8ee1-2f5cb62e5fe8"
+      ],
+      "payload": {
+        "error": "capability_violation",
+        "attempted_kind": "chat",
+        "your_capabilities": []
+      }
+    }
+  ],
+  "workspace": {
+    "index.html": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Todo List App</title>\n    <style>\n        body {\n            font-family: Arial, sans-serif;\n            max-width: 600px;\n            margin: 50px auto;\n            padding: 20px;\n            background-color: #e3f2fd;\n        }\n        .todo-container {\n            background: white;\n            border-radius: 8px;\n            padding: 20px;\n            box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n        }\n        .completed {\n            text-decoration: line-through;\n            opacity: 0.6;\n        }\n        .todo-item {\n            display: flex;\n            align-items: center;\n            padding: 10px;\n            border-bottom: 1px solid #eee;\n        }\n        .delete-btn {\n            margin-left: auto;\n            background: #ff4444;\n            color: white;\n            border: none;\n            padding: 5px 10px;\n            border-radius: 4px;\n            cursor: pointer;\n        }\n    </style>\n</head>\n<body>\n    <div class=\"todo-container\">\n        <h1>My Todo List</h1>\n        <div>\n            <input type=\"text\" id=\"todoInput\" placeholder=\"Add a new todo...\">\n            <button onclick=\"addTodo()\">Add Todo</button>\n        </div>\n        <ul id=\"todoList\"></ul>\n    </div>\n    <script>\n        function addTodo() {\n            const input = document.getElementById('todoInput');\n            const text = input.value.trim();\n            if (!text) return;\n            \n            const li = document.createElement('li');\n            li.className = 'todo-item';\n            li.innerHTML = `\n                <input type=\"checkbox\" onchange=\"toggleComplete(this)\">\n                <span>${text}</span>\n                <button class=\"delete-btn\" onclick=\"deleteTodo(this)\">Delete</button>\n            `;\n            \n            document.getElementById('todoList').appendChild(li);\n            input.value = '';\n        }\n        \n        function toggleComplete(checkbox) {\n            const item = checkbox.parentElement;\n            if (checkbox.checked) {\n                item.classList.add('completed');\n            } else {\n                item.classList.remove('completed');\n            }\n        }\n        \n        function deleteTodo(button) {\n            button.parentElement.remove();\n        }\n    </script>\n</body>\n</html>"
+  },
+  "timestamp": "2025-09-12T20:18:39.795Z"
+}

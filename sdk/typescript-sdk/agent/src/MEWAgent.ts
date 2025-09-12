@@ -15,12 +15,22 @@ export interface AgentConfig extends ParticipantOptions {
   maxIterations?: number;
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
   
+  // Chat response configuration
+  chatResponse?: {
+    respondToQuestions?: boolean;    // Respond to questions (default: true)
+    respondToMentions?: boolean;     // Respond when mentioned (default: true)
+    respondToDirect?: boolean;       // Respond to direct messages (default: true)
+    confidenceThreshold?: number;    // Min confidence to respond (0-1, default: 0.5)
+    contextWindow?: number;          // Messages to consider for context (default: 10)
+  };
+  
   // Overridable prompts for different phases (ReAct pattern)
   prompts?: {
     system?: string;    // Override the base system prompt
     reason?: string;    // Template for reasoning/planning phase (ReAct: Reason)
     act?: string;       // Template for tool selection and execution (ReAct: Act)
     respond?: string;   // Template for formatting final response
+    classify?: string;  // Template for chat classification
   };
 }
 
@@ -56,6 +66,9 @@ export class MEWAgent extends MEWParticipant {
   private otherParticipants = new Map<string, OtherParticipant>();
   private isRunning = false;
   private currentConversation: Array<{ role: string; content: string }> = [];
+  private pendingDiscovery: string[] = [];
+  private discoveryQueue: string[] = [];
+  private isDiscovering = false;
 
   constructor(config: AgentConfig) {
     super(config);
@@ -63,8 +76,8 @@ export class MEWAgent extends MEWParticipant {
       reasoningEnabled: true,
       autoRespond: true,
       maxIterations: 10,
-      logLevel: 'info',
-      model: 'gpt-4-turbo-preview',
+      logLevel: 'debug',
+      model: 'gpt-4o',
       ...config
     };
 
@@ -74,6 +87,48 @@ export class MEWAgent extends MEWParticipant {
     }
 
     this.setupAgentBehavior();
+    
+    // Override welcome handler to capture participants
+    this.onWelcome(async (data: any) => {
+      if (data.participants) {
+        this.log('info', `Welcome received, storing ${data.participants.length} existing participants`);
+        for (const participant of data.participants) {
+          if (participant.id !== this.options.participant_id) {
+            this.log('info', `Storing participant from welcome: ${participant.id}`);
+            // Track participant
+            this.otherParticipants.set(participant.id, {
+              id: participant.id,
+              joinedAt: new Date(),
+              capabilities: participant.capabilities
+            });
+            // Only discover tools from participants that can respond to MCP requests
+            const canRespond = participant.capabilities?.some((cap: any) => 
+              cap.kind === 'mcp/response'
+            );
+            if (canRespond) {
+              this.pendingDiscovery.push(participant.id);
+            } else {
+              this.log('debug', `Skipping tool discovery for ${participant.id} - no mcp/response capability`);
+            }
+          }
+        }
+        // Queue discoveries and start processing after a delay
+        setTimeout(() => {
+          this.log('info', `Queuing tool discovery for ${this.pendingDiscovery.length} participants`);
+          this.discoveryQueue.push(...this.pendingDiscovery);
+          this.pendingDiscovery = [];
+          this.processDiscoveryQueue();
+        }, 1000); // Wait 1 second for system to stabilize
+      }
+    });
+  }
+  
+  /**
+   * Override onReady to discover tools after connection is established
+   */
+  protected async onReady(): Promise<void> {
+    // Tool discovery now happens in the welcome handler after a delay
+    this.log('info', `Agent ready`);
   }
 
   /**
@@ -121,12 +176,18 @@ export class MEWAgent extends MEWParticipant {
   private setupAgentBehavior(): void {
     // Handle system presence events for tool discovery
     this.onMessage(async (envelope: Envelope) => {
+      // Only log presence and welcome for debugging
+      if (envelope.kind === 'system/presence' || envelope.kind === 'system/welcome') {
+        this.log('debug', `Received ${envelope.kind} from: ${envelope.from}`);
+      }
+      
       if (envelope.kind === 'system/presence') {
         await this.handlePresence(envelope);
       }
       
-      // Auto-respond to chat messages if enabled
-      if (this.config.autoRespond && envelope.kind === 'chat' && 
+      
+      // Handle chat messages (autoRespond check is inside handleChat)
+      if (envelope.kind === 'chat' && 
           envelope.from !== this.options.participant_id) {
         await this.handleChat(envelope);
       }
@@ -143,9 +204,12 @@ export class MEWAgent extends MEWParticipant {
    * Handle presence events (participant join/leave)
    */
   private async handlePresence(envelope: Envelope): Promise<void> {
-    const { action, participant } = envelope.payload;
+    const { event, participant } = envelope.payload;
     
-    if (action === 'join' && participant.id !== this.options.participant_id) {
+    this.log('debug', `Presence event: ${event} for ${participant.id}`);
+    
+    if (event === 'join' && participant.id !== this.options.participant_id) {
+      this.log('debug', `New participant joined: ${participant.id}`);
       // Track new participant
       this.otherParticipants.set(participant.id, {
         id: participant.id,
@@ -153,9 +217,20 @@ export class MEWAgent extends MEWParticipant {
         capabilities: participant.capabilities
       });
       
-      // Discover their tools
-      await this.discoverToolsFrom(participant.id);
-    } else if (action === 'leave') {
+      // Check if participant can respond to MCP requests
+      const canRespond = participant.capabilities?.some((cap: any) => 
+        cap.kind === 'mcp/response'
+      );
+      
+      if (canRespond) {
+        // Add to discovery queue instead of discovering immediately
+        this.discoveryQueue.push(participant.id);
+        // Process queue with a delay to avoid storms
+        setTimeout(() => this.processDiscoveryQueue(), 2000);
+      } else {
+        this.log('debug', `Skipping ${participant.id} - no mcp/response capability`);
+      }
+    } else if (event === 'leave') {
       // Remove participant and their tools
       this.otherParticipants.delete(participant.id);
       for (const [key, tool] of this.discoveredTools.entries()) {
@@ -167,13 +242,40 @@ export class MEWAgent extends MEWParticipant {
   }
 
   /**
+   * Process the discovery queue with rate limiting
+   */
+  private async processDiscoveryQueue(): Promise<void> {
+    if (this.isDiscovering || this.discoveryQueue.length === 0) {
+      return;
+    }
+    
+    this.isDiscovering = true;
+    const participantId = this.discoveryQueue.shift();
+    
+    if (participantId) {
+      await this.discoverToolsFrom(participantId);
+      
+      // Wait 500ms between discoveries to avoid overwhelming the system
+      setTimeout(() => {
+        this.isDiscovering = false;
+        this.processDiscoveryQueue();
+      }, 500);
+    } else {
+      this.isDiscovering = false;
+    }
+  }
+
+  /**
    * Discover tools from a participant
    */
   private async discoverToolsFrom(participantId: string): Promise<void> {
+    this.log('info', `Discovering tools from ${participantId}`);
     try {
       const result = await this.mcpRequest([participantId], {
         method: 'tools/list'
       }, 5000);
+      
+      this.log('info', `Tool discovery response from ${participantId}: ${JSON.stringify(result)}`);
       
       if (result?.tools) {
         for (const tool of result.tools) {
@@ -186,10 +288,12 @@ export class MEWAgent extends MEWParticipant {
           });
         }
         
-        this.log('debug', `Discovered ${result.tools.length} tools from ${participantId}`);
+        this.log('info', `Discovered ${result.tools.length} tools from ${participantId}: ${result.tools.map((t: any) => t.name).join(', ')}`);
+      } else {
+        this.log('info', `No tools found from ${participantId}`);
       }
     } catch (error) {
-      this.log('warn', `Failed to discover tools from ${participantId}: ${error}`);
+      this.log('error', `Could not discover tools from ${participantId}: ${error}`);
     }
   }
 
@@ -199,13 +303,23 @@ export class MEWAgent extends MEWParticipant {
   private async handleChat(envelope: Envelope): Promise<void> {
     const { text } = envelope.payload;
     
+    // Check if we should respond to this message
+    const shouldRespond = await this.shouldRespondToChat(envelope);
+    
+    if (!shouldRespond) {
+      this.log('debug', `Skipping response to chat from ${envelope.from}: did not meet response criteria`);
+      return;
+    }
+    
     // Start reasoning if enabled
     if (this.config.reasoningEnabled) {
       this.emitReasoning('reasoning/start', { input: text });
       
       try {
         const response = await this.processWithReAct(text);
+        this.log('info', `Processed response: ${response}`);
         await this.sendResponse(response, envelope.from);
+        this.log('info', `Sent response to ${envelope.from}`);
       } catch (error) {
         this.log('error', `Failed to process chat: ${error}`);
         await this.sendResponse(
@@ -224,6 +338,121 @@ export class MEWAgent extends MEWParticipant {
         this.log('error', `Failed to process chat: ${error}`);
       }
     }
+  }
+  
+  /**
+   * Determine if agent should respond to a chat message
+   */
+  private async shouldRespondToChat(envelope: Envelope): Promise<boolean> {
+    // First check if autoRespond is enabled
+    if (!this.config.autoRespond) {
+      return false;
+    }
+    
+    const chatConfig = {
+      respondToQuestions: true,
+      respondToMentions: true,
+      respondToDirect: true,
+      confidenceThreshold: 0.5,
+      contextWindow: 10,
+      ...this.config.chatResponse
+    };
+    
+    // Priority 1: Check if directly addressed
+    if (chatConfig.respondToDirect && envelope.to?.includes(this.options.participant_id!)) {
+      this.log('debug', 'Responding to directly addressed message');
+      return true;
+    }
+    
+    // Priority 2: Check if mentioned by name/ID
+    const { text } = envelope.payload;
+    const myId = this.options.participant_id!;
+    const myName = this.config.name || myId;
+    
+    if (chatConfig.respondToMentions) {
+      const mentionPatterns = [
+        new RegExp(`@${myId}\\b`, 'i'),
+        new RegExp(`@${myName}\\b`, 'i'),
+        new RegExp(`\\b${myId}\\b`, 'i'),
+        new RegExp(`\\b${myName}\\b`, 'i')
+      ];
+      
+      if (mentionPatterns.some(pattern => pattern.test(text))) {
+        this.log('debug', 'Responding to message with mention');
+        return true;
+      }
+    }
+    
+    // Priority 3: Use LLM classification for relevance
+    if (!this.openai) {
+      // No LLM available, use simple heuristics
+      if (chatConfig.respondToQuestions && text.includes('?')) {
+        this.log('debug', 'Responding to question (heuristic)');
+        return true;
+      }
+      return false;
+    }
+    
+    // Perform LLM classification
+    try {
+      const classification = await this.classifyChat(text);
+      
+      if (classification.shouldRespond && classification.confidence >= chatConfig.confidenceThreshold) {
+        this.log('debug', `Responding based on LLM classification (confidence: ${classification.confidence}, reason: ${classification.reason})`);
+        return true;
+      }
+      
+      this.log('debug', `Not responding based on LLM classification (confidence: ${classification.confidence}, reason: ${classification.reason})`);
+      return false;
+    } catch (error) {
+      this.log('warn', `Failed to classify chat message: ${error}`);
+      // Fall back to simple heuristics
+      if (chatConfig.respondToQuestions && text.includes('?')) {
+        return true;
+      }
+      return false;
+    }
+  }
+  
+  /**
+   * Use LLM to classify whether to respond to a chat message
+   */
+  private async classifyChat(text: string): Promise<{shouldRespond: boolean; confidence: number; reason: string}> {
+    if (!this.openai) {
+      throw new Error('No OpenAI client available for classification');
+    }
+    
+    const tools = Array.from(this.discoveredTools.values()).map(t => t.name);
+    
+    const classificationPrompt = this.config.prompts?.classify || `
+You are an AI agent with the following tools: ${JSON.stringify(tools)}
+
+A message was sent in the conversation: "${text}"
+
+Should you respond to this message?
+Consider:
+1. Is this a question you can answer?
+2. Does it relate to your tools or capabilities?
+3. Can you provide unique value by responding?
+
+Return a JSON object:
+{
+  "shouldRespond": boolean,
+  "confidence": number (0-1),
+  "reason": string
+}`;
+    
+    const response = await this.openai.chat.completions.create({
+      model: this.config.model!,
+      messages: [
+        { role: 'system', content: 'You are a classification system. Return only valid JSON.' },
+        { role: 'user', content: classificationPrompt }
+      ],
+      response_format: { type: 'json_object' }
+    });
+    
+    const content = response.choices[0].message.content || '{}';
+    return JSON.parse(content);
   }
 
   /**
@@ -248,11 +477,13 @@ export class MEWAgent extends MEWParticipant {
     
     while (iterations < this.config.maxIterations!) {
       iterations++;
+      this.log('debug', `ReAct iteration ${iterations}/${this.config.maxIterations}`);
       
       // Reason phase
       const thought = await this.reason(input, thoughts);
       thoughts.push(thought);
       
+      this.log('debug', `Thought action: ${thought.action}, reasoning: ${thought.reasoning}`);
       this.emitReasoning('reasoning/thought', thought);
       
       // Act phase
@@ -260,14 +491,25 @@ export class MEWAgent extends MEWParticipant {
         return thought.actionInput;
       }
       
-      const observation = await this.act(thought.action, thought.actionInput);
-      
-      // Add observation to context
-      thoughts.push({
-        reasoning: `Observation: ${observation}`,
-        action: 'observe',
-        actionInput: observation
-      });
+      try {
+        const observation = await this.act(thought.action, thought.actionInput);
+        this.log('debug', `Observation: ${observation}`);
+        
+        // If we got a result from the tool, return it
+        if (observation && thought.action === 'tool') {
+          return observation;
+        }
+        
+        // Add observation to context
+        thoughts.push({
+          reasoning: `Observation: ${observation}`,
+          action: 'observe',
+          actionInput: observation
+        });
+      } catch (error) {
+        this.log('error', `Error in act phase: ${error}`);
+        return `I encountered an error: ${error}`;
+      }
     }
     
     return 'I exceeded the maximum number of reasoning iterations.';
@@ -278,7 +520,8 @@ export class MEWAgent extends MEWParticipant {
    */
   private async processDirectly(input: string): Promise<string> {
     if (!this.openai) {
-      return 'I need an API key to process requests.';
+      // Simple fallback without LLM
+      return 'I need an OpenAI API key configured to process this request.';
     }
 
     const tools = this.prepareLLMTools();
@@ -318,47 +561,194 @@ export class MEWAgent extends MEWParticipant {
    */
   protected async reason(input: string, previousThoughts: Thought[]): Promise<Thought> {
     if (!this.openai) {
-      return {
-        reasoning: 'No API key available',
-        action: 'respond',
-        actionInput: 'I need an API key to process requests.'
-      };
+      // Fallback to simple pattern matching without LLM
+      return this.reasonWithoutLLM(input, previousThoughts);
     }
 
     const tools = this.prepareLLMTools();
-    const reasonPrompt = this.config.prompts?.reason || 
-      `Analyze this request: {input}\nAvailable tools: {tools}\nReason about your approach:`;
-
-    const prompt = reasonPrompt
-      .replace('{input}', input)
-      .replace('{tools}', JSON.stringify(tools.map(t => t.name)));
-
+    
+    // Use function calling to let the model decide whether to use tools
     const response = await this.openai.chat.completions.create({
       model: this.config.model!,
       messages: [
-        { role: 'system', content: 'You are reasoning about how to handle a request.' },
-        { role: 'user', content: prompt }
-      ]
+        { 
+          role: 'system', 
+          content: 'You are a helpful assistant. When asked to perform calculations or tasks, use the available tools. Only respond directly if no tool is needed.' 
+        },
+        { role: 'user', content: input }
+      ],
+      tools: tools.length > 0 ? this.convertToOpenAITools(tools) : undefined,
+      tool_choice: tools.length > 0 ? 'auto' : undefined
     });
 
-    // Parse reasoning into thought structure
-    const content = response.choices[0].message.content || '';
+    const message = response.choices[0].message;
     
-    // Simple parsing - in real implementation would be more sophisticated
+    // Check if the model wants to use a tool
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      const toolCall = message.tool_calls[0] as any;
+      const toolName = toolCall.function.name.replace('_', '/'); // Convert back from OpenAI format
+      const args = JSON.parse(toolCall.function.arguments);
+      
+      return {
+        reasoning: message.content || `Using tool ${toolName}`,
+        action: 'tool',
+        actionInput: {
+          tool: toolName,
+          arguments: args
+        }
+      };
+    }
+    
+    // No tool needed, just respond
     return {
-      reasoning: content,
+      reasoning: message.content || 'Responding directly',
       action: 'respond',
-      actionInput: content
+      actionInput: message.content || 'I can help with that.'
     };
   }
 
+  /**
+   * Reason without LLM (fallback for no API key)
+   */
+  protected reasonWithoutLLM(input: string, previousThoughts: Thought[]): Thought {
+    const lowerInput = input.toLowerCase();
+    
+    // Debug: Check available tools
+    this.log('info', `ReasonWithoutLLM - Tool count: ${this.discoveredTools.size}`);
+    if (this.discoveredTools.size > 0) {
+      this.log('info', `ReasonWithoutLLM - Available tools: ${Array.from(this.discoveredTools.keys()).join(', ')}`);
+    }
+    
+    // Check for file operations (read, list, etc.)
+    if (lowerInput.includes('read') || lowerInput.includes('show') || lowerInput.includes('see') || 
+        lowerInput.includes('look at') || lowerInput.includes('view') || lowerInput.includes('check')) {
+      // Look for file-related tools
+      for (const [key, tool] of this.discoveredTools) {
+        if (tool.name.includes('read') || tool.name === 'read_file') {
+          // Extract potential file path from input
+          const pathMatch = input.match(/['"`]([^'"`]+)['"`]/) || input.match(/(\S+\.(txt|js|ts|json|md|yaml|yml))/i);
+          if (pathMatch) {
+            const filePath = pathMatch[1];
+            return {
+              reasoning: `The user wants to read file ${filePath}. I'll use the ${tool.name} tool from ${tool.participantId}.`,
+              action: 'tool',
+              actionInput: {
+                tool: `${tool.participantId}/${tool.name}`,
+                arguments: { path: filePath }
+              }
+            };
+          }
+        }
+      }
+    }
+    
+    // Check for list/directory operations
+    if (lowerInput.includes('list') || lowerInput.includes('ls') || lowerInput.includes('dir') || 
+        lowerInput.includes('files') || lowerInput.includes('directory')) {
+      // Look for list-related tools
+      for (const [key, tool] of this.discoveredTools) {
+        if (tool.name.includes('list') || tool.name === 'list_directory') {
+          // Extract potential directory path from input
+          const pathMatch = input.match(/['"`]([^'"`]+)['"`]/) || input.match(/in\s+(\S+)/);
+          const dirPath = pathMatch ? pathMatch[1] : '.';
+          return {
+            reasoning: `The user wants to list files in ${dirPath}. I'll use the ${tool.name} tool from ${tool.participantId}.`,
+            action: 'tool',
+            actionInput: {
+              tool: `${tool.participantId}/${tool.name}`,
+              arguments: { path: dirPath }
+            }
+          };
+        }
+      }
+    }
+    
+    // Check for simple arithmetic with discovered tools
+    if (lowerInput.includes('calculate') || lowerInput.includes('add') || lowerInput.includes('plus') || lowerInput.includes('+')) {
+      // Look for calculation tools
+      for (const [key, tool] of this.discoveredTools) {
+        if (tool.name === 'add' || tool.name.includes('calc') || tool.name.includes('math')) {
+          const numbers = input.match(/\d+/g);
+          if (numbers && numbers.length >= 2) {
+            const a = parseInt(numbers[0]);
+            const b = parseInt(numbers[1]);
+            return {
+              reasoning: `The user wants to calculate ${a} + ${b}. I'll use the ${tool.name} tool from ${tool.participantId}.`,
+              action: 'tool',
+              actionInput: {
+                tool: `${tool.participantId}/${tool.name}`,
+                arguments: { a, b }
+              }
+            };
+          }
+        }
+      }
+      
+      // Fallback: do calculation locally if no tools available
+      const numbers = input.match(/\d+/g);
+      if (numbers && numbers.length >= 2) {
+        const a = parseInt(numbers[0]);
+        const b = parseInt(numbers[1]);
+        const result = a + b;
+        return {
+          reasoning: `The user wants to calculate ${a} + ${b}. No calculation tools available, so I'll compute it directly.`,
+          action: 'respond',
+          actionInput: `The result of ${a} + ${b} is ${result}.`
+        };
+      }
+    }
+    
+    // Check for greetings
+    if (lowerInput.includes('hello') || lowerInput.includes('hi') || lowerInput.includes('hey')) {
+      const toolList = this.discoveredTools.size > 0 
+        ? `I have access to the following tools: ${Array.from(this.discoveredTools.values()).map(t => t.name).join(', ')}.` 
+        : 'I\'m still discovering available tools.';
+      return {
+        reasoning: 'The user is greeting me.',
+        action: 'respond',
+        actionInput: `Hello! I'm the coder agent. ${toolList} What would you like me to help with?`
+      };
+    }
+    
+    // Default response with available tools
+    if (this.discoveredTools.size > 0) {
+      const toolDescriptions = Array.from(this.discoveredTools.values())
+        .map(t => `${t.name} (from ${t.participantId})`)
+        .join(', ');
+      return {
+        reasoning: 'I should inform the user about available tools.',
+        action: 'respond',
+        actionInput: `I have these tools available: ${toolDescriptions}. How can I help you use them?`
+      };
+    }
+    
+    // No tools discovered yet
+    return {
+      reasoning: 'I haven\'t discovered any tools yet.',
+      action: 'respond',
+      actionInput: 'I\'m still discovering available tools. Please wait a moment and try again.'
+    };
+  }
+  
   /**
    * Act phase (ReAct: Act)
    */
   protected async act(action: string, input: any): Promise<string> {
     if (action === 'tool') {
       const result = await this.executeLLMToolCall(input.tool, input.arguments);
-      return JSON.stringify(result);
+      
+      // Format the result as a string response
+      if (typeof result === 'object' && result.content) {
+        // MCP response format
+        if (Array.isArray(result.content)) {
+          return result.content.map((c: any) => c.text || '').join('\n');
+        }
+        return result.content;
+      } else if (typeof result === 'string') {
+        return result;
+      } else {
+        return JSON.stringify(result);
+      }
     }
     
     return 'Action completed';
@@ -368,11 +758,27 @@ export class MEWAgent extends MEWParticipant {
    * Prepare tools for LLM (per ADR-mpt)
    */
   protected prepareLLMTools(): LLMTool[] {
-    return Array.from(this.discoveredTools.values()).map(tool => ({
-      name: `${tool.participantId}/${tool.name}`,
-      description: tool.description || `${tool.name} from ${tool.participantId}`,
-      parameters: tool.schema
-    }));
+    const tools: LLMTool[] = [];
+    
+    // Add our own tools
+    for (const [name, tool] of this.tools.entries()) {
+      tools.push({
+        name: `${this.options.participant_id}/${name}`,
+        description: tool.description || `${name} tool`,
+        parameters: tool.inputSchema
+      });
+    }
+    
+    // Add discovered tools from other participants
+    for (const tool of this.discoveredTools.values()) {
+      tools.push({
+        name: `${tool.participantId}/${tool.name}`,
+        description: tool.description || `${tool.name} from ${tool.participantId}`,
+        parameters: tool.schema
+      });
+    }
+    
+    return tools;
   }
 
   /**
@@ -381,57 +787,44 @@ export class MEWAgent extends MEWParticipant {
   protected async executeLLMToolCall(namespacedTool: string, args: any): Promise<any> {
     const [participantId, toolName] = namespacedTool.split('/');
     
-    // Check if we can send tools/call
-    if (this.canSend({ kind: 'mcp/request', payload: { method: 'tools/call' } })) {
-      // Direct call
-      return await this.mcpRequest([participantId], {
+    // Check if this is our own tool
+    if (participantId === this.options.participant_id) {
+      // Execute our own tool directly
+      const tool = this.tools.get(toolName);
+      if (tool && tool.execute) {
+        const result = await tool.execute(args);
+        return result;
+      } else {
+        throw new Error(`Tool ${toolName} not found`);
+      }
+    }
+    
+    // For remote tools, use mcpRequest which handles capability routing automatically
+    // It will use direct request if we have mcp/request capability for tools/call,
+    // or create a proposal if we only have mcp/proposal capability
+    try {
+      this.log('debug', `Calling tool ${toolName} on ${participantId} with args: ${JSON.stringify(args)}`);
+      
+      const result = await this.mcpRequest([participantId], {
         method: 'tools/call',
         params: {
           name: toolName,
           arguments: args
         }
-      });
-    } else if (this.canSend({ kind: 'mcp/proposal', payload: { method: 'tools/call' } })) {
-      // Create proposal
-      const proposalId = uuidv4();
+      }, 30000); // 30 second timeout for proposals
       
-      const proposal: Envelope = {
-        protocol: PROTOCOL_VERSION,
-        id: proposalId,
-        ts: new Date().toISOString(),
-        from: this.options.participant_id!,
-        kind: 'mcp/proposal',
-        payload: {
-          method: 'tools/call',
-          params: {
-            name: toolName,
-            arguments: args
-          }
-        }
-      };
+      this.log('debug', `Tool call result: ${JSON.stringify(result)}`);
+      return result;
+    } catch (error) {
+      this.log('error', `Failed to execute tool ${namespacedTool}: ${error}`);
       
-      this.send(proposal);
+      // If it's a proposal that wasn't fulfilled, provide helpful feedback
+      if (error instanceof Error && error.message.includes('proposal')) {
+        return `I've proposed using the ${toolName} tool from ${participantId}, but it requires approval. The proposal has been sent and is waiting for a participant with appropriate capabilities to fulfill it.`;
+      }
       
-      // Wait for fulfillment
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Proposal not fulfilled'));
-        }, 30000);
-        
-        const handler = (envelope: Envelope) => {
-          if (envelope.kind === 'mcp/response' && 
-              envelope.correlation_id?.includes(proposalId)) {
-            clearTimeout(timeout);
-            this.removeListener('message', handler);
-            resolve(envelope.payload.result);
-          }
-        };
-        
-        this.on('message', handler);
-      });
+      throw error;
     }
-    
-    throw new Error(`Cannot call tool ${namespacedTool}: no capability`);
   }
 
   /**
@@ -452,7 +845,14 @@ export class MEWAgent extends MEWParticipant {
    * Send response
    */
   private async sendResponse(text: string, to: string): Promise<void> {
-    this.chat(text, to);
+    this.log('info', `Attempting to send chat response to ${to}: ${text}`);
+    try {
+      this.chat(text, to);
+      this.log('info', `Chat message sent successfully to ${to}`);
+    } catch (error) {
+      this.log('error', `Failed to send chat to ${to}: ${error}`);
+      throw error; // Re-throw to ensure we know about failures
+    }
   }
 
   /**

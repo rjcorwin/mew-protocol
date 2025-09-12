@@ -608,7 +608,7 @@ Presence messages are broadcast to notify all participants about join/leave even
   "protocol": "mew/v0.3",
   "id": "env-presence-1",
   "from": "system:gateway",
-  "kind": "system.presence",
+  "kind": "system/presence",
   "payload": {
     "event": "join",
     "participant": {
@@ -641,7 +641,7 @@ When a participant connects, the gateway MUST send a welcome message addressed s
   "id": "env-welcome-1",
   "from": "system:gateway",
   "to": ["new-participant"],
-  "kind": "system.welcome",
+  "kind": "system/welcome",
   "payload": {
     "you": {
       "id": "new-participant",
@@ -726,7 +726,7 @@ The gateway enforces security through two mechanisms:
 - Nested patterns: Match specific payload fields
 
 **Reserved Namespace:**
-The `system.*` namespace is reserved exclusively for the gateway. Participants MUST NOT send messages with `kind` starting with `system.`. The gateway MUST reject any such attempts. Only the gateway can generate system messages (`system.welcome`, `system.presence`, `system.error`).
+The `system/*` namespace is reserved exclusively for the gateway. Participants MUST NOT send messages with `kind` starting with `system/`. The gateway MUST reject any such attempts. Only the gateway can generate system messages (`system/welcome`, `system/presence`, `system/error`).
 
 **Example Capability Sets:**
 

@@ -232,6 +232,7 @@ async function main(): Promise<void> {
     systemPrompt: 'You are a helpful TypeScript-based AI assistant in the MEW protocol ecosystem.',
     reasoningEnabled: true,
     autoRespond: true,
+    apiKey: process.env.OPENAI_API_KEY,
     maxIterations: 5,
   };
 

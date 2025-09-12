@@ -19,8 +19,8 @@ export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Use random port to avoid conflicts
 export TEST_PORT=$((8000 + RANDOM % 1000))
 
-echo -e "${YELLOW}=== Scenario 9: TypeScript Agent Proposals Only Test ===${NC}"
-echo -e "${BLUE}Testing TypeScript agent with proposal-only permissions${NC}"
+echo -e "${YELLOW}=== Scenario 9: TypeScript Agent Proposals & Chat Response Test ===${NC}"
+echo -e "${BLUE}Testing TypeScript agent with proposal-only permissions and chat response behavior${NC}"
 echo ""
 
 # Cleanup function (no trap, will call explicitly)

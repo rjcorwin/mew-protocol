@@ -41,9 +41,10 @@ export class MEWParticipant extends MEWClient {
     capabilities: Capability[];
   };
   
-  private tools = new Map<string, Tool>();
+  protected tools = new Map<string, Tool>();
   private resources = new Map<string, Resource>();
   private pendingRequests = new Map<string, PendingRequest>();
+  private proposalFulfillments = new Map<string, string>(); // Maps fulfillment request ID to proposal ID
   private proposalHandlers = new Set<MCPProposalHandler>();
   private requestHandlers = new Set<MCPRequestHandler>();
   private matcher = new PatternMatcher();
@@ -100,6 +101,7 @@ export class MEWParticipant extends MEWClient {
 
         // Store pending request
         this.pendingRequests.set(id, { resolve, reject, timer });
+        // Debug: Sending MCP request
 
         // Send the request
         this.send(envelope);
@@ -114,7 +116,7 @@ export class MEWParticipant extends MEWClient {
           id,
           ts: new Date().toISOString(),
           from: this.options.participant_id!,
-          // No 'to' field for proposals - they're broadcast
+          to,  // Include target participant(s) if specified
           kind: 'mcp/proposal',
           payload
         };
@@ -127,6 +129,7 @@ export class MEWParticipant extends MEWClient {
 
         // Store pending proposal
         this.pendingRequests.set(id, { resolve, reject, timer });
+        // Debug: Sending MCP proposal
 
         // Send the proposal
         this.send(envelope);
@@ -219,11 +222,21 @@ export class MEWParticipant extends MEWClient {
     this.onMessage(async (envelope: Envelope) => {
       // Handle MCP responses
       if (envelope.kind === 'mcp/response') {
+        // Debug: Received MCP response
         await this.handleMCPResponse(envelope);
       }
 
       // Handle MCP requests
       if (envelope.kind === 'mcp/request') {
+        // Track if this request is fulfilling one of our proposals
+        if (envelope.correlation_id && envelope.correlation_id.length > 0) {
+          const proposalId = envelope.correlation_id[0];
+          if (this.pendingRequests.has(proposalId)) {
+            // Someone is fulfilling our proposal - track it
+            this.proposalFulfillments.set(envelope.id, proposalId);
+          }
+        }
+        
         if (this.shouldHandleRequest(envelope)) {
           await this.handleMCPRequest(envelope);
         }
@@ -258,19 +271,49 @@ export class MEWParticipant extends MEWClient {
    */
   private async handleMCPResponse(envelope: Envelope): Promise<void> {
     const correlationId = envelope.correlation_id?.[0];
-    if (!correlationId) return;
+    if (!correlationId) {
+      // Debug: MCP response received but no correlation_id
+      return;
+    }
 
+    // First check if this is a direct response to our request
     const pending = this.pendingRequests.get(correlationId);
     if (pending) {
+      // Debug: Resolving pending request
       if (pending.timer) clearTimeout(pending.timer);
       this.pendingRequests.delete(correlationId);
 
       if (envelope.payload.error) {
+        // Debug: Request failed
         pending.reject(new Error(envelope.payload.error.message || 'Request failed'));
       } else {
+        // Debug: Request succeeded
         pending.resolve(envelope.payload.result);
       }
+      return;
     }
+
+    // Check if this is a response to a fulfilled proposal
+    const fulfillmentProposalId = this.proposalFulfillments.get(correlationId);
+    if (fulfillmentProposalId) {
+      // This response is for a request that fulfilled our proposal
+      const pending = this.pendingRequests.get(fulfillmentProposalId);
+      if (pending) {
+        // Resolve our original proposal with the result
+        if (pending.timer) clearTimeout(pending.timer);
+        this.pendingRequests.delete(fulfillmentProposalId);
+        this.proposalFulfillments.delete(correlationId);
+        
+        if (envelope.payload.error) {
+          pending.reject(new Error(envelope.payload.error.message || 'Proposal fulfillment failed'));
+        } else {
+          pending.resolve(envelope.payload.result);
+        }
+        return;
+      }
+    }
+    
+    // Debug: No pending request found for response
   }
 
   /**
@@ -330,6 +373,7 @@ export class MEWParticipant extends MEWClient {
       payload: error ? { error } : { result }
     };
 
+    // Debug: Sending MCP response
     this.send(response);
   }
 
@@ -358,6 +402,7 @@ export class MEWParticipant extends MEWClient {
       inputSchema: tool.inputSchema
     }));
     
+    // Debug: Returning tools list
     return { tools };
   }
 

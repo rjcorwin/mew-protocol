@@ -17,7 +17,7 @@ participants:
   coder-agent:
     type: local
     command: "node"
-    args: ["../../sdk/typescript-sdk/agent/dist/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-space", "--token", "coder-token", "--id", "coder-agent"]
+    args: ["../../sdk/typescript-sdk/agent/dist/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-demo", "--token", "coder-token", "--id", "coder-agent"]
     auto_start: true
     tokens:
       - coder-token
@@ -33,8 +33,8 @@ participants:
   # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:
     type: local
-    command: "npx"
-    args: ["@modelcontextprotocol/server-filesystem", "./workspace"]
+    command: "node"
+    args: ["../../bridge/bin/mew-bridge.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-demo", "--token", "mcp-bridge-token", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,.", "--mcp-cwd", "/Users/rj/Git/rjcorwin/mew-protocol/demos/coder-agent/workspace"]
     auto_start: true
     tokens:
       - mcp-bridge-token
@@ -43,18 +43,19 @@ participants:
       - kind: "mcp/response"
       - kind: "mcp/notification"
 
-  # Optional: Auto-approver for read operations (security: only allows reads)
-  read-approver:
+  # Auto-fulfiller for proposals (for demonstration/testing)
+  auto-fulfiller:
     type: local
     command: "node"
-    args: ["./read-approver.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-demo", "--token", "read-approver-token"]
-    auto_start: false  # Set to true if you want automatic approval of read operations
+    args: ["./auto-fulfiller.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-demo", "--token", "fulfiller-token", "--participant-id", "auto-fulfiller"]
+    auto_start: false  # Disabled for manual testing
     tokens:
-      - read-approver-token
+      - fulfiller-token
     capabilities:
       - kind: "mcp/proposal"  # Can see proposals
       - kind: "mcp/request"   # Can execute approved operations
       - kind: "mcp/response"  # Can respond to requests
+      - kind: "chat"
 
 defaults:
   capabilities:

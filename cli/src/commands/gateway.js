@@ -728,23 +728,22 @@ gateway
             envelope.correlation_id = [envelope.correlation_id];
           }
 
-          // Route message based on 'to' field
+          // ALWAYS broadcast to ALL participants - MEW Protocol requires all messages visible to all
           if (spaceId && spaces.has(spaceId)) {
             const space = spaces.get(spaceId);
 
+            // Log if message has specific addressing
             if (envelope.to && Array.isArray(envelope.to)) {
-              // Send to specific participants
-              for (const targetId of envelope.to) {
-                const targetWs = space.participants.get(targetId);
-                if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-                  targetWs.send(JSON.stringify(envelope));
-                }
-              }
-            } else {
-              // Broadcast to all participants
-              for (const [pid, pws] of space.participants.entries()) {
-                if (pws.readyState === WebSocket.OPEN) {
-                  pws.send(JSON.stringify(envelope));
+              console.log(`[GATEWAY DEBUG] Message from ${envelope.from} addressed to: ${envelope.to.join(', ')}, kind: ${envelope.kind}`);
+            }
+
+            // Broadcast to ALL participants (everyone sees everything in MEW Protocol)
+            console.log(`[GATEWAY DEBUG] Broadcasting ${envelope.kind} from ${envelope.from} to all ${space.participants.size} participants`);
+            for (const [pid, pws] of space.participants.entries()) {
+              if (pws.readyState === WebSocket.OPEN) {
+                pws.send(JSON.stringify(envelope));
+                if (options.logLevel === 'debug') {
+                  console.log(`[GATEWAY DEBUG] Sent to ${pid}`);
                 }
               }
             }

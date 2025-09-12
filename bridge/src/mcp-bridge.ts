@@ -22,6 +22,8 @@ export class MCPBridge extends MEWParticipant {
   private mcpCapabilities: any[] = [];
   private initTimeout: number;
   private isShuttingDown = false;
+  private restartAttempts = 0;
+  private maxRestartAttempts = 3;
 
   constructor(options: MCPBridgeOptions) {
     // Initialize parent with connection options
@@ -95,14 +97,15 @@ export class MCPBridge extends MEWParticipant {
 
     // Get capabilities from MCP server
     const serverInfo = await this.mcpClient.initialize();
-    console.log('Bridge: MCP server initialized with capabilities:', serverInfo?.capabilities);
+    console.log('Bridge: MCP server initialized with full serverInfo:', JSON.stringify(serverInfo, null, 2));
+    console.log('Bridge: MCP server capabilities:', serverInfo?.capabilities);
     this.mcpCapabilities = this.translateMCPCapabilities(serverInfo.capabilities);
     debug('MCP server capabilities:', this.mcpCapabilities);
 
     // Register MCP tools as MEUP tools
-    if (serverInfo.capabilities?.tools) {
-      await this.registerMCPTools();
-    }
+    // Note: Some MCP servers may have tools but not advertise in capabilities
+    // Always try to list tools
+    await this.registerMCPTools();
   }
 
   /**
@@ -143,17 +146,25 @@ export class MCPBridge extends MEWParticipant {
    * Register MCP tools as MEW tools
    */
   private async registerMCPTools(): Promise<void> {
-    if (!this.mcpClient) return;
+    if (!this.mcpClient) {
+      console.log('Bridge: No MCP client available for tool registration');
+      return;
+    }
 
     try {
+      console.log('Bridge: Attempting to list MCP tools...');
       // List available MCP tools
       const toolsResponse = await this.mcpClient.request('tools/list', {});
+      console.log('Bridge: Tools response:', JSON.stringify(toolsResponse, null, 2));
+      
       const tools = toolsResponse.tools || [];
+      console.log(`Bridge: Found ${tools.length} MCP tools to register`);
 
       debug(`Registering ${tools.length} MCP tools`);
 
       // Register each tool with the participant
       for (const tool of tools) {
+        console.log(`Bridge: Registering tool "${tool.name}"`);
         this.registerTool({
           name: tool.name,
           description: tool.description,
@@ -172,8 +183,10 @@ export class MCPBridge extends MEWParticipant {
         });
       }
 
+      console.log(`Bridge: Successfully registered ${tools.length} tools from MCP server`);
       debug(`Registered ${tools.length} tools from MCP server`);
     } catch (error) {
+      console.error('Bridge: Failed to register MCP tools:', error);
       debug('Failed to register MCP tools:', error);
     }
   }
@@ -241,7 +254,19 @@ export class MCPBridge extends MEWParticipant {
    * Restart MCP server after disconnection
    */
   private async restartMCPServer(config: MCPServerConfig): Promise<void> {
-    debug('Attempting to restart MCP server...');
+    // Check if we're shutting down or exceeded max attempts
+    if (this.isShuttingDown) {
+      debug('Skipping restart - bridge is shutting down');
+      return;
+    }
+
+    if (this.restartAttempts >= this.maxRestartAttempts) {
+      console.error(`Failed to restart MCP server after ${this.maxRestartAttempts} attempts. Giving up.`);
+      process.exit(1); // Exit to prevent infinite spawning
+    }
+
+    this.restartAttempts++;
+    debug(`Attempting to restart MCP server (attempt ${this.restartAttempts}/${this.maxRestartAttempts})...`);
 
     try {
       // Wait a bit before restarting
@@ -251,15 +276,22 @@ export class MCPBridge extends MEWParticipant {
       await this.startMCPServer(config);
 
       debug('MCP server restarted successfully');
+      this.restartAttempts = 0; // Reset counter on success
 
       // Re-send registration with updated capabilities
       if (this.participantInfo) {
         this.sendRegistration();
       }
     } catch (error) {
-      console.error('Failed to restart MCP server:', error);
-      // Try again after delay
-      setTimeout(() => this.restartMCPServer(config), 5000);
+      console.error(`Failed to restart MCP server (attempt ${this.restartAttempts}):`, error);
+      
+      // Only retry if we haven't exceeded attempts and not shutting down
+      if (this.restartAttempts < this.maxRestartAttempts && !this.isShuttingDown) {
+        setTimeout(() => this.restartMCPServer(config), 5000);
+      } else {
+        console.error('Giving up on MCP server restart');
+        process.exit(1);
+      }
     }
   }
 

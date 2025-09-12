@@ -1,6 +1,8 @@
 
 Hi! 
 
+Before starting work, ALWAYS COMPLETELY read the MEW Protocol spec at spec/v0.3/SPEC.md. Assume everything in that doc is correct. The code we write in this repository should be a reflection of that. There is a copy of the spec below.
+
 # Task management
 
 Please collab with me on managing tasks in TODO.md. 
@@ -17,3 +19,1898 @@ When helping with development, please follow these rules.
 1. Always lint and run tests as you change dev files.
 2. Use the packages/cli in fifo mode to kick the tires on your changes.
 3. ALWAYS BACKGROUND PROCESS PIPING TO A FIFO IN CASE IT BLOCKS. Otherwise you get stuck and we have to restart. 
+
+# MEW Protocol v0.3 Specification
+
+Version: v0.3  
+Status: Released  
+Release Date: 2025-09-10
+Intended Status: Experimental  
+Editors: RJ Corwin (https://github.com/rjcorwin)
+
+---
+
+## Requirements Language
+
+The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted as described in RFC 2119 and RFC 8174.
+
+---
+
+## 1. Abstract
+
+MEW Protocol (Multi-Entity Workspace Protocol) provides a unified context where all agent-to-agent and agent-to-tool interactions are visible and controllable at the protocol layer. The name playfully evokes "herding cats" - the quintessential challenge of coordinating multiple independent, autonomous agents who each have their own goals and behaviors. Unlike traditional systems where AI coordination happens in hidden contexts, MEW Protocol broadcasts all messages within a shared workspace, enabling participants to observe everything and privileged users to approve or reject actions through a proposal-review pattern. The protocol extends MCP semantics while adding capability-based access control, allowing untrusted agents to propose operations that trusted participants execute. This transparency enables progressive automation, where systems learn from human decisions to safely expand their autonomous capabilities over time - essentially teaching the "cats" to work together effectively.
+
+---
+
+## 2. Goals and Non-Goals
+
+### 2.1 Goals
+- **Unified Context**: All participants share the same visible stream of interactions
+- **Protocol-Level Control**: Control actions through capabilities and proposals, not application wrappers
+- **Progressive Automation**: Learn from human decisions to safely expand autonomous operations
+- **Tool Compatibility**: Preserve existing MCP tool and resource interfaces
+
+### 2.2 Non-Goals
+- End-to-end encryption or private channels (all messages visible within space)
+- Message persistence or replay (spaces are ephemeral)
+- Cross-space routing or participant discovery
+- Guaranteed delivery or ordering (WebSocket best-effort)
+- Application-specific semantics beyond MCP operations
+- Configuration management (implementation-specific)
+
+---
+
+## 3. Message Envelope
+
+All data flowing over a space MUST be a single top-level JSON envelope:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "2f6b6e70-7b36-4b8b-9ad8-7c4f7d0e2d0b",
+  "ts": "2025-08-26T14:00:00Z",
+  "from": "robot-alpha",
+  "to": ["coordinator"],
+  "kind": "mcp/request",
+  "correlation_id": ["env-1"],
+  "context": "workflow-123/step-1",
+  "payload": { /* kind-specific body */ }
+}
+```
+
+Field semantics:
+- `protocol`: MUST be `"mew/v0.3"` for this version
+- `id`: globally unique message id (e.g., UUIDv4)
+- `ts`: RFC3339 timestamp
+- `from`: stable participant id within the space
+- `to`: array of participant ids (empty/omitted = broadcast)
+- `kind`: Message type using minimal kinds:
+  - `mcp/request` - MCP request/notification
+  - `mcp/response` - MCP response
+  - `mcp/proposal` - MCP proposal for operations
+  - `mcp/withdraw` - Withdraw a proposal
+  - `mcp/reject` - Reject a proposal
+  - `reasoning/start` - Begin reasoning sequence
+  - `reasoning/thought` - Reasoning monologue (thinking out loud)
+  - `reasoning/conclusion` - End reasoning sequence
+  - `capability/grant` - Grant capabilities to participant
+  - `capability/revoke` - Revoke capabilities from participant
+  - `capability/grant-ack` - Acknowledge capability grant
+  - `space/invite` - Invite participant to space
+  - `space/kick` - Remove participant from space
+  - `chat` - Chat messages
+  - `system/presence` - Join/leave events
+  - `system/welcome` - Welcome message for new participants
+  - `system/error` - System error messages
+- `correlation_id`: array of message IDs this message relates to (always an array, even for single values)
+  - Response → Request: `mcp/response` MUST reference the originating `mcp/request`
+  - Fulfillment → Proposal: `mcp/request` MAY reference a `mcp/proposal` when fulfilling it
+  - Withdraw → Proposal: `mcp/withdraw` MUST reference the proposal being withdrawn
+  - Reject → Proposal: `mcp/reject` MUST reference the proposal being rejected
+  - Error → Trigger: `system/error` messages SHOULD reference the envelope that caused the error
+  - Reply → Message: Any envelope MAY reference others to indicate explicit reply intent (use `context` field for threading)
+  - Workflow → Multiple: Messages in complex workflows MAY reference multiple related messages (e.g., a summary referencing several analyses, a decision based on multiple proposals, a response addressing multiple questions)
+  - Fork/Join → Multiple: A response that combines results from multiple parallel requests
+  - The array structure supports complex multi-party coordination and DAG-like message flows
+- `context`: (optional) string representing the context or sub-context for this message
+  - Path-based hierarchy using forward slashes: `"parent/child/grandchild"`
+  - Messages in sub-contexts (reasoning, workflows) include this field for organization
+  - Context groups related messages together (e.g., all thoughts in a reasoning sequence)
+  - When prompting LLMs, implementations MAY filter contexts to reduce noise
+  - IMPORTANT: Messages addressed to a participant (via `to` field) MUST be handled regardless of context
+- `payload`: object; structure depends on `kind`
+
+### 3.1 MCP Messages
+
+MCP messages use minimal kinds with method information in the payload:
+- `kind: "mcp/request"` for requests/notifications
+- `kind: "mcp/response"` for responses
+- `kind: "mcp/proposal"` for proposals
+- `kind: "mcp/withdraw"` for withdrawing proposals
+- `kind: "mcp/reject"` for rejecting proposals
+- The specific method (e.g., `tools/call`, `resources/read`) is in `payload.method`
+
+#### 3.1.1 MCP Requests
+
+Example tool call request:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-call-1",
+  "from": "trusted-agent",
+  "to": ["target-agent"],
+  "kind": "mcp/request",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 42,
+    "method": "tools/call",
+    "params": {
+      "name": "dangerous_operation",
+      "arguments": {"target": "production"}
+    }
+  }
+}
+```
+
+#### 3.1.2 MCP Responses
+
+Responses MUST include the `correlation_id` field referencing the original request's `id`. This is critical for translating MCP's client-server request/response model to MEW Protocol's multi-participant broadcast paradigm, allowing all participants to match responses to their corresponding requests.
+
+Response to the above tool call:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-resp-1",
+  "from": "target-agent",
+  "to": ["trusted-agent"],
+  "kind": "mcp/response",
+  "correlation_id": ["env-call-1"],
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 42,
+    "result": {
+      "content": [{
+        "type": "text",
+        "text": "Operation completed"
+      }]
+    }
+  }
+}
+```
+
+Note: The MCP payload structure remains unchanged from standard MCP.
+
+### 3.2 MCP Proposals
+
+Participants with restricted capabilities MUST use proposals instead of direct MCP operations. Proposals have the same payload structure as requests:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-req-1",
+  "from": "untrusted-agent",
+  "to": ["target-agent"],
+  "kind": "mcp/proposal",
+  "payload": {
+    "method": "tools/call",
+    "params": {
+      "name": "dangerous_operation",
+      "arguments": {"target": "production"}
+    }
+  }
+}
+```
+
+This is a MEW Protocol-specific extension that proposes an MCP operation requiring fulfillment by a participant with appropriate capabilities.
+
+#### 3.2.1 Proposal Fulfillment
+
+A participant with appropriate capabilities fulfills the proposal by making the real MCP call. The `correlation_id` field is critical for matching approvals to their original proposals:
+- Proposals typically don't include `correlation_id` (they originate new workflows)
+- Fulfillment messages MUST include `correlation_id` referencing the proposal's `id`
+- This allows participants to track which fulfillment corresponds to which proposal
+- The correlation chain enables audit trails and multi-step approval workflows
+
+Example fulfillment:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-fulfill-1",
+  "from": "human-user",
+  "to": ["target-agent"],
+  "kind": "mcp/request",
+  "correlation_id": ["env-req-1"],
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 44,
+    "method": "tools/call",
+    "params": {
+      "name": "dangerous_operation",
+      "arguments": {"target": "production"}
+    }
+  }
+}
+```
+
+The response goes only to the fulfiller who made the request. The response's `correlation_id` references the fulfillment message (`env-fulfill-1`), maintaining the standard request/response pairing. The original proposer can observe the outcome since messages are broadcast by default:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-fulfill-resp-1",
+  "from": "target-agent",
+  "to": ["human-user"],
+  "kind": "mcp/response",
+  "correlation_id": ["env-fulfill-1"],
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 44,
+    "result": {
+      "content": [{
+        "type": "text",
+        "text": "Operation completed successfully"
+      }]
+    }
+  }
+}
+```
+
+The proposer can follow the correlation chain to track the outcome:
+1. Proposer sends proposal (`env-req-1`)
+2. Fulfiller sends request with `correlation_id: ["env-req-1"]` (`env-fulfill-1`)
+3. Target sends response with `correlation_id: ["env-fulfill-1"]` (`env-fulfill-resp-1`)
+4. Proposer observes the broadcast response and can trace back through the correlation chain
+
+### 3.3 Proposal Lifecycle Operations
+
+MEW Protocol extends the proposal pattern with lifecycle operations for cancellation and feedback.
+
+#### 3.3.1 Withdraw Proposals (kind = "mcp/withdraw")
+
+Proposers can withdraw their own proposals that are no longer needed:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "withdraw-456",
+  "from": "untrusted-agent",
+  "correlation_id": ["env-req-1"],
+  "kind": "mcp/withdraw",
+  "payload": {
+    "reason": "no_longer_needed"
+  }
+}
+```
+
+- Only the original proposer can withdraw their proposals
+- `correlation_id` MUST reference the proposal being withdrawn
+- `reason` field uses standardized codes (see below)
+
+#### 3.3.2 Reject Proposals (kind = "mcp/reject")
+
+Any participant with the capability can reject proposals. Rejections provide early feedback to avoid unnecessary waiting:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "reject-789",
+  "from": "filesystem-agent",
+  "to": ["untrusted-agent"],
+  "correlation_id": ["env-req-1"],
+  "kind": "mcp/reject",
+  "payload": {
+    "reason": "unsafe"
+  }
+}
+```
+
+**Purpose and Behavior:**
+- Prevents proposers from waiting unnecessarily for fulfillment that won't come
+- Particularly important when explicitly targeted in a proposal's `to` field
+- Proposers MAY give up after the first rejection (fail-fast approach)
+- Proposers MAY continue waiting for other participants to fulfill (resilient approach)
+- The choice depends on the proposer's implementation and use case
+- Multiple participants may reject the same proposal for different reasons
+
+**Requirements:**
+- `correlation_id` MUST reference the proposal being rejected
+- `reason` field uses standardized codes (see below)
+
+#### 3.3.3 Standardized Reason Codes
+
+Lifecycle operations use standardized reason codes:
+
+- `"disagree"` - Don't agree with the proposed action
+- `"inappropriate"` - Not suitable for the current context
+- `"unsafe"` - Could cause harm or unintended consequences
+- `"busy"` - Currently handling other work
+- `"incapable"` - Don't have the required tools/access
+- `"policy"` - Violates security or operational policy
+- `"duplicate"` - Already being handled by another participant
+- `"invalid"` - Proposal is malformed or impossible
+- `"timeout"` - Too old or expired
+- `"resource_limit"` - Would exceed resource constraints
+- `"no_longer_needed"` - Proposer no longer needs the operation
+- `"other"` - Reason not covered above
+
+Detailed explanations can be provided via follow-up chat messages using `correlation_id`:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "chat-790",
+  "from": "filesystem-agent",
+  "to": ["untrusted-agent"],
+  "correlation_id": ["reject-789"],
+  "kind": "chat",
+  "payload": {
+    "text": "I'm currently processing a large batch operation that requires exclusive file access. Please retry in about 5 minutes.",
+    "format": "plain"
+  }
+}
+```
+
+**Important timing consideration:** The reject message with a reason code should be sent immediately for fast feedback. Detailed explanations may arrive later as generating them (especially with LLMs) can take time. Participants implementing proposers should:
+- Process the reject immediately upon receipt
+- Optionally wait for follow-up explanations if they need details
+- Not block on explanations that may never come
+
+### 3.4 Chat Messages (kind = "chat")
+
+Chat messages are MEW Protocol-specific and do not pollute the MCP namespace:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-chat-1",
+  "from": "user-alice",
+  "kind": "chat",
+  "payload": {
+    "text": "Hello everyone!",
+    "format": "plain"
+  }
+}
+```
+
+- `text` (required): The message content
+- `format` (optional): "plain" or "markdown", defaults to "plain"
+- Chat messages are typically broadcast (empty/omitted `to` array)
+
+### 3.5 Reasoning Transparency
+
+MEW Protocol supports transparent reasoning through dedicated message kinds and the context field. This allows agents to share their thinking process while maintaining clear boundaries between reasoning sequences and regular operations.
+
+#### 3.5.1 Reasoning Pattern
+
+Common patterns for transparent reasoning:
+
+**Response Pattern:**
+1. Agent receives a request (e.g., `mcp/request`)
+2. Agent sends `reasoning/start` with `correlation_id` referencing the request
+3. The `reasoning/start` message ID becomes the `context` for subsequent messages
+4. Agent MAY send `reasoning/thought` messages for internal monologue (optional)
+5. Agent MAY use `chat` messages within context for dialogue with other participants
+6. Agent MAY send `reasoning/conclusion` to summarize findings (optional)
+7. Agent sends final response with `correlation_id` to original request
+
+**Autonomous Pattern:**
+- Agent sends `reasoning/start` at any time (e.g., periodic analysis, monitoring)
+- The `reasoning/start` creates a context for transparent thinking
+- Agent shares thoughts as they occur
+- No response required - purely for transparency
+
+Note: `reasoning/start` creates a context for transparency. Whether responding to requests or reasoning autonomously, it lets other participants observe the agent's thinking process.
+
+#### 3.5.2 Reasoning Start (kind = "reasoning/start")
+
+Signals the beginning of a reasoning sequence:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "reason-start-1",
+  "from": "agent-1",
+  "kind": "reasoning/start",
+  "correlation_id": ["req-123"],
+  "payload": {
+    "message": "Analyzing the request to modify the configuration file..."
+  }
+}
+```
+
+#### 3.5.3 Reasoning Thought (kind = "reasoning/thought")
+
+Shares internal reasoning steps (monologue, no reply expected):
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "thought-1",
+  "from": "agent-1",
+  "kind": "reasoning/thought",
+  "context": "reason-start-1",
+  "payload": {
+    "message": "The configuration file appears to use YAML format. I should validate the syntax before making changes."
+  }
+}
+```
+
+#### 3.5.4 Reasoning Conclusion (kind = "reasoning/conclusion")
+
+Concludes the reasoning sequence:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "reason-end-1",
+  "from": "agent-1",
+  "kind": "reasoning/conclusion",
+  "context": "reason-start-1",
+  "payload": {
+    "message": "Configuration update is safe to proceed. The changes are valid YAML and won't break existing settings."
+  }
+}
+```
+
+#### 3.5.5 Context Behavior
+
+- Messages with a `context` field are part of a sub-context
+- Participants MAY filter out contexts when constructing prompts (e.g., excluding other agents' reasoning traces to reduce noise)
+- **Exception**: Participants MUST NOT ignore `mcp/request` or `mcp/proposal` messages, even if they have a context field
+- The context field supports hierarchical paths: `"parent/child/grandchild"`
+- Context enables parallel reasoning by multiple agents without interference
+
+### 3.6 Space Management Operations
+
+A **space** in MEW Protocol is a communication context where participants exchange messages. It's analogous to a channel or room - a bounded environment where a specific set of participants collaborate. Each space has its own:
+- Set of participants (who can send/receive messages)
+- Capability assignments (what each participant can do)
+- Message history (the stream of envelopes exchanged)
+
+A gateway may manage multiple spaces, each isolated from the others. The gateway enforces capabilities and routing rules for all its spaces.
+
+MEW Protocol extends with operations for managing these spaces dynamically. These operations use the `capability/*` and `space/*` namespaces to clearly indicate their purpose.
+
+#### 3.6.1 Grant Capabilities (kind = "capability/grant")
+
+Allows participants with appropriate capabilities to grant capabilities to other participants:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "grant-789",
+  "from": "trusted-orchestrator",
+  "to": ["untrusted-agent"],
+  "kind": "capability/grant",
+  "payload": {
+    "recipient": "untrusted-agent",
+    "capabilities": [
+      {
+        "kind": "mcp/request",
+        "payload": {
+          "method": "tools/call",
+          "params": {
+            "name": "read_file"
+          }
+        }
+      }
+    ],
+    "reason": "Demonstrated safe file handling"
+  }
+}
+```
+
+- The grant message ID becomes the `grant_id` for future revocation
+- Capabilities use the same JSON pattern matching format from Section 4.1
+- Gateway SHOULD add granted capabilities to recipient's capability set
+- Multiple grants are cumulative
+
+#### 3.6.2 Revoke Capabilities (kind = "capability/revoke")
+
+Revokes previously granted capabilities:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "revoke-123",
+  "from": "orchestrator",
+  "kind": "capability/revoke",
+  "payload": {
+    "recipient": "agent",
+    "grant_id": "grant-789",
+    "reason": "Task completed"
+  }
+}
+```
+
+Alternatively, revoke by capability pattern (removes ALL matching capabilities):
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "revoke-456",
+  "from": "orchestrator",
+  "kind": "capability/revoke",
+  "payload": {
+    "recipient": "agent",
+    "capabilities": [
+      {
+        "kind": "mcp/request",
+        "payload": {
+          "method": "tools/*"
+        }
+      }
+    ],
+    "reason": "No longer needed"
+  }
+}
+```
+
+#### 3.6.3 Grant Acknowledgment (kind = "capability/grant-ack")
+
+Recipients acknowledge capability grants:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "ack-001",
+  "from": "agent",
+  "correlation_id": ["grant-789"],
+  "kind": "capability/grant-ack",
+  "payload": {
+    "status": "accepted"
+  }
+}
+```
+
+#### 3.6.4 Invite Participant (kind = "space/invite")
+
+Invites new participants to the space:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "invite-123",
+  "from": "admin",
+  "kind": "space/invite",
+  "payload": {
+    "participant_id": "new-agent",
+    "email": "agent-operator@example.com",  // Optional
+    "initial_capabilities": [
+      {"kind": "mcp/proposal"},
+      {"kind": "chat"}
+    ],
+    "reason": "Adding specialized analysis agent"
+  }
+}
+```
+
+**Fields:**
+- `participant_id`: Identifier for the new participant
+- `email`: (optional) Email address to send invitation to
+- `initial_capabilities`: Capabilities the participant will have when they join
+- `reason`: Explanation for the invitation
+
+**Note:** This message is broadcast within the space to inform existing participants. If `email` is provided, the gateway SHOULD send an invitation email with connection details. Additional notification methods (webhook, token generation, etc.) are gateway implementation-specific.
+
+#### 3.6.5 Remove Participant (kind = "space/kick")
+
+Removes participants from the space:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "kick-456",
+  "from": "admin",
+  "kind": "space/kick",
+  "payload": {
+    "participant_id": "misbehaving-agent",
+    "reason": "Repeated capability violations"
+  }
+}
+```
+
+#### 3.6.6 Delegation Security
+
+- Only participants with `capability/grant` capability can grant capabilities
+- Participants cannot grant capabilities they don't possess
+- Gateway SHOULD track grant chains for audit purposes
+- Revocations take effect immediately
+- All space management operations generate audit logs
+
+### 3.7 Presence Messages (kind = "system/presence")
+
+Presence messages are broadcast to notify all participants about join/leave events:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-presence-1",
+  "from": "system:gateway",
+  "kind": "system/presence",
+  "payload": {
+    "event": "join",
+    "participant": {
+      "id": "new-agent",
+      "capabilities": [
+        {"kind": "mcp/proposal"},
+        {"kind": "chat"}
+      ]
+    }
+  }
+}
+```
+
+- `event` (required): Either `"join"` or `"leave"`
+- `participant` (required): Information about the participant
+  - `id`: The participant's identifier
+  - `capabilities`: The participant's capabilities (for `join` events)
+
+Note: Presence messages are broadcast to all participants. The joining participant also receives a welcome message addressed specifically to them (via the `to` field) with their authoritative capabilities and the current participant list.
+
+### 3.8 System Messages
+
+#### 3.8.1 Welcome Message (kind = "system/welcome")
+
+When a participant connects, the gateway MUST send a welcome message addressed specifically to that participant (using the `to` field):
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-welcome-1",
+  "from": "system:gateway",
+  "to": ["new-participant"],
+  "kind": "system/welcome",
+  "payload": {
+    "you": {
+      "id": "new-participant",
+      "capabilities": [
+        {"kind": "mcp/proposal"},
+        {"kind": "chat"}
+      ]
+    },
+    "participants": [
+      {
+        "id": "agent-1",
+        "capabilities": [
+          {"kind": "mcp/*"},
+          {"kind": "chat"}
+        ]
+      },
+      {
+        "id": "agent-2",
+        "capabilities": [
+          {"kind": "mcp/response"},
+          {"kind": "chat"}
+        ]
+      }
+    ]
+  }
+}
+```
+
+- `you`: The joining participant's own information and authoritative capabilities
+- `participants`: Current list of other participants in the space and their capabilities
+
+**Important:** Other participants SHOULD ignore welcome messages not addressed to them when constructing prompts, as these can cause significant bloat. The message is already targeted via the `to` field.
+
+#### 3.8.2 Capability Violation (kind = "system/error")
+
+When a participant attempts an operation they lack capability for:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "env-violation-1",
+  "from": "system:gateway",
+  "to": ["violator"],
+  "kind": "system/error",
+  "correlation_id": ["env-bad-call"],
+  "payload": {
+    "error": "capability_violation",
+    "attempted_kind": "mcp/request",
+    "your_capabilities": [
+      {"kind": "mcp/proposal"},
+      {"kind": "chat"}
+    ]
+  }
+}
+```
+
+---
+
+## 4. Security Model
+
+### 4.1 Capability-Based Access Control
+
+The gateway enforces security through two mechanisms:
+
+1. **Identity Validation**: The gateway MUST verify that the `from` field matches the authenticated participant's ID. Participants cannot spoof messages from other participants.
+
+2. **Capability Matching**: The gateway assigns capabilities to each connection using JSON pattern matching. Capabilities are JSON objects that match against the message structure (kind and payload).
+
+**Capability Pattern Structure:**
+```json
+{
+  "kind": "pattern",
+  "payload": {
+    "field": "pattern"
+  }
+}
+```
+
+**Pattern Types:**
+- String with wildcards: `"mcp/*"` matches `mcp/request`, `mcp/response`, etc.
+- Exact match: `"chat"` only matches `"chat"`
+- Nested patterns: Match specific payload fields
+
+**Reserved Namespace:**
+The `system/*` namespace is reserved exclusively for the gateway. Participants MUST NOT send messages with `kind` starting with `system/`. The gateway MUST reject any such attempts. Only the gateway can generate system messages (`system/welcome`, `system/presence`, `system/error`).
+
+**Example Capability Sets:**
+
+Gateways may implement various capability profiles using JSON patterns:
+
+1. **Full Access** example:
+   ```json
+   [
+     {"kind": "mcp/*"},
+     {"kind": "chat"}
+   ]
+   ```
+   Can send any MCP messages (requests, responses, proposals)
+
+2. **Proposal-Only** example:
+   ```json
+   [
+     {"kind": "mcp/proposal"},
+     {"kind": "mcp/response"},
+     {"kind": "chat"}
+   ]
+   ```
+   Cannot send direct MCP requests, must use proposals
+
+3. **Tool-Specific** example:
+   ```json
+   [
+     {
+       "kind": "mcp/request",
+       "payload": {
+         "method": "tools/call",
+         "params": {
+           "name": "read_*"
+         }
+       }
+     },
+     {"kind": "mcp/response"},
+     {"kind": "chat"}
+   ]
+   ```
+   Can only call tools matching `read_*` pattern
+
+**Progressive Trust Example:**
+
+Capabilities can be expanded as trust increases:
+1. Initial: `[{"kind": "mcp/proposal"}, {"kind": "chat"}]` - Proposals only
+2. Basic: Add read capabilities with payload patterns
+3. Trusted: Add tool usage with specific tool patterns
+4. Full: Replace with `[{"kind": "mcp/*"}]` - Unrestricted MCP access
+
+### 4.2 Gateway Enforcement
+
+The gateway enforces capabilities using JSON pattern matching against the message structure:
+
+**What the Gateway Does:**
+- Matches the message's `kind` and `payload` against participant's capability patterns
+- Uses wildcards, regex patterns, and JSONPath for flexible matching
+- Blocks messages if no capability matches
+- Returns error responses for capability violations
+
+**What the Gateway Does NOT Do:**
+- Parse or validate JSON-RPC payloads
+- Understand MCP semantics
+- Detect spoofing (where `kind` doesn't match payload content)
+
+**Pattern Matching Examples:**
+- Message with `kind: "mcp/request"` and `payload.method: "tools/call"` matches:
+  - `{"kind": "mcp/*"}`
+  - `{"kind": "mcp/request"}`
+  - `{"kind": "mcp/request", "payload": {"method": "tools/*"}}`
+- Message with `kind: "chat"` only matches:
+  - `{"kind": "chat"}`
+  - `{"kind": "*"}` (wildcard for all kinds)
+
+### 4.3 Participant Validation
+
+Receiving participants SHOULD validate message structure:
+- Verify `kind` is appropriate for the message type
+- Validate payload structure matches expected schema
+- Drop or report malformed messages
+- MAY track misbehaving participants for reputation scoring
+
+**Schema Mismatch Warning:** Participants may observe messages with schemas that differ from what was advertised:
+- Other participants might advertise one tool schema but send different parameters
+- Participants joining mid-conversation may see responses to requests they never observed
+- Always parse messages defensively and validate structure before processing
+
+---
+
+## 5. Realtime Gateway API
+
+### 5.1 Authentication and Capability Assignment
+
+The gateway determines capabilities during authentication. Implementation-specific policies may include:
+
+1. **Token-based**: Tokens map to specific capability sets
+   - Implementations may encode capabilities in tokens or map tokens to capability profiles
+2. **Identity-based**: Map authenticated identities to capability sets
+3. **Space access control**: Spaces may be public, private, or restricted
+4. **Dynamic capabilities**: Capabilities may be modified during a session
+
+### 5.2 WebSocket Connection
+
+Connect: `GET /ws?space=<name>` with Authorization header
+
+The gateway:
+1. Validates the bearer token (if provided)
+2. Maps the token to a participant ID (implementation-specific)
+3. Determines capabilities based on implementation policy
+4. **MUST** send welcome message with the assigned participant ID and accurate capabilities
+5. **MUST** enforce capability rules on all subsequent messages
+
+**Note:** Participants only provide their bearer token. The gateway is responsible for mapping tokens to participant IDs through its own implementation-specific mechanism.
+
+The capabilities in the welcome message constitute the authoritative list of what operations the participant can perform. Participants SHOULD use this list to understand their allowed operations.
+
+### 5.3 Message Filtering
+
+For each incoming message from a participant:
+
+```python
+if not matches_any_capability(message, participant.capabilities):
+    send_error(f"Capability violation: you lack capability for this operation")
+    broadcast_violation_notice()  # optional
+    return
+send_to_space(message)
+```
+
+---
+
+## 6. Version Compatibility
+
+### 6.1 Breaking Changes
+
+This is a v0.x release. Breaking changes are expected between minor versions until v1.0:
+- v0.3 is NOT backward compatible with v0.2
+- Clients and gateways MUST use matching protocol versions
+- No compatibility guarantees until v1.0 release
+
+### 6.2 Migration from v0.2
+
+Key breaking changes from v0.2:
+- Protocol name changed from MEUP to MEW Protocol
+- Protocol identifier changed from `meup/v0.2` to `mew/v0.3`
+- Full name is now "Multi-Entity Workspace Protocol"
+
+### 6.3 Migration from v0.0
+
+Key breaking changes from v0.0:
+- Protocol identifier changed from `mcp-x/v0` to `mew/v0.3`
+- Message kinds now use slash notation (e.g., `mcp/request` instead of `mcp/request:tools/call`)
+- Method information moved to payload
+- Capabilities use JSON pattern matching instead of string wildcards
+- `correlation_id` is now always an array
+- Chat remains as dedicated `chat` kind
+
+### 6.4 Future Compatibility
+
+- v0.x series is experimental and subject to breaking changes
+- v1.0 will establish stable protocol with compatibility guarantees
+- Production deployments should pin specific v0.x versions
+
+---
+
+## 7. Security Considerations
+
+MEW Protocol's security model relies on capability-based access control enforced by the gateway, with additional validation responsibilities distributed among participants.
+
+### 7.1 Core Security Mechanisms
+
+1. **Identity Validation**: Gateway MUST verify the `from` field matches the authenticated participant ID (Section 4.1)
+2. **Capability Enforcement**: Gateway enforces JSON pattern-based capabilities on all messages (Section 4.1, 4.2)
+3. **Reserved Namespaces**: Only the gateway can send `system/*` messages, preventing spoofing (Section 3.8)
+4. **Proposal Isolation**: Untrusted agents use `mcp/proposal` to suggest rather than execute operations (Section 3.3)
+5. **Lazy Gateway Enforcement**: Gateway validates message structure but not payload semantics (Section 4.2)
+
+### 7.2 Security Boundaries
+
+**Gateway Responsibilities:**
+- Authenticate participants and assign stable IDs
+- Enforce capability patterns on message kinds and payloads
+- Prevent identity spoofing via `from` field validation
+- Block `system/*` messages from participants
+
+**Participant Responsibilities:**
+- Validate envelope `kind` matches payload content
+- Detect and report malformed or spoofed messages
+- Parse messages defensively (schemas may differ from advertised)
+- Track misbehaving participants for reputation scoring
+
+### 7.3 Best Practices
+
+1. **Start Restricted**: New agents begin with `mcp/proposal` capability only
+2. **Progressive Trust**: Expand capabilities based on observed behavior over time
+3. **Validate Strictly**: Check that `kind` matches the payload type (e.g., `mcp/request` for MCP requests)
+4. **Monitor Proposals**: Log proposal/fulfillment patterns for audit trails
+5. **Report Violations**: Track and broadcast capability violations for transparency
+
+---
+
+## 8. Implementation Checklist
+
+### 8.1 Gateway Requirements
+- [ ] **Connection Management**
+  - [ ] WebSocket server at `GET /ws?space=<name>`
+  - [ ] Bearer token validation from Authorization header
+  - [ ] Token-to-participant-ID mapping (implementation-specific)
+  - [ ] Connection state tracking per participant
+  
+- [ ] **Capability Enforcement**
+  - [ ] Pattern matching engine for wildcard capabilities
+  - [ ] Validate message `kind` against sender's capabilities
+  - [ ] Block messages that don't match capabilities
+  - [ ] Return `system/error` for capability violations
+  
+- [ ] **System Messages**
+  - [ ] Send `system/welcome` with participant ID and capabilities on connect
+  - [ ] Broadcast `system/presence` for join/leave events
+  - [ ] Generate `system/error` for protocol violations
+  - [ ] Ensure only gateway can send `system/*` messages
+  
+- [ ] **Message Routing**
+  - [ ] Route messages based on `to` field (broadcast if empty/omitted)
+  - [ ] Preserve envelope structure without modification
+  - [ ] NO payload parsing or validation (lazy enforcement)
+
+### 8.2 Participant Requirements
+- [ ] **Message Validation**
+  - [ ] Verify envelope structure before processing
+  - [ ] Validate `kind` matches the payload type (e.g., `mcp/request` for requests with `payload.method`)
+  - [ ] Validate payload structure matches expected schema for the `kind`
+  - [ ] Drop messages that fail validation
+  - [ ] Track/report misbehaving participants
+  
+- [ ] **MCP Integration**
+  - [ ] Implement MCP server capabilities
+  - [ ] Handle incoming MCP requests/responses
+  - [ ] Generate proper correlation IDs for responses
+  - [ ] Include correlation ID in all response messages
+  
+- [ ] **Proposal Handling** (if applicable)
+  - [ ] Recognize `mcp.proposal` messages
+  - [ ] Implement fulfillment logic for approved proposals
+  - [ ] Include proposal ID as correlation_id when fulfilling
+  
+- [ ] **Connection Behavior**
+  - [ ] Process `system/welcome` to learn own ID and capabilities
+  - [ ] Handle `system/presence` to track other participants
+  - [ ] Respect capability restrictions from welcome message
+
+---
+
+## 9. Examples
+
+The following examples demonstrate multi-agent orchestration patterns enabled by MEW Protocol's capability-based security model. The core pattern is **delegated fulfillment**, where untrusted agents propose operations that are reviewed and executed by trusted participants.
+
+### 9.1 Proposal-Based Workflow Example
+
+In this example, an agent with limited capabilities uses proposals:
+
+1. Agent connects → receives proposal-only capabilities
+2. Agent attempts MCP request → gateway blocks, returns error
+3. Agent sends `mcp/proposal` → visible to all participants
+4. Another participant with appropriate capabilities fulfills it
+5. Fulfiller sends real `mcp/request` message to target
+6. Target executes and returns result to fulfiller (proposer observes via broadcast)
+
+### 9.2 Capability Expansion Example
+
+One possible administrative workflow:
+
+1. Agent operates successfully over time
+2. Administrator observes behavior patterns
+3. Administrator expands agent capabilities
+4. Agent gains access to additional operations
+
+### 9.3 Mixed Environment Example
+
+A gateway might assign different capability profiles:
+
+- Administrative users: `{"kind": "mcp/*"}` (full access)
+- Service agents: `{"kind": "mcp/response"}` (response-only)
+- New agents: `{"kind": "mcp/proposal"}` (proposal-only)
+- Monitoring tools: `{"kind": "mcp/request", "payload": {"method": "*/list"}}` (read-only)
+
+All participants operate in the same space with their assigned capabilities.
+
+### 9.4 Delegated Fulfillment Example
+
+A human supervises an untrusted agent through intermediary agents:
+
+1. **Proposer Agent** (capability: `mcp/proposal`) proposes writing a file
+2. **Human** reviews the proposal and decides to approve it by directing the **Orchestrator Agent** (capability: `mcp/request`) to fulfill the proposal
+3. **Orchestrator Agent** sends the MCP request to **Worker Agent**
+4. **Worker Agent** executes the actual file write operation and responds
+5. Over time, **Human** teaches **Orchestrator Agent** rules about which proposals to auto-approve
+6. **Orchestrator Agent** begins autonomously fulfilling certain proposals without human intervention
+
+This pattern demonstrates **progressive automation** - a key goal of MEW Protocol. As the orchestrator observes human decisions over time, it learns which types of proposals can be safely auto-approved. This transforms human judgment into automated policies, creating a system that becomes more autonomous while maintaining safety through learned boundaries.
+
+---
+
+## 10. Appendix: Implementation Notes
+
+### 10.1 Gateway State
+
+Minimal state required per connection:
+```json
+{
+  "connection_id": "ws-123",
+  "participant_id": "agent-a",
+  "capabilities": [{"kind": "mcp/proposal"}, {"kind": "chat"}],
+  "connected_at": "2025-08-26T14:00:00Z"
+}
+```
+
+### 10.2 Proposal Tracking
+
+Optional proposal tracking for fulfillment (maintained by agents, not gateway):
+```json
+{
+  "proposalId": "env-proposal-1",
+  "proposer": "untrusted-agent",
+  "target": "target-agent",
+  "method": "tools/call",
+  "params": {"name": "dangerous_operation", "arguments": {...}},
+  "status": "pending",
+  "createdAt": "2025-08-26T14:00:00Z",
+  "expiresAt": "2025-08-26T14:05:00Z"
+}
+```
+
+---
+
+## References
+
+- MCP Specification 2025-06-18
+- MEW v0.0 Specification (formerly MEUP)
+- ADR-003: Tool Access Control
+- OAuth 2.0 RFC 6749 (for token patterns)
+
+# MEW SDK Specification
+
+**Version:** draft  
+**Status:** Draft  
+**Last Updated:** 2025-09-12
+
+## Overview
+
+The MEW SDK provides a TypeScript/JavaScript implementation for building participants in the MEW Protocol ecosystem/ It consists of three layered classes that provide increasing levels of abstraction and functionality:
+
+1. **MEWClient** - Low-level WebSocket connection and message handling
+2. **MEWParticipant** - Protocol-aware participant with MCP capabilities
+3. **MEWAgent** - AI/autonomous agent with reasoning and decision-making
+
+Each layer builds upon the previous one, providing clear separation of concerns and allowing developers to choose the appropriate level of abstraction for their needs.
+
+## Scope
+
+This specification covers:
+- The architecture and responsibilities of each SDK layer
+- The interfaces between layers
+- The lifecycle and state management of participants
+- Tool and resource discovery mechanisms
+- Capability-based message routing
+
+This specification does NOT cover:
+- The MEW Protocol itself (see protocol spec)
+- Specific MCP method implementations
+- Gateway implementation details
+- Transport mechanisms beyond WebSocket
+
+## Architecture
+
+### Layer Hierarchy
+
+```
+┌─────────────────────────────────────────┐
+│            MEWAgent                     │  Layer 3: AI/Autonomous
+│  - Reasoning & decision-making          │  Agents with cognitive
+│  - Autonomous tool discovery & use      │  capabilities
+│  - Thinking/acting patterns             │
+├─────────────────────────────────────────┤
+│          MEWParticipant                 │  Layer 2: Protocol-aware
+│  - MCP request/response handling        │  participants with
+│  - Tool & resource registration         │  business logic
+│  - Capability-based routing             │
+│  - Proposal/fulfillment patterns        │
+├─────────────────────────────────────────┤
+│            MEWClient                    │  Layer 1: Transport &
+│  - WebSocket connection management      │  basic messaging
+│  - Message serialization                │
+│  - Reconnection & heartbeat             │
+│  - Event emission                       │
+└─────────────────────────────────────────┘
+```
+
+### Class Relationships
+
+```typescript
+// Current implementation uses inheritance (to be refactored per ADR-cmp)
+class MEWClient extends EventEmitter { }
+class MEWParticipant extends MEWClient { }
+class MEWAgent extends MEWParticipant { }
+
+// Future implementation will use composition (per ADR-cmp)
+class MEWClient extends EventEmitter { }
+class MEWParticipant {
+  private client: MEWClient;
+}
+class MEWAgent {
+  private participant: MEWParticipant;
+}
+```
+
+## Layer 1: MEWClient
+
+### Purpose
+Provides low-level WebSocket connectivity and message handling for the MEW Protocol.
+
+### Responsibilities
+- **Connection Management**: Connect, disconnect, reconnect to gateway
+- **Message Transport**: Send and receive envelopes
+- **Protocol Compliance**: Ensure messages follow MEW Protocol format
+- **Event System**: Emit events for message types
+- **Heartbeat**: Maintain connection with periodic heartbeats
+- **State Tracking**: Track connection state
+
+### Interface
+
+```typescript
+interface ClientOptions {
+  gateway: string;          // WebSocket URL
+  space: string;           // Space to join
+  token: string;           // Authentication token
+  participant_id?: string;  // Unique identifier
+  reconnect?: boolean;     // Auto-reconnect on disconnect
+  heartbeatInterval?: number;
+  maxReconnectAttempts?: number;
+  reconnectDelay?: number;
+  capabilities?: Capability[];  // Initial capabilities
+}
+
+class MEWClient extends EventEmitter {
+  constructor(options: ClientOptions);
+  
+  // Connection management
+  connect(): Promise<void>;
+  disconnect(): void;
+  
+  // Message handling
+  send(envelope: Envelope | PartialEnvelope): void;
+  
+  // Event handlers (for subclasses)
+  onConnected(handler: () => void): void;
+  onDisconnected(handler: () => void): void;
+  onMessage(handler: (envelope: Envelope) => void): void;
+  onWelcome(handler: (data: any) => void): void;
+  onError(handler: (error: Error) => void): void;
+}
+```
+
+### State Management
+- `disconnected`: Not connected to gateway
+- `connecting`: WebSocket connection in progress
+- `connected`: WebSocket connected, not yet joined
+- `joined`: Sent join message
+- `ready`: Received welcome message
+
+### Events
+- `connected`: WebSocket connection established
+- `disconnected`: Connection closed
+- `message`: Envelope received
+- `welcome`: Welcome message received
+- `error`: Error occurred
+- `reconnecting`: Attempting to reconnect
+
+## Layer 2: MEWParticipant
+
+### Purpose
+Provides protocol-aware participant functionality with MCP support, tool/resource management, and capability-based routing.
+
+### Responsibilities
+- **MCP Protocol**: Handle MCP requests and responses
+- **Tool Management**: Register and execute own tools (respond to tools/list and tools/call)
+- **Resource Management**: Register and serve own resources
+- **Capability Checking**: Validate operations against capabilities
+- **Smart Routing**: Route requests via direct send or proposals
+- **Request Tracking**: Track pending requests with timeouts
+- **Tool Invocation**: Send tools/call requests to other participants (if has capability)
+
+### Interface
+
+```typescript
+interface ParticipantOptions extends ClientOptions {
+  requestTimeout?: number;  // Default timeout for MCP requests
+}
+
+// Handler types
+type MCPProposalHandler = (envelope: Envelope) => Promise<void>;
+type MCPRequestHandler = (envelope: Envelope) => Promise<void>;
+
+class MEWParticipant {
+  constructor(options: ParticipantOptions);
+  
+  // Connection (delegates to client)
+  connect(): Promise<void>;
+  disconnect(): void;
+  
+  // Tool & Resource Management
+  registerTool(tool: Tool): void;
+  registerResource(resource: Resource): void;
+  
+  // Capability checking
+  canSend(envelope: Partial<Envelope>): boolean;
+  
+  // Smart MCP request routing (uses mcp/request or mcp/proposal based on capabilities)
+  mcpRequest(
+    target: string | string[],
+    payload: any,
+    timeoutMs?: number
+  ): Promise<any>;
+  
+  // Direct messaging
+  chat(text: string, to?: string | string[]): void;
+  
+  // MCP event handlers
+  onMCPProposal(handler: MCPProposalHandler): () => void;
+  onMCPRequest(handler: MCPRequestHandler): () => void;
+  
+  // Lifecycle hooks (for subclasses)
+  protected onReady(): Promise<void>;
+  protected onShutdown(): Promise<void>;
+}
+```
+
+### Key Features
+
+#### Capability Checking
+The `canSend()` method uses the capability matcher to evaluate if a participant can send a specific message:
+- Accepts a partial envelope containing at least the `kind` field
+- Optionally includes `payload` for more specific capability matching  
+- Uses `@mew-protocol/capability-matcher` for pattern matching
+- Supports negative patterns (e.g., `!tools/call`), wildcards, and complex payload patterns
+- Returns true if any capability matches the envelope
+
+Example:
+```typescript
+// Check basic capability
+participant.canSend({ kind: 'chat' }); // true if has chat capability
+
+// Check with payload
+participant.canSend({ 
+  kind: 'mcp/request', 
+  payload: { method: 'tools/call' } 
+}); // false if has !tools/call restriction
+```
+
+#### Smart MCP Request Routing
+The `mcpRequest()` method automatically chooses the appropriate mechanism for MCP operations:
+1. If has `mcp/request` capability for the payload → send directly
+2. If has `mcp/proposal` capability → create proposal with the payload
+3. Otherwise → reject with error
+
+Example:
+```typescript
+// Send an MCP request (or proposal if lacking capability)
+const result = await participant.mcpRequest(
+  'target-participant',
+  { method: 'tools/call', params: { name: 'add', arguments: { a: 1, b: 2 } } },
+  5000 // timeout
+);
+```
+
+#### Proposal Pattern
+When a participant lacks capability for direct requests:
+```typescript
+// Participant creates proposal
+{
+  kind: "mcp/proposal",
+  payload: {
+    method: "tools/call",
+    params: { name: "calculate", arguments: { a: 1, b: 2 } }
+  }
+}
+
+// Human/authorized participant fulfills
+{
+  kind: "mcp/request",
+  to: ["target"],
+  correlation_id: ["proposal-id"],
+  payload: { /* same as proposal */ }
+}
+```
+
+#### Tool Registry
+```typescript
+interface Tool {
+  name: string;
+  description?: string;
+  inputSchema?: JSONSchema;
+  execute: (args: any) => Promise<any>;
+}
+```
+
+## Layer 3: MEWAgent
+
+### Purpose
+Provides autonomous agent functionality with reasoning, tool discovery, and decision-making capabilities.
+
+### Responsibilities
+- **Autonomous Behavior**: Optional ReAct pattern (Reason+Act loops, can be disabled for reasoning models)
+- **Tool Discovery**: Automatically discover tools from other participants via tools/list
+- **Tool Orchestration**: Call tools from other participants via tools/call or proposals
+- **Reasoning Transparency**: Emit reasoning events
+- **Message Handling**: Process chat and requests autonomously
+- **Participant Tracking**: Track other participants and their capabilities
+- **Dynamic Tool Use**: Use discovered tools without hardcoding
+- **Own Tools**: Can also register own tools (inherited from MEWParticipant)
+
+### Interface
+
+```typescript
+interface AgentConfig extends ParticipantOptions {
+  name?: string;
+  systemPrompt?: string;
+  model?: string;
+  apiKey?: string;
+  reasoningEnabled?: boolean;  // Enable ReAct pattern (false for models with built-in reasoning)
+  autoRespond?: boolean;
+  maxIterations?: number;
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  
+  // Overridable prompts for different phases (ReAct pattern)
+  prompts?: {
+    system?: string;    // Override the base system prompt
+    reason?: string;    // Template for reasoning/planning phase (ReAct: Reason)
+    act?: string;       // Template for tool selection and execution (ReAct: Act)
+    respond?: string;   // Template for formatting final response
+  };
+}
+
+class MEWAgent extends MEWParticipant {
+  constructor(config: AgentConfig);
+  
+  // Lifecycle
+  start(): Promise<void>;
+  stop(): void;
+  
+  // Tool management (extends parent)
+  addTool(tool: Tool): void;
+  addResource(resource: Resource): void;
+  
+  // Internal methods (protected) - ReAct pattern
+  protected reason(input: string, previousThoughts: Thought[]): Thought;
+  protected act(action: string, input: any): Promise<string>;
+  
+  // Tool namespace management (per ADR-tns)
+  protected prepareLLMTools(): LLMTool[];
+  protected executeLLMToolCall(namespacedTool: string, args: any): Promise<any>;
+}
+```
+
+### Key Features
+
+#### Tool Discovery and Namespacing
+Agents automatically discover tools when participants join and present them using hierarchical namespace notation (per ADR-mpt):
+
+1. Listen for `system/presence` events
+2. Send `tools/list` request to new participants
+3. Store discovered tools with participant attribution
+4. Present tools to LLM using `participant/tool` notation
+
+```typescript
+// Internal storage
+discoveredTools: Map<string, {
+  name: string;
+  participantId: string;
+  description?: string;
+  schema?: any;
+}>;
+
+// Tool presentation for LLM (per ADR-mpt)
+interface LLMTool {
+  name: string;        // "calculator/add" - hierarchical namespace
+  description: string; // Includes participant context
+  parameters?: any;    // Tool schema
+}
+
+// Example tool list for LLM
+[
+  {
+    name: "calculator/add",
+    description: "Add two numbers using the calculator service",
+    parameters: { /* schema */ }
+  },
+  {
+    name: "math-service/add",
+    description: "Add two numbers using the math-service",
+    parameters: { /* schema */ }
+  }
+]
+```
+
+The `participant/tool` notation:
+- Provides clear attribution of which participant owns each tool
+- Handles duplicate tool names across participants
+- Is familiar to LLMs (similar to file paths and module imports)
+- Easy to parse: `const [participantId, toolName] = toolCall.split('/')`
+
+#### ReAct Loop
+```typescript
+interface Thought {
+  reasoning: string;  // ReAct: reasoning step
+  action: string;     // ReAct: action to take
+  actionInput: any;   // ReAct: action parameters
+}
+
+// ReAct pattern (Reason + Act cycle)
+1. Receive input (chat/request)
+2. Start reasoning (emit reasoning/start if reasoningEnabled)
+3. Process:
+   - If reasoningEnabled (ReAct pattern): 
+     * Loop (up to maxIterations):
+       - Reason: Analyze and decide action
+       - Emit: reasoning/thought
+       - Act: Execute action
+       - Observe: Process result
+   - If reasoning disabled (for models with built-in reasoning):
+     * Direct execution with model's built-in reasoning
+     * Model handles its own chain-of-thought internally
+4. Conclude (emit reasoning/conclusion if reasoningEnabled)
+5. Respond to original sender
+```
+
+#### Custom Prompts
+Agents support customizable prompts for different ReAct phases:
+
+```typescript
+const agent = new MEWAgent({
+  // ... other config
+  prompts: {
+    system: "You are a helpful assistant with access to tools.",
+    reason: "Analyze this request: {input}\nAvailable tools: {tools}\nReason about your approach:",
+    act: "Select and execute the best tool for: {objective}\nTools: {tools}",
+    respond: "Based on the result: {observation}\nProvide a helpful response:"
+  }
+});
+```
+
+The prompt phases correspond to the agent's workflow:
+1. **system**: Base instructions for the agent's behavior
+2. **reason**: Reasoning phase - analyze request and determine approach (ReAct: Reason)
+3. **act**: Action phase - select and call appropriate tools (ReAct: Act)
+4. **respond**: Response phase - format results for the user
+
+Default prompts are provided but can be overridden for:
+- **Domain-specific reasoning**: Customize ReAct reasoning for specific use cases
+- **Language/tone adjustment**: Match organizational communication style
+- **Specialized workflows**: Add domain knowledge to prompts
+
+#### Dynamic Tool Selection
+Agents select tools based on:
+- Natural language matching of request to tool names/descriptions
+- Availability of discovered tools
+- Adaptation of arguments to tool schemas
+- No hardcoded tool names or participant IDs
+
+Example flow:
+```typescript
+// 1. Agent discovers tools and prepares for LLM
+const llmTools = this.prepareLLMTools();
+// Returns: [{ name: "calculator/add", ... }, { name: "math-service/multiply", ... }]
+
+// 2. LLM selects a tool
+const llmResponse = {
+  tool: "calculator/add",
+  arguments: { a: 5, b: 3 }
+};
+
+// 3. Agent parses and executes
+const [participantId, toolName] = llmResponse.tool.split('/');
+await this.mcpRequest([participantId], {
+  method: 'tools/call',
+  params: {
+    name: toolName,
+    arguments: llmResponse.arguments
+  }
+});
+```
+
+## Separation of Concerns
+
+### MEWClient (Transport Layer)
+**Concerns:**
+- WebSocket lifecycle
+- Message serialization/deserialization
+- Connection reliability
+- Event distribution
+
+**NOT Concerns:**
+- Protocol semantics
+- Business logic
+- Tool execution
+- Decision making
+
+### MEWParticipant (Protocol Layer)
+**Concerns:**
+- MCP protocol implementation
+- Capability enforcement
+- Own tool/resource management (register, list, execute)
+- Calling other participants' tools (via tools/call)
+- Request/response correlation
+- Proposal patterns
+
+**NOT Concerns:**
+- Transport details
+- Autonomous behavior
+- Reasoning patterns
+- Tool discovery from other participants
+- Dynamic tool orchestration
+
+### MEWAgent (Application Layer)
+**Concerns:**
+- Autonomous behavior
+- Reasoning and decision-making (ReAct pattern)
+- Tool discovery from other participants
+- Tool namespace management for LLM (per ADR-tns)
+- Converting `participant/tool` calls to MEW envelopes
+- Dynamic tool orchestration across participants
+- Multi-step workflows
+- Natural language understanding
+- Own tools (via inheritance from MEWParticipant)
+
+**NOT Concerns:**
+- Protocol details
+- Connection management
+- Low-level message handling
+- Direct tool registration (uses parent's methods)
+
+## Configuration
+
+### Environment Variables
+```bash
+MEW_GATEWAY=ws://localhost:8080
+MEW_SPACE=default
+MEW_TOKEN=agent-token
+MEW_PARTICIPANT_ID=my-agent
+MEW_AGENT_CONFIG='{"thinkingEnabled": true}'
+```
+
+### Configuration Files
+Agents support YAML/JSON configuration:
+```yaml
+# agent-config.yaml
+gateway: ws://localhost:8080
+space: production
+token: ${AGENT_TOKEN}
+participant_id: assistant-1
+systemPrompt: "You are a helpful assistant"
+thinkingEnabled: true
+maxIterations: 10
+```
+
+## Dependencies
+
+### Required
+- Node.js >= 18.0.0
+- WebSocket support
+- TypeScript 5.0+ (for TypeScript SDK)
+
+### Protocol Dependencies
+- MEW Protocol v0.3
+- MCP (Model Context Protocol)
+
+### Package Dependencies
+```json
+{
+  "@mew-protocol/types": "workspace:*",
+  "@mew-protocol/client": "workspace:*",
+  "@mew-protocol/participant": "workspace:*",
+  "@mew-protocol/agent": "workspace:*"
+}
+```
+
+## Security Considerations
+
+### Authentication
+- Tokens passed in connection options
+- Gateway validates tokens before allowing join
+- No token refresh mechanism (reconnect with new token)
+
+### Capability Enforcement
+- Gateway enforces capabilities at message level
+- Participants should validate capabilities before sending
+- Proposals allow capability-limited operations
+
+### Tool Security
+- Tools execute in participant's context
+- No sandboxing of tool execution
+- Tools should validate inputs
+- Agents should not expose dangerous operations
+
+### Message Security
+- No end-to-end encryption (relies on TLS)
+- Messages visible to gateway
+- No message signing/verification
+
+## Error Handling
+
+### Connection Errors
+- Automatic reconnection with exponential backoff
+- Maximum retry attempts configurable
+- Events emitted for connection state changes
+
+### Protocol Errors
+- MCP errors returned with proper error codes
+- Capability violations result in gateway errors
+- Timeout errors for pending requests
+
+### Tool Errors
+- Tool execution errors caught and returned
+- Validation errors for invalid arguments
+- Schema validation before execution
+
+## Testing
+
+### Unit Testing
+Each layer should be independently testable:
+- MEWClient: Mock WebSocket
+- MEWParticipant: Mock client events
+- MEWAgent: Mock participant methods
+
+### Integration Testing
+- Use test gateway for end-to-end tests
+- Test capability enforcement
+- Test proposal/fulfillment patterns
+- Test tool discovery and execution
+
+## Migration Guide
+
+### From Direct WebSocket
+1. Replace WebSocket with MEWClient
+2. Convert message handlers to event listeners
+3. Add envelope wrapping/unwrapping
+
+### From MEWClient to MEWParticipant
+1. Change inheritance/composition
+2. Register tools/resources
+3. Use `mcpRequest()` for MCP operations
+
+### From MEWParticipant to MEWAgent
+1. Configure agent-specific options
+2. Implement reasoning patterns
+3. Enable tool discovery
+
+## Examples
+
+### Basic Client
+```typescript
+const client = new MEWClient({
+  gateway: 'ws://localhost:8080',
+  space: 'test',
+  token: 'client-token'
+});
+
+await client.connect();
+client.send({
+  kind: 'chat',
+  payload: { text: 'Hello!' }
+});
+```
+
+### Participant with Tools
+```typescript
+const participant = new MEWParticipant({
+  gateway: 'ws://localhost:8080',
+  space: 'test',
+  token: 'participant-token',
+  participant_id: 'calculator'
+});
+
+participant.registerTool({
+  name: 'add',
+  execute: async ({ a, b }) => a + b
+});
+
+await participant.connect();
+
+// Make an MCP request (will use proposal if lacking mcp/request capability)
+const result = await participant.mcpRequest(
+  'another-participant',
+  { method: 'tools/list' }
+);
+```
+
+### Autonomous Agent
+```typescript
+// Agent with explicit ReAct pattern
+const agent = new MEWAgent({
+  gateway: 'ws://localhost:8080',
+  space: 'test',
+  token: 'agent-token',
+  participant_id: 'assistant',
+  reasoningEnabled: true,  // Enable ReAct (Reason + Act) loop
+  autoRespond: true
+});
+
+// Agent with reasoning model (no explicit ReAct)
+const reasoningAgent = new MEWAgent({
+  gateway: 'ws://localhost:8080',
+  space: 'test',
+  token: 'agent-token',
+  participant_id: 'reasoning-assistant',
+  model: 'o1-preview',  // Has built-in reasoning
+  reasoningEnabled: false,  // Model handles ReAct internally
+  autoRespond: true
+});
+
+// Agent with custom prompts for specialized domain
+const specializedAgent = new MEWAgent({
+  gateway: 'ws://localhost:8080',
+  space: 'test',
+  token: 'agent-token',
+  participant_id: 'medical-assistant',
+  reasoningEnabled: true,
+  prompts: {
+    system: "You are a medical assistant. Always prioritize patient safety and include appropriate disclaimers.",
+    reason: "Analyze this medical query: {input}\nConsider patient safety and available tools: {tools}",
+    act: "Select appropriate medical tool for: {objective}\nEnsure safe usage of: {tools}",
+    respond: "Provide medically accurate response based on: {observation}\nInclude necessary disclaimers."
+  }
+});
+
+await agent.start();
+// Agent now autonomously handles messages
+```
+
+## Future Considerations
+
+### Composition vs Inheritance
+The current implementation uses inheritance, but will be refactored to use composition per ADR-cmp (see `decisions/accepted/001-cmp-composition-over-inheritance.md`). This refactoring is planned for the next major version (2.0) to provide better separation of concerns, testability, and flexibility.
+
+### Plugin System
+Allow extending agents with plugins:
+- Custom thinking strategies
+- Tool providers
+- Middleware for message processing
+
+### Multi-Transport
+Support beyond WebSocket:
+- HTTP long-polling
+- Server-sent events
+- WebRTC data channels
+
+### Persistence
+Add state persistence:
+- Save/restore conversation context
+- Persist discovered tools
+- Resume after disconnect
+
+## References
+
+- [MEW Protocol Specification v0.3](../spec/v0.3/SPEC.md)
+- [MCP Specification](https://modelcontextprotocol.org)
+### Chat Message Response Strategy
+
+MEWAgent implements a selective response pattern for chat messages to avoid noise while ensuring relevant interactions. The agent decides whether to respond based on multiple factors:
+
+#### Response Decision Criteria
+
+The agent evaluates the following triggers when a chat message is received:
+
+1. **Direct Addressing** (Priority: HIGH)
+   - Message is addressed to the agent via the `to` field
+   - Agent's name or ID is mentioned in the message text
+   - Always responds when directly addressed
+
+2. **Content Relevance** (Priority: MEDIUM) - *Requires LLM Classification*
+   - When not directly addressed, agent uses LLM to classify if response is appropriate
+   - LLM evaluates:
+     - Whether message contains a question
+     - Whether message relates to agent's tools/resources
+     - Whether agent can meaningfully contribute
+   - Response decision based on classification confidence score
+
+3. **Conversation Context** (Priority: LOW) - *LLM-Assisted*
+   - Agent uses LLM to evaluate ongoing conversation relevance
+   - Considers previous message history in context window
+   - Determines if agent has unique value to add to discussion
+
+#### Configuration Options
+
+```typescript
+interface ChatResponseConfig {
+  autoRespond: boolean;           // Global enable/disable (default: true)
+  respondToQuestions: boolean;    // Respond to questions (default: true)
+  respondToMentions: boolean;     // Respond when mentioned (default: true)
+  respondToDirect: boolean;       // Respond to direct messages (default: true)
+  confidenceThreshold: number;    // Min confidence to respond (0-1, default: 0.5)
+  contextWindow: number;          // Messages to consider for context (default: 10)
+}
+```
+
+#### Response Flow
+
+```
+Chat Message Received
+        ↓
+Is it from self? → Yes → Ignore
+        ↓ No
+Is autoRespond enabled? → No → Ignore
+        ↓ Yes
+Is it directly addressed? → Yes → Respond
+        ↓ No
+Does it mention agent? → Yes → Respond
+        ↓ No
+        ↓
+[LLM Classification Call]
+"Should I respond to this message?"
+- Analyze message content
+- Check relevance to my tools
+- Evaluate if I can help
+        ↓
+Confidence > threshold? → Yes → Respond
+        ↓ No
+      Ignore
+```
+
+#### LLM Classification Prompt
+
+When not directly addressed, the agent uses an LLM call with a prompt like:
+
+```typescript
+const classificationPrompt = `
+You are an AI agent with the following tools: ${agent.tools}
+A message was sent in the conversation: "${message.text}"
+
+Should you respond to this message?
+Consider:
+1. Is this a question you can answer?
+2. Does it relate to your tools or capabilities?
+3. Can you provide unique value by responding?
+
+Return a JSON object:
+{
+  "shouldRespond": boolean,
+  "confidence": number (0-1),
+  "reason": string
+}
+`;
+```
+
+#### Implementation Notes
+
+- Agents SHOULD implement rate limiting to avoid chat spam
+- Agents SHOULD track conversation context to avoid redundant responses
+- Agents MAY use LLM to determine response relevance
+- Agents MUST respect the `autoRespond` configuration flag
+- Multiple agents SHOULD coordinate to avoid duplicate responses
+
+## References
+
+- [TypeScript SDK Documentation](../typescript-sdk/README.md)
+- [Test Scenarios](../tests/README.md)

@@ -1,0 +1,42 @@
+{
+  "scenario": {
+    "id": "todo-app-create",
+    "name": "Create Todo List HTML App"
+  },
+  "evaluation": {
+    "scenarioId": "todo-app-create",
+    "timestamp": "2025-09-12T20:18:38.784Z",
+    "scores": {
+      "taskCompletion": 0.7719684330511115,
+      "protocolCompliance": 0.780623136427313,
+      "fileOperations": 0.9992684910222118,
+      "codeQuality": 0.9363974730603443
+    },
+    "details": {},
+    "passed": true,
+    "overallScore": 0.8720643833902451,
+    "report": "{\"score\":0.807961860342045,\"completed\":true,\"reasoning\":\"Mock evaluation - replace with actual LLM\"}"
+  },
+  "messages": [
+    {
+      "protocol": "mew/v0.3",
+      "id": "error-1757708317781",
+      "ts": "2025-09-12T20:18:37.781Z",
+      "from": "system:gateway",
+      "to": [
+        null
+      ],
+      "kind": "system/error",
+      "correlation_id": [
+        "231edf81-d56b-4598-be75-be10bc6024dc"
+      ],
+      "payload": {
+        "error": "capability_violation",
+        "attempted_kind": "chat",
+        "your_capabilities": []
+      }
+    }
+  ],
+  "workspace": {},
+  "timestamp": "2025-09-12T20:18:38.788Z"
+}
