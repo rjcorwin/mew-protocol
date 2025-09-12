@@ -101,6 +101,9 @@ run_test "Scenario 4: Dynamic Capability Granting" "./scenario-4-capabilities"
 run_test "Scenario 5: Reasoning with Context Field" "./scenario-5-reasoning"
 run_test "Scenario 6: Error Recovery and Edge Cases" "./scenario-6-errors"
 run_test "Scenario 7: MCP Bridge Integration" "./scenario-7-mcp-bridge"
+run_test "Scenario 8: TypeScript Agent" "./scenario-8-typescript-agent"
+run_test "Scenario 9: TypeScript Proposals" "./scenario-9-typescript-proposals"
+run_test "Scenario 10: Multi-Agent" "./scenario-10-multi-agent"
 
 # Summary
 echo -e "${BLUE}================================================${NC}"
