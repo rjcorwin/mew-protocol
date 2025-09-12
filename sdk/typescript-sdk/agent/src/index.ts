@@ -16,6 +16,7 @@ function parseArgs(): { options: any; configFile?: string } {
     participantId: process.env.MEW_PARTICIPANT_ID || 'typescript-agent',
     debug: false,
     config: null,
+    noSampleTools: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -44,6 +45,9 @@ function parseArgs(): { options: any; configFile?: string } {
       case '-d':
         options.debug = true;
         break;
+      case '--no-sample-tools':
+        options.noSampleTools = true;
+        break;
       case '--help':
       case '-h':
         printHelp();
@@ -67,6 +71,7 @@ Options:
   -i, --id <id>          Participant ID (default: typescript-agent)
   -c, --config <file>    Configuration file (YAML or JSON)
   -d, --debug            Enable debug logging
+  --no-sample-tools      Do not register sample tools
   -h, --help            Show this help message
 
 Environment Variables:
@@ -225,7 +230,7 @@ async function main(): Promise<void> {
     logLevel: options.debug ? 'debug' : 'info',
     name: options.participantId,
     systemPrompt: 'You are a helpful TypeScript-based AI assistant in the MEW protocol ecosystem.',
-    thinkingEnabled: true,
+    reasoningEnabled: true,
     autoRespond: true,
     maxIterations: 5,
   };
@@ -254,10 +259,14 @@ async function main(): Promise<void> {
 
   const agent = new MEWAgent(agentConfig);
 
-  // Register sample tools
-  const tools = createSampleTools();
-  tools.forEach((tool) => agent.addTool(tool));
-  console.log(`Registered ${tools.length} tools`);
+  // Register sample tools if not disabled
+  if (!options.noSampleTools) {
+    const tools = createSampleTools();
+    tools.forEach((tool) => agent.addTool(tool));
+    console.log(`Registered ${tools.length} tools`);
+  } else {
+    console.log('Sample tools disabled - agent will discover tools from other participants');
+  }
 
   // Handle graceful shutdown
   process.on('SIGINT', () => {

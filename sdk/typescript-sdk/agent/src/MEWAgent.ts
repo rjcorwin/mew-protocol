@@ -1,739 +1,532 @@
-import { MEWParticipant } from '@mew-protocol/participant';
-import { Envelope, PartialEnvelope, Capability } from '@mew-protocol/types';
-import { ClientEvents, PROTOCOL_VERSION } from '@mew-protocol/client';
-import { Tool, Resource, ParticipantOptions } from '@mew-protocol/participant';
+import { MEWParticipant, ParticipantOptions, Tool, Resource } from '@mew-protocol/participant';
+import { Envelope } from '@mew-protocol/types';
+import { v4 as uuidv4 } from 'uuid';
+import OpenAI from 'openai';
+
+const PROTOCOL_VERSION = 'mew/v0.3';
 
 export interface AgentConfig extends ParticipantOptions {
   name?: string;
   systemPrompt?: string;
   model?: string;
   apiKey?: string;
-  maxIterations?: number;
-  thinkingEnabled?: boolean;
+  reasoningEnabled?: boolean;  // Enable ReAct pattern (false for models with built-in reasoning)
   autoRespond?: boolean;
+  maxIterations?: number;
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  
+  // Overridable prompts for different phases (ReAct pattern)
+  prompts?: {
+    system?: string;    // Override the base system prompt
+    reason?: string;    // Template for reasoning/planning phase (ReAct: Reason)
+    act?: string;       // Template for tool selection and execution (ReAct: Act)
+    respond?: string;   // Template for formatting final response
+  };
 }
 
-export interface ThoughtStep {
-  thought: string;
-  action?: string;
-  actionInput?: any;
-  observation?: string;
+interface Thought {
+  reasoning: string;  // ReAct: reasoning step
+  action: string;     // ReAct: action to take
+  actionInput: any;   // ReAct: action parameters
+}
+
+interface DiscoveredTool {
+  name: string;
+  participantId: string;
+  description?: string;
+  schema?: any;
+}
+
+interface LLMTool {
+  name: string;        // "participant/tool" - hierarchical namespace
+  description: string; // Includes participant context
+  parameters?: any;    // Tool schema
+}
+
+interface OtherParticipant {
+  id: string;
+  joinedAt: Date;
+  capabilities?: any[];
 }
 
 export class MEWAgent extends MEWParticipant {
   private config: AgentConfig;
-  private systemPrompt: string;
-  private conversationHistory: Envelope[] = [];
-  private activeRequests = new Map<string, { from: string; method: string }>();
-  private thinkingContext: string | null = null;
-  private hasGreeted: boolean = false;
-  private pendingProposals = new Map<string, { 
-    originalRequest: Envelope;
-    method: string;
-    from: string;
-  }>();
+  private openai?: OpenAI;
+  private discoveredTools = new Map<string, DiscoveredTool>();
+  private otherParticipants = new Map<string, OtherParticipant>();
+  private isRunning = false;
+  private currentConversation: Array<{ role: string; content: string }> = [];
 
   constructor(config: AgentConfig) {
     super(config);
-    this.config = config;
-    this.systemPrompt =
-      config.systemPrompt || 'You are a helpful AI assistant in the MEW protocol ecosystem.';
-    this.setupEventHandlers();
-  }
-
-  private setupEventHandlers(): void {
-    // Handle incoming envelopes
-    this.client.on(ClientEvents.MESSAGE, async (envelope: Envelope) => {
-      await this.handleEnvelope(envelope);
-    });
-
-    // Handle welcome message
-    this.client.on(ClientEvents.WELCOME, (welcomeData: any) => {
-      this.log(
-        'info',
-        `Agent ${this.config.participant_id} joined with capabilities:`,
-        welcomeData.you.capabilities,
-      );
-      if (this.config.autoRespond && !this.hasGreeted) {
-        this.sendChat('Hello! I am an AI assistant ready to help. What can I do for you?');
-        this.hasGreeted = true;
-      }
-    });
-
-    // Handle errors
-    this.client.on(ClientEvents.ERROR, (error: any) => {
-      this.log('error', 'Client error:', error);
-    });
-  }
-
-  private async handleEnvelope(envelope: Envelope): Promise<void> {
-    // Skip our own messages
-    if (envelope.from === this.config.participant_id) {
-      return;
-    }
-
-    // Store in conversation history
-    this.conversationHistory.push(envelope);
-
-    switch (envelope.kind) {
-      case 'chat':
-        await this.handleChat(envelope);
-        break;
-
-      case 'mcp/request':
-        await this.handleAgentMCPRequest(envelope);
-        break;
-
-      case 'mcp/proposal':
-        await this.handleMCPProposal(envelope);
-        break;
-
-      case 'mcp/response':
-        await this.handleAgentMCPResponse(envelope);
-        break;
-        
-      case 'mcp/reject':
-        await this.handleProposalRejection(envelope);
-        break;
-    }
-  }
-
-  private async handleChat(envelope: Envelope): Promise<void> {
-    const text = envelope.payload?.text;
-    if (!text) return;
-
-    // Don't respond to other agents' responses to avoid infinite loops
-    const fromAgent = envelope.from.endsWith('-agent');
-    const isResponse = text.includes('I understand your request') || 
-                      text.includes('How can I assist you') ||
-                      text.includes('I\'ve asked') ||
-                      text.includes('The response should appear');
-    
-    if (fromAgent && isResponse && !envelope.to?.includes(this.config.participant_id!)) {
-      // This is an agent responding to someone else, ignore it
-      return;
-    }
-
-    // Check if message is directed at us or is a broadcast we should respond to
-    const isBroadcast = !envelope.to || envelope.to.length === 0;
-    const isDirectedToUs = envelope.to?.includes(this.config.participant_id!);
-    const mentionsUs = text.toLowerCase().includes(this.config.name?.toLowerCase() || '');
-    const mentionsAllAgents = text.toLowerCase().includes('all agents');
-    
-    // Respond if:
-    // 1. Directed specifically to us
-    // 2. Mentions us by name
-    // 3. It's a broadcast from a non-agent that mentions "all agents"
-    // 4. It's a broadcast from a non-agent and autoRespond is true
-    const shouldRespond = 
-      isDirectedToUs ||
-      mentionsUs ||
-      (isBroadcast && !fromAgent && mentionsAllAgents) ||
-      (isBroadcast && !fromAgent && this.config.autoRespond);
-
-    if (!shouldRespond) {
-      return;
-    }
-
-    this.log('info', `Received chat from ${envelope.from}: ${text}`);
-
-    // Start thinking process if enabled
-    if (this.config.thinkingEnabled) {
-      await this.startThinking(`Responding to message from ${envelope.from}: "${text}"`);
-    }
-
-    // Use ReAct loop to generate response
-    await this.reactLoop(text, envelope.from);
-  }
-
-  private async handleAgentMCPRequest(envelope: Envelope): Promise<void> {
-    // Check if request is for us
-    if (!envelope.to?.includes(this.config.participant_id!)) {
-      return;
-    }
-
-    const { method, params, id } = envelope.payload || {};
-    this.log('info', `Received MCP request: ${method}`);
-
-    // Check if this is a fulfillment of our proposal
-    // Note: When someone fulfills our proposal, they execute the request themselves
-    // We don't need to handle it unless we're the target of the fulfilled request
-
-    // Store request for correlation
-    this.activeRequests.set(envelope.id, { from: envelope.from, method });
-
-    // Check if we have capability to respond to this specific method
-    // The capability matcher will check the payload.method pattern
-    if (!this.canSend('mcp/response', { method: method })) {
-      // We cannot respond to this specific method, create a proposal
-      this.log('info', `No capability to respond to ${method}, creating proposal`);
-      await this.createProposal(envelope);
-      return;
-    }
-
-    // Handle based on method
-    switch (method) {
-      case 'tools/list':
-        await this.respondWithTools(envelope);
-        break;
-
-      case 'tools/call':
-        await this.executeTool(envelope, params);
-        break;
-
-      case 'resources/list':
-        await this.respondWithResources(envelope);
-        break;
-
-      case 'resources/read':
-        await this.readAgentResource(envelope, params);
-        break;
-
-      default:
-        await this.sendMCPError(envelope, `Unsupported method: ${method}`);
-    }
-  }
-
-  private async handleMCPProposal(envelope: Envelope): Promise<void> {
-    const proposal = envelope.payload;
-    this.log('info', `Received proposal from ${envelope.from}:`, proposal);
-
-    // If we have approval capability, we could auto-approve safe operations
-    if (this.canSend('mcp/request') && this.isSafeOperation(proposal)) {
-      await this.fulfillProposal(envelope);
-    } else {
-      this.log('info', 'Cannot fulfill proposal - lacking capability or unsafe operation');
-    }
-  }
-
-  private async handleAgentMCPResponse(envelope: Envelope): Promise<void> {
-    // Check if this is a response to our request
-    const correlationId = envelope.correlation_id;
-    if (!correlationId) return;
-    
-    const corrId = Array.isArray(correlationId) ? correlationId[0] : correlationId;
-    
-    // Check if this is a response to a fulfilled proposal
-    const proposal = this.pendingProposals.get(corrId);
-    if (proposal) {
-      // This is a response to our proposal that was fulfilled
-      this.log('info', `Received response for fulfilled proposal ${corrId}`);
-      
-      // Send the response back to the original requester
-      await this.sendMCPResponse(proposal.originalRequest, envelope.payload?.result || envelope.payload);
-      
-      // Clean up
-      this.pendingProposals.delete(corrId);
-      return;
-    }
-    
-    // Check if this is a response to our direct request
-    if (this.activeRequests.has(corrId)) {
-      const request = this.activeRequests.get(corrId);
-      this.activeRequests.delete(corrId);
-
-      this.log('info', `Received response for ${request?.method}:`, envelope.payload);
-
-      // Process the response in our thinking context if active
-      if (this.thinkingContext) {
-        await this.addThought(`Received response: ${JSON.stringify(envelope.payload)}`);
-      }
-    }
-  }
-
-  private async reactLoop(input: string, from: string): Promise<void> {
-    const maxIterations = this.config.maxIterations || 5;
-    const thoughts: ThoughtStep[] = [];
-
-    for (let i = 0; i < maxIterations; i++) {
-      // Think step
-      const thought = await this.think(input, thoughts);
-      thoughts.push(thought);
-
-      if (this.thinkingContext) {
-        await this.addThought(thought.thought);
-      }
-
-      // Check if we have an action to take
-      if (thought.action) {
-        // Act step
-        const observation = await this.act(thought.action, thought.actionInput);
-        thought.observation = observation;
-
-        if (this.thinkingContext) {
-          await this.addThought(`Action: ${thought.action}, Observation: ${observation}`);
-        }
-      }
-
-      // Check if we have a final answer
-      if (thought.action === 'respond' || thought.thought.toLowerCase().includes('final answer')) {
-        const response = thought.actionInput || thought.thought;
-        await this.sendChat(response, from);
-        break;
-      }
-    }
-
-    // End thinking process
-    if (this.thinkingContext) {
-      await this.concludeThinking('Completed response generation');
-    }
-  }
-
-  private async think(input: string, previousThoughts: ThoughtStep[]): Promise<ThoughtStep> {
-    // This would integrate with an LLM in a real implementation
-    // For now, return a mock thought process
-
-    if (previousThoughts.length === 0) {
-      // Check if this is a delegation request
-      const lowerInput = input.toLowerCase();
-      if (lowerInput.includes('ask') && lowerInput.includes('agent') && lowerInput.includes('tools')) {
-        // Extract target agent name
-        const agentMatch = input.match(/(\w+-agent)/i);
-        const targetAgent = agentMatch ? agentMatch[1] : 'worker-agent';
-        
-        return {
-          thought: `I need to ask ${targetAgent} to list its tools`,
-          action: 'delegate',
-          actionInput: { target: targetAgent, method: 'tools/list' },
-        };
-      }
-      
-      // Check if this is a simple math question
-      const sumMatch = input.match(/sum\s+of\s+(\d+)\s+and\s+(\d+)/i);
-      if (sumMatch) {
-        const a = parseInt(sumMatch[1]);
-        const b = parseInt(sumMatch[2]);
-        return {
-          thought: `I need to calculate the sum of ${a} and ${b}`,
-          action: 'calculate',
-          actionInput: { operation: 'sum', a, b },
-        };
-      }
-      
-      return {
-        thought: `I need to understand what the user is asking: "${input}"`,
-        action: 'analyze',
-        actionInput: input,
-      };
-    }
-
-    const lastThought = previousThoughts[previousThoughts.length - 1];
-    if (lastThought.action === 'analyze') {
-      // Don't re-embed the input to avoid infinite loops
-      const cleanInput = input.length > 100 ? input.substring(0, 100) + '...' : input;
-      return {
-        thought: 'I should provide a helpful response based on my analysis',
-        action: 'respond',
-        actionInput: `I understand your request about "${cleanInput}". As an AI assistant in the MEW protocol, I can help coordinate with other agents and tools. How can I assist you specifically?`,
-      };
-    }
-
-    if (lastThought.action === 'calculate') {
-      // After calculation, prepare response with result
-      const { a, b, operation } = lastThought.actionInput;
-      const result = operation === 'sum' ? a + b : 0;
-      return {
-        thought: `The sum is ${result}`,
-        action: 'respond',
-        actionInput: `The sum of ${a} and ${b} is ${result}.`,
-      };
-    }
-
-    if (lastThought.action === 'delegate') {
-      // After delegation, prepare response
-      return {
-        thought: 'I have sent the request to the other agent',
-        action: 'respond',
-        actionInput: `I've asked ${lastThought.actionInput.target} to ${lastThought.actionInput.method}. The response should appear shortly.`,
-      };
-    }
-
-    return {
-      thought: 'I have completed my analysis',
-      action: 'respond',
-      actionInput: 'How else can I help you?',
-    };
-  }
-
-  private async act(action: string, input: any): Promise<string> {
-    switch (action) {
-      case 'analyze':
-        return `Analyzed input: ${input}`;
-
-      case 'search':
-        // Could call a search tool here
-        return `Search results for: ${input}`;
-
-      case 'calculate':
-        // Perform calculation
-        if (input && input.operation === 'sum') {
-          const result = input.a + input.b;
-          return `Calculated sum: ${input.a} + ${input.b} = ${result}`;
-        }
-        return `Calculation result: ${input}`;
-
-      case 'delegate':
-        // Send MCP request to another agent
-        if (input.target && input.method) {
-          await this.sendMCPRequest(input.target, input.method);
-          return `Sent ${input.method} request to ${input.target}`;
-        }
-        return 'Invalid delegation parameters';
-
-      case 'respond':
-        return 'Response prepared';
-
-      default:
-        return `Unknown action: ${action}`;
-    }
-  }
-
-  private async startThinking(message: string): Promise<void> {
-    const envelope: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `think-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      kind: 'reasoning/start',
-      payload: { message },
+    this.config = {
+      reasoningEnabled: true,
+      autoRespond: true,
+      maxIterations: 10,
+      logLevel: 'info',
+      model: 'gpt-4-turbo-preview',
+      ...config
     };
 
-    this.thinkingContext = envelope.id;
-    this.client.send(envelope);
-  }
-
-  private async addThought(message: string): Promise<void> {
-    if (!this.thinkingContext) return;
-
-    const envelope: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `thought-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      kind: 'reasoning/thought',
-      context: this.thinkingContext as any,
-      payload: { message },
-    };
-
-    this.client.send(envelope);
-  }
-
-  private async concludeThinking(message: string): Promise<void> {
-    if (!this.thinkingContext) return;
-
-    const envelope: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `conclude-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      kind: 'reasoning/conclusion',
-      context: this.thinkingContext as any,
-      payload: { message },
-    };
-
-    this.client.send(envelope);
-    this.thinkingContext = null;
-  }
-
-  private async sendChat(text: string, to?: string | string[]): Promise<void> {
-    const envelope: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `chat-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      to: to ? (Array.isArray(to) ? to : [to]) : undefined,
-      kind: 'chat',
-      payload: { text, format: 'plain' },
-    };
-
-    this.client.send(envelope);
-  }
-
-  private async respondWithTools(request: Envelope): Promise<void> {
-    const response = this.tools.list();
-    await this.sendMCPResponse(request, response.result);
-  }
-
-  private async executeTool(request: Envelope, params: any): Promise<void> {
-    const { name, arguments: args } = params || {};
-
-    try {
-      const result = await this.tools.execute(name, args);
-      await this.sendMCPResponse(request, result);
-    } catch (error: any) {
-      await this.sendMCPError(request, error.message);
-    }
-  }
-
-  private async respondWithResources(request: Envelope): Promise<void> {
-    const resources = Array.from(this.resources.values()).map((r) => ({
-      uri: r.uri,
-      name: r.name,
-      description: r.description,
-      mimeType: r.mimeType,
-    }));
-
-    await this.sendMCPResponse(request, { resources });
-  }
-
-  private async readAgentResource(request: Envelope, params: any): Promise<void> {
-    const { uri } = params || {};
-    const resource = this.resources.get(uri);
-
-    if (!resource) {
-      await this.sendMCPError(request, `Resource not found: ${uri}`);
-      return;
+    // Initialize OpenAI if API key provided
+    if (this.config.apiKey) {
+      this.openai = new OpenAI({ apiKey: this.config.apiKey });
     }
 
-    try {
-      const contents = await resource.read();
-      await this.sendMCPResponse(request, { contents });
-    } catch (error: any) {
-      await this.sendMCPError(request, error.message);
-    }
+    this.setupAgentBehavior();
   }
 
-  private async sendMCPResponse(request: Envelope, result: any): Promise<void> {
-    const envelope: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `resp-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      to: [request.from],
-      kind: 'mcp/response',
-      correlation_id: [request.id],
-      payload: {
-        jsonrpc: '2.0',
-        id: request.payload?.id,
-        result,
-      },
-    };
-
-    this.client.send(envelope);
-  }
-
-  private async sendMCPError(request: Envelope, message: string): Promise<void> {
-    const envelope: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `err-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      to: [request.from],
-      kind: 'mcp/response',
-      correlation_id: [request.id],
-      payload: {
-        jsonrpc: '2.0',
-        id: request.payload?.id,
-        error: {
-          code: -32603,
-          message,
-        },
-      },
-    };
-
-    this.client.send(envelope);
-  }
-
-  private async sendMCPRequest(target: string, method: string, params?: any): Promise<void> {
-    const request: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `mcp-req-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      to: [target],
-      kind: 'mcp/request',
-      payload: {
-        method,
-        params: params || {},
-      },
-    };
-
-    this.client.send(request);
-    this.log('info', `Sent MCP request ${method} to ${target}`);
-  }
-
-  private async fulfillProposal(proposal: Envelope): Promise<void> {
-    const { method, params } = proposal.payload || {};
-
-    const envelope: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `fulfill-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      kind: 'mcp/request',
-      correlation_id: [proposal.id],
-      payload: {
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method,
-        params,
-      },
-    };
-
-    this.client.send(envelope);
-  }
-
-  private isSafeOperation(proposal: any): boolean {
-    // Implement safety checks based on your requirements
-    const method = proposal?.method?.toLowerCase() || '';
-
-    // Only auto-approve read operations
-    if (method.includes('list') || method.includes('read') || method.includes('browse')) {
-      return true;
-    }
-
-    return false;
-  }
-
-  private log(level: string, ...args: any[]): void {
-    const logLevel = this.config.logLevel || 'info';
-    const levels = ['debug', 'info', 'warn', 'error'];
-
-    if (levels.indexOf(level) >= levels.indexOf(logLevel)) {
-      console.log(`[${level.toUpperCase()}] [${this.config.participant_id}]`, ...args);
-    }
-  }
-
-  // Public methods for registering custom tools and resources
-  public addTool(tool: Tool): void {
-    this.registerTool(tool);
-    this.log('info', `Registered tool: ${tool.name}`);
-  }
-
-  public addResource(resource: Resource): void {
-    this.registerResource(resource);
-    this.log('info', `Registered resource: ${resource.uri}`);
-  }
-
-  // Start the agent
-  public async start(): Promise<void> {
-    this.log('info', `Starting MEW Agent: ${this.config.participant_id}`);
+  /**
+   * Start the agent
+   */
+  async start(): Promise<void> {
     await this.connect();
+    this.isRunning = true;
+    this.log('info', 'Agent started');
   }
 
-  // Stop the agent
-  public stop(): void {
-    this.log('info', `Stopping MEW Agent: ${this.config.participant_id}`);
+  /**
+   * Stop the agent
+   */
+  stop(): void {
+    this.isRunning = false;
     this.disconnect();
+    this.log('info', 'Agent stopped');
   }
-  
-  // Create a proposal when we don't have mcp/response capability
-  private async createProposal(request: Envelope): Promise<void> {
-    const { method, params } = request.payload || {};
-    const proposalId = `prop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Store the proposal for tracking
-    this.pendingProposals.set(proposalId, {
-      originalRequest: request,
-      method,
-      from: request.from
+
+  /**
+   * Add a tool (extends parent)
+   */
+  addTool(tool: Tool): void {
+    this.registerTool(tool);
+    // Also track as discovered tool for our own tools
+    this.discoveredTools.set(tool.name, {
+      name: tool.name,
+      participantId: this.options.participant_id!,
+      description: tool.description,
+      schema: tool.inputSchema
     });
-    
-    // Create proposal envelope
-    const proposal: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: proposalId,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      to: undefined, // Broadcast to all who can fulfill
-      kind: 'mcp/proposal',
-      payload: {
-        method,
-        params
-      }
-    };
-    
-    this.client.send(proposal);
-    this.log('info', `Created proposal ${proposalId} for ${method} request`);
   }
-  
-  // Handle when our proposal is fulfilled
-  private async handleFulfilledProposal(fulfillment: Envelope, proposal: any): Promise<void> {
-    const { method } = proposal;
-    const { params } = fulfillment.payload || {};
-    
-    this.log('info', `Handling fulfilled proposal for ${method}`);
-    
-    // Execute the actual method and get result
-    let result;
-    let error;
-    
-    try {
-      switch (method) {
-        case 'tools/list':
-          result = this.tools.list().result;
-          break;
-          
-        case 'tools/call':
-          result = await this.tools.execute(params?.name, params?.arguments);
-          break;
-          
-        case 'resources/list':
-          result = {
-            resources: Array.from(this.resources.values()).map((r) => ({
-              uri: r.uri,
-              name: r.name,
-              description: r.description,
-              mimeType: r.mimeType,
-            }))
-          };
-          break;
-          
-        case 'resources/read':
-          const resource = this.resources.get(params?.uri);
-          if (!resource) {
-            error = { code: -32602, message: `Resource not found: ${params?.uri}` };
-          } else {
-            result = { contents: await resource.read() };
-          }
-          break;
-          
-        default:
-          error = { code: -32601, message: `Unsupported method: ${method}` };
+
+  /**
+   * Add a resource (extends parent)
+   */
+  addResource(resource: Resource): void {
+    this.registerResource(resource);
+  }
+
+  /**
+   * Set up agent behavior
+   */
+  private setupAgentBehavior(): void {
+    // Handle system presence events for tool discovery
+    this.onMessage(async (envelope: Envelope) => {
+      if (envelope.kind === 'system/presence') {
+        await this.handlePresence(envelope);
       }
-    } catch (e: any) {
-      error = { code: -32603, message: e.message };
+      
+      // Auto-respond to chat messages if enabled
+      if (this.config.autoRespond && envelope.kind === 'chat' && 
+          envelope.from !== this.options.participant_id) {
+        await this.handleChat(envelope);
+      }
+      
+      // Handle proposals that need our attention
+      if (envelope.kind === 'mcp/proposal' && 
+          envelope.from !== this.options.participant_id) {
+        await this.handleProposal(envelope);
+      }
+    });
+  }
+
+  /**
+   * Handle presence events (participant join/leave)
+   */
+  private async handlePresence(envelope: Envelope): Promise<void> {
+    const { action, participant } = envelope.payload;
+    
+    if (action === 'join' && participant.id !== this.options.participant_id) {
+      // Track new participant
+      this.otherParticipants.set(participant.id, {
+        id: participant.id,
+        joinedAt: new Date(),
+        capabilities: participant.capabilities
+      });
+      
+      // Discover their tools
+      await this.discoverToolsFrom(participant.id);
+    } else if (action === 'leave') {
+      // Remove participant and their tools
+      this.otherParticipants.delete(participant.id);
+      for (const [key, tool] of this.discoveredTools.entries()) {
+        if (tool.participantId === participant.id) {
+          this.discoveredTools.delete(key);
+        }
+      }
+    }
+  }
+
+  /**
+   * Discover tools from a participant
+   */
+  private async discoverToolsFrom(participantId: string): Promise<void> {
+    try {
+      const result = await this.mcpRequest([participantId], {
+        method: 'tools/list'
+      }, 5000);
+      
+      if (result?.tools) {
+        for (const tool of result.tools) {
+          const key = `${participantId}/${tool.name}`;
+          this.discoveredTools.set(key, {
+            name: tool.name,
+            participantId,
+            description: tool.description,
+            schema: tool.inputSchema
+          });
+        }
+        
+        this.log('debug', `Discovered ${result.tools.length} tools from ${participantId}`);
+      }
+    } catch (error) {
+      this.log('warn', `Failed to discover tools from ${participantId}: ${error}`);
+    }
+  }
+
+  /**
+   * Handle chat messages
+   */
+  private async handleChat(envelope: Envelope): Promise<void> {
+    const { text } = envelope.payload;
+    
+    // Start reasoning if enabled
+    if (this.config.reasoningEnabled) {
+      this.emitReasoning('reasoning/start', { input: text });
+      
+      try {
+        const response = await this.processWithReAct(text);
+        await this.sendResponse(response, envelope.from);
+      } catch (error) {
+        this.log('error', `Failed to process chat: ${error}`);
+        await this.sendResponse(
+          `I encountered an error processing your request: ${error}`,
+          envelope.from
+        );
+      }
+      
+      this.emitReasoning('reasoning/conclusion', {});
+    } else {
+      // Use model's built-in reasoning
+      try {
+        const response = await this.processDirectly(text);
+        await this.sendResponse(response, envelope.from);
+      } catch (error) {
+        this.log('error', `Failed to process chat: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Handle proposals
+   */
+  private async handleProposal(envelope: Envelope): Promise<void> {
+    const proposal = envelope.payload;
+    
+    // Check if we can fulfill this proposal
+    if (this.canSend({ kind: 'mcp/request', payload: proposal }) && 
+        this.isSafeOperation(proposal)) {
+      await this.fulfillProposal(envelope);
+    }
+  }
+
+  /**
+   * Process with ReAct pattern
+   */
+  private async processWithReAct(input: string): Promise<string> {
+    const thoughts: Thought[] = [];
+    let iterations = 0;
+    
+    while (iterations < this.config.maxIterations!) {
+      iterations++;
+      
+      // Reason phase
+      const thought = await this.reason(input, thoughts);
+      thoughts.push(thought);
+      
+      this.emitReasoning('reasoning/thought', thought);
+      
+      // Act phase
+      if (thought.action === 'respond') {
+        return thought.actionInput;
+      }
+      
+      const observation = await this.act(thought.action, thought.actionInput);
+      
+      // Add observation to context
+      thoughts.push({
+        reasoning: `Observation: ${observation}`,
+        action: 'observe',
+        actionInput: observation
+      });
     }
     
-    // Send response to fulfiller
-    const response: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `resp-${Date.now()}`,
-      ts: new Date().toISOString(),
-      from: this.config.participant_id!,
-      to: [fulfillment.from],
-      kind: 'mcp/response',
-      correlation_id: [fulfillment.id],
-      payload: {
-        jsonrpc: '2.0',
-        id: fulfillment.payload?.id,
-        ...(error ? { error } : { result })
+    return 'I exceeded the maximum number of reasoning iterations.';
+  }
+
+  /**
+   * Process directly (for reasoning models)
+   */
+  private async processDirectly(input: string): Promise<string> {
+    if (!this.openai) {
+      return 'I need an API key to process requests.';
+    }
+
+    const tools = this.prepareLLMTools();
+    const systemPrompt = this.config.prompts?.system || this.config.systemPrompt || 
+                        'You are a helpful assistant with access to tools.';
+
+    const response = await this.openai.chat.completions.create({
+      model: this.config.model!,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: input }
+      ],
+      tools: tools.length > 0 ? this.convertToOpenAITools(tools) : undefined,
+      tool_choice: tools.length > 0 ? 'auto' : undefined
+    });
+
+    const message = response.choices[0].message;
+    
+    // Handle tool calls if any
+    if (message.tool_calls) {
+      for (const toolCall of message.tool_calls) {
+        if ('function' in toolCall) {
+          const result = await this.executeLLMToolCall(
+            toolCall.function.name,
+            JSON.parse(toolCall.function.arguments)
+          );
+          // Would normally add tool result to conversation and continue
+        }
       }
+    }
+    
+    return message.content || 'I could not generate a response.';
+  }
+
+  /**
+   * Reason phase (ReAct: Reason)
+   */
+  protected async reason(input: string, previousThoughts: Thought[]): Promise<Thought> {
+    if (!this.openai) {
+      return {
+        reasoning: 'No API key available',
+        action: 'respond',
+        actionInput: 'I need an API key to process requests.'
+      };
+    }
+
+    const tools = this.prepareLLMTools();
+    const reasonPrompt = this.config.prompts?.reason || 
+      `Analyze this request: {input}\nAvailable tools: {tools}\nReason about your approach:`;
+
+    const prompt = reasonPrompt
+      .replace('{input}', input)
+      .replace('{tools}', JSON.stringify(tools.map(t => t.name)));
+
+    const response = await this.openai.chat.completions.create({
+      model: this.config.model!,
+      messages: [
+        { role: 'system', content: 'You are reasoning about how to handle a request.' },
+        { role: 'user', content: prompt }
+      ]
+    });
+
+    // Parse reasoning into thought structure
+    const content = response.choices[0].message.content || '';
+    
+    // Simple parsing - in real implementation would be more sophisticated
+    return {
+      reasoning: content,
+      action: 'respond',
+      actionInput: content
+    };
+  }
+
+  /**
+   * Act phase (ReAct: Act)
+   */
+  protected async act(action: string, input: any): Promise<string> {
+    if (action === 'tool') {
+      const result = await this.executeLLMToolCall(input.tool, input.arguments);
+      return JSON.stringify(result);
+    }
+    
+    return 'Action completed';
+  }
+
+  /**
+   * Prepare tools for LLM (per ADR-mpt)
+   */
+  protected prepareLLMTools(): LLMTool[] {
+    return Array.from(this.discoveredTools.values()).map(tool => ({
+      name: `${tool.participantId}/${tool.name}`,
+      description: tool.description || `${tool.name} from ${tool.participantId}`,
+      parameters: tool.schema
+    }));
+  }
+
+  /**
+   * Execute LLM tool call (per ADR-tns)
+   */
+  protected async executeLLMToolCall(namespacedTool: string, args: any): Promise<any> {
+    const [participantId, toolName] = namespacedTool.split('/');
+    
+    // Check if we can send tools/call
+    if (this.canSend({ kind: 'mcp/request', payload: { method: 'tools/call' } })) {
+      // Direct call
+      return await this.mcpRequest([participantId], {
+        method: 'tools/call',
+        params: {
+          name: toolName,
+          arguments: args
+        }
+      });
+    } else if (this.canSend({ kind: 'mcp/proposal', payload: { method: 'tools/call' } })) {
+      // Create proposal
+      const proposalId = uuidv4();
+      
+      const proposal: Envelope = {
+        protocol: PROTOCOL_VERSION,
+        id: proposalId,
+        ts: new Date().toISOString(),
+        from: this.options.participant_id!,
+        kind: 'mcp/proposal',
+        payload: {
+          method: 'tools/call',
+          params: {
+            name: toolName,
+            arguments: args
+          }
+        }
+      };
+      
+      this.send(proposal);
+      
+      // Wait for fulfillment
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Proposal not fulfilled'));
+        }, 30000);
+        
+        const handler = (envelope: Envelope) => {
+          if (envelope.kind === 'mcp/response' && 
+              envelope.correlation_id?.includes(proposalId)) {
+            clearTimeout(timeout);
+            this.removeListener('message', handler);
+            resolve(envelope.payload.result);
+          }
+        };
+        
+        this.on('message', handler);
+      });
+    }
+    
+    throw new Error(`Cannot call tool ${namespacedTool}: no capability`);
+  }
+
+  /**
+   * Convert to OpenAI tool format
+   */
+  private convertToOpenAITools(tools: LLMTool[]): any[] {
+    return tools.map(tool => ({
+      type: 'function',
+      function: {
+        name: tool.name.replace('/', '_'), // OpenAI doesn't like slashes
+        description: tool.description,
+        parameters: tool.parameters || { type: 'object', properties: {} }
+      }
+    }));
+  }
+
+  /**
+   * Send response
+   */
+  private async sendResponse(text: string, to: string): Promise<void> {
+    this.chat(text, to);
+  }
+
+  /**
+   * Check if operation is safe
+   */
+  private isSafeOperation(proposal: any): boolean {
+    // Implement safety checks
+    const { method } = proposal;
+    
+    // Only auto-approve read operations
+    const safeOperations = ['tools/list', 'resources/list', 'resources/read'];
+    return safeOperations.includes(method);
+  }
+
+  /**
+   * Fulfill a proposal
+   */
+  private async fulfillProposal(envelope: Envelope): Promise<void> {
+    const { method, params } = envelope.payload;
+    
+    try {
+      // Find target that can handle this
+      // For now, just try first available participant with the tool
+      const targetId = Array.from(this.otherParticipants.keys())[0];
+      
+      if (targetId) {
+        const result = await this.mcpRequest([targetId], {
+          method,
+          params
+        });
+        
+        // Send response with correlation to proposal
+        const response: Envelope = {
+          protocol: PROTOCOL_VERSION,
+          id: uuidv4(),
+          ts: new Date().toISOString(),
+          from: this.options.participant_id!,
+          to: [envelope.from],
+          correlation_id: [envelope.id],
+          kind: 'mcp/response',
+          payload: { result }
+        };
+        
+        this.send(response);
+      }
+    } catch (error) {
+      this.log('error', `Failed to fulfill proposal: ${error}`);
+    }
+  }
+
+  /**
+   * Logging helper
+   */
+  private log(level: string, message: string): void {
+    const levels = ['debug', 'info', 'warn', 'error'];
+    const configLevel = levels.indexOf(this.config.logLevel || 'info');
+    const msgLevel = levels.indexOf(level);
+    
+    if (msgLevel >= configLevel) {
+      console.log(`[${level.toUpperCase()}] [${this.config.name || 'MEWAgent'}] ${message}`);
+    }
+  }
+
+  /**
+   * Emit reasoning events
+   */
+  private emitReasoning(event: string, data: any): void {
+    const envelope: Partial<Envelope> = {
+      kind: event as any,
+      payload: data
     };
     
-    this.client.send(response);
-  }
-  
-  // Handle proposal rejection
-  private async handleProposalRejection(envelope: Envelope): Promise<void> {
-    const correlationId = envelope.correlation_id;
-    if (!correlationId) return;
-    
-    const corrId = Array.isArray(correlationId) ? correlationId[0] : correlationId;
-    const proposal = this.pendingProposals.get(corrId);
-    
-    if (proposal) {
-      this.log('info', `Proposal ${corrId} was rejected: ${envelope.payload?.reason}`);
-      
-      // Send error response to original requester
-      await this.sendMCPError(
-        proposal.originalRequest, 
-        `Proposal rejected: ${envelope.payload?.reason || 'Unknown reason'}`
-      );
-      
-      // Clean up
-      this.pendingProposals.delete(corrId);
+    if (this.canSend(envelope)) {
+      this.send(envelope);
     }
   }
 }

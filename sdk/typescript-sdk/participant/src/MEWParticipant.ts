@@ -1,401 +1,410 @@
-import { MEWClient, ClientEvents, PROTOCOL_VERSION } from '@mew-protocol/client';
-import { Envelope, PartialEnvelope, Capability } from '@mew-protocol/types';
-import { 
-  ParticipantOptions, 
-  ParticipantInfo, 
-  Tool, 
-  Resource,
-  MCPResponse,
-  ProposalHandler,
-  RequestHandler,
-  PendingRequest
-} from './types';
-import { canSend, matchesCapability } from './capabilities';
-import { ToolRegistry } from './mcp/tools';
+import { MEWClient, ClientOptions } from '@mew-protocol/client';
+import { Envelope, Capability } from '@mew-protocol/types';
+import { PatternMatcher } from '@mew-protocol/capability-matcher';
+import { v4 as uuidv4 } from 'uuid';
 
-export class MEWParticipant {
-  protected client: MEWClient;
-  protected participantInfo?: ParticipantInfo;
-  protected tools = new ToolRegistry();
-  protected resources = new Map<string, Resource>();
-  private joined = false;
-  private proposalHandlers = new Set<ProposalHandler>();
-  private requestHandlers = new Set<RequestHandler>();
-  private pendingRequests = new Map<string, PendingRequest>();
-  private requestTimeout = 30000; // 30 seconds default timeout
+const PROTOCOL_VERSION = 'mew/v0.3';
+
+export interface ParticipantOptions extends ClientOptions {
+  requestTimeout?: number;  // Default timeout for MCP requests
+}
+
+// Handler types
+export type MCPProposalHandler = (envelope: Envelope) => Promise<void>;
+export type MCPRequestHandler = (envelope: Envelope) => Promise<void>;
+
+// Tool and Resource interfaces
+export interface Tool {
+  name: string;
+  description?: string;
+  inputSchema?: any;
+  execute: (args: any) => Promise<any>;
+}
+
+export interface Resource {
+  uri: string;
+  name?: string;
+  description?: string;
+  mimeType?: string;
+  read: () => Promise<any>;
+}
+
+interface PendingRequest {
+  resolve: (value: any) => void;
+  reject: (error: Error) => void;
+  timer?: NodeJS.Timeout;
+}
+
+export class MEWParticipant extends MEWClient {
+  protected participantInfo?: {
+    id: string;
+    capabilities: Capability[];
+  };
   
-  constructor(protected options: ParticipantOptions) {
-    // Create underlying client
-    this.client = new MEWClient({
-      ...options,
-      capabilities: [] // Will be set from welcome message
-    });
-    
+  private tools = new Map<string, Tool>();
+  private resources = new Map<string, Resource>();
+  private pendingRequests = new Map<string, PendingRequest>();
+  private proposalHandlers = new Set<MCPProposalHandler>();
+  private requestHandlers = new Set<MCPRequestHandler>();
+  private matcher = new PatternMatcher();
+  private joined = false;
+
+  constructor(options: ParticipantOptions) {
+    super(options);
+    this.options = { requestTimeout: 30000, ...options };
     this.setupLifecycle();
   }
-  
+
   /**
-   * Connect to the gateway
+   * Check if we can send a specific envelope
    */
-  async connect(): Promise<void> {
-    await this.client.connect();
+  canSend(envelope: Partial<Envelope>): boolean {
+    if (!this.participantInfo) return false;
+    // Use matchesCapability directly to check against all capabilities
+    return this.participantInfo.capabilities.some(cap => 
+      this.matcher.matchesCapability(cap as any, envelope as any)
+    );
   }
-  
+
   /**
-   * Disconnect from the gateway
+   * Send a smart MCP request - uses mcp/request or mcp/proposal based on capabilities
    */
-  disconnect(): void {
-    this.client.disconnect();
+  async mcpRequest(
+    target: string | string[],
+    payload: any,
+    timeoutMs?: number
+  ): Promise<any> {
+    const id = uuidv4();
+    const to = Array.isArray(target) ? target : [target];
+    const timeout = timeoutMs || (this.options as ParticipantOptions).requestTimeout || 30000;
+
+    return new Promise((resolve, reject) => {
+      // Check if we can send direct request
+      if (this.canSend({ kind: 'mcp/request', payload })) {
+        // Send direct MCP request
+        const envelope: Envelope = {
+          protocol: PROTOCOL_VERSION,
+          id,
+          ts: new Date().toISOString(),
+          from: this.options.participant_id!,
+          to,
+          kind: 'mcp/request',
+          payload
+        };
+
+        // Set up timeout
+        const timer = setTimeout(() => {
+          this.pendingRequests.delete(id);
+          reject(new Error(`Request ${id} timed out after ${timeout}ms`));
+        }, timeout);
+
+        // Store pending request
+        this.pendingRequests.set(id, { resolve, reject, timer });
+
+        // Send the request
+        this.send(envelope);
+        return;
+      }
+
+      // Check if we can send proposal
+      if (this.canSend({ kind: 'mcp/proposal', payload })) {
+        // Create proposal for someone else to fulfill
+        const envelope: Envelope = {
+          protocol: PROTOCOL_VERSION,
+          id,
+          ts: new Date().toISOString(),
+          from: this.options.participant_id!,
+          // No 'to' field for proposals - they're broadcast
+          kind: 'mcp/proposal',
+          payload
+        };
+
+        // Set up timeout for proposal
+        const timer = setTimeout(() => {
+          this.pendingRequests.delete(id);
+          reject(new Error(`Proposal ${id} not fulfilled after ${timeout}ms`));
+        }, timeout);
+
+        // Store pending proposal
+        this.pendingRequests.set(id, { resolve, reject, timer });
+
+        // Send the proposal
+        this.send(envelope);
+        return;
+      }
+
+      // Can't send request or proposal
+      reject(new Error(`No capability to send request for method: ${payload.method}`));
+    });
   }
-  
+
+  /**
+   * Send a chat message
+   */
+  chat(text: string, to?: string | string[]): void {
+    if (!this.canSend({ kind: 'chat', payload: { text } })) {
+      throw new Error('No capability to send chat messages');
+    }
+
+    const envelope: Partial<Envelope> = {
+      kind: 'chat',
+      payload: { text }
+    };
+
+    if (to) {
+      envelope.to = Array.isArray(to) ? to : [to];
+    }
+
+    this.send(envelope);
+  }
+
   /**
    * Register a tool
    */
   registerTool(tool: Tool): void {
-    this.tools.register(tool);
+    this.tools.set(tool.name, tool);
   }
-  
+
   /**
    * Register a resource
    */
   registerResource(resource: Resource): void {
     this.resources.set(resource.uri, resource);
   }
-  
+
   /**
-   * Check if we have a capability
+   * Handle MCP proposal events
    */
-  canSend(kind: string, payload?: any): boolean {
-    if (!this.participantInfo) return false;
-    return canSend(this.participantInfo.capabilities, kind, payload);
-  }
-  
-  /**
-   * Send a smart request - uses mcp/request or mcp/proposal based on capabilities
-   * Returns a promise that resolves with the response
-   */
-  async request(target: string | string[], method: string, params?: any, timeoutMs?: number): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const to = Array.isArray(target) ? target : [target];
-      const id = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const timeout = timeoutMs || this.requestTimeout;
-      
-      // Set up timeout
-      const timeoutHandle = setTimeout(() => {
-        this.pendingRequests.delete(id);
-        reject(new Error(`Request timed out after ${timeout}ms`));
-      }, timeout);
-      
-      // Store pending request
-      this.pendingRequests.set(id, {
-        id,
-        resolve,
-        reject,
-        timeout: timeoutHandle
-      });
-      
-      // Check if we can send direct MCP request
-      if (this.canSend('mcp/request', { method, params })) {
-        const envelope: Envelope = {
-          protocol: PROTOCOL_VERSION,
-          id,
-          ts: new Date().toISOString(),
-          from: this.options.participant_id!,
-          to,
-          kind: 'mcp/request',
-          payload: {
-            jsonrpc: '2.0',
-            id: Date.now(),
-            method,
-            params
-          }
-        };
-        
-        this.client.send(envelope);
-        return;
-      }
-      
-      // Fall back to proposal if we have that capability
-      if (this.canSend('mcp/proposal')) {
-        // Create the envelope that would be sent if approved
-        const proposedEnvelope: PartialEnvelope = {
-          to,
-          kind: 'mcp/request',
-          payload: {
-            jsonrpc: '2.0',
-            id: Date.now(),
-            method,
-            params
-          }
-        };
-        
-        const envelope: Envelope = {
-          protocol: PROTOCOL_VERSION,
-          id,
-          ts: new Date().toISOString(),
-          from: this.options.participant_id!,
-          kind: 'mcp/proposal',
-          payload: {
-            proposal: {
-              correlation_id: id,
-              capability: 'mcp/request',
-              envelope: proposedEnvelope
-            }
-          }
-        };
-        
-        this.client.send(envelope);
-        return;
-      }
-      
-      // Clean up and reject
-      clearTimeout(timeoutHandle);
-      this.pendingRequests.delete(id);
-      reject(new Error(`No capability to send ${method} request`));
-    });
-  }
-  
-  /**
-   * Send a chat message
-   */
-  chat(text: string, to?: string | string[]): void {
-    if (!this.canSend('chat')) {
-      throw new Error('No capability to send chat messages');
-    }
-    
-    const envelope: Envelope = {
-      protocol: PROTOCOL_VERSION,
-      id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ts: new Date().toISOString(),
-      from: this.options.participant_id!,
-      to: to ? (Array.isArray(to) ? to : [to]) : undefined,
-      kind: 'chat',
-      payload: {
-        text,
-        format: 'plain'
-      }
-    };
-    
-    this.client.send(envelope);
-  }
-  
-  onProposal(handler: ProposalHandler): () => void {
+  onMCPProposal(handler: MCPProposalHandler): () => void {
     this.proposalHandlers.add(handler);
     return () => this.proposalHandlers.delete(handler);
   }
-  
-  onRequest(handler: RequestHandler): () => void {
+
+  /**
+   * Handle MCP request events
+   */
+  onMCPRequest(handler: MCPRequestHandler): () => void {
     this.requestHandlers.add(handler);
     return () => this.requestHandlers.delete(handler);
   }
-  
+
+  /**
+   * Lifecycle hooks for subclasses
+   */
   protected async onReady(): Promise<void> {}
   protected async onShutdown(): Promise<void> {}
-  
+
+  /**
+   * Set up lifecycle management
+   */
   private setupLifecycle(): void {
-    this.client.onConnected(() => {
+    // Handle connection
+    this.onConnected(() => {
       if (!this.joined) {
-        this.client.send({
-          type: 'join',
-          participantId: this.options.participant_id,
-          space: this.options.space,
-          token: this.options.token
-        } as any);
+        // Join is now handled by MEWClient
         this.joined = true;
       }
     });
-    
-    this.client.onWelcome(async (data: any) => {
+
+    // Handle welcome message
+    this.onWelcome(async (data: any) => {
       this.participantInfo = {
         id: data.you.id,
         capabilities: data.you.capabilities
       };
       await this.onReady();
     });
-    
-    this.client.onMessage(async (envelope: any) => {
+
+    // Handle incoming messages
+    this.onMessage(async (envelope: Envelope) => {
+      // Handle MCP responses
       if (envelope.kind === 'mcp/response') {
         await this.handleMCPResponse(envelope);
       }
+
+      // Handle MCP requests
       if (envelope.kind === 'mcp/request') {
         if (this.shouldHandleRequest(envelope)) {
           await this.handleMCPRequest(envelope);
         }
       }
+
+      // Handle MCP proposals (not from self)
       if (envelope.kind === 'mcp/proposal' && envelope.from !== this.options.participant_id) {
         for (const handler of this.proposalHandlers) {
           await handler(envelope);
         }
       }
-      // Handle proposal rejection for our proposals
+
+      // Handle proposal rejection
       if (envelope.kind === 'mcp/reject') {
         await this.handleProposalReject(envelope);
       }
     });
-    
-    this.client.onError((error: any) => {});
-    
-    this.client.onDisconnected(async () => {
-      for (const [id, pendingRequest] of this.pendingRequests) {
-        clearTimeout(pendingRequest.timeout);
-        pendingRequest.reject(new Error('Connection closed'));
-      }
-      this.pendingRequests.clear();
-      await this.onShutdown();
-    });
   }
-  
-  private async handleMCPResponse(envelope: Envelope): Promise<void> {
-    if (envelope.correlation_id) {
-      const correlationId = Array.isArray(envelope.correlation_id) 
-        ? envelope.correlation_id[0] 
-        : envelope.correlation_id;
-      
-      const pendingRequest = this.pendingRequests.get(correlationId);
-      if (pendingRequest) {
-        clearTimeout(pendingRequest.timeout);
-        this.pendingRequests.delete(correlationId);
-        
-        const payload = envelope.payload;
-        
-        if (payload.error) {
-          pendingRequest.reject(new Error(`MCP Error ${payload.error.code}: ${payload.error.message}`));
-          return;
-        }
-        
-        if (payload.result) {
-          pendingRequest.resolve(payload.result);
-        } else {
-          pendingRequest.resolve(payload);
-        }
-        return;
-      }
-    }
-  }
-  
-  private async handleProposalReject(envelope: Envelope): Promise<void> {
-    const correlationId = envelope.payload?.correlation_id;
-    if (correlationId) {
-      const pendingRequest = this.pendingRequests.get(correlationId);
-      if (pendingRequest) {
-        clearTimeout(pendingRequest.timeout);
-        this.pendingRequests.delete(correlationId);
-        
-        const reason = envelope.payload?.reason || 'Proposal rejected';
-        pendingRequest.reject(new Error(`Proposal rejected: ${reason}`));
-      }
-    }
-  }
-  
+
+  /**
+   * Check if we should handle a request
+   */
   private shouldHandleRequest(envelope: Envelope): boolean {
-    if (envelope.to && !envelope.to.includes(this.options.participant_id!)) {
-      return false;
-    }
-    return this.canSend('mcp/response');
+    // Handle if addressed to us or broadcast
+    return !envelope.to || 
+           envelope.to.length === 0 || 
+           envelope.to.includes(this.options.participant_id!);
   }
-  
+
+  /**
+   * Handle MCP response
+   */
+  private async handleMCPResponse(envelope: Envelope): Promise<void> {
+    const correlationId = envelope.correlation_id?.[0];
+    if (!correlationId) return;
+
+    const pending = this.pendingRequests.get(correlationId);
+    if (pending) {
+      if (pending.timer) clearTimeout(pending.timer);
+      this.pendingRequests.delete(correlationId);
+
+      if (envelope.payload.error) {
+        pending.reject(new Error(envelope.payload.error.message || 'Request failed'));
+      } else {
+        pending.resolve(envelope.payload.result);
+      }
+    }
+  }
+
+  /**
+   * Handle MCP request
+   */
   private async handleMCPRequest(envelope: Envelope): Promise<void> {
-    const { method, params } = envelope.payload || {};
-    const requestId = envelope.payload?.id;
-    
-    let response: MCPResponse;
-    
+    // Check if we have capability to respond
+    if (!this.canSend({ kind: 'mcp/response' })) {
+      return;
+    }
+
+    const { method, params } = envelope.payload;
+    let result: any;
+    let error: any;
+
     try {
-      for (const handler of this.requestHandlers) {
-        const result = await handler(envelope);
-        if (result) {
-          response = result;
+      switch (method) {
+        case 'tools/list':
+          result = await this.handleToolsList();
           break;
-        }
+        
+        case 'tools/call':
+          result = await this.handleToolCall(params);
+          break;
+        
+        case 'resources/list':
+          result = await this.handleResourcesList();
+          break;
+        
+        case 'resources/read':
+          result = await this.handleResourceRead(params);
+          break;
+        
+        default:
+          // Let request handlers handle it
+          for (const handler of this.requestHandlers) {
+            await handler(envelope);
+          }
+          return; // Don't send automatic response
       }
-      
-      if (!response!) {
-        switch (method) {
-          case 'tools/list':
-            response = this.tools.list();
-            break;
-          case 'tools/call':
-            response = await this.tools.execute(params?.name, params?.arguments);
-            break;
-          case 'resources/list':
-            response = this.listResources();
-            break;
-          case 'resources/read':
-            response = await this.readResource(params?.uri);
-            break;
-          default:
-            response = { error: { code: -32601, message: `Method not found: ${method}` } };
-        }
-      }
-    } catch (error: any) {
-      response = { error: { code: -32603, message: error.message || 'Internal error', data: error.stack } };
+    } catch (err: any) {
+      error = {
+        code: err.code || -32603,
+        message: err.message || 'Internal error'
+      };
     }
-    
-    // If the request had a correlation_id (fulfilling a proposal), preserve it
-    // Otherwise use the request's ID as correlation_id
-    const correlationId = envelope.correlation_id || envelope.id;
-    
-    // For proposal fulfillments (has correlation_id), broadcast the response
-    // Otherwise, send to the requester
-    let recipients: string[] | undefined;
-    if (envelope.correlation_id) {
-      // This is a proposal fulfillment - broadcast so the original proposer gets it
-      recipients = undefined; // undefined means broadcast to all
-    } else {
-      // Normal request - respond to sender
-      recipients = [envelope.from];
-      if (envelope.to && Array.isArray(envelope.to)) {
-        recipients.push(...envelope.to.filter(id => id !== this.options.participant_id));
-      }
-    }
-    
-    const responseEnvelope: Envelope = {
+
+    // Send response
+    const response: Envelope = {
       protocol: PROTOCOL_VERSION,
-      id: `resp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: uuidv4(),
       ts: new Date().toISOString(),
       from: this.options.participant_id!,
-      to: recipients,
+      to: [envelope.from],
+      correlation_id: [envelope.id],
       kind: 'mcp/response',
-      correlation_id: correlationId,
-      payload: {
-        jsonrpc: '2.0',
-        id: requestId,
-        ...response
-      }
+      payload: error ? { error } : { result }
     };
-    
-    this.client.send(responseEnvelope);
+
+    this.send(response);
   }
-  
-  private listResources(): MCPResponse {
-    const resources = Array.from(this.resources.values()).map(r => ({
-      uri: r.uri,
-      name: r.name,
-      description: r.description,
-      mimeType: r.mimeType
+
+  /**
+   * Handle proposal rejection
+   */
+  private async handleProposalReject(envelope: Envelope): Promise<void> {
+    const correlationId = envelope.correlation_id?.[0];
+    if (!correlationId) return;
+
+    const pending = this.pendingRequests.get(correlationId);
+    if (pending) {
+      if (pending.timer) clearTimeout(pending.timer);
+      this.pendingRequests.delete(correlationId);
+      pending.reject(new Error(envelope.payload.reason || 'Proposal rejected'));
+    }
+  }
+
+  /**
+   * Handle tools/list request
+   */
+  private async handleToolsList(): Promise<any> {
+    const tools = Array.from(this.tools.values()).map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema
     }));
-    return { result: { resources } };
+    
+    return { tools };
   }
-  
-  private async readResource(uri: string): Promise<MCPResponse> {
+
+  /**
+   * Handle tools/call request
+   */
+  private async handleToolCall(params: any): Promise<any> {
+    const { name, arguments: args } = params;
+    const tool = this.tools.get(name);
+    
+    if (!tool) {
+      throw new Error(`Tool not found: ${name}`);
+    }
+
+    return await tool.execute(args);
+  }
+
+  /**
+   * Handle resources/list request
+   */
+  private async handleResourcesList(): Promise<any> {
+    const resources = Array.from(this.resources.values()).map(resource => ({
+      uri: resource.uri,
+      name: resource.name,
+      description: resource.description,
+      mimeType: resource.mimeType
+    }));
+    
+    return { resources };
+  }
+
+  /**
+   * Handle resources/read request
+   */
+  private async handleResourceRead(params: any): Promise<any> {
+    const { uri } = params;
     const resource = this.resources.get(uri);
+    
     if (!resource) {
-      return { error: { code: -32602, message: `Resource not found: ${uri}` } };
+      throw new Error(`Resource not found: ${uri}`);
     }
-    try {
-      const data = await resource.read();
-      return {
-        result: {
-          contents: [{
-            uri: resource.uri,
-            mimeType: resource.mimeType || 'text/plain',
-            text: typeof data === 'string' ? data : JSON.stringify(data, null, 2)
-          }]
-        }
-      };
-    } catch (error: any) {
-      return { error: { code: -32603, message: error.message || 'Failed to read resource' } };
-    }
+
+    const contents = await resource.read();
+    return {
+      uri,
+      mimeType: resource.mimeType,
+      contents
+    };
   }
 }
-
