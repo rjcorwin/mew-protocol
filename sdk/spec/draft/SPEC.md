@@ -722,5 +722,103 @@ Add state persistence:
 
 - [MEW Protocol Specification v0.3](../spec/v0.3/SPEC.md)
 - [MCP Specification](https://modelcontextprotocol.org)
+### Chat Message Response Strategy
+
+MEWAgent implements a selective response pattern for chat messages to avoid noise while ensuring relevant interactions. The agent decides whether to respond based on multiple factors:
+
+#### Response Decision Criteria
+
+The agent evaluates the following triggers when a chat message is received:
+
+1. **Direct Addressing** (Priority: HIGH)
+   - Message is addressed to the agent via the `to` field
+   - Agent's name or ID is mentioned in the message text
+   - Always responds when directly addressed
+
+2. **Content Relevance** (Priority: MEDIUM) - *Requires LLM Classification*
+   - When not directly addressed, agent uses LLM to classify if response is appropriate
+   - LLM evaluates:
+     - Whether message contains a question
+     - Whether message relates to agent's tools/resources
+     - Whether agent can meaningfully contribute
+   - Response decision based on classification confidence score
+
+3. **Conversation Context** (Priority: LOW) - *LLM-Assisted*
+   - Agent uses LLM to evaluate ongoing conversation relevance
+   - Considers previous message history in context window
+   - Determines if agent has unique value to add to discussion
+
+#### Configuration Options
+
+```typescript
+interface ChatResponseConfig {
+  autoRespond: boolean;           // Global enable/disable (default: true)
+  respondToQuestions: boolean;    // Respond to questions (default: true)
+  respondToMentions: boolean;     // Respond when mentioned (default: true)
+  respondToDirect: boolean;       // Respond to direct messages (default: true)
+  confidenceThreshold: number;    // Min confidence to respond (0-1, default: 0.5)
+  contextWindow: number;          // Messages to consider for context (default: 10)
+}
+```
+
+#### Response Flow
+
+```
+Chat Message Received
+        ↓
+Is it from self? → Yes → Ignore
+        ↓ No
+Is autoRespond enabled? → No → Ignore
+        ↓ Yes
+Is it directly addressed? → Yes → Respond
+        ↓ No
+Does it mention agent? → Yes → Respond
+        ↓ No
+        ↓
+[LLM Classification Call]
+"Should I respond to this message?"
+- Analyze message content
+- Check relevance to my tools
+- Evaluate if I can help
+        ↓
+Confidence > threshold? → Yes → Respond
+        ↓ No
+      Ignore
+```
+
+#### LLM Classification Prompt
+
+When not directly addressed, the agent uses an LLM call with a prompt like:
+
+```typescript
+const classificationPrompt = `
+You are an AI agent with the following tools: ${agent.tools}
+A message was sent in the conversation: "${message.text}"
+
+Should you respond to this message?
+Consider:
+1. Is this a question you can answer?
+2. Does it relate to your tools or capabilities?
+3. Can you provide unique value by responding?
+
+Return a JSON object:
+{
+  "shouldRespond": boolean,
+  "confidence": number (0-1),
+  "reason": string
+}
+`;
+```
+
+#### Implementation Notes
+
+- Agents SHOULD implement rate limiting to avoid chat spam
+- Agents SHOULD track conversation context to avoid redundant responses
+- Agents MAY use LLM to determine response relevance
+- Agents MUST respect the `autoRespond` configuration flag
+- Multiple agents SHOULD coordinate to avoid duplicate responses
+
+## References
+
 - [TypeScript SDK Documentation](../typescript-sdk/README.md)
 - [Test Scenarios](../tests/README.md)
