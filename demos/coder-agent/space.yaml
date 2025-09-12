@@ -1,45 +1,61 @@
-# Coder Agent Demo Space
+# Coder Agent Demo Space - With Approval Required for File Modifications
 space:
   id: coder-demo
   name: "Coder Agent Demo"
-  description: "Demonstrates MEW Agent as a coding assistant with file access via MCP bridge"
+  description: "Coding assistant that requires human approval for file modifications"
   default_participant: human
 
 participants:
+  # Human participant with full capabilities (can approve proposals)
   human:
     tokens: 
       - human-token
     capabilities:
-      - kind: "*"  # Full capabilities
+      - kind: "*"  # Full capabilities including proposal approval
       
+  # Coder agent with limited capabilities - creates proposals for file modifications
   coder-agent:
     type: local
     command: "node"
-    args: ["../../mew-agent/src/index.js", "--config", "./config/coder-config.yaml", "--gateway", "ws://localhost:8080", "--space", "coder-demo", "--token", "coder-token"]
+    args: ["../../sdk/typescript-sdk/agent/dist/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-space", "--token", "coder-token", "--id", "coder-agent"]
     auto_start: true
     tokens:
       - coder-token
     capabilities:
       - kind: "chat"
-      - kind: "mcp/request"
+      - kind: "reasoning/*"
+      - kind: "mcp/proposal"
       - kind: "mcp/response"
-      - kind: "reasoning/start"
-      - kind: "reasoning/thought"
-      - kind: "reasoning/conclusion"
+      - kind: "mcp/request"
+        payload:
+          method: "!tools/call"
   
-  # MCP Bridge for file system access
+  # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:
     type: local
-    command: "node"
-    args: ["../../bridge/bin/mew-bridge.js", "--participant-id", "mcp-fs-bridge", "--gateway", "ws://localhost:8080", "--space", "coder-demo", "--token", "mcp-bridge-token", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./workspace"]
+    command: "npx"
+    args: ["@modelcontextprotocol/server-filesystem", "./workspace"]
     auto_start: true
     tokens:
       - mcp-bridge-token
     capabilities:
       - kind: "mcp/request"
       - kind: "mcp/response"
-      - kind: "mcp/tool"
+      - kind: "mcp/notification"
+
+  # Optional: Auto-approver for read operations (security: only allows reads)
+  read-approver:
+    type: local
+    command: "node"
+    args: ["./read-approver.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-demo", "--token", "read-approver-token"]
+    auto_start: false  # Set to true if you want automatic approval of read operations
+    tokens:
+      - read-approver-token
+    capabilities:
+      - kind: "mcp/proposal"  # Can see proposals
+      - kind: "mcp/request"   # Can execute approved operations
+      - kind: "mcp/response"  # Can respond to requests
 
 defaults:
   capabilities:
-    - kind: "chat"
+    - kind: "chat"  # Everyone can chat by default
