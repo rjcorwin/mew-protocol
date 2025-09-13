@@ -6,13 +6,14 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist",
-    "prepare": "npm run build"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mew-protocol/types": "file:../types",
+    "@mew-protocol/capability-matcher": "file:../capability-matcher",
     "@mew-protocol/client": "file:../client",
-    "@mew-protocol/capability-matcher": "file:../capability-matcher"
+    "@mew-protocol/types": "file:../types",
+    "@types/uuid": "^10.0.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
