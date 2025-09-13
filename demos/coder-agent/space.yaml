@@ -29,6 +29,69 @@ participants:
       - kind: "mcp/request"
         payload:
           method: "!tools/call"
+      # Allow direct calls to read-only operations without approval
+      # These are safe operations that don't modify the filesystem:
+      # - list_allowed_directories: Check where files can be written
+      # - read_file: Read existing files (deprecated)
+      # - read_text_file: Read text files (modern replacement for read_file)
+      # - read_media_file: Read image/audio files as base64
+      # - read_multiple_files: Read multiple files efficiently
+      # - search_files: Search for files by pattern
+      # - list_directory: List contents of directories
+      # - list_directory_with_sizes: List directory with file sizes
+      # - directory_tree: Get recursive tree view
+      # - get_file_info: Get metadata about files
+      # Write operations (write_file, edit_file, create_directory, move_file) still require approval
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "list_allowed_directories"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "read_file"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "read_text_file"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "read_media_file"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "read_multiple_files"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "search_files"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "list_directory"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "list_directory_with_sizes"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "directory_tree"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "get_file_info"
     env:
       # OPENAI_API_KEY is inherited from environment automatically
       OPENAI_MODEL: "gpt-5"
