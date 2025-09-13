@@ -38,7 +38,7 @@ participants:
   mcp-fs-bridge:
     type: local
     command: "node"
-    args: ["../../bridge/bin/mew-bridge.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-demo", "--token", "mcp-bridge-token", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,.", "--mcp-cwd", "/Users/rj/Git/rjcorwin/mew-protocol/demos/coder-agent/workspace"]
+    args: ["../../bridge/bin/mew-bridge.js", "--gateway", "ws://localhost:${PORT}", "--space", "coder-demo", "--token", "mcp-bridge-token", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,.", "--mcp-cwd", "./workspace"]
     auto_start: true
     tokens:
       - mcp-bridge-token
