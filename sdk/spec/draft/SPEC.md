@@ -143,6 +143,7 @@ Provides protocol-aware participant functionality with MCP support, tool/resourc
 - **MCP Protocol**: Handle MCP requests and responses
 - **Tool Management**: Register and execute own tools (respond to tools/list and tools/call)
 - **Resource Management**: Register and serve own resources
+- **Tool Discovery**: Discover and cache tools from other participants
 - **Capability Checking**: Validate operations against capabilities
 - **Smart Routing**: Route requests via direct send or proposals
 - **Request Tracking**: Track pending requests with timeouts
@@ -170,6 +171,11 @@ class MEWParticipant {
   registerTool(tool: Tool): void;
   registerResource(resource: Resource): void;
   
+  // Tool Discovery
+  discoverTools(participantId: string): Promise<Tool[]>;
+  getAvailableTools(): Tool[];
+  enableAutoDiscovery(): void;
+  
   // Capability checking
   canSend(envelope: Partial<Envelope>): boolean;
   
@@ -186,6 +192,7 @@ class MEWParticipant {
   // MCP event handlers
   onMCPProposal(handler: MCPProposalHandler): () => void;
   onMCPRequest(handler: MCPRequestHandler): () => void;
+  onParticipantJoin(handler: (participant: any) => void): () => void;
   
   // Lifecycle hooks (for subclasses)
   protected onReady(): Promise<void>;
@@ -298,6 +305,46 @@ interface Tool {
 }
 ```
 
+#### Tool Discovery
+MEWParticipant provides tool discovery capabilities that were previously only in MEWAgent:
+
+```typescript
+// Discovered tools stored by participant
+discoveredTools: Map<string, Tool[]>;
+
+// Tool cache with TTL
+toolCache: {
+  participant: string;
+  tools: Tool[];
+  timestamp: number;
+  ttl: number;
+}[];
+```
+
+**Key Features:**
+- **Auto-discovery**: Automatically discover tools when participants join (opt-in)
+- **Manual discovery**: Explicitly discover tools from specific participants
+- **Caching**: Cache discovered tools with configurable TTL
+- **Unified access**: All discovered tools available through `getAvailableTools()`
+
+**Example usage:**
+```typescript
+// Human interface can discover tools
+class HumanInterface extends MEWParticipant {
+  async onReady() {
+    // Enable automatic discovery
+    this.enableAutoDiscovery();
+    
+    // Or manually discover
+    await this.discoverTools('calculator-service');
+    
+    // Get all available tools
+    const tools = this.getAvailableTools();
+    this.ui.showTools(tools);
+  }
+}
+```
+
 ## Layer 3: MEWAgent
 
 ### Purpose
@@ -305,11 +352,11 @@ Provides autonomous agent functionality with reasoning, tool discovery, and deci
 
 ### Responsibilities
 - **Autonomous Behavior**: Optional ReAct pattern (Reason+Act loops, can be disabled for reasoning models)
-- **Tool Discovery**: Automatically discover tools from other participants via tools/list
+- **Tool Selection**: Select appropriate tools using LLM reasoning
 - **Tool Orchestration**: Call tools from other participants via tools/call or proposals
 - **Reasoning Transparency**: Emit reasoning events
 - **Message Handling**: Process chat and requests autonomously
-- **Participant Tracking**: Track other participants and their capabilities
+- **LLM Tool Preparation**: Format discovered tools for LLM consumption
 - **Dynamic Tool Use**: Use discovered tools without hardcoding
 - **Own Tools**: Can also register own tools (inherited from MEWParticipant)
 
@@ -358,23 +405,14 @@ class MEWAgent extends MEWParticipant {
 
 ### Key Features
 
-#### Tool Discovery and Namespacing
-Agents automatically discover tools when participants join and present them using hierarchical namespace notation (per ADR-mpt):
+#### Tool Preparation and Namespacing
+Agents prepare discovered tools (from parent MEWParticipant) for LLM consumption using hierarchical namespace notation (per ADR-mpt):
 
-1. Listen for `system/presence` events
-2. Send `tools/list` request to new participants
-3. Store discovered tools with participant attribution
-4. Present tools to LLM using `participant/tool` notation
+1. Get discovered tools from parent's `getAvailableTools()`
+2. Format tools with participant attribution
+3. Present tools to LLM using `participant/tool` notation
 
 ```typescript
-// Internal storage
-discoveredTools: Map<string, {
-  name: string;
-  participantId: string;
-  description?: string;
-  schema?: any;
-}>;
-
 // Tool presentation for LLM (per ADR-mpt)
 interface LLMTool {
   name: string;        // "calculator/add" - hierarchical namespace
@@ -463,8 +501,9 @@ Agents select tools based on:
 
 Example flow:
 ```typescript
-// 1. Agent discovers tools and prepares for LLM
-const llmTools = this.prepareLLMTools();
+// 1. Agent gets discovered tools from parent and prepares for LLM
+const tools = this.getAvailableTools(); // From MEWParticipant
+const llmTools = this.prepareLLMTools(tools);
 // Returns: [{ name: "calculator/add", ... }, { name: "math-service/multiply", ... }]
 
 // 2. LLM selects a tool
@@ -504,24 +543,27 @@ await this.mcpRequest([participantId], {
 - MCP protocol implementation
 - Capability enforcement
 - Own tool/resource management (register, list, execute)
+- Tool discovery and caching from other participants
 - Calling other participants' tools (via tools/call)
 - Request/response correlation
 - Proposal patterns
+- Participant join/leave tracking
 
 **NOT Concerns:**
 - Transport details
 - Autonomous behavior
 - Reasoning patterns
-- Tool discovery from other participants
-- Dynamic tool orchestration
+- LLM-specific tool selection strategies
+- Natural language to tool mapping
 
 ### MEWAgent (Application Layer)
 **Concerns:**
 - Autonomous behavior
 - Reasoning and decision-making (ReAct pattern)
-- Tool discovery from other participants
+- LLM-specific tool selection strategies
 - Tool namespace management for LLM (per ADR-tns)
 - Converting `participant/tool` calls to MEW envelopes
+- Natural language to tool mapping
 - Dynamic tool orchestration across participants
 - Multi-step workflows
 - Natural language understanding
@@ -531,7 +573,8 @@ await this.mcpRequest([participantId], {
 - Protocol details
 - Connection management
 - Low-level message handling
-- Direct tool registration (uses parent's methods)
+- Direct tool discovery (uses parent's discovery)
+- Tool caching (handled by parent)
 
 ## Configuration
 
