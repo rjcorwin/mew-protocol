@@ -12,8 +12,8 @@
     "@mew-protocol/capability-matcher": "file:../capability-matcher",
     "@mew-protocol/client": "file:../client",
     "@mew-protocol/types": "file:../types",
-    "@types/uuid": "^10.0.0",
-    "uuid": "^13.0.0"
+    "@types/uuid": "^9.0.8",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
