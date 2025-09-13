@@ -40,12 +40,7 @@ interface Thought {
   actionInput: any;   // ReAct: action parameters
 }
 
-interface DiscoveredTool {
-  name: string;
-  participantId: string;
-  description?: string;
-  schema?: any;
-}
+// DiscoveredTool interface now comes from MEWParticipant
 
 interface LLMTool {
   name: string;        // "participant/tool" - hierarchical namespace
@@ -62,13 +57,9 @@ interface OtherParticipant {
 export class MEWAgent extends MEWParticipant {
   private config: AgentConfig;
   private openai?: OpenAI;
-  private discoveredTools = new Map<string, DiscoveredTool>();
   private otherParticipants = new Map<string, OtherParticipant>();
   private isRunning = false;
   private currentConversation: Array<{ role: string; content: string }> = [];
-  private pendingDiscovery: string[] = [];
-  private discoveryQueue: string[] = [];
-  private isDiscovering = false;
 
   constructor(config: AgentConfig) {
     super(config);
@@ -88,47 +79,29 @@ export class MEWAgent extends MEWParticipant {
 
     this.setupAgentBehavior();
     
-    // Override welcome handler to capture participants
-    this.onWelcome(async (data: any) => {
-      if (data.participants) {
-        this.log('info', `Welcome received, storing ${data.participants.length} existing participants`);
-        for (const participant of data.participants) {
-          if (participant.id !== this.options.participant_id) {
-            this.log('info', `Storing participant from welcome: ${participant.id}`);
-            // Track participant
-            this.otherParticipants.set(participant.id, {
-              id: participant.id,
-              joinedAt: new Date(),
-              capabilities: participant.capabilities
-            });
-            // Only discover tools from participants that can respond to MCP requests
-            const canRespond = participant.capabilities?.some((cap: any) => 
-              cap.kind === 'mcp/response'
-            );
-            if (canRespond) {
-              this.pendingDiscovery.push(participant.id);
-            } else {
-              this.log('debug', `Skipping tool discovery for ${participant.id} - no mcp/response capability`);
-            }
-          }
-        }
-        // Queue discoveries and start processing after a delay
-        setTimeout(() => {
-          this.log('info', `Queuing tool discovery for ${this.pendingDiscovery.length} participants`);
-          this.discoveryQueue.push(...this.pendingDiscovery);
-          this.pendingDiscovery = [];
-          this.processDiscoveryQueue();
-        }, 1000); // Wait 1 second for system to stabilize
+    // Enable auto-discovery for agents
+    this.enableAutoDiscovery();
+    
+    // Set up participant join handler for tracking
+    this.onParticipantJoin((participant) => {
+      if (participant.id !== this.options.participant_id) {
+        this.log('info', `New participant joined: ${participant.id}`);
+        this.otherParticipants.set(participant.id, {
+          id: participant.id,
+          joinedAt: new Date(),
+          capabilities: participant.capabilities
+        });
       }
     });
   }
   
   /**
-   * Override onReady to discover tools after connection is established
+   * Override onReady to log agent readiness
    */
   protected async onReady(): Promise<void> {
-    // Tool discovery now happens in the welcome handler after a delay
+    // Tool discovery is handled by parent MEWParticipant with auto-discovery
     this.log('info', `Agent ready`);
+    await super.onReady();
   }
 
   /**
@@ -154,13 +127,6 @@ export class MEWAgent extends MEWParticipant {
    */
   addTool(tool: Tool): void {
     this.registerTool(tool);
-    // Also track as discovered tool for our own tools
-    this.discoveredTools.set(tool.name, {
-      name: tool.name,
-      participantId: this.options.participant_id!,
-      description: tool.description,
-      schema: tool.inputSchema
-    });
   }
 
   /**
@@ -174,17 +140,20 @@ export class MEWAgent extends MEWParticipant {
    * Set up agent behavior
    */
   private setupAgentBehavior(): void {
-    // Handle system presence events for tool discovery
+    // Handle messages for agent behavior
     this.onMessage(async (envelope: Envelope) => {
       // Only log presence and welcome for debugging
       if (envelope.kind === 'system/presence' || envelope.kind === 'system/welcome') {
         this.log('debug', `Received ${envelope.kind} from: ${envelope.from}`);
       }
       
+      // Track presence for other participants
       if (envelope.kind === 'system/presence') {
-        await this.handlePresence(envelope);
+        const { event, participant } = envelope.payload;
+        if (event === 'leave') {
+          this.otherParticipants.delete(participant.id);
+        }
       }
-      
       
       // Handle chat messages (autoRespond check is inside handleChat)
       if (envelope.kind === 'chat' && 
@@ -200,102 +169,6 @@ export class MEWAgent extends MEWParticipant {
     });
   }
 
-  /**
-   * Handle presence events (participant join/leave)
-   */
-  private async handlePresence(envelope: Envelope): Promise<void> {
-    const { event, participant } = envelope.payload;
-    
-    this.log('debug', `Presence event: ${event} for ${participant.id}`);
-    
-    if (event === 'join' && participant.id !== this.options.participant_id) {
-      this.log('debug', `New participant joined: ${participant.id}`);
-      // Track new participant
-      this.otherParticipants.set(participant.id, {
-        id: participant.id,
-        joinedAt: new Date(),
-        capabilities: participant.capabilities
-      });
-      
-      // Check if participant can respond to MCP requests
-      const canRespond = participant.capabilities?.some((cap: any) => 
-        cap.kind === 'mcp/response'
-      );
-      
-      if (canRespond) {
-        // Add to discovery queue instead of discovering immediately
-        this.discoveryQueue.push(participant.id);
-        // Process queue with a delay to avoid storms
-        setTimeout(() => this.processDiscoveryQueue(), 2000);
-      } else {
-        this.log('debug', `Skipping ${participant.id} - no mcp/response capability`);
-      }
-    } else if (event === 'leave') {
-      // Remove participant and their tools
-      this.otherParticipants.delete(participant.id);
-      for (const [key, tool] of this.discoveredTools.entries()) {
-        if (tool.participantId === participant.id) {
-          this.discoveredTools.delete(key);
-        }
-      }
-    }
-  }
-
-  /**
-   * Process the discovery queue with rate limiting
-   */
-  private async processDiscoveryQueue(): Promise<void> {
-    if (this.isDiscovering || this.discoveryQueue.length === 0) {
-      return;
-    }
-    
-    this.isDiscovering = true;
-    const participantId = this.discoveryQueue.shift();
-    
-    if (participantId) {
-      await this.discoverToolsFrom(participantId);
-      
-      // Wait 500ms between discoveries to avoid overwhelming the system
-      setTimeout(() => {
-        this.isDiscovering = false;
-        this.processDiscoveryQueue();
-      }, 500);
-    } else {
-      this.isDiscovering = false;
-    }
-  }
-
-  /**
-   * Discover tools from a participant
-   */
-  private async discoverToolsFrom(participantId: string): Promise<void> {
-    this.log('info', `Discovering tools from ${participantId}`);
-    try {
-      const result = await this.mcpRequest([participantId], {
-        method: 'tools/list'
-      }, 5000);
-      
-      this.log('info', `Tool discovery response from ${participantId}: ${JSON.stringify(result)}`);
-      
-      if (result?.tools) {
-        for (const tool of result.tools) {
-          const key = `${participantId}/${tool.name}`;
-          this.discoveredTools.set(key, {
-            name: tool.name,
-            participantId,
-            description: tool.description,
-            schema: tool.inputSchema
-          });
-        }
-        
-        this.log('info', `Discovered ${result.tools.length} tools from ${participantId}: ${result.tools.map((t: any) => t.name).join(', ')}`);
-      } else {
-        this.log('info', `No tools found from ${participantId}`);
-      }
-    } catch (error) {
-      this.log('error', `Could not discover tools from ${participantId}: ${error}`);
-    }
-  }
 
   /**
    * Handle chat messages
@@ -422,7 +295,8 @@ export class MEWAgent extends MEWParticipant {
       throw new Error('No OpenAI client available for classification');
     }
     
-    const tools = Array.from(this.discoveredTools.values()).map(t => t.name);
+    const allTools = this.getAvailableTools();
+    const tools = allTools.map(t => `${t.participantId}/${t.name}`);
     
     const classificationPrompt = this.config.prompts?.classify || `
 You are an AI agent with the following tools: ${JSON.stringify(tools)}
@@ -613,17 +487,20 @@ Return a JSON object:
   protected reasonWithoutLLM(input: string, previousThoughts: Thought[]): Thought {
     const lowerInput = input.toLowerCase();
     
+    // Get available tools from parent
+    const allTools = this.getAvailableTools();
+    
     // Debug: Check available tools
-    this.log('info', `ReasonWithoutLLM - Tool count: ${this.discoveredTools.size}`);
-    if (this.discoveredTools.size > 0) {
-      this.log('info', `ReasonWithoutLLM - Available tools: ${Array.from(this.discoveredTools.keys()).join(', ')}`);
+    this.log('info', `ReasonWithoutLLM - Tool count: ${allTools.length}`);
+    if (allTools.length > 0) {
+      this.log('info', `ReasonWithoutLLM - Available tools: ${allTools.map(t => `${t.participantId}/${t.name}`).join(', ')}`);
     }
     
     // Check for file operations (read, list, etc.)
     if (lowerInput.includes('read') || lowerInput.includes('show') || lowerInput.includes('see') || 
         lowerInput.includes('look at') || lowerInput.includes('view') || lowerInput.includes('check')) {
       // Look for file-related tools
-      for (const [key, tool] of this.discoveredTools) {
+      for (const tool of allTools) {
         if (tool.name.includes('read') || tool.name === 'read_file') {
           // Extract potential file path from input
           const pathMatch = input.match(/['"`]([^'"`]+)['"`]/) || input.match(/(\S+\.(txt|js|ts|json|md|yaml|yml))/i);
@@ -646,7 +523,7 @@ Return a JSON object:
     if (lowerInput.includes('list') || lowerInput.includes('ls') || lowerInput.includes('dir') || 
         lowerInput.includes('files') || lowerInput.includes('directory')) {
       // Look for list-related tools
-      for (const [key, tool] of this.discoveredTools) {
+      for (const tool of allTools) {
         if (tool.name.includes('list') || tool.name === 'list_directory') {
           // Extract potential directory path from input
           const pathMatch = input.match(/['"`]([^'"`]+)['"`]/) || input.match(/in\s+(\S+)/);
@@ -666,7 +543,7 @@ Return a JSON object:
     // Check for simple arithmetic with discovered tools
     if (lowerInput.includes('calculate') || lowerInput.includes('add') || lowerInput.includes('plus') || lowerInput.includes('+')) {
       // Look for calculation tools
-      for (const [key, tool] of this.discoveredTools) {
+      for (const tool of allTools) {
         if (tool.name === 'add' || tool.name.includes('calc') || tool.name.includes('math')) {
           const numbers = input.match(/\d+/g);
           if (numbers && numbers.length >= 2) {
@@ -700,8 +577,8 @@ Return a JSON object:
     
     // Check for greetings
     if (lowerInput.includes('hello') || lowerInput.includes('hi') || lowerInput.includes('hey')) {
-      const toolList = this.discoveredTools.size > 0 
-        ? `I have access to the following tools: ${Array.from(this.discoveredTools.values()).map(t => t.name).join(', ')}.` 
+      const toolList = allTools.length > 0 
+        ? `I have access to the following tools: ${allTools.map(t => t.name).join(', ')}.` 
         : 'I\'m still discovering available tools.';
       return {
         reasoning: 'The user is greeting me.',
@@ -711,8 +588,8 @@ Return a JSON object:
     }
     
     // Default response with available tools
-    if (this.discoveredTools.size > 0) {
-      const toolDescriptions = Array.from(this.discoveredTools.values())
+    if (allTools.length > 0) {
+      const toolDescriptions = allTools
         .map(t => `${t.name} (from ${t.participantId})`)
         .join(', ');
       return {
@@ -759,22 +636,14 @@ Return a JSON object:
    */
   protected prepareLLMTools(): LLMTool[] {
     const tools: LLMTool[] = [];
+    const allTools = this.getAvailableTools();
     
-    // Add our own tools
-    for (const [name, tool] of this.tools.entries()) {
-      tools.push({
-        name: `${this.options.participant_id}/${name}`,
-        description: tool.description || `${name} tool`,
-        parameters: tool.inputSchema
-      });
-    }
-    
-    // Add discovered tools from other participants
-    for (const tool of this.discoveredTools.values()) {
+    // Format all tools for LLM consumption
+    for (const tool of allTools) {
       tools.push({
         name: `${tool.participantId}/${tool.name}`,
         description: tool.description || `${tool.name} from ${tool.participantId}`,
-        parameters: tool.schema
+        parameters: tool.inputSchema
       });
     }
     

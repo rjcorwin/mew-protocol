@@ -36,6 +36,20 @@ interface PendingRequest {
   proposer?: string;  // Track original proposer for security validation
 }
 
+interface DiscoveredTool {
+  name: string;
+  participantId: string;
+  description?: string;
+  inputSchema?: any;
+}
+
+interface ToolCacheEntry {
+  participant: string;
+  tools: DiscoveredTool[];
+  timestamp: number;
+  ttl: number;
+}
+
 export class MEWParticipant extends MEWClient {
   protected participantInfo?: {
     id: string;
@@ -43,13 +57,18 @@ export class MEWParticipant extends MEWClient {
   };
   
   protected tools = new Map<string, Tool>();
+  protected discoveredTools = new Map<string, DiscoveredTool[]>();
   private resources = new Map<string, Resource>();
   private pendingRequests = new Map<string, PendingRequest>();
   private proposalFulfillments = new Map<string, string>(); // Maps fulfillment request ID to proposal ID
   private proposalHandlers = new Set<MCPProposalHandler>();
   private requestHandlers = new Set<MCPRequestHandler>();
+  private participantJoinHandlers = new Set<(participant: any) => void>();
   private matcher = new PatternMatcher();
   private joined = false;
+  private toolCache: ToolCacheEntry[] = [];
+  private autoDiscoveryEnabled = false;
+  private defaultCacheTTL = 300000; // 5 minutes
 
   constructor(options: ParticipantOptions) {
     super(options);
@@ -241,6 +260,96 @@ export class MEWParticipant extends MEWClient {
   }
 
   /**
+   * Handle participant join events
+   */
+  onParticipantJoin(handler: (participant: any) => void): () => void {
+    this.participantJoinHandlers.add(handler);
+    return () => this.participantJoinHandlers.delete(handler);
+  }
+
+  /**
+   * Discover tools from a specific participant
+   */
+  async discoverTools(participantId: string): Promise<DiscoveredTool[]> {
+    try {
+      // Check cache first
+      const cached = this.toolCache.find(entry => 
+        entry.participant === participantId && 
+        Date.now() - entry.timestamp < entry.ttl
+      );
+      
+      if (cached) {
+        return cached.tools;
+      }
+
+      // Fetch tools from participant
+      const result = await this.mcpRequest([participantId], {
+        method: 'tools/list'
+      }, 5000);
+      
+      const tools: DiscoveredTool[] = [];
+      if (result?.tools) {
+        for (const tool of result.tools) {
+          tools.push({
+            name: tool.name,
+            participantId,
+            description: tool.description,
+            inputSchema: tool.inputSchema
+          });
+        }
+      }
+      
+      // Update cache
+      this.toolCache = this.toolCache.filter(e => e.participant !== participantId);
+      this.toolCache.push({
+        participant: participantId,
+        tools,
+        timestamp: Date.now(),
+        ttl: this.defaultCacheTTL
+      });
+      
+      // Store discovered tools
+      this.discoveredTools.set(participantId, tools);
+      
+      return tools;
+    } catch (error) {
+      console.error(`Failed to discover tools from ${participantId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all available tools (own + discovered)
+   */
+  getAvailableTools(): DiscoveredTool[] {
+    const allTools: DiscoveredTool[] = [];
+    
+    // Add own tools
+    for (const [name, tool] of this.tools.entries()) {
+      allTools.push({
+        name,
+        participantId: this.options.participant_id!,
+        description: tool.description,
+        inputSchema: tool.inputSchema
+      });
+    }
+    
+    // Add discovered tools
+    for (const tools of this.discoveredTools.values()) {
+      allTools.push(...tools);
+    }
+    
+    return allTools;
+  }
+
+  /**
+   * Enable automatic tool discovery when participants join
+   */
+  enableAutoDiscovery(): void {
+    this.autoDiscoveryEnabled = true;
+  }
+
+  /**
    * Lifecycle hooks for subclasses
    */
   protected async onReady(): Promise<void> {}
@@ -306,6 +415,11 @@ export class MEWParticipant extends MEWClient {
       // Handle proposal withdrawal
       if (envelope.kind === 'mcp/withdraw') {
         await this.handleProposalWithdraw(envelope);
+      }
+
+      // Handle system presence for auto-discovery
+      if (envelope.kind === 'system/presence' && this.autoDiscoveryEnabled) {
+        await this.handlePresence(envelope);
       }
     });
   }
@@ -539,5 +653,36 @@ export class MEWParticipant extends MEWClient {
       mimeType: resource.mimeType,
       contents
     };
+  }
+
+  /**
+   * Handle presence events for auto-discovery
+   */
+  private async handlePresence(envelope: Envelope): Promise<void> {
+    const { event, participant } = envelope.payload;
+    
+    if (event === 'join' && participant.id !== this.options.participant_id) {
+      // Notify join handlers
+      for (const handler of this.participantJoinHandlers) {
+        handler(participant);
+      }
+      
+      // Auto-discover tools if enabled
+      if (this.autoDiscoveryEnabled) {
+        // Check if participant can respond to MCP requests
+        const canRespond = participant.capabilities?.some((cap: any) => 
+          cap.kind === 'mcp/response'
+        );
+        
+        if (canRespond) {
+          // Discover tools with a small delay to avoid storms
+          setTimeout(() => this.discoverTools(participant.id), 1000);
+        }
+      }
+    } else if (event === 'leave') {
+      // Remove cached tools for leaving participant
+      this.discoveredTools.delete(participant.id);
+      this.toolCache = this.toolCache.filter(e => e.participant !== participant.id);
+    }
   }
 }
