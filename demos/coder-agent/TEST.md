@@ -265,6 +265,149 @@ Error responses will have an `error` field instead of `result`:
 }
 ```
 
+## Testing with curl (HTTP API)
+
+The gateway provides an HTTP API endpoint for sending messages without a WebSocket connection. This is useful for quick testing with curl.
+
+### HTTP API Endpoint
+```
+POST http://localhost:8080/participants/{participantId}/messages?space={spaceId}
+```
+
+### Authentication
+Include the participant's token in the Authorization header:
+```
+Authorization: Bearer {token}
+```
+
+### Example curl Commands
+
+#### 1. List Available Tools
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/list"
+    }
+  }'
+```
+
+#### 2. List Resources
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "resources/list"
+    }
+  }'
+```
+
+#### 3. List Directory Contents
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "tools/call",
+      "params": {
+        "name": "list_directory",
+        "arguments": {
+          "path": "."
+        }
+      }
+    }
+  }'
+```
+
+#### 4. Read a File
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "tools/call",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "test.txt"
+        }
+      }
+    }
+  }'
+```
+
+#### 5. Write a File
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "tools/call",
+      "params": {
+        "name": "write_file",
+        "arguments": {
+          "path": "test-write.txt",
+          "content": "Hello from MEW Protocol test!"
+        }
+      }
+    }
+  }'
+```
+
+### Monitoring Responses
+
+To see the responses, you need to have a WebSocket client connected to observe the messages. You can:
+
+1. Use the MEW CLI client in another terminal:
+```bash
+mew client connect --gateway ws://localhost:8080 --space coder-demo --token human-token
+```
+
+2. Or use the HTTP API to check participants:
+```bash
+curl 'http://localhost:8080/participants?space=coder-demo'
+```
+
+### Response Format
+
+The HTTP API returns a simple acknowledgment:
+```json
+{
+  "id": "http-{timestamp}-{random}",
+  "status": "accepted",
+  "timestamp": "2025-09-13T22:23:09.792Z"
+}
+```
+
+The actual MCP response will be broadcast to all participants in the space via WebSocket.
+
 ## Testing Workflow
 
 1. **Discovery Phase**
