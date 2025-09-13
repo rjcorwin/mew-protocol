@@ -14,6 +14,9 @@ function parseArgs(): { options: any; configFile?: string } {
     space: process.env.MEW_SPACE || 'playground',
     token: process.env.MEW_TOKEN || 'agent-token',
     participantId: process.env.MEW_PARTICIPANT_ID || 'typescript-agent',
+    model: process.env.OPENAI_MODEL,
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENAI_BASE_URL,
     debug: false,
     config: null,
     noSampleTools: false,
@@ -36,6 +39,18 @@ function parseArgs(): { options: any; configFile?: string } {
       case '--id':
       case '-i':
         options.participantId = args[++i];
+        break;
+      case '--model':
+      case '-m':
+        options.model = args[++i];
+        break;
+      case '--api-key':
+      case '-k':
+        options.apiKey = args[++i];
+        break;
+      case '--openai-url':
+      case '--base-url':
+        options.baseURL = args[++i];
         break;
       case '--config':
       case '-c':
@@ -69,6 +84,9 @@ Options:
   -s, --space <name>      Space name to join (default: playground)
   -t, --token <token>     Authentication token (default: agent-token)
   -i, --id <id>          Participant ID (default: typescript-agent)
+  -m, --model <model>    OpenAI model to use (default: gpt-4o)
+  -k, --api-key <key>    OpenAI API key
+  --openai-url <url>     Custom OpenAI API base URL (for alternative providers)
   -c, --config <file>    Configuration file (YAML or JSON)
   -d, --debug            Enable debug logging
   --no-sample-tools      Do not register sample tools
@@ -79,11 +97,16 @@ Environment Variables:
   MEW_SPACE            Space name
   MEW_TOKEN            Authentication token
   MEW_PARTICIPANT_ID   Participant ID
+  OPENAI_API_KEY       OpenAI API key
+  OPENAI_MODEL         OpenAI model (default: gpt-4o)
+  OPENAI_BASE_URL      Custom OpenAI API base URL
   MEW_AGENT_CONFIG     JSON configuration (overrides file config)
 
 Example:
   mew-agent --gateway ws://localhost:8080 --space dev --id my-agent
   mew-agent --config agent-config.yaml
+  mew-agent --model gpt-3.5-turbo --api-key sk-...
+  mew-agent --openai-url http://localhost:11434/v1 --model llama2  # For Ollama
 `);
 }
 
@@ -232,7 +255,9 @@ async function main(): Promise<void> {
     systemPrompt: 'You are a helpful TypeScript-based AI assistant in the MEW protocol ecosystem.',
     reasoningEnabled: true,
     autoRespond: true,
-    apiKey: process.env.OPENAI_API_KEY,
+    model: options.model || 'gpt-4o',
+    apiKey: options.apiKey,
+    baseURL: options.baseURL,
     maxIterations: 5,
   };
 

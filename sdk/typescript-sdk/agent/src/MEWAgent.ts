@@ -10,6 +10,7 @@ export interface AgentConfig extends ParticipantOptions {
   systemPrompt?: string;
   model?: string;
   apiKey?: string;
+  baseURL?: string;  // Custom OpenAI API base URL (for alternative providers)
   reasoningEnabled?: boolean;  // Enable ReAct pattern (false for models with built-in reasoning)
   autoRespond?: boolean;
   maxIterations?: number;
@@ -74,7 +75,11 @@ export class MEWAgent extends MEWParticipant {
 
     // Initialize OpenAI if API key provided
     if (this.config.apiKey) {
-      this.openai = new OpenAI({ apiKey: this.config.apiKey });
+      const openaiConfig: any = { apiKey: this.config.apiKey };
+      if (this.config.baseURL) {
+        openaiConfig.baseURL = this.config.baseURL;
+      }
+      this.openai = new OpenAI(openaiConfig);
     }
 
     this.setupAgentBehavior();
