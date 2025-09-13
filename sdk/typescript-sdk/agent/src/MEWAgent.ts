@@ -385,20 +385,21 @@ Return a JSON object:
         const observation = await this.act(thought.action, thought.actionInput);
         this.log('debug', `Observation: ${observation}`);
         
-        // If we got a result from the tool, return it
-        if (observation && thought.action === 'tool') {
-          return observation;
-        }
+        // Store the observation for the next iteration
+        thought.observation = observation;
         
-        // Add observation to context
-        thoughts.push({
-          reasoning: `Observation: ${observation}`,
-          action: 'observe',
-          actionInput: observation
-        });
+        // Don't immediately return on tool results - let the LLM decide if more work is needed
+        // The LLM will analyze the observation and decide whether to:
+        // 1. Continue with more tool calls
+        // 2. Respond with the final answer
+        // This allows for multi-step workflows
       } catch (error) {
         this.log('error', `Error in act phase: ${error}`);
-        return `I encountered an error: ${error}`;
+        
+        // Store error as observation so the LLM can decide how to handle it
+        thought.observation = `Error: ${error}`;
+        
+        // Continue the loop - let the LLM decide if it can recover or needs to respond with error
       }
     }
     
@@ -425,6 +426,19 @@ Return a JSON object:
     } else {
       // Scratchpad format (original implementation)
       messages = this.buildScratchpadFormatMessages(input, previousThoughts);
+    }
+    
+    // Add guidance about proposal timeouts if we've encountered them
+    const hasProposalTimeout = previousThoughts.some(t => 
+      t.observation && t.observation.includes('PROPOSAL_TIMEOUT')
+    );
+    
+    if (hasProposalTimeout) {
+      const guidanceMessage = {
+        role: 'system',
+        content: 'Important: Some tool calls require approval (proposals). When you see PROPOSAL_TIMEOUT, it means the operation needs human approval. You should either: 1) Try a different approach that doesn\'t require that tool, 2) Explain to the user what you need approval for and what it will do, or 3) If you\'ve already tried multiple approaches, provide a clear explanation of what you were trying to accomplish and what approvals are needed.'
+      };
+      messages.splice(1, 0, guidanceMessage); // Insert after system prompt
     }
     
     // Add conversation history if configured
@@ -771,8 +785,8 @@ Return a JSON object:
       this.log('error', `Failed to execute tool ${namespacedTool}: ${error}`);
       
       // If it's a proposal that wasn't fulfilled, provide helpful feedback
-      if (error instanceof Error && error.message.includes('proposal')) {
-        return `I've proposed using the ${toolName} tool from ${participantId}, but it requires approval. The proposal has been sent and is waiting for a participant with appropriate capabilities to fulfill it.`;
+      if (error instanceof Error && error.message.includes('Proposal') && error.message.includes('not fulfilled')) {
+        return `PROPOSAL_TIMEOUT: I proposed using the ${toolName} tool, but it requires human approval. The proposal is waiting for fulfillment. I should try a different approach or explain what I need approval for.`;
       }
       
       throw error;
