@@ -368,10 +368,13 @@ interface AgentConfig extends ParticipantOptions {
   systemPrompt?: string;
   model?: string;
   apiKey?: string;
-  reasoningEnabled?: boolean;  // Enable ReAct pattern (false for models with built-in reasoning)
+  baseURL?: string;  // Custom OpenAI API base URL (for alternative providers)
+  reasoningEnabled?: boolean;  // Emit reasoning events (reasoning/start, reasoning/thought, reasoning/conclusion)
   autoRespond?: boolean;
   maxIterations?: number;
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  reasoningFormat?: 'native' | 'scratchpad';  // How to format previous thoughts for LLM (default: 'native')
+  conversationHistoryLength?: number;  // Number of previous messages to include in context (default: 0)
   
   // Overridable prompts for different phases (ReAct pattern)
   prompts?: {
@@ -441,30 +444,372 @@ The `participant/tool` notation:
 - Is familiar to LLMs (similar to file paths and module imports)
 - Easy to parse: `const [participantId, toolName] = toolCall.split('/')`
 
+**Important Restriction**: Participant IDs MUST NOT contain underscores (`_`) as the SDK converts slashes to underscores for OpenAI API compatibility. Use hyphens (`-`) instead (e.g., `weather-service`, not `weather_service`).
+
 #### ReAct Loop
+
+The ReAct (Reason + Act) loop is the core decision-making pattern for autonomous agents. This section details the complete flow including LLM calls, MEW Protocol messages, and response formation.
+
+##### Data Structures
+
 ```typescript
 interface Thought {
-  reasoning: string;  // ReAct: reasoning step
-  action: string;     // ReAct: action to take
-  actionInput: any;   // ReAct: action parameters
+  reasoning: string;     // Analysis of the current situation
+  action: string;        // Next action to take: "tool_call", "respond", or "continue"
+  actionInput: any;      // Parameters for the action
+  observation?: string;  // Result of the action (filled after execution)
 }
 
-// ReAct pattern (Reason + Act cycle)
-1. Receive input (chat/request)
-2. Start reasoning (emit reasoning/start if reasoningEnabled)
-3. Process:
-   - If reasoningEnabled (ReAct pattern): 
-     * Loop (up to maxIterations):
-       - Reason: Analyze and decide action
-       - Emit: reasoning/thought
-       - Act: Execute action
-       - Observe: Process result
-   - If reasoning disabled (for models with built-in reasoning):
-     * Direct execution with model's built-in reasoning
-     * Model handles its own chain-of-thought internally
-4. Conclude (emit reasoning/conclusion if reasoningEnabled)
-5. Respond to original sender
+interface ReActContext {
+  originalEnvelope: Envelope;  // The triggering message
+  thoughts: Thought[];          // Accumulated reasoning chain
+  iteration: number;            // Current iteration count
+  finalResponse?: string;       // Final response to send
+}
 ```
+
+##### Complete ReAct Flow
+
+###### Step 1: Message Reception
+
+When a chat message or MCP request arrives:
+
+```typescript
+// Incoming MEW Protocol envelope
+{
+  "protocol": "mew/v0.3",
+  "id": "msg-123",
+  "from": "user",
+  "to": ["agent"],
+  "kind": "chat",
+  "payload": {
+    "text": "What's the weather in Tokyo and calculate 15% tip on $85?"
+  }
+}
+```
+
+###### Step 2: Reasoning Start (MEW Protocol Message)
+
+If `reasoningEnabled: true`, emit reasoning start:
+
+```typescript
+// Agent sends reasoning/start message
+{
+  "protocol": "mew/v0.3",
+  "id": "reason-001",
+  "from": "agent",
+  "kind": "reasoning/start",
+  "correlation_id": ["msg-123"],
+  "payload": {
+    "message": "Processing request about weather and tip calculation"
+  }
+}
+```
+
+###### Step 3: ReAct Iterations
+
+The agent enters the ReAct loop (maximum `maxIterations` times):
+
+**Iteration 1 - First LLM Call (Reasoning)**
+
+```typescript
+// LLM Call #1: Reasoning about the request
+const reasoningPrompt = `
+You are an AI assistant with access to these tools:
+${JSON.stringify(llmTools, null, 2)}
+
+User request: "What's the weather in Tokyo and calculate 15% tip on $85?"
+
+Previous thoughts: []
+
+Analyze this request and decide your next action.
+Return a JSON object with:
+{
+  "reasoning": "your analysis",
+  "action": "tool_call" | "respond" | "continue",
+  "actionInput": {
+    "tool": "tool_name" (if action is tool_call),
+    "arguments": {...} (if action is tool_call),
+    "message": "response text" (if action is respond)
+  }
+}`;
+
+// LLM Response
+{
+  "reasoning": "The user needs two things: weather information for Tokyo and a tip calculation. I should handle these sequentially. First, I'll get the weather for Tokyo.",
+  "action": "tool_call",
+  "actionInput": {
+    "tool": "weather-service/get_weather", // weather-service is the Participant ID, get_weather is the tool
+    "arguments": {"city": "Tokyo"}
+  }
+}
+```
+
+**MEW Protocol Message - Reasoning Thought**
+
+```typescript
+// Agent emits reasoning/thought
+{
+  "protocol": "mew/v0.3",
+  "id": "thought-001",
+  "from": "agent",
+  "kind": "reasoning/thought",
+  "context": "reason-001",
+  "payload": {
+    "message": "The user needs weather info and tip calculation. Getting Tokyo weather first." // from reasoning
+  }
+}
+```
+
+**Tool Execution - MEW Protocol Messages**
+
+```typescript
+// Agent sends MCP request (or proposal if lacking capability)
+{
+  "protocol": "mew/v0.3",
+  "id": "req-001",
+  "from": "agent",
+  "to": ["weather-service"],
+  "kind": "mcp/request",  // or "mcp/proposal"
+  "correlation_id": ["reason-001"],
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get_weather",
+      "arguments": {"city": "Tokyo"}
+    }
+  }
+}
+
+// Tool responds
+{
+  "protocol": "mew/v0.3",
+  "id": "resp-001",
+  "from": "weather-service",
+  "to": ["agent"],
+  "kind": "mcp/response",
+  "correlation_id": ["req-001"],
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "content": [{
+        "type": "text",
+        "text": "Tokyo: 22°C, partly cloudy"
+      }]
+    }
+  }
+}
+```
+
+**Iteration 2 - Second LLM Call (Continue with tip calculation)**
+
+```typescript
+// LLM Call #2: Continue reasoning with observation
+const continuationPrompt = `
+You are an AI assistant with access to these tools:
+${JSON.stringify(llmTools, null, 2)}
+
+User request: "What's the weather in Tokyo and calculate 15% tip on $85?"
+
+Previous thoughts:
+1. Reasoning: "The user needs two things: weather information for Tokyo and a tip calculation. I should handle these sequentially. First, I'll get the weather for Tokyo."
+   Action: tool_call (weather-service/get_weather)
+   Observation: "Tokyo: 22°C, partly cloudy"
+
+Continue processing this request.
+Return a JSON object with:
+{
+  "reasoning": "your analysis",
+  "action": "tool_call" | "respond" | "continue",
+  "actionInput": {...}
+}`;
+
+// LLM Response
+{
+  "reasoning": "I've got the Tokyo weather. Now I need to calculate the 15% tip on $85. 15% of 85 is 12.75.",
+  "action": "tool_call",
+  "actionInput": {
+    "tool": "calculator/multiply",
+    "arguments": {"a": 85, "b": 0.15}
+  }
+}
+```
+
+**More MEW Protocol Messages for second tool call...**
+
+```typescript
+// Another reasoning/thought
+{
+  "protocol": "mew/v0.3",
+  "id": "thought-002",
+  "from": "agent",
+  "kind": "reasoning/thought",
+  "context": "reason-001",
+  "payload": {
+    "message": "Got Tokyo weather. Now calculating 15% tip on $85."
+  }
+}
+
+// Another MCP request/response cycle...
+```
+
+###### Step 4: Final Response Formation
+
+**Final LLM Call - Response Generation**
+
+```typescript
+// LLM Call #3: Generate final response
+const responsePrompt = `
+You are an AI assistant. You've gathered the following information:
+
+User request: "What's the weather in Tokyo and calculate 15% tip on $85?"
+
+Information gathered:
+1. Tokyo weather: "Tokyo: 22°C, partly cloudy"
+2. Tip calculation: 15% of $85 = $12.75
+
+Generate a natural, helpful response to the user.`;
+
+// LLM Response
+"The weather in Tokyo is currently 22°C (72°F) with partly cloudy skies. 
+
+For your tip calculation: 15% of $85 is $12.75, making your total $97.75."
+```
+
+###### Step 5: Reasoning Conclusion (MEW Protocol Message)
+
+```typescript
+// Agent sends reasoning/conclusion
+{
+  "protocol": "mew/v0.3",
+  "id": "reason-end-001",
+  "from": "agent",
+  "kind": "reasoning/conclusion",
+  "context": "reason-001",
+  "payload": {
+    "message": "Successfully retrieved weather data and calculated tip. Ready to respond."
+  }
+}
+```
+
+###### Step 6: Final Chat Response (MEW Protocol Message)
+
+```typescript
+// Agent sends final response
+{
+  "protocol": "mew/v0.3",
+  "id": "response-001",
+  "from": "agent",
+  "to": ["user"],
+  "kind": "chat",
+  "correlation_id": ["msg-123"],
+  "payload": {
+    "text": "The weather in Tokyo is currently 22°C (72°F) with partly cloudy skies.\n\nFor your tip calculation: 15% of $85 is $12.75, making your total $97.75."
+  }
+}
+```
+
+##### Loop Termination Conditions
+
+The ReAct loop ends when:
+1. **Action is "respond"**: LLM decides to send final response
+2. **Max iterations reached**: Prevents infinite loops (typically 5-10)
+3. **Error occurs**: Tool call fails or timeout
+4. **No more actions needed**: Task completed
+
+##### Error Handling in ReAct Loop
+
+```typescript
+try {
+  // Execute tool call
+  const result = await this.mcpRequest(target, payload);
+  thought.observation = result;
+} catch (error) {
+  // On error, add observation and let LLM decide next action
+  thought.observation = `Error: ${error.message}`;
+  
+  // LLM might retry, use different tool, or respond with error info
+  // Next iteration will include this error in context
+}
+```
+
+
+##### Reasoning Format Options
+
+The agent supports two formats for providing context to the LLM during ReAct iterations:
+
+###### Native Format (`reasoningFormat: 'native'`)
+Uses OpenAI's standard message format with proper role designations:
+
+```typescript
+// Previous tool call represented as:
+{
+  role: 'assistant',
+  content: 'Let me check the weather in Tokyo',
+  tool_calls: [{
+    id: 'call_abc123',
+    type: 'function',
+    function: {
+      name: 'weather_service_get_weather',
+      arguments: '{"city": "Tokyo"}'
+    }
+  }]
+}
+
+// Tool result represented as:
+{
+  role: 'tool',
+  tool_call_id: 'call_abc123',
+  content: 'Tokyo: 22°C, partly cloudy'
+}
+```
+
+Benefits:
+- LLM sees tool calls in the expected format
+- Better context understanding for models trained on this format
+- Maintains proper correlation between calls and results
+
+###### Scratchpad Format (`reasoningFormat: 'scratchpad'`)
+Builds a text-based context summary:
+
+```typescript
+{
+  role: 'assistant',
+  content: `Previous actions and observations:
+
+Reasoning: The user needs weather information for Tokyo
+Action: tool
+Tool used: weather-service/get_weather
+Observation: Tokyo: 22°C, partly cloudy
+
+Based on the above context, continue processing the user's request.`
+}
+```
+
+Benefits:
+- More human-readable format
+- Works with models that may not support tool calling
+- Easier to debug and understand
+
+##### Conversation History
+
+The `conversationHistoryLength` configuration controls how much conversation context is included:
+
+```typescript
+const agent = new MEWAgent({
+  conversationHistoryLength: 10,  // Include last 10 messages
+  // 0 = only current request (default)
+  // -1 could mean all history (not implemented)
+});
+```
+
+When set, the agent includes previous user/assistant exchanges in the LLM context, enabling:
+- Multi-turn conversations with context
+- Reference to earlier topics
+- More coherent long-form interactions
 
 #### Custom Prompts
 Agents support customizable prompts for different ReAct phases:

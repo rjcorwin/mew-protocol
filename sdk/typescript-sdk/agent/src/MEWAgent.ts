@@ -11,10 +11,12 @@ export interface AgentConfig extends ParticipantOptions {
   model?: string;
   apiKey?: string;
   baseURL?: string;  // Custom OpenAI API base URL (for alternative providers)
-  reasoningEnabled?: boolean;  // Enable ReAct pattern (false for models with built-in reasoning)
+  reasoningEnabled?: boolean;  // Emit reasoning events (reasoning/start, reasoning/thought, reasoning/conclusion)
   autoRespond?: boolean;
   maxIterations?: number;
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  reasoningFormat?: 'native' | 'scratchpad';  // How to format previous thoughts for LLM (default: 'native')
+  conversationHistoryLength?: number;  // Number of previous messages to include in context (default: 0 = only current)
   
   // Chat response configuration
   chatResponse?: {
@@ -39,6 +41,7 @@ interface Thought {
   reasoning: string;  // ReAct: reasoning step
   action: string;     // ReAct: action to take
   actionInput: any;   // ReAct: action parameters
+  observation?: string; // ReAct: observation from action execution
 }
 
 // DiscoveredTool interface now comes from MEWParticipant
@@ -61,6 +64,7 @@ export class MEWAgent extends MEWParticipant {
   private otherParticipants = new Map<string, OtherParticipant>();
   private isRunning = false;
   private currentConversation: Array<{ role: string; content: string }> = [];
+  private conversationHistory: any[] = [];  // Full conversation history for context
 
   constructor(config: AgentConfig) {
     super(config);
@@ -70,6 +74,8 @@ export class MEWAgent extends MEWParticipant {
       maxIterations: 10,
       logLevel: 'debug',
       model: 'gpt-4o',
+      reasoningFormat: 'native',
+      conversationHistoryLength: 0,
       ...config
     };
 
@@ -181,6 +187,13 @@ export class MEWAgent extends MEWParticipant {
   private async handleChat(envelope: Envelope): Promise<void> {
     const { text } = envelope.payload;
     
+    // Track conversation history
+    this.conversationHistory.push({
+      role: 'user',
+      content: text,
+      name: envelope.from  // Track who sent the message
+    });
+    
     // Check if we should respond to this message
     const shouldRespond = await this.shouldRespondToChat(envelope);
     
@@ -207,14 +220,6 @@ export class MEWAgent extends MEWParticipant {
       }
       
       this.emitReasoning('reasoning/conclusion', {});
-    } else {
-      // Use model's built-in reasoning
-      try {
-        const response = await this.processDirectly(text);
-        await this.sendResponse(response, envelope.from);
-      } catch (error) {
-        this.log('error', `Failed to process chat: ${error}`);
-      }
     }
   }
   
@@ -360,6 +365,12 @@ Return a JSON object:
       
       // Reason phase
       const thought = await this.reason(input, thoughts);
+      
+      // Generate tool call ID if not provided (for non-native format)
+      if (thought.action === 'tool' && !thought.actionInput?.toolCallId) {
+        thought.actionInput.toolCallId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      }
+      
       thoughts.push(thought);
       
       this.log('debug', `Thought action: ${thought.action}, reasoning: ${thought.reasoning}`);
@@ -395,47 +406,6 @@ Return a JSON object:
   }
 
   /**
-   * Process directly (for reasoning models)
-   */
-  private async processDirectly(input: string): Promise<string> {
-    if (!this.openai) {
-      // Simple fallback without LLM
-      return 'I need an OpenAI API key configured to process this request.';
-    }
-
-    const tools = this.prepareLLMTools();
-    const systemPrompt = this.config.prompts?.system || this.config.systemPrompt || 
-                        'You are a helpful assistant with access to tools.';
-
-    const response = await this.openai.chat.completions.create({
-      model: this.config.model!,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: input }
-      ],
-      tools: tools.length > 0 ? this.convertToOpenAITools(tools) : undefined,
-      tool_choice: tools.length > 0 ? 'auto' : undefined
-    });
-
-    const message = response.choices[0].message;
-    
-    // Handle tool calls if any
-    if (message.tool_calls) {
-      for (const toolCall of message.tool_calls) {
-        if ('function' in toolCall) {
-          const result = await this.executeLLMToolCall(
-            toolCall.function.name,
-            JSON.parse(toolCall.function.arguments)
-          );
-          // Would normally add tool result to conversation and continue
-        }
-      }
-    }
-    
-    return message.content || 'I could not generate a response.';
-  }
-
-  /**
    * Reason phase (ReAct: Reason)
    */
   protected async reason(input: string, previousThoughts: Thought[]): Promise<Thought> {
@@ -446,16 +416,28 @@ Return a JSON object:
 
     const tools = this.prepareLLMTools();
     
+    // Build messages based on configured format
+    let messages: any[];
+    
+    if (this.config.reasoningFormat === 'native') {
+      // Native OpenAI format with proper tool call/result messages
+      messages = this.buildNativeFormatMessages(input, previousThoughts);
+    } else {
+      // Scratchpad format (original implementation)
+      messages = this.buildScratchpadFormatMessages(input, previousThoughts);
+    }
+    
+    // Add conversation history if configured
+    if (this.config.conversationHistoryLength && this.config.conversationHistoryLength > 0) {
+      // Insert historical messages after system prompt but before current request
+      const historyToInclude = this.conversationHistory.slice(-this.config.conversationHistoryLength);
+      messages.splice(1, 0, ...historyToInclude);
+    }
+    
     // Use function calling to let the model decide whether to use tools
     const response = await this.openai.chat.completions.create({
       model: this.config.model!,
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are a helpful assistant. When asked to perform calculations or tasks, use the available tools. Only respond directly if no tool is needed.' 
-        },
-        { role: 'user', content: input }
-      ],
+      messages,
       tools: tools.length > 0 ? this.convertToOpenAITools(tools) : undefined,
       tool_choice: tools.length > 0 ? 'auto' : undefined
     });
@@ -465,7 +447,9 @@ Return a JSON object:
     // Check if the model wants to use a tool
     if (message.tool_calls && message.tool_calls.length > 0) {
       const toolCall = message.tool_calls[0] as any;
-      const toolName = toolCall.function.name.replace('_', '/'); // Convert back from OpenAI format
+      // Convert back from OpenAI format: replace underscore separator with slash
+      // Note: Participant IDs must not contain underscores for this to work correctly
+      const toolName = toolCall.function.name.replace('_', '/'); // e.g., 'weather-service_get_weather' -> 'weather-service/get_weather'
       const args = JSON.parse(toolCall.function.arguments);
       
       return {
@@ -473,7 +457,8 @@ Return a JSON object:
         action: 'tool',
         actionInput: {
           tool: toolName,
-          arguments: args
+          arguments: args,
+          toolCallId: toolCall.id  // Store for native format
         }
       };
     }
@@ -487,9 +472,97 @@ Return a JSON object:
   }
 
   /**
+   * Build messages in native OpenAI format with tool calls and results
+   */
+  private buildNativeFormatMessages(input: string, previousThoughts: Thought[]): any[] {
+    const messages: any[] = [
+      { 
+        role: 'system', 
+        content: this.config.systemPrompt || 'You are a helpful assistant. When asked to perform calculations or tasks, use the available tools. Only respond directly if no tool is needed.' 
+      }
+    ];
+    
+    // Add the original user request
+    messages.push({ role: 'user', content: input });
+    
+    // Add previous thoughts as proper assistant/tool messages
+    for (const thought of previousThoughts) {
+      if (thought.action === 'tool' && thought.actionInput?.toolCallId) {
+        // Assistant message with tool call
+        messages.push({
+          role: 'assistant',
+          content: thought.reasoning || null,
+          tool_calls: [{
+            id: thought.actionInput.toolCallId,
+            type: 'function',
+            function: {
+              name: thought.actionInput.tool.replace('/', '_'),
+              arguments: JSON.stringify(thought.actionInput.arguments)
+            }
+          }]
+        });
+        
+        // Tool result message
+        if (thought.observation) {
+          messages.push({
+            role: 'tool',
+            tool_call_id: thought.actionInput.toolCallId,
+            content: thought.observation
+          });
+        }
+      } else if (thought.action === 'respond') {
+        // Regular assistant response
+        messages.push({
+          role: 'assistant',
+          content: thought.reasoning
+        });
+      }
+    }
+    
+    return messages;
+  }
+
+  /**
+   * Build messages in scratchpad format (original implementation)
+   */
+  private buildScratchpadFormatMessages(input: string, previousThoughts: Thought[]): any[] {
+    const messages: any[] = [
+      { 
+        role: 'system', 
+        content: this.config.systemPrompt || 'You are a helpful assistant. When asked to perform calculations or tasks, use the available tools. Only respond directly if no tool is needed.' 
+      }
+    ];
+    
+    // Add the original user request
+    messages.push({ role: 'user', content: input });
+    
+    // Add previous thoughts and observations to maintain context
+    if (previousThoughts.length > 0) {
+      // Build context from previous iterations
+      let context = "Previous actions and observations:\n";
+      for (const thought of previousThoughts) {
+        context += `\nReasoning: ${thought.reasoning}\n`;
+        context += `Action: ${thought.action}\n`;
+        if (thought.action === 'tool' && thought.actionInput?.tool) {
+          context += `Tool used: ${thought.actionInput.tool}\n`;
+        }
+        if (thought.observation) {
+          context += `Observation: ${thought.observation}\n`;
+        }
+      }
+      context += "\nBased on the above context, continue processing the user's request.";
+      
+      messages.push({ role: 'assistant', content: context });
+      messages.push({ role: 'user', content: "Continue with the next step, or provide the final response if all tasks are complete." });
+    }
+    
+    return messages;
+  }
+
+  /**
    * Reason without LLM (fallback for no API key)
    */
-  protected reasonWithoutLLM(input: string, previousThoughts: Thought[]): Thought {
+  protected reasonWithoutLLM(input: string, _previousThoughts: Thought[]): Thought {
     const lowerInput = input.toLowerCase();
     
     // Get available tools from parent
@@ -708,7 +781,9 @@ Return a JSON object:
     return tools.map(tool => ({
       type: 'function',
       function: {
-        name: tool.name.replace('/', '_'), // OpenAI doesn't like slashes
+        // Replace slash with underscore for OpenAI compatibility (slashes not allowed)
+        // Note: Participant IDs must not contain underscores for this to work correctly
+        name: tool.name.replace('/', '_'), // e.g., 'weather-service/get_weather' -> 'weather-service_get_weather'
         description: tool.description,
         parameters: tool.parameters || { type: 'object', properties: {} }
       }
@@ -722,6 +797,13 @@ Return a JSON object:
     this.log('info', `Attempting to send chat response to ${to}: ${text}`);
     try {
       this.chat(text, to);
+      
+      // Track assistant's response in conversation history
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: text
+      });
+      
       this.log('info', `Chat message sent successfully to ${to}`);
     } catch (error) {
       this.log('error', `Failed to send chat to ${to}: ${error}`);
