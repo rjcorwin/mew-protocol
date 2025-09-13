@@ -33,6 +33,7 @@ interface PendingRequest {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
   timer?: NodeJS.Timeout;
+  proposer?: string;  // Track original proposer for security validation
 }
 
 export class MEWParticipant extends MEWClient {
@@ -124,11 +125,31 @@ export class MEWParticipant extends MEWClient {
         // Set up timeout for proposal
         const timer = setTimeout(() => {
           this.pendingRequests.delete(id);
+          
+          // Send withdrawal when timing out
+          const withdrawEnvelope: Envelope = {
+            protocol: PROTOCOL_VERSION,
+            id: uuidv4(),
+            ts: new Date().toISOString(),
+            from: this.options.participant_id!,
+            kind: 'mcp/withdraw',
+            correlation_id: [id],
+            payload: {
+              reason: 'timeout'
+            }
+          };
+          this.send(withdrawEnvelope);
+          
           reject(new Error(`Proposal ${id} not fulfilled after ${timeout}ms`));
         }, timeout);
 
-        // Store pending proposal
-        this.pendingRequests.set(id, { resolve, reject, timer });
+        // Store pending proposal with proposer info for security validation
+        this.pendingRequests.set(id, { 
+          resolve, 
+          reject, 
+          timer,
+          proposer: this.options.participant_id  // Track who created this proposal
+        });
         // Debug: Sending MCP proposal
 
         // Send the proposal
@@ -139,6 +160,34 @@ export class MEWParticipant extends MEWClient {
       // Can't send request or proposal
       reject(new Error(`No capability to send request for method: ${payload.method}`));
     });
+  }
+
+  /**
+   * Withdraw a pending proposal
+   * Use when you no longer need the proposal (found alternative, user cancelled, etc)
+   */
+  withdrawProposal(proposalId: string, reason: string = 'no_longer_needed'): void {
+    const pending = this.pendingRequests.get(proposalId);
+    if (!pending) return;
+    
+    // Clear timeout
+    if (pending.timer) clearTimeout(pending.timer);
+    this.pendingRequests.delete(proposalId);
+    
+    // Send withdrawal
+    const withdrawEnvelope: Envelope = {
+      protocol: PROTOCOL_VERSION,
+      id: uuidv4(),
+      ts: new Date().toISOString(),
+      from: this.options.participant_id!,
+      kind: 'mcp/withdraw',
+      correlation_id: [proposalId],
+      payload: { reason }
+    };
+    this.send(withdrawEnvelope);
+    
+    // Reject the promise
+    pending.reject(new Error(`Proposal withdrawn: ${reason}`));
   }
 
   /**
@@ -252,6 +301,11 @@ export class MEWParticipant extends MEWClient {
       // Handle proposal rejection
       if (envelope.kind === 'mcp/reject') {
         await this.handleProposalReject(envelope);
+      }
+
+      // Handle proposal withdrawal
+      if (envelope.kind === 'mcp/withdraw') {
+        await this.handleProposalWithdraw(envelope);
       }
     });
   }
@@ -388,8 +442,42 @@ export class MEWParticipant extends MEWClient {
     if (pending) {
       if (pending.timer) clearTimeout(pending.timer);
       this.pendingRequests.delete(correlationId);
-      pending.reject(new Error(envelope.payload.reason || 'Proposal rejected'));
+      
+      // Include who rejected and why for better debugging
+      const reason = envelope.payload?.reason || 'unknown';
+      const errorMessage = `Proposal rejected by ${envelope.from}: ${reason}`;
+      pending.reject(new Error(errorMessage));
     }
+  }
+
+  /**
+   * Handle proposal withdrawal
+   * SECURITY: Only the original proposer can withdraw their proposal
+   */
+  private async handleProposalWithdraw(envelope: Envelope): Promise<void> {
+    const correlationId = envelope.correlation_id?.[0];
+    if (!correlationId) return;
+
+    const pending = this.pendingRequests.get(correlationId);
+    if (!pending) return;
+    
+    // SECURITY CHECK: Verify the withdrawal is from the original proposer
+    // This prevents privilege escalation where other participants try to cancel proposals
+    if (envelope.from !== (pending as any).proposer) {
+      console.warn(`[SECURITY] Ignoring withdrawal from ${envelope.from} for proposal created by ${(pending as any).proposer}`);
+      return;
+    }
+    
+    // Valid withdrawal from the original proposer
+    if (pending.timer) clearTimeout(pending.timer);
+    this.pendingRequests.delete(correlationId);
+    
+    // Only reject if this is our own proposal
+    if (envelope.from === this.options.participant_id) {
+      const reason = envelope.payload?.reason || 'no_longer_needed';
+      pending.reject(new Error(`Proposal withdrawn: ${reason}`));
+    }
+    // Otherwise, we're an observer/auto-fulfiller and should stop processing
   }
 
   /**

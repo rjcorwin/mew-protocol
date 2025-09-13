@@ -237,6 +237,7 @@ When a participant lacks capability for direct requests:
 // Participant creates proposal
 {
   kind: "mcp/proposal",
+  to: ["mcp-fs-bridge"],  // MUST specify target participant(s)
   payload: {
     method: "tools/call",
     params: { name: "calculate", arguments: { a: 1, b: 2 } }
@@ -246,11 +247,46 @@ When a participant lacks capability for direct requests:
 // Human/authorized participant fulfills
 {
   kind: "mcp/request",
-  to: ["target"],
+  to: ["target"], // same as proposal's
   correlation_id: ["proposal-id"],
   payload: { /* same as proposal */ }
 }
+
+// Target responds to fulfiller (proposer observes via broadcast)
+{
+  kind: "mcp/response",
+  to: ["fulfiller"],
+  correlation_id: ["fulfillment-id"],
+  payload: { /* result or error */ }
+}
 ```
+
+**Key Points:**
+- Proposals MUST include `to` field specifying target participant(s)
+- Fulfillment MUST include `correlation_id` referencing the proposal
+- Fulfillment MUST match `to` of the proposal
+- Response goes to fulfiller, but proposer can observe outcome via broadcast
+- Proposers MAY timeout waiting for fulfillment (implementation-specific)
+- Multiple participants MAY fulfill the same proposal (first wins)
+
+**Proposal Lifecycle:**
+- **Withdrawal** (`mcp/withdraw`): Proposer cancels their OWN proposal ONLY
+  - MUST only be sent by the original proposer (security: prevents privilege escalation)
+  - The `from` field MUST match the proposal's original `from` field
+  - Use when: Timeout reached, found alternative solution, or no longer needed
+  - Example: Proposer times out after 30s and sends withdrawal
+  - **IMPORTANT**: Other participants CANNOT withdraw someone else's proposals
+- **Rejection** (`mcp/reject`): Target participant declines to fulfill
+  - Can be sent by any participant (typically those addressed in `to` field)
+  - Use when: Unsafe operation, busy, or lacks capability
+  - Example: File service rejects write to protected directory
+
+**SDK Behavior (fail-fast):**
+- When `mcp/reject` received: Proposal fails immediately with error
+- When `mcp/withdraw` received: Only processed if `from` matches original proposer
+- Withdrawals from other participants MUST be ignored (security check)
+- Error format: `"Proposal rejected by filesystem-service: unsafe"`
+- Proposers SHOULD send `mcp/withdraw` when giving up (timeout or alternative found)
 
 #### Tool Registry
 ```typescript
