@@ -576,12 +576,17 @@ Return a JSON object:
     
     // Check for file operations (read, list, etc.)
     if (lowerInput.includes('read') || lowerInput.includes('show') || lowerInput.includes('see') || 
-        lowerInput.includes('look at') || lowerInput.includes('view') || lowerInput.includes('check')) {
+        lowerInput.includes('look at') || lowerInput.includes('view') || lowerInput.includes('check') ||
+        lowerInput.includes('contents') || lowerInput.includes('what is in') || lowerInput.includes('what are in')) {
       // Look for file-related tools
       for (const tool of allTools) {
         if (tool.name.includes('read') || tool.name === 'read_file') {
           // Extract potential file path from input
-          const pathMatch = input.match(/['"`]([^'"`]+)['"`]/) || input.match(/(\S+\.(txt|js|ts|json|md|yaml|yml))/i);
+          // Try multiple patterns: quoted strings, files with extensions, or "the X file" pattern
+          const pathMatch = input.match(/['"`]([^'"`]+)['"`]/) || 
+                           input.match(/(\S+\.(txt|js|ts|json|md|yaml|yml|log|xml|html|css|py|java|c|cpp|h|hpp))/i) ||
+                           input.match(/the\s+(\S+)\s+file/i) ||
+                           input.match(/file\s+(?:named\s+|called\s+)?(\S+)/i);
           if (pathMatch) {
             const filePath = pathMatch[1];
             return {

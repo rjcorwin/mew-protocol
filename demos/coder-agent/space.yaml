@@ -29,6 +29,10 @@ participants:
       - kind: "mcp/request"
         payload:
           method: "!tools/call"
+    env:
+      # OPENAI_API_KEY is inherited from environment automatically
+      OPENAI_MODEL: "gpt-5"
+      # OPENAI_BASE_URL: "..."
   
   # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:

@@ -512,7 +512,10 @@ space
             out_file: agentLogPath,
             merge_logs: true,
             time: true,
-            env: participant.env || {},
+            env: {
+              ...process.env,  // Inherit all environment variables from current shell
+              ...(participant.env || {})  // Override with any specific env from config
+            },
           });
 
           pids.agents[participantId] = agentApp.pid || agentApp.pm2_env?.pm_id || 'unknown';
