@@ -315,23 +315,27 @@ function MessageDisplay({ item, verbose, useColor }) {
   const participant = sent ? 'you' : message.from || 'system';
   const kind = message.kind || 'unknown';
 
+  // Add context indicator
+  const contextPrefix = message.context ? '  └─ ' : '';
+  const contextIndicator = message.context ? '┌─ ' : '';
+
   if (verbose) {
     return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
       React.createElement(Text, { color: "gray" },
-        `[${time}] ${direction} ${participant} ${kind}`
+        `${contextPrefix}[${time}] ${direction} ${participant} ${kind}`
       ),
       React.createElement(Text, null, JSON.stringify(message, null, 2))
     );
   }
 
   let headerColor = useColor ? getColorForKind(kind) : 'white';
-  
+
   return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
     React.createElement(Text, { color: headerColor },
-      `[${time}] ${direction} ${participant} ${kind}`
+      `${contextPrefix}[${time}] ${direction} ${participant} ${kind}`
     ),
     message.payload && React.createElement(Text, null,
-      `└─ ${getPayloadPreview(message.payload, kind)}`
+      `${contextPrefix}└─ ${getPayloadPreview(message.payload, kind)}`
     )
   );
 }
@@ -515,6 +519,76 @@ function getPayloadPreview(payload, kind) {
       preview += `, name: "${payload.params.name}"`;
     }
     return preview;
+  }
+
+  if (kind === 'mcp/response') {
+    if (payload.result) {
+      if (payload.result.content && Array.isArray(payload.result.content)) {
+        // Show first content item if it's text
+        const firstContent = payload.result.content[0];
+        if (firstContent?.type === 'text') {
+          const text = firstContent.text;
+          return `result: "${text.length > 150 ? text.substring(0, 150) + '...' : text}"`;
+        }
+        return `result: ${payload.result.content.length} content items`;
+      }
+      if (typeof payload.result === 'object') {
+        const keys = Object.keys(payload.result);
+        return `result: {${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '...' : ''}}`;
+      }
+      // For string results (like file operations), show more of the path
+      const resultStr = String(payload.result);
+      return `result: ${resultStr.length > 200 ? '...' + resultStr.substring(resultStr.length - 200) : resultStr}`;
+    }
+    if (payload.error) {
+      return `error: ${payload.error.message || payload.error}`;
+    }
+    return 'response';
+  }
+
+  if (kind === 'mcp/proposal' && payload.method) {
+    let preview = `proposing: "${payload.method}"`;
+    if (payload.params?.name) {
+      preview += `, name: "${payload.params.name}"`;
+    }
+    return preview;
+  }
+
+  if (kind === 'reasoning/thought') {
+    // Try to show both reasoning and action if available
+    let parts = [];
+    if (payload.reasoning && payload.reasoning !== payload.action) {
+      parts.push(`reasoning: "${payload.reasoning}"`);
+    }
+    if (payload.action) {
+      parts.push(`action: "${payload.action}"`);
+    }
+    if (payload.actionInput && typeof payload.actionInput === 'object') {
+      const input = JSON.stringify(payload.actionInput);
+      parts.push(`input: ${input.length > 50 ? input.substring(0, 50) + '...' : input}`);
+    }
+    if (payload.message) {
+      parts.push(`"${payload.message}"`);
+    }
+
+    let combined = parts.join(' | ');
+    return combined.length > 200 ? combined.substring(0, 200) + '...' : combined;
+  }
+
+  if (kind === 'reasoning/start') {
+    if (payload.message) {
+      const message = payload.message;
+      return `🧠 Starting: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
+    }
+    return '🧠 Started reasoning session';
+  }
+
+  if (kind === 'reasoning/conclusion') {
+    if (payload.message) {
+      const message = payload.message;
+      return `✅ Concluded: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
+    }
+    return '✅ Reasoning session complete';
   }
 
   if (typeof payload === 'string') {
