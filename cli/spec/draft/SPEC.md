@@ -11,6 +11,7 @@ The MEW CLI (`@mew/cli`) provides minimal command-line tools needed to execute t
 ## Scope
 
 This specification covers:
+- Space initialization with template system
 - Gateway server with space configuration support
 - Client connections with FIFO mode for automation
 - Interactive space connection via terminal UI
@@ -22,10 +23,14 @@ This specification covers:
 ```
 @mew/cli
 ├── Commands
+│   ├── init.js       # Initialize new space from templates
 │   ├── gateway.js    # Start gateway server
 │   ├── client.js     # Connect as client (interactive or FIFO)
 │   ├── space.js      # Space management (up/down/status)
 │   └── token.js      # Generate test tokens
+├── Templates         # Built-in space templates
+│   ├── coder-agent/  # Development workspace with coding assistant
+│   └── note-taker/   # Note-taking and organization assistant
 ├── SDK Dependencies
 │   ├── @mew/gateway
 │   ├── @mew/client
@@ -43,16 +48,499 @@ This specification covers:
 
 ## Commands
 
+### `mew init`
+
+Initializes a new MEW space in the current directory using predefined templates. This command provides a quick way to set up a working space configuration for common use cases. By default, creates the space configuration in `.mew/space.yaml` to keep the project root clean.
+
+```bash
+mew init [template] [options]
+
+Arguments:
+  template                   Space template to use (optional, prompts if not provided)
+
+Options:
+  --name <name>             Space name (default: current directory name)
+  --description <desc>      Space description
+  --port <port>             Gateway port (default: 8080)
+  --force                   Overwrite existing space configuration
+  --list-templates          Show available templates and exit
+  --template-info <name>    Show details about a specific template
+```
+
+#### Template System
+
+The init command uses a template-based approach to create space configurations for common patterns:
+
+**Available Templates:**
+
+1. **`coder-agent`** (default if no template specified)
+   - Development workspace with AI coding assistant
+   - File system and code execution tools
+   - MCP request capabilities for the agent
+   - Based on the `demos/coder-agent` pattern
+   - Specialized prompt for code generation and debugging
+
+2. **`note-taker`**
+   - Meeting and conversation note-taking assistant
+   - File system tools for saving and organizing notes
+   - MCP request capabilities for structured note management
+   - Similar structure to coder-agent but with note-taking prompt
+   - Focuses on summarization and organization
+
+#### Template Discovery
+
+Templates are discovered from:
+1. Built-in templates (in CLI package)
+2. `~/.mew/templates/` (user templates)
+3. `./templates/` (project-local templates)
+4. URLs or Git repositories (future)
+
+Each template directory contains:
+- `space.yaml` - Template space configuration with placeholders
+- `package.json` - Node.js dependencies for the space (MCP servers, agent libs)
+- `agents/` - Agent scripts/configurations
+- `README.md` - Template documentation and usage instructions
+- `template.json` - Template metadata (name, description, variables)
+
+**Example Template Structure:**
+```
+templates/coder-agent/
+├── space.yaml          # Space configuration template
+├── package.json        # Dependencies (copied to .mew/package.json)
+├── template.json       # Template metadata and variables
+├── README.md          # How to use this template
+└── agents/
+    └── assistant.js   # Main agent implementation
+```
+
+#### Template Metadata
+
+```json
+{
+  "name": "coder-agent",
+  "description": "Development workspace with AI coding assistant",
+  "author": "MEW Protocol Team",
+  "version": "1.0.0",
+  "tags": ["development", "coding", "ai-assistant"],
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Name of your space",
+      "default": "${dirname}",
+      "prompt": true  // Ask user during init
+    },
+    {
+      "name": "AGENT_MODEL",
+      "description": "AI model to use (e.g., gpt-5, claude-3-opus)",
+      "default": "gpt-5",
+      "prompt": true  // Ask user during init
+    },
+    {
+      "name": "WORKSPACE_PATH",
+      "description": "Path to workspace",
+      "default": "./",
+      "prompt": false  // Use default, don't ask
+    },
+    {
+      "name": "AGENT_PROMPT",
+      "description": "System prompt for the agent",
+      "default": "You are a helpful coding assistant...",
+      "prompt": false  // Template provides this, don't ask
+    }
+  ]
+}
+```
+
+#### Interactive Flow
+
+When run without arguments, `mew init` provides an interactive experience:
+
+```bash
+$ mew init
+
+Welcome to MEW Protocol! Let's set up your space.
+
+? Choose a template:
+❯ coder-agent - AI coding assistant for development
+  note-taker - AI assistant for note-taking and organization
+
+Setting up isolated MEW environment...
+✓ Created .mew directory
+✓ Copied template files to .mew/
+
+Installing dependencies...
+✓ Running npm install in .mew/
+✓ Dependencies installed
+
+? Space name: (my-project)
+? AI model: (gpt-5)
+
+Checking environment...
+✓ Found OPENAI_API_KEY in environment
+✓ Using OPENAI_BASE_URL: https://api.openai.com/v1
+
+✓ Created .mew/space.yaml
+✓ Copied agent files to .mew/agents/
+✓ Configured isolated dependencies
+✓ Updated .gitignore
+
+Ready! Your project root remains clean.
+MEW configuration and dependencies are isolated in .mew/
+
+Try: mew
+```
+
+#### Behavior Logic
+
+The command follows this decision tree:
+
+1. **No space configuration exists (checks .mew/space.yaml then space.yaml):**
+   - If template specified: Use that template
+   - If no template: Show template selection prompt
+   - Create .mew/space.yaml from template
+
+2. **Space configuration exists:**
+   - If `--force`: Overwrite with template
+   - Otherwise: Error "Space already initialized, use --force to overwrite"
+
+3. **No arguments and no template:**
+   - If only one template available: Use it automatically
+   - Otherwise: Show interactive template selection
+
+4. **Template not found:**
+   - Show error with available templates
+   - Suggest `--list-templates` for full list
+
+#### Template Processing
+
+Templates support variable substitution using mustache-style syntax. Both templates have similar structure but different agent configurations:
+
+```yaml
+# templates/coder-agent/space.yaml (template file)
+space:
+  id: "{{SPACE_NAME}}"
+  name: "{{SPACE_NAME}}"
+  description: "{{SPACE_DESCRIPTION}}"
+
+participants:
+  human:
+    capabilities:
+      - kind: "mcp/*"
+      - kind: "chat"
+
+  filesystem-server:
+    command: "node"
+    args: ["./.mew/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js", "./"]
+    auto_start: true
+    type: mcp_server
+    capabilities:
+      - kind: "mcp/response"
+
+  assistant:
+    command: "node"
+    args: ["./.mew/agents/assistant.js"]
+    auto_start: true
+    env:
+      NODE_PATH: "./.mew/node_modules"
+      AGENT_MODEL: "{{AGENT_MODEL}}"  # Template variable, stored in space.yaml
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"  # Template-specific (coder vs note-taker)
+      # API key and base URL come from environment at runtime
+    capabilities:
+      - kind: "mcp/request"
+      - kind: "chat"
+```
+
+The key difference between `coder-agent` and `note-taker` templates is the `AGENT_PROMPT` variable:
+- **coder-agent**: Focuses on code generation, debugging, and development tasks
+- **note-taker**: Focuses on summarization, organization, and meeting notes
+
+#### Variable Resolution
+
+Template variables are resolved in order:
+
+1. **Command-line options** - Override any variable (e.g., `--name my-space`)
+2. **Interactive prompts** - Only if `prompt: true` in template.json
+3. **Environment variables** - Check for matching env var
+4. **Template defaults** - Use the default value from template.json
+5. **System defaults** - Special variables like `${dirname}` for current directory
+
+**Variable Prompting Logic:**
+```javascript
+for (const variable of template.variables) {
+  if (variable.prompt) {
+    // Ask user for this variable
+    value = await prompt(variable.description, variable.default);
+  } else {
+    // Use default without prompting
+    value = variable.default;
+  }
+
+  // Special resolution for ${...} syntax
+  if (value.startsWith('${')) {
+    value = resolveSpecialVariable(value);
+  }
+}
+```
+
+**Special Variables:**
+- `${dirname}` - Current directory name
+- `${username}` - System username
+- `${date}` - Current date
+- `${VARNAME}` - Environment variable lookup
+
+#### Configuration Strategy
+
+MEW uses a simple strategy for configuration:
+
+**Template Variables (stored in space.yaml):**
+- Space name
+- Model name (e.g., "gpt-5", "claude-3-opus")
+- Any other non-sensitive configuration
+
+**Environment Variables (never stored):**
+- `OPENAI_API_KEY` - Your API key
+- `OPENAI_BASE_URL` - Provider endpoint (defaults to OpenAI)
+- Any other sensitive or deployment-specific values
+
+**During Init:**
+1. Prompt for template variables (space name, model)
+2. Substitute variables in template files
+3. Save to `.mew/space.yaml`
+4. Check for required environment variables
+5. Warn if missing (but don't block init)
+
+**At Runtime:**
+```bash
+# Agent gets configuration from both sources:
+# From space.yaml: AGENT_MODEL="gpt-5"
+# From environment: OPENAI_API_KEY, OPENAI_BASE_URL
+```
+
+**Common Provider Examples:**
+```bash
+# OpenAI GPT-5 (default)
+export OPENAI_BASE_URL=https://api.openai.com/v1
+export OPENAI_API_KEY=sk-...
+# Model in space.yaml: "gpt-5"
+
+# OpenRouter with Claude
+export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+export OPENAI_API_KEY=sk-or-...
+# Model in space.yaml: "anthropic/claude-3-opus"
+
+# Local model (LM Studio)
+export OPENAI_BASE_URL=http://localhost:1234/v1
+# No API key needed
+# Model in space.yaml: "local-model"
+
+# Override model at runtime (without editing space.yaml)
+AGENT_MODEL_OVERRIDE=gpt-4-turbo mew
+```
+
+**Storage Options:**
+```bash
+# Option 1: Environment variables (recommended)
+export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+export OPENAI_API_KEY=sk-or-...
+mew  # Agent reads from environment
+
+# Option 2: .env file in .mew/ (gitignored)
+cat > .mew/.env << EOF
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_API_KEY=sk-or-...
+EOF
+
+# Option 3: Pass at runtime
+OPENAI_BASE_URL=http://localhost:1234/v1 mew
+```
+
+**What Gets Saved in space.yaml:**
+```yaml
+participants:
+  assistant:
+    command: "node"
+    args: ["./.mew/agents/assistant.js"]
+    env:
+      AGENT_MODEL: "gpt-5"  # Model name IS stored (not sensitive)
+      # Base URL and API key NOT stored here
+```
+
+**What the Agent Actually Sees at Runtime:**
+```javascript
+// space.yaml provides:
+process.env.AGENT_MODEL  // "gpt-5" from space.yaml
+
+// Environment provides:
+process.env.OPENAI_BASE_URL  // "https://openrouter.ai/api/v1" from shell
+process.env.OPENAI_API_KEY   // "sk-or-..." from shell
+
+// Agent can also override model if needed:
+const model = process.env.AGENT_MODEL_OVERRIDE ||
+              process.env.AGENT_MODEL ||
+              'gpt-5';
+```
+
+**Agent Implementation:**
+```javascript
+// Agent reads configuration from environment
+const baseUrl = process.env.OPENAI_BASE_URL ||
+                process.env.AGENT_BASE_URL ||
+                'https://api.openai.com/v1';
+const apiKey = process.env.OPENAI_API_KEY || process.env.AGENT_API_KEY;
+
+// For local models, API key might be optional
+if (!apiKey && !baseUrl.includes('localhost')) {
+  console.error('No API key found. Set OPENAI_API_KEY environment variable.');
+  process.exit(1);
+}
+
+// Initialize client with provider-agnostic config
+const client = new OpenAI({
+  baseURL: baseUrl,
+  apiKey: apiKey || 'not-needed',  // Some local models don't need keys
+});
+```
+
+This approach ensures:
+- API keys never appear in space.yaml
+- Keys can be shared across spaces via environment
+- Different deployment environments can use different keys
+- Git never sees the actual keys
+
+#### Dependency Management
+
+The CLI isolates all MEW-related dependencies (MCP servers, agents, etc.) in a `.mew` directory, keeping them completely separate from the project's dependencies. Each template includes its own `package.json` that defines exactly what the space needs.
+
+**Simple Flow:**
+1. **Copy**: Template files → `.mew/` directory
+2. **Install**: Run `npm install` in `.mew/`
+3. **Done**: Everything ready to use
+
+**Benefits:**
+- Project's package.json (if any) remains untouched
+- All MEW dependencies isolated in `.mew/node_modules/`
+- Works with any project type (Python, Ruby, Go, etc.)
+- Clean separation between project and tooling
+
+**Example Template `package.json`:**
+```json
+{
+  "name": "mew-coder-agent-space",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dependencies for MEW coder-agent space",
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "^0.5.0",
+    "@mew-protocol/agent": "^0.2.0",
+    "openai": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+```
+
+#### Post-Initialization Actions
+
+After creating the space configuration:
+
+1. **Create .mew Directory**: Initialize `.mew/` directory structure
+2. **Copy Template Files**:
+   - `template/package.json` → `.mew/package.json`
+   - `template/agents/*` → `.mew/agents/`
+   - `template/space.yaml` → `.mew/space.yaml` (with variable substitution)
+3. **Install Dependencies**: Run `npm install` in `.mew/` directory
+4. **Git Integration**: Add `.mew/node_modules/`, `.mew/pm2/`, `.mew/logs/` to .gitignore
+5. **File Permissions**: Set execute permissions on agent scripts
+6. **Validation**: Verify the generated configuration and dependencies
+7. **Instructions**: Show that project root remains clean, everything MEW-related in `.mew/`
+
+#### Examples
+
+```bash
+# Initialize with default template (basic)
+mew init
+
+# Initialize with specific template
+mew init coder-agent
+
+# Initialize with options
+mew init coder-agent --name "my-project" --port 3000
+
+# See available templates
+mew init --list-templates
+
+# Get info about a template
+mew init --template-info coder-agent
+
+# Force overwrite existing space
+mew init test-automation --force
+
+# Initialize in different directory
+cd /path/to/project && mew init coder-agent
+```
+
+#### Integration with Other Commands
+
+After initialization:
+- `mew space up -i` starts the space and connects interactively
+- `mew space status` shows if processes are running
+- `mew space down` stops all processes
+- All other space commands work with the initialized configuration
+
+The init command creates a foundation that works seamlessly with the rest of the CLI ecosystem.
+
+#### Default Command Behavior
+
+When `mew` is run without any subcommand, it provides intelligent defaults:
+
+```bash
+$ mew
+```
+
+**Behavior:**
+1. **No space configuration found** (neither `.mew/space.yaml` nor `space.yaml`):
+   - Automatically runs `mew init` with interactive template selection
+   - Creates configuration in `.mew/space.yaml` by default
+2. **Space configuration exists** (in either location):
+   - Automatically runs `mew space up -i` to start and connect interactively
+
+This provides a streamlined experience:
+- New users get guided setup when they first run `mew`
+- Existing spaces start immediately when users run `mew`
+- No need to remember specific commands for common workflows
+
+**Examples:**
+
+```bash
+# First time in a new directory
+$ mew
+Welcome to MEW Protocol! Let's set up your space.
+? Choose a template: ...
+# (runs init flow)
+
+# After init, or in existing space directory
+$ mew
+Starting space and connecting interactively...
+# (runs space up -i automatically)
+```
+
+This behavior can be overridden by explicitly providing a subcommand:
+```bash
+mew space up -d  # Start detached instead of interactive
+mew init --force # Force re-initialization
+```
+
 ### `mew gateway start`
 
-Starts a gateway server.
+Starts a gateway server. Automatically detects configuration in `.mew/space.yaml` or `space.yaml`.
 
 ```bash
 mew gateway start [options]
 
 Options:
   --port <port>          Port to listen on (default: 8080)
-  --space-config <path>  Path to space.yaml (default: ./space.yaml)
+  --space-config <path>  Path to space.yaml (default: auto-detect)
   --log-level <level>    debug|info|warn|error (default: info)
 ```
 
@@ -109,6 +597,8 @@ mew client connect \
   --fifo-in cli-in \
   --fifo-out cli-out \
   --no-interactive &
+
+# @TODO Document curl example here for automation
 ```
 
 ## Running Agents
@@ -457,11 +947,22 @@ This architecture enables:
 The CLI loads space configuration in order of precedence:
 1. Command-line flag: `--space-config path/to/space.yaml`
 2. Environment variable: `MEW_SPACE_CONFIG`
-3. Default location: `./space.yaml`
+3. Default search order:
+   - `./.mew/space.yaml` (preferred, keeps root clean)
+   - `./space.yaml` (legacy/compatibility)
+
+This dual-location support ensures:
+- New spaces keep configuration in `.mew/` by default
+- Existing spaces with root `space.yaml` continue to work
+- Backward compatibility maintained
 
 Example:
 ```bash
+# Use specific config
 mew gateway start --port 8080 --space-config ./configs/production.yaml
+
+# Auto-detect (checks .mew/space.yaml first, then space.yaml)
+mew space up
 ```
 
 ## Process Management
@@ -485,21 +986,27 @@ pm2.connect((err) => {
 
 ### Space-Local Process Management
 
-Each space maintains complete isolation:
+Each space maintains complete isolation with all MEW-related files in the `.mew` directory:
 
 ```
 space-directory/
-├── space.yaml           # Space configuration
-├── .mew/              
+├── .mew/                # MEW infrastructure directory
+│   ├── space.yaml       # Space configuration (preferred location)
+│   ├── package.json     # MEW dependencies only
+│   ├── node_modules/    # Isolated node_modules for MCP servers and agents
+│   ├── agents/          # Agent scripts (copied from template)
+│   │   └── assistant.js # Main agent implementation
 │   ├── pm2/            # PM2 daemon for this space only
 │   │   ├── pm2.log     # PM2 daemon logs
 │   │   ├── pm2.pid     # Daemon process ID
 │   │   └── pids/       # Managed process PIDs
-│   └── pids.json       # Space metadata
-├── logs/               # Process output logs
-│   ├── gateway.log
-│   └── agent-*.log
-└── fifos/              # FIFO pipes if configured
+│   ├── pids.json       # Space metadata
+│   ├── logs/           # Process output logs
+│   │   ├── gateway.log
+│   │   └── agent-*.log
+│   └── fifos/          # FIFO pipes if configured
+├── space.yaml          # Space configuration (legacy/optional location)
+└── [project files]     # Your actual project remains clean
 ```
 
 Benefits of this approach:
@@ -513,13 +1020,13 @@ Benefits of this approach:
 
 ### `mew space up`
 
-Brings up all components of a space based on space.yaml configuration, optionally connecting interactively as a participant.
+Brings up all components of a space based on space configuration, optionally connecting interactively as a participant. Automatically detects configuration in `.mew/space.yaml` or `space.yaml`.
 
 ```bash
 mew space up [options]
 
 Options:
-  --space-config <path>   Path to space.yaml (default: ./space.yaml)
+  --space-config <path>   Path to space.yaml (default: auto-detect)
   --port <port>          Gateway port (default: from config or 8080)
   --participant <id>      Connect as this participant
   --interactive, -i      Connect interactively after starting space
@@ -569,13 +1076,13 @@ participants:
 
 ### `mew space status`
 
-Shows the status of running space processes.
+Shows the status of running space processes. Automatically detects configuration in `.mew/space.yaml` or `space.yaml`.
 
 ```bash
 mew space status [options]
 
 Options:
-  --space-config <path>   Path to space.yaml (default: ./space.yaml)
+  --space-config <path>   Path to space.yaml (default: auto-detect)
   --json                  Output as JSON
 ```
 
@@ -587,13 +1094,13 @@ This command:
 
 ### `mew space connect`
 
-Connects interactively to a running space.
+Connects interactively to a running space. Automatically detects configuration in `.mew/space.yaml` or `space.yaml`.
 
 ```bash
 mew space connect [options]
 
 Options:
-  --space-config <path>   Path to space.yaml (default: ./space.yaml)
+  --space-config <path>   Path to space.yaml (default: auto-detect)
   --participant <id>     Connect as this participant
   --space-dir <path>     Directory of space to connect to (default: .)
   --gateway <url>        Override gateway URL (default: from running space)
@@ -616,13 +1123,13 @@ Error handling:
 
 ### `mew space down`
 
-Stops all components of a running space.
+Stops all components of a running space. Automatically detects configuration in `.mew/space.yaml` or `space.yaml`.
 
 ```bash
 mew space down [options]
 
 Options:
-  --space-config <path>   Path to space.yaml (default: ./space.yaml)
+  --space-config <path>   Path to space.yaml (default: auto-detect)
   --force                 Force kill processes if graceful shutdown fails
 ```
 
