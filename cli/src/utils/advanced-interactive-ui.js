@@ -330,14 +330,44 @@ function MessageDisplay({ item, verbose, useColor }) {
 
   let headerColor = useColor ? getColorForKind(kind) : 'white';
 
-  return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
+  return React.createElement(Box, { flexDirection: "column", marginBottom: kind === 'reasoning/thought' ? 2 : 1 },
     React.createElement(Text, { color: headerColor },
       `${contextPrefix}[${time}] ${direction} ${participant} ${kind}`
     ),
-    message.payload && React.createElement(Text, null,
-      `${contextPrefix}└─ ${getPayloadPreview(message.payload, kind)}`
-    )
+    message.payload && React.createElement(ReasoningDisplay, {
+      payload: message.payload,
+      kind: kind,
+      contextPrefix: contextPrefix
+    })
   );
+}
+
+/**
+ * Reasoning Display Component - Shows payload with better formatting for reasoning
+ */
+function ReasoningDisplay({ payload, kind, contextPrefix }) {
+  const preview = getPayloadPreview(payload, kind);
+
+  // Special formatting for reasoning/thought messages
+  if (kind === 'reasoning/thought' && payload.reasoning) {
+    return React.createElement(Box, { flexDirection: "column" },
+      React.createElement(Text, null, `${contextPrefix}└─ reasoning/thought`),
+      React.createElement(Text, {
+        color: "cyan",
+        marginLeft: 6,
+        marginTop: 1,
+        wrap: "wrap"
+      }, payload.reasoning),
+      payload.action && React.createElement(Text, {
+        color: "gray",
+        marginLeft: 6,
+        marginTop: 1
+      }, `→ action: ${payload.action}`)
+    );
+  }
+
+  // Default single-line display for other message types
+  return React.createElement(Text, null, `${contextPrefix}└─ ${preview}`);
 }
 
 /**
@@ -565,14 +595,14 @@ function getPayloadPreview(payload, kind) {
     }
     if (payload.actionInput && typeof payload.actionInput === 'object') {
       const input = JSON.stringify(payload.actionInput);
-      parts.push(`input: ${input.length > 50 ? input.substring(0, 50) + '...' : input}`);
+      parts.push(`input: ${input.length > 80 ? input.substring(0, 80) + '...' : input}`);
     }
     if (payload.message) {
       parts.push(`"${payload.message}"`);
     }
 
     let combined = parts.join(' | ');
-    return combined.length > 200 ? combined.substring(0, 200) + '...' : combined;
+    return combined.length > 1000 ? combined.substring(0, 1000) + '...' : combined;
   }
 
   if (kind === 'reasoning/start') {
