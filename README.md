@@ -1,29 +1,41 @@
 # 🐱 MEW Protocol - Multi-Entity Workspace Protocol 🚀
 
-MEW Protocol (pronounced like a cat's "mew" 🐾) addresses the challenge of "herding cats" - coordinating multiple autonomous AI agents in a shared workspace while maintaining human control through capability-based permissions and progressive trust.
+MEW Protocol (pronounced like a cat's "mew" 🐾) addresses the challenge of "herding cats" - coordinating multiple autonomous AI agents and MCP Servers in a shared workspace while maintaining human control through capability-based permissions and progressive trust.
 
 ## The Evolution
 
 ```
-MCP:  human <--> agent ... agent <--> mcp_server   (separate contexts)
-A2A:  human <--> agent ... agent <--> agent        (separate contexts)
-MEW:  human <--> agent <--> mcp_server             (unified context)
+MCP:  human ──► agent ════► mcp_server
+                  ↑
+            trust boundary
+            (agent decides)
+
+A2A:  human ──► agent₁ ════► agent₂
+                  ↑
+            trust boundary
+            (agent₁ decides)
+
+MEW:  human ──►┌─────────┐◄── agent
+               │ GATEWAY │
+ mcp_server ──►└─────────┘◄── agent₂
+                    ↑
+              trust boundary
+            (gateway enforces)
 ```
 
-In MEW Protocol, humans move from **observing** to **participating** - joining agents inside a unified context where:
-- 🎯 All messages are visible to all participants (no hidden contexts)
-- 🛡️ Untrusted agents propose, trusted participants approve
-- 📈 Trust grows through observed behavior
-- 🎮 Sub-contexts organize activity without hiding it
-- 🌐 Everything happens in one shared workspace
+**Legend:** ──► trusted flow, ════► potentially untrusted
+
+In MEW Protocol, everyone joins as equal **participants** - humans, agents, and MCP servers all:
+- 💬 Can send chat messages and MCP requests to any other participant
+- 🎯 See every operation broadcast in the shared workspace
+- 🛡️ Have capabilities enforced by the gateway, not by trust
 
 ## 🌟 Key Features
 
-- **👥 Humans as peers**: Direct participation, not just supervision
-- **🔐 Capability control**: Participants can only propose operations until granted execution rights
-- **📈 Progressive trust**: Capabilities expand based on observed behavior
-- **👁️ Full visibility**: All participants see all operations in real-time
-- **🌉 Protocol bridging**: MCP and A2A agents can join via automatic translation
+- **🟰 Universal participants**: Humans, agents, and MCP servers all join as peers
+- **🔐 Proposal mechanism**: Limited participants propose operations, privileged ones fulfill or reject
+- **🌉 Protocol bridging**: Humans, MCP servers, and agents work seamlessly in unified context
+- **👁️ Complete transparency**: Every message visible, participants filter by their concerns
 
 ## 🎯 How It Works
 
@@ -47,52 +59,31 @@ MEW Protocol is in experimental phase (v0.x) with breaking changes allowed betwe
 npm install -g mew-protocol
 ```
 
-### Create a Workspace
-
-This simple config gets you into a shared space with an AI agent and filesystem access. Direct the agent to take notes, write code, research topics - whatever you need! 🐈✨
-
-The agent will **propose** file operations (read/write) as MCP requests, which you can approve or reject. Think of it as pair programming where you maintain control - the agent suggests, you decide. Use it as a coding assistant, note taker, creative writing partner, or anything else!
-
-```yaml
-# space.yaml - Configure a workspace 🌌
-participants:
-  human:
-    type: terminal
-    capabilities: ["mcp/*", "chat"]
-  
-  project-files:
-    type: mcp-bridge
-    server: "npx -y @modelcontextprotocol/server-filesystem"
-    args: ["/path/to/project"]
-    capabilities: ["mcp/response"]
-    
-  agent:
-    type: agent
-    model: "claude-3-sonnet"
-    capabilities: ["mcp/proposal", "chat"]
-    
-```
-
-### Launch the Workspace
+### Create & Launch a Workspace
 
 ```bash
-mew up space.yaml
+# Create a new directory for your workspace
+mkdir my-workspace
+cd my-workspace
+
+# Start MEW - it will guide you through setup
+mew
 
 # 🐱 MEW Protocol workspace starting...
-# 🌌 Space created: workspace-xyz
-# 👤 Human connected (terminal)
-# 📁 project-files connected (MCP filesystem server)
-# 🤖 agent connected (Claude Sonnet)
-# 
+# 🎯 Setting up your workspace...
+# 🤖 Choose your AI agent (Claude, GPT-4, etc.)
+# 📁 Select tools (filesystem, web search, etc.)
+# 🔐 Configure capabilities (proposals vs direct execution)
+#
 # Type 'help' for commands or start chatting!
 ```
 
-Now you have a shared workspace where:
-- 🧑‍💻 You participate directly via terminal
-- 📁 MCP filesystem server provides file access
-- 🤖 Agent proposes file operations (read/write)
-- ✅ You approve or reject all proposals before execution
-- 🎓 Over time, trusted patterns can be auto-approved
+That's it! MEW guides you through setting up your workspace with:
+- 🧑‍💻 You participating directly via terminal
+- 🤖 AI agent(s) with configured capabilities
+- 🛠️ Tools and MCP servers for extended functionality
+- ✅ Proposal/approval flow for safe operations
+- 🎓 Progressive trust as patterns prove safe
 
 ## 📚 Learn More
 
