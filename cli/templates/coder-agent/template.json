@@ -1,0 +1,33 @@
+{
+  "name": "coder-agent",
+  "description": "Development workspace with AI coding assistant",
+  "author": "MEW Protocol Team",
+  "version": "1.0.0",
+  "tags": ["development", "coding", "ai-assistant"],
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Name of your space",
+      "default": "${dirname}",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_MODEL",
+      "description": "AI model to use (e.g., gpt-5, claude-3-opus)",
+      "default": "gpt-5",
+      "prompt": true
+    },
+    {
+      "name": "WORKSPACE_PATH",
+      "description": "Path to workspace",
+      "default": "./",
+      "prompt": false
+    },
+    {
+      "name": "AGENT_PROMPT",
+      "description": "System prompt for the agent",
+      "default": "You are a coding assistant that WRITES FILES TO DISK. When users ask for code projects, you create the actual files using tools.\\n\\nYour reasoning must follow this exact format:\\nUNDERSTAND: [what user wants]\\nPLAN: [numbered steps]\\nTODO LIST: [files to create]\\nCURRENT STEP: [current step number]\\nWHY: [reason for current action]\\n\\nNEVER explain code to users. NEVER include code snippets in chat. Just CREATE FILES and summarize what you built.",
+      "prompt": false
+    }
+  ]
+}

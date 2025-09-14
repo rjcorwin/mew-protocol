@@ -166,10 +166,33 @@ function hasMkfifo() {
 
 /**
  * Load space configuration from yaml file
+ * Checks .mew/space.yaml first, then falls back to provided path
  */
 function loadSpaceConfig(configPath) {
   try {
-    const resolvedPath = path.resolve(configPath);
+    let resolvedPath;
+
+    // Check if the path ends with space.yaml (common default)
+    if (configPath.endsWith('space.yaml') && !configPath.includes('.mew')) {
+      // Extract the directory from the path
+      const dir = path.dirname(configPath);
+      const mewConfigPath = path.join(dir, '.mew/space.yaml');
+
+      // Check .mew/space.yaml first
+      if (fs.existsSync(mewConfigPath)) {
+        resolvedPath = mewConfigPath;
+      } else if (fs.existsSync(configPath)) {
+        // Fall back to the original path
+        resolvedPath = configPath;
+      } else {
+        // Neither exists, try to give a helpful error
+        throw new Error(`No space configuration found. Checked:\n  - ${mewConfigPath}\n  - ${configPath}`);
+      }
+    } else {
+      // Use the explicit path provided (e.g., already includes .mew or is absolute)
+      resolvedPath = path.resolve(configPath);
+    }
+
     const configContent = fs.readFileSync(resolvedPath, 'utf8');
     const config = yaml.load(configContent);
     return { config, configPath: resolvedPath };
@@ -278,7 +301,7 @@ function cleanupFifos(spaceDir) {
 space
   .command('up')
   .description('Start a space with gateway and configured participants')
-  .option('-c, --config <path>', 'Path to space.yaml configuration', './space.yaml')
+  .option('-c, --config <path>', 'Path to space.yaml (default: auto-detect)', './space.yaml')
   .option('-d, --space-dir <path>', 'Space directory', '.')
   .option('-p, --port <port>', 'Gateway port', '8080')
   .option('-l, --log-level <level>', 'Log level', 'info')
@@ -295,11 +318,18 @@ space
       process.exit(1);
     }
     const spaceDir = path.resolve(options.spaceDir);
-    const configPath = path.join(spaceDir, path.basename(options.config));
+
+    // Construct config path - if options.config is relative, make it relative to spaceDir
+    let configPath;
+    if (path.isAbsolute(options.config)) {
+      configPath = options.config;
+    } else {
+      configPath = path.join(spaceDir, options.config);
+    }
 
     console.log(`Starting space in ${spaceDir}...`);
 
-    // Load space configuration
+    // Load space configuration (will check .mew/space.yaml first)
     const { config } = loadSpaceConfig(configPath);
     const spaceName = config.space?.name || 'unnamed-space';
     const spaceId = config.space?.id || 'space-' + Date.now();
@@ -921,12 +951,17 @@ space
   .option('--dry-run', 'Show what would be cleaned without doing it')
   .action(async (options) => {
     const spaceDir = process.cwd();
-    const spaceConfigPath = path.join(spaceDir, 'space.yaml');
 
-    // Check if this is a valid space directory
+    // Check for space configuration (.mew/space.yaml first, then space.yaml)
+    let spaceConfigPath = path.join(spaceDir, '.mew/space.yaml');
     if (!fs.existsSync(spaceConfigPath)) {
-      console.error('Error: space.yaml not found in current directory');
-      process.exit(1);
+      spaceConfigPath = path.join(spaceDir, 'space.yaml');
+      if (!fs.existsSync(spaceConfigPath)) {
+        console.error('Error: No space configuration found.');
+        console.error('Checked: .mew/space.yaml and space.yaml');
+        console.error('Run "mew init" to create a new space.');
+        process.exit(1);
+      }
     }
 
     // Check if space is running
@@ -1211,7 +1246,7 @@ function formatBytes(bytes) {
 space
   .command('connect')
   .description('Connect interactively to a running space')
-  .option('-c, --config <path>', 'Path to space.yaml configuration', './space.yaml')
+  .option('-c, --config <path>', 'Path to space.yaml (default: auto-detect)', './space.yaml')
   .option('-d, --space-dir <path>', 'Directory of space to connect to', '.')
   .option('--participant <id>', 'Connect as this participant')
   .option('--gateway <url>', 'Override gateway URL (default: from running space)')

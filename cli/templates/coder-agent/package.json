@@ -1,0 +1,12 @@
+{
+  "name": "mew-coder-agent-space",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dependencies for MEW coder-agent space",
+  "dependencies": {
+    "ws": "^8.14.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

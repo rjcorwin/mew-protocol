@@ -1,0 +1,26 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "{{SPACE_NAME}}"
+  description: "Development workspace with AI coding assistant"
+
+participants:
+  human:
+    capabilities:
+      - kind: "mcp/*"
+      - kind: "chat"
+
+  assistant:
+    command: "node"
+    args: ["./.mew/agents/assistant.js"]
+    auto_start: true
+    env:
+      NODE_PATH: "./.mew/node_modules"
+      MEW_GATEWAY: "ws://localhost:8080"
+      MEW_SPACE: "{{SPACE_NAME}}"
+      MEW_TOKEN: "assistant-token"
+      MEW_PARTICIPANT_ID: "assistant"
+      AGENT_MODEL: "{{AGENT_MODEL}}"
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"
+    capabilities:
+      - kind: "mcp/request"
+      - kind: "chat"

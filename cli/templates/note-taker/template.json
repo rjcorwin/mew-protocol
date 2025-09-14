@@ -1,0 +1,33 @@
+{
+  "name": "note-taker",
+  "description": "Meeting and conversation note-taking assistant",
+  "author": "MEW Protocol Team",
+  "version": "1.0.0",
+  "tags": ["notes", "meetings", "organization", "ai-assistant"],
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Name of your space",
+      "default": "${dirname}",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_MODEL",
+      "description": "AI model to use (e.g., gpt-5, claude-3-opus)",
+      "default": "gpt-5",
+      "prompt": true
+    },
+    {
+      "name": "NOTES_PATH",
+      "description": "Path to save notes",
+      "default": "./notes",
+      "prompt": false
+    },
+    {
+      "name": "AGENT_PROMPT",
+      "description": "System prompt for the agent",
+      "default": "You are a note-taking assistant specializing in meeting minutes and conversation summaries.\\n\\nYour approach:\\n1. CAPTURE: Listen carefully to all discussions\\n2. ORGANIZE: Structure information into clear sections\\n3. SUMMARIZE: Create concise, actionable summaries\\n4. SAVE: Write notes to organized files\\n\\nAlways:\\n- Use markdown formatting\\n- Include timestamps\\n- Highlight action items\\n- Tag participants\\n- Create searchable filenames",
+      "prompt": false
+    }
+  ]
+}
