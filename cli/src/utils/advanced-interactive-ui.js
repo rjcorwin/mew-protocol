@@ -351,9 +351,9 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
   // Special formatting for reasoning/thought messages
   if (kind === 'reasoning/thought' && payload.reasoning) {
     return React.createElement(Box, { flexDirection: "column" },
-      React.createElement(Text, null, `${contextPrefix}└─ reasoning/thought`),
+      React.createElement(Text, { color: "blue" }, `${contextPrefix}└─ reasoning/thought`),
       React.createElement(Text, {
-        color: "blueBright",
+        color: "blackBright",
         marginLeft: 6,
         marginTop: 1,
         wrap: "wrap"
@@ -366,8 +366,19 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
     );
   }
 
+  // Special formatting for chat messages
+  if (kind === 'chat') {
+    return React.createElement(Text, {
+      color: "green",
+      bold: true,
+      wrap: "wrap"
+    }, `${contextPrefix}└─ ${preview}`);
+  }
+
   // Default single-line display for other message types
-  return React.createElement(Text, null, `${contextPrefix}└─ ${preview}`);
+  return React.createElement(Text, {
+    color: "blackBright"
+  }, `${contextPrefix}└─ ${preview}`);
 }
 
 /**
@@ -532,10 +543,11 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId
 // Helper functions
 function getColorForKind(kind) {
   if (kind.startsWith('system/error')) return 'red';
-  if (kind.startsWith('system/')) return 'gray';
-  if (kind.startsWith('mcp/')) return 'yellow';
-  if (kind === 'chat') return 'white';
-  return 'cyan';
+  if (kind.startsWith('system/')) return 'blackBright';
+  if (kind.startsWith('mcp/')) return 'blackBright';
+  if (kind.startsWith('reasoning/')) return 'blue';  // Reasoning headers in blue
+  if (kind === 'chat') return 'greenBright';  // Make chat messages bright and attention-grabbing
+  return 'blackBright';
 }
 
 function getPayloadPreview(payload, kind) {
