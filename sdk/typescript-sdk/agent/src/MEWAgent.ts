@@ -376,9 +376,25 @@ Return a JSON object:
       this.log('debug', `Thought action: ${thought.action}, reasoning: ${thought.reasoning}`);
       this.emitReasoning('reasoning/thought', thought);
       
+      // Track reasoning in conversation history
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: `[Reasoning] ${thought.reasoning}`,
+        metadata: { type: 'reasoning', thought }
+      });
+      
       // Act phase
       if (thought.action === 'respond') {
         return thought.actionInput;
+      }
+      
+      // Track tool call in conversation history
+      if (thought.action === 'tool') {
+        this.conversationHistory.push({
+          role: 'assistant',
+          content: `[Tool Call] ${thought.actionInput.tool}: ${JSON.stringify(thought.actionInput.arguments)}`,
+          metadata: { type: 'tool_call', tool: thought.actionInput.tool, arguments: thought.actionInput.arguments }
+        });
       }
       
       try {
@@ -387,6 +403,13 @@ Return a JSON object:
         
         // Store the observation for the next iteration
         thought.observation = observation;
+        
+        // Track observation in conversation history
+        this.conversationHistory.push({
+          role: 'system',
+          content: `[Observation] ${observation}`,
+          metadata: { type: 'observation' }
+        });
         
         // Don't immediately return on tool results - let the LLM decide if more work is needed
         // The LLM will analyze the observation and decide whether to:
@@ -398,6 +421,13 @@ Return a JSON object:
         
         // Store error as observation so the LLM can decide how to handle it
         thought.observation = `Error: ${error}`;
+        
+        // Track error in conversation history
+        this.conversationHistory.push({
+          role: 'system',
+          content: `[Error] ${error}`,
+          metadata: { type: 'error' }
+        });
         
         // Continue the loop - let the LLM decide if it can recover or needs to respond with error
       }

@@ -97,7 +97,9 @@ participants:
       OPENAI_MODEL: "gpt-5"
       # OPENAI_BASE_URL: "..."
       # Configure the agent with 100 max iterations for complex multi-step tasks
-      MEW_AGENT_CONFIG: '{"maxIterations": 100}'
+      # and 10 minute timeout for proposals to allow human review time
+      # and 50 message conversation history for context across interactions
+      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 600000, "conversationHistoryLength": 50}'
   
   # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:
