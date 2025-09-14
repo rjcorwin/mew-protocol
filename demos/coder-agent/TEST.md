@@ -265,6 +265,149 @@ Error responses will have an `error` field instead of `result`:
 }
 ```
 
+## Testing with curl (HTTP API)
+
+The gateway provides an HTTP API endpoint for sending messages without a WebSocket connection. This is useful for quick testing with curl.
+
+### HTTP API Endpoint
+```
+POST http://localhost:8080/participants/{participantId}/messages?space={spaceId}
+```
+
+### Authentication
+Include the participant's token in the Authorization header:
+```
+Authorization: Bearer {token}
+```
+
+### Example curl Commands
+
+#### 1. List Available Tools
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/list"
+    }
+  }'
+```
+
+#### 2. List Resources
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "resources/list"
+    }
+  }'
+```
+
+#### 3. List Directory Contents
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "tools/call",
+      "params": {
+        "name": "list_directory",
+        "arguments": {
+          "path": "."
+        }
+      }
+    }
+  }'
+```
+
+#### 4. Read a File
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "tools/call",
+      "params": {
+        "name": "read_file",
+        "arguments": {
+          "path": "test.txt"
+        }
+      }
+    }
+  }'
+```
+
+#### 5. Write a File
+```bash
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "tools/call",
+      "params": {
+        "name": "write_file",
+        "arguments": {
+          "path": "test-write.txt",
+          "content": "Hello from MEW Protocol test!"
+        }
+      }
+    }
+  }'
+```
+
+### Monitoring Responses
+
+To see the responses, you need to have a WebSocket client connected to observe the messages. You can:
+
+1. Use the MEW CLI client in another terminal:
+```bash
+mew client connect --gateway ws://localhost:8080 --space coder-demo --token human-token
+```
+
+2. Or use the HTTP API to check participants:
+```bash
+curl 'http://localhost:8080/participants?space=coder-demo'
+```
+
+### Response Format
+
+The HTTP API returns a simple acknowledgment:
+```json
+{
+  "id": "http-{timestamp}-{random}",
+  "status": "accepted",
+  "timestamp": "2025-09-13T22:23:09.792Z"
+}
+```
+
+The actual MCP response will be broadcast to all participants in the space via WebSocket.
+
 ## Testing Workflow
 
 1. **Discovery Phase**
@@ -294,8 +437,123 @@ Error responses will have an `error` field instead of `result`:
 - **Permission errors**: Check the workspace directory permissions
 - **Path issues**: Paths are relative to `/Users/rj/Git/rjcorwin/mew-protocol/demos/coder-agent/workspace`
 
+## Debugging with PM2 Logs
+
+The demo uses PM2 to manage processes. Use these commands to monitor and debug:
+
+### View Logs
+```bash
+# View all logs
+pm2 logs
+
+# View specific participant logs
+pm2 logs coder-agent      # Coder agent logs
+pm2 logs mcp-fs-bridge    # MCP bridge logs
+pm2 logs gateway          # Gateway logs
+
+# View last N lines
+pm2 logs --lines 100
+
+# Stream logs in real-time
+pm2 logs --stream
+
+# Clear logs
+pm2 flush
+```
+
+### Process Management
+```bash
+# List all processes
+pm2 list
+
+# Restart a specific process
+pm2 restart coder-agent
+
+# Stop/start processes
+pm2 stop coder-agent
+pm2 start coder-agent
+
+# Monitor resources
+pm2 monit
+```
+
+## Simulating Human Interactions
+
+You can simulate being the human participant to test agent behavior:
+
+### Send Chat Messages as Human
+```bash
+# Ask the agent to perform a task
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["coder-agent"],
+    "kind": "chat",
+    "payload": {
+      "text": "Please write a file called hello.txt with the content: Hello World"
+    }
+  }'
+```
+
+### Fulfill Agent Proposals as Human
+
+When the coder agent creates proposals (because it lacks direct tool capabilities), you can fulfill them as the human:
+
+1. First, observe proposals in the logs:
+```bash
+pm2 logs | grep "mcp/proposal"
+```
+
+2. Then fulfill a proposal by copying its content and sending as human:
+```bash
+# Example: Fulfill a write_file proposal
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["mcp-fs-bridge"],
+    "kind": "mcp/request",
+    "correlation_id": ["PROPOSAL_ID_HERE"],
+    "payload": {
+      "jsonrpc": "2.0",
+      "id": 999,
+      "method": "tools/call",
+      "params": {
+        "name": "write_file",
+        "arguments": {
+          "path": "hello.txt",
+          "content": "Hello World"
+        }
+      }
+    }
+  }'
+```
+
+### Testing the ReAct Loop
+
+To test if the agent properly continues its ReAct loop:
+
+```bash
+# Ask it to do something that requires multiple steps
+curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{
+    "to": ["coder-agent"],
+    "kind": "chat",
+    "payload": {
+      "text": "Create a file called test.txt with some content, then read it back to verify"
+    }
+  }'
+
+# Watch the logs to see the reasoning steps
+pm2 logs coder-agent --stream | grep -E "(reasoning|ReAct|Thought)"
+```
+
 ## Notes
 
 - The exact tool names may vary depending on the MCP fileserver implementation
 - Always start with `tools/list` to discover the actual available operations
 - The workspace directory is configured in `space.yaml` as the MCP server's working directory
+- The coder agent uses proposals when it lacks direct tool capabilities (see space.yaml for capability configuration)
