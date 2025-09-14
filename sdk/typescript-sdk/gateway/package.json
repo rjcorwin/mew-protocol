@@ -34,8 +34,8 @@
   "author": "MEW Working Group",
   "license": "MIT",
   "dependencies": {
-    "@mew-protocol/types": "file:../types",
-    "@mew-protocol/capability-matcher": "file:../capability-matcher",
+    "@mew-protocol/types": "^0.2.0",
+    "@mew-protocol/capability-matcher": "^0.2.0",
     "ws": "^8.18.0",
     "express": "^4.18.2",
     "cors": "^2.8.5",
@@ -63,12 +63,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjcorwin/mcpx-protocol.git",
+    "url": "https://github.com/rjcorwin/mew-protocol.git",
     "directory": "sdk/typescript-sdk/gateway"
   },
-  "homepage": "https://github.com/rjcorwin/mcpx-protocol#readme",
+  "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
   "bugs": {
-    "url": "https://github.com/rjcorwin/mcpx-protocol/issues"
+    "url": "https://github.com/rjcorwin/mew-protocol/issues"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -29,9 +29,25 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@mew-protocol/types": "file:../types",
+    "@mew-protocol/types": "^0.2.0",
     "jsonpath-plus": "^8.0.0",
     "lodash": "^4.17.21",
     "micromatch": "^4.0.5"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mew-protocol.git",
+    "directory": "sdk/typescript-sdk/capability-matcher"
+  },
+  "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mew-protocol/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

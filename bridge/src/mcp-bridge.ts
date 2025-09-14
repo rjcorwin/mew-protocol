@@ -1,5 +1,5 @@
 import Debug from 'debug';
-import { MEWParticipant } from '../../sdk/typescript-sdk/participant/dist/index.js';
+import { MEWParticipant } from '@mew-protocol/participant';
 import { MCPClient, MCPServerConfig } from './mcp-client';
 
 const debug = Debug('mew:bridge');

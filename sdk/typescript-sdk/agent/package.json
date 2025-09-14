@@ -18,9 +18,9 @@
     "prepublishOnly": "npm run clean && npm run build"
   },
   "dependencies": {
-    "@mew-protocol/client": "file:../client",
-    "@mew-protocol/participant": "file:../participant",
-    "@mew-protocol/types": "file:../types",
+    "@mew-protocol/client": "^0.2.0",
+    "@mew-protocol/participant": "^0.1.0",
+    "@mew-protocol/types": "^0.2.0",
     "@types/uuid": "^9.0.8",
     "js-yaml": "^4.1.0",
     "openai": "^5.20.1",
@@ -39,11 +39,23 @@
     "ai",
     "typescript"
   ],
-  "author": "",
+  "author": "MEW Working Group",
   "license": "MIT",
   "files": [
     "dist",
     "README.md",
     "config.example.yaml"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mew-protocol.git",
+    "directory": "sdk/typescript-sdk/agent"
+  },
+  "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mew-protocol/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

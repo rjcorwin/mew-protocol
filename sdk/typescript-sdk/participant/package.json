@@ -9,9 +9,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mew-protocol/capability-matcher": "file:../capability-matcher",
-    "@mew-protocol/client": "file:../client",
-    "@mew-protocol/types": "file:../types",
+    "@mew-protocol/capability-matcher": "^0.2.0",
+    "@mew-protocol/client": "^0.2.0",
+    "@mew-protocol/types": "^0.2.0",
     "@types/uuid": "^9.0.8",
     "uuid": "^9.0.1"
   },
@@ -20,6 +20,22 @@
     "@types/ws": "^8.5.5",
     "typescript": "^5.0.0"
   },
-  "author": "",
-  "license": "MIT"
+  "author": "MEW Working Group",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mew-protocol.git",
+    "directory": "sdk/typescript-sdk/participant"
+  },
+  "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mew-protocol/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
