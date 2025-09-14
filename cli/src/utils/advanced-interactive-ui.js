@@ -374,8 +374,7 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
   // Special formatting for chat messages
   if (kind === 'chat') {
     return React.createElement(Text, {
-      color: "green",
-      bold: true,
+      color: "white",
       wrap: "wrap"
     }, `${contextPrefix}└─ ${preview}`);
   }
@@ -551,7 +550,7 @@ function getColorForKind(kind) {
   if (kind.startsWith('system/')) return 'blackBright';
   if (kind.startsWith('mcp/')) return 'blackBright';
   if (kind.startsWith('reasoning/')) return 'blue';  // Reasoning headers in blue
-  if (kind === 'chat') return 'greenBright';  // Make chat messages bright and attention-grabbing
+  if (kind === 'chat') return 'white';  // Clean white for chat messages
   return 'blackBright';
 }
 
