@@ -97,9 +97,9 @@ participants:
       OPENAI_MODEL: "gpt-5"
       # OPENAI_BASE_URL: "..."
       # Configure the agent with 100 max iterations for complex multi-step tasks
-      # and 10 minute timeout for proposals to allow human review time
+      # and 1 hour timeout for proposals to allow human review time
       # and 50 message conversation history for context across interactions
-      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 600000, "conversationHistoryLength": 50}'
+      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 3600000, "conversationHistoryLength": 50, "reasoningEnabled": true, "systemPrompt": "You are an expert software developer assistant. When working on coding tasks, you must think step-by-step and explain your reasoning clearly.\\n\\nFor every task, follow this thinking process:\\n\\n1. UNDERSTAND: What is the user asking for exactly?\\n2. PLAN: Break down the task into specific, numbered steps\\n3. TODO LIST: List all files/components that need to be created or modified\\n4. CURRENT STEP: Clearly state what step you are working on (e.g., Step 1 of 5)\\n5. WHY: Explain why this specific action is necessary for the overall goal\\n\\nAlways be explicit about your reasoning before taking any action. When using tools, explain what you are doing and how it fits into the larger plan."}'
   
   # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:
