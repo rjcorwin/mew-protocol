@@ -1,8 +1,8 @@
 # 🐱 MEW Protocol - Multi-Entity Workspace Protocol 🚀
 
-MEW Protocol (pronounced like a cat's "mew" 🐾) addresses the challenge of "herding cats" - coordinating multiple autonomous AI agents and MCP Servers in a shared workspace while maintaining human control through capability-based permissions and progressive trust.
+MEW Protocol (pronounced like a cat's "mew" 🐾) keeps **humans in the loop** - you participate directly in agent workspaces, see every operation, and maintain control through gateway-enforced capabilities.
 
-## The Evolution
+## The Problem: Agents Operating in the Dark
 
 ```
 MCP:  human ──► agent ════► mcp_server
@@ -25,25 +25,23 @@ MEW:  human ──►┌─────────┐◄── agent
 
 **Legend:** ──► trusted flow, ════► potentially untrusted
 
-In MEW Protocol, everyone joins as equal **participants** - humans, agents, and MCP servers all:
-- 💬 Can send chat messages and MCP requests to any other participant
-- 🎯 See every operation broadcast in the shared workspace
-- 🛡️ Have capabilities enforced by the gateway, not by trust
+## 🌟 The Solution: Human-in-the-Loop by Design
 
-## 🌟 Key Features
+In MEW, humans aren't observers - they're **active participants** alongside agents and MCP servers:
+- 👀 **See everything**: Every message, every operation, nothing hidden
+- 🎛️ **Control access**: You grant and revoke capabilities, not the agents
+- ✅ **Review proposals**: Agents propose, you decide what executes
+- 💬 **Direct interaction**: Chat with any participant, send MCP requests directly
 
-- **🟰 Universal participants**: Humans, agents, and MCP servers all join as peers
-- **🔐 Proposal mechanism**: Limited participants propose operations, privileged ones fulfill or reject
-- **🌉 Protocol bridging**: Humans, MCP servers, and agents work seamlessly in unified context
-- **👁️ Complete transparency**: Every message visible, participants filter by their concerns
+The **proposal mechanism** ensures humans stay in control. New agents start with proposal-only access - they suggest operations but can't execute until you approve. As you observe their behavior, you grant specific capabilities. Trust is earned, not assumed.
 
-## 🎯 How It Works
+## 🎯 Human-Controlled Workflow
 
-1. 🪐 Participants join a workspace (or "space") with specific capabilities
-2. 💭 Untrusted participants propose operations
-3. ✅ Trusted participants (human or AI) approve and execute
-4. 🎓 Over time, safe patterns earn direct execution rights
-5. 🎮 Humans maintain ultimate control while automation grows
+1. **You define the rules**: Set initial capabilities for each participant
+2. **Agents propose**: Limited agents suggest operations via proposals
+3. **You review**: Approve, reject, or delegate review to trusted participants
+4. **You grant trust**: Expand capabilities for agents that prove reliable
+5. **You maintain control**: Revoke capabilities instantly if needed
 
 ## 📦 Current Version
 
