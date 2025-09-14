@@ -64,6 +64,11 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   }, [ws, exit]);
 
   const handleIncomingMessage = (message) => {
+    // Filter out echo messages - don't show messages from ourselves coming back
+    if (message.from === participantId) {
+      return;
+    }
+
     // Filter messages based on configuration
     if (!showHeartbeat && message.kind === 'system/heartbeat') {
       return;
