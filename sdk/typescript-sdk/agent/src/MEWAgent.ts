@@ -79,14 +79,34 @@ export class MEWAgent extends MEWParticipant {
       ...config
     };
 
-    // Initialize OpenAI if API key provided
-    if (this.config.apiKey) {
-      const openaiConfig: any = { apiKey: this.config.apiKey };
-      if (this.config.baseURL) {
-        openaiConfig.baseURL = this.config.baseURL;
-      }
-      this.openai = new OpenAI(openaiConfig);
+    // LOUDLY FAIL if no API key provided
+    if (!this.config.apiKey) {
+      console.error('');
+      console.error('🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨');
+      console.error('❌ FATAL ERROR: OPENAI_API_KEY is not configured! ❌');
+      console.error('🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨');
+      console.error('');
+      console.error('MEWAgent requires an OpenAI API key to function.');
+      console.error('');
+      console.error('Please provide the API key using one of these methods:');
+      console.error('  1. Pass it in the config: new MEWAgent({ apiKey: "sk-..." })');
+      console.error('  2. Set the OPENAI_API_KEY environment variable');
+      console.error('  3. Include it in your configuration file');
+      console.error('');
+      console.error('Get your API key from: https://platform.openai.com/api-keys');
+      console.error('');
+      console.error('🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨');
+
+      // Exit the process with error code
+      process.exit(1);
     }
+
+    // Initialize OpenAI with the API key
+    const openaiConfig: any = { apiKey: this.config.apiKey };
+    if (this.config.baseURL) {
+      openaiConfig.baseURL = this.config.baseURL;
+    }
+    this.openai = new OpenAI(openaiConfig);
 
     this.setupAgentBehavior();
     
@@ -107,12 +127,57 @@ export class MEWAgent extends MEWParticipant {
   }
   
   /**
-   * Override onReady to log agent readiness
+   * Override discoverTools to announce what we find
+   */
+  async discoverTools(participantId: string): Promise<any> {
+    this.log('info', `🔍 Discovering tools from participant: ${participantId}...`);
+
+    try {
+      const tools = await super.discoverTools(participantId);
+
+      if (tools && tools.length > 0) {
+        this.log('info', `✅ Discovered ${tools.length} tool(s) from ${participantId}:`);
+        for (const tool of tools) {
+          this.log('info', `   - ${tool.name}${tool.description ? `: ${tool.description}` : ''}`);
+        }
+      } else {
+        this.log('warn', `⚠️ No tools discovered from ${participantId} (participant may not have any tools or may not support tools/list)`);
+      }
+
+      return tools;
+    } catch (error) {
+      this.log('error', `❌ Failed to discover tools from ${participantId}: ${error}`);
+      return [];
+    }
+  }
+
+  /**
+   * Override onReady to log agent readiness and announce available tools
    */
   protected async onReady(): Promise<void> {
     // Tool discovery is handled by parent MEWParticipant with auto-discovery
     this.log('info', `Agent ready`);
     await super.onReady();
+
+    // Announce total available tools after initial discovery
+    setTimeout(() => {
+      const allTools = this.getAvailableTools();
+      if (allTools.length > 0) {
+        this.log('info', `📦 Total tools available: ${allTools.length}`);
+        const byParticipant = new Map<string, string[]>();
+        for (const tool of allTools) {
+          if (!byParticipant.has(tool.participantId)) {
+            byParticipant.set(tool.participantId, []);
+          }
+          byParticipant.get(tool.participantId)!.push(tool.name);
+        }
+        for (const [participant, tools] of byParticipant) {
+          this.log('info', `   ${participant}: ${tools.join(', ')}`);
+        }
+      } else {
+        this.log('warn', `⚠️ No tools available yet. Waiting for other participants to join...`);
+      }
+    }, 2000); // Wait a bit for initial discovery to complete
   }
 
   /**
@@ -267,13 +332,9 @@ export class MEWAgent extends MEWParticipant {
     }
     
     // Priority 3: Use LLM classification for relevance
+    // We now guarantee OpenAI is initialized in constructor
     if (!this.openai) {
-      // No LLM available, use simple heuristics
-      if (chatConfig.respondToQuestions && text.includes('?')) {
-        this.log('debug', 'Responding to question (heuristic)');
-        return true;
-      }
-      return false;
+      throw new Error('OpenAI client not initialized - this should never happen!');
     }
     
     // Perform LLM classification
@@ -301,8 +362,9 @@ export class MEWAgent extends MEWParticipant {
    * Use LLM to classify whether to respond to a chat message
    */
   private async classifyChat(text: string): Promise<{shouldRespond: boolean; confidence: number; reason: string}> {
+    // We now guarantee OpenAI is initialized in constructor
     if (!this.openai) {
-      throw new Error('No OpenAI client available for classification');
+      throw new Error('OpenAI client not initialized - this should never happen!');
     }
     
     const allTools = this.getAvailableTools();
@@ -440,13 +502,19 @@ Return a JSON object:
    * Reason phase (ReAct: Reason)
    */
   protected async reason(input: string, previousThoughts: Thought[]): Promise<Thought> {
+    // We now guarantee OpenAI is initialized in constructor
     if (!this.openai) {
-      // Fallback to simple pattern matching without LLM
-      return this.reasonWithoutLLM(input, previousThoughts);
+      throw new Error('OpenAI client not initialized - this should never happen!');
     }
 
     const tools = this.prepareLLMTools();
-    
+
+    // Warn if no tools are available
+    if (tools.length === 0) {
+      this.log('warn', '⚠️ No tools available for reasoning! The agent may have limited capabilities.');
+      this.log('warn', '   Waiting for other participants to join and share their tools...');
+    }
+
     // Build messages based on configured format
     let messages: any[];
     
@@ -478,6 +546,11 @@ Return a JSON object:
       messages.splice(1, 0, ...historyToInclude);
     }
     
+    // Add warning to system prompt if no tools available
+    if (tools.length === 0 && messages.length > 0 && messages[0].role === 'system') {
+      messages[0].content += '\n\nIMPORTANT: No tools are currently available. You can only respond with text. If the user asks you to perform actions that would require tools, explain that you are waiting for tool-providing participants to join the workspace.';
+    }
+
     // Use function calling to let the model decide whether to use tools
     const response = await this.openai.chat.completions.create({
       model: this.config.model!,
@@ -603,136 +676,6 @@ Return a JSON object:
     return messages;
   }
 
-  /**
-   * Reason without LLM (fallback for no API key)
-   */
-  protected reasonWithoutLLM(input: string, _previousThoughts: Thought[]): Thought {
-    const lowerInput = input.toLowerCase();
-    
-    // Get available tools from parent
-    const allTools = this.getAvailableTools();
-    
-    // Debug: Check available tools
-    this.log('info', `ReasonWithoutLLM - Tool count: ${allTools.length}`);
-    if (allTools.length > 0) {
-      this.log('info', `ReasonWithoutLLM - Available tools: ${allTools.map(t => `${t.participantId}/${t.name}`).join(', ')}`);
-    }
-    
-    // Check for file operations (read, list, etc.)
-    if (lowerInput.includes('read') || lowerInput.includes('show') || lowerInput.includes('see') || 
-        lowerInput.includes('look at') || lowerInput.includes('view') || lowerInput.includes('check') ||
-        lowerInput.includes('contents') || lowerInput.includes('what is in') || lowerInput.includes('what are in')) {
-      // Look for file-related tools
-      for (const tool of allTools) {
-        if (tool.name.includes('read') || tool.name === 'read_file') {
-          // Extract potential file path from input
-          // Try multiple patterns: quoted strings, files with extensions, or "the X file" pattern
-          const pathMatch = input.match(/['"`]([^'"`]+)['"`]/) || 
-                           input.match(/(\S+\.(txt|js|ts|json|md|yaml|yml|log|xml|html|css|py|java|c|cpp|h|hpp))/i) ||
-                           input.match(/the\s+(\S+)\s+file/i) ||
-                           input.match(/file\s+(?:named\s+|called\s+)?(\S+)/i);
-          if (pathMatch) {
-            const filePath = pathMatch[1];
-            return {
-              reasoning: `The user wants to read file ${filePath}. I'll use the ${tool.name} tool from ${tool.participantId}.`,
-              action: 'tool',
-              actionInput: {
-                tool: `${tool.participantId}/${tool.name}`,
-                arguments: { path: filePath }
-              }
-            };
-          }
-        }
-      }
-    }
-    
-    // Check for list/directory operations
-    if (lowerInput.includes('list') || lowerInput.includes('ls') || lowerInput.includes('dir') || 
-        lowerInput.includes('files') || lowerInput.includes('directory')) {
-      // Look for list-related tools
-      for (const tool of allTools) {
-        if (tool.name.includes('list') || tool.name === 'list_directory') {
-          // Extract potential directory path from input
-          const pathMatch = input.match(/['"`]([^'"`]+)['"`]/) || input.match(/in\s+(\S+)/);
-          const dirPath = pathMatch ? pathMatch[1] : '.';
-          return {
-            reasoning: `The user wants to list files in ${dirPath}. I'll use the ${tool.name} tool from ${tool.participantId}.`,
-            action: 'tool',
-            actionInput: {
-              tool: `${tool.participantId}/${tool.name}`,
-              arguments: { path: dirPath }
-            }
-          };
-        }
-      }
-    }
-    
-    // Check for simple arithmetic with discovered tools
-    if (lowerInput.includes('calculate') || lowerInput.includes('add') || lowerInput.includes('plus') || lowerInput.includes('+')) {
-      // Look for calculation tools
-      for (const tool of allTools) {
-        if (tool.name === 'add' || tool.name.includes('calc') || tool.name.includes('math')) {
-          const numbers = input.match(/\d+/g);
-          if (numbers && numbers.length >= 2) {
-            const a = parseInt(numbers[0]);
-            const b = parseInt(numbers[1]);
-            return {
-              reasoning: `The user wants to calculate ${a} + ${b}. I'll use the ${tool.name} tool from ${tool.participantId}.`,
-              action: 'tool',
-              actionInput: {
-                tool: `${tool.participantId}/${tool.name}`,
-                arguments: { a, b }
-              }
-            };
-          }
-        }
-      }
-      
-      // Fallback: do calculation locally if no tools available
-      const numbers = input.match(/\d+/g);
-      if (numbers && numbers.length >= 2) {
-        const a = parseInt(numbers[0]);
-        const b = parseInt(numbers[1]);
-        const result = a + b;
-        return {
-          reasoning: `The user wants to calculate ${a} + ${b}. No calculation tools available, so I'll compute it directly.`,
-          action: 'respond',
-          actionInput: `The result of ${a} + ${b} is ${result}.`
-        };
-      }
-    }
-    
-    // Check for greetings
-    if (lowerInput.includes('hello') || lowerInput.includes('hi') || lowerInput.includes('hey')) {
-      const toolList = allTools.length > 0 
-        ? `I have access to the following tools: ${allTools.map(t => t.name).join(', ')}.` 
-        : 'I\'m still discovering available tools.';
-      return {
-        reasoning: 'The user is greeting me.',
-        action: 'respond',
-        actionInput: `Hello! I'm the coder agent. ${toolList} What would you like me to help with?`
-      };
-    }
-    
-    // Default response with available tools
-    if (allTools.length > 0) {
-      const toolDescriptions = allTools
-        .map(t => `${t.name} (from ${t.participantId})`)
-        .join(', ');
-      return {
-        reasoning: 'I should inform the user about available tools.',
-        action: 'respond',
-        actionInput: `I have these tools available: ${toolDescriptions}. How can I help you use them?`
-      };
-    }
-    
-    // No tools discovered yet
-    return {
-      reasoning: 'I haven\'t discovered any tools yet.',
-      action: 'respond',
-      actionInput: 'I\'m still discovering available tools. Please wait a moment and try again.'
-    };
-  }
   
   /**
    * Act phase (ReAct: Act)

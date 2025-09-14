@@ -17,7 +17,7 @@ participants:
   coder-agent:
     type: local
     command: "npx"
-    args: ["@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "coder-token", "--id", "coder-agent"]
+    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "coder-token", "--id", "coder-agent"]
     auto_start: true
     tokens:
       - coder-token
@@ -101,7 +101,7 @@ participants:
   mcp-fs-bridge:
     type: local
     command: "npx"
-    args: ["@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "mcp-bridge-token", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./", "--mcp-cwd", "./"]
+    args: ["--yes", "@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "mcp-bridge-token", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./", "--mcp-cwd", "./"]
     auto_start: true
     tokens:
       - mcp-bridge-token

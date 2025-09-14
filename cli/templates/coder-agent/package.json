@@ -4,7 +4,7 @@
   "private": true,
   "description": "MEW Protocol coder agent workspace with MCP filesystem tools",
   "dependencies": {
-    "@mew-protocol/agent": "^0.3.0",
+    "@mew-protocol/agent": "^0.3.1",
     "@mew-protocol/bridge": "^0.1.1",
     "@mew-protocol/client": "^0.2.0",
     "@mew-protocol/participant": "^0.1.0",
