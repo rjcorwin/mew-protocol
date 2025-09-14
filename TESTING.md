@@ -1,20 +1,107 @@
-# Coder Agent Demo - Manual Testing Guide
+# MEW Protocol Testing Guide
 
-This guide provides test envelopes for manually testing the MCP fileserver bridge in the coder demo.
+This guide covers testing MEW Protocol implementations, including setting up test spaces with local dependencies and manual testing procedures.
 
-## Prerequisites
+## Setting Up a Test Space with Local Dependencies
 
-1. Start the space:
+When developing MEW Protocol, you'll want to test with your local packages instead of published npm versions. The coder-agent template provides a complete example of setting up a space with all components.
+
+### Quick Start with Local Dependencies
+
+1. **First, link the local CLI (from the root of mew-protocol repo):**
    ```bash
-   mew space up -f space.yaml
+   cd cli
+   npm link
+   cd ..
+
+   # Verify you're using the local version
+   mew --version  # Should show the version from cli/package.json
    ```
 
-2. Connect as human:
+2. **Initialize a coder-agent space from the template:**
    ```bash
-   mew client connect --space coder-demo --token human-token
+   mew space init --template coder-agent my-test-space
+   cd my-test-space
+   ```
+
+3. **Modify package.json to use local dependencies:**
+
+   Edit `package.json` to point to your local packages:
+   ```json
+   {
+     "name": "mew-test-space",
+     "version": "1.0.0",
+     "private": true,
+     "dependencies": {
+       "@mew-protocol/agent": "file:../sdk/typescript-sdk/agent",
+       "@mew-protocol/bridge": "file:../bridge",
+       "@mew-protocol/client": "file:../sdk/typescript-sdk/client",
+       "@mew-protocol/participant": "file:../sdk/typescript-sdk/participant",
+       "@mew-protocol/types": "file:../sdk/typescript-sdk/types",
+       "@modelcontextprotocol/server-filesystem": "^0.6.2",
+       "openai": "^5.20.1",
+       "js-yaml": "^4.1.0",
+       "ws": "^8.14.0"
+     }
+   }
+   ```
+
+4. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+5. **Set your OpenAI API key:**
+   ```bash
+   export OPENAI_API_KEY=sk-your-key-here
+   ```
+
+6. **Start the space:**
+   ```bash
+   mew space up
+   ```
+
+### What's in the Coder-Agent Template
+
+The coder-agent template sets up:
+
+- **Gateway**: The MEW Protocol gateway for message routing
+- **Coder Agent**: An AI agent using @mew-protocol/agent with OpenAI
+- **MCP Filesystem Bridge**: Bridges MCP filesystem tools to MEW Protocol
+- **Human participant**: For manual interaction and testing
+
+
+### Monitoring the Space
+
+View logs for all participants:
+```bash
+pm2 logs
+```
+
+View specific participant logs:
+```bash
+pm2 logs coder-agent
+pm2 logs mcp-fs-bridge
+pm2 logs gateway
+```
+
+Connect as human to interact:
+```bash
+mew client connect --space my-test-space --token human-token
+```
+
+## Manual Testing Procedures
+
+### Prerequisites
+
+1. Start the space and connect as human:
+   ```bash
+   mew
    ```
 
 ## Test Envelopes
+
+**Note**: In the CLI's interactive mode, you can paste JSON envelopes directly and they will be sent as protocol messages instead of chat. The CLI automatically detects valid JSON and sends it as-is. This is often more convenient than using curl commands since you'll see the responses in the same terminal. See `cli/spec/draft/SPEC.md` for details on input processing.
 
 ### 1. List Available Tools
 Discover what tools the fileserver provides:
@@ -24,7 +111,7 @@ Discover what tools the fileserver provides:
   "protocol": "mew/v0.3",
   "id": "test-1",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -42,7 +129,7 @@ Check what resources are exposed:
   "protocol": "mew/v0.3",
   "id": "test-2",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -60,7 +147,7 @@ List files in the current directory:
   "protocol": "mew/v0.3",
   "id": "test-3",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -84,7 +171,7 @@ Read contents of a specific file:
   "protocol": "mew/v0.3",
   "id": "test-4",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -108,7 +195,7 @@ Create or update a file:
   "protocol": "mew/v0.3",
   "id": "test-5",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -133,7 +220,7 @@ Get metadata about a file:
   "protocol": "mew/v0.3",
   "id": "test-6",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -157,7 +244,7 @@ Create a new directory:
   "protocol": "mew/v0.3",
   "id": "test-7",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -181,7 +268,7 @@ Move or rename a file:
   "protocol": "mew/v0.3",
   "id": "test-8",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -206,7 +293,7 @@ Delete a file:
   "protocol": "mew/v0.3",
   "id": "test-9",
   "from": "human",
-  "to": ["mcp-fs-bridge"],
+  "to": ["filesystem-server"],
   "kind": "mcp/request",
   "payload": {
     "jsonrpc": "2.0",
@@ -282,9 +369,11 @@ Authorization: Bearer {token}
 
 ### Example curl Commands
 
+**Note**: Replace `<your-folder-name>` with the actual name of your directory, as the space name defaults to the folder name when you run `mew space init`.
+
 #### 1. List Available Tools
 ```bash
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+curl -X POST 'http://localhost:8080/participants/human/messages?space=<your-folder-name>' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer human-token' \
   -d '{
@@ -300,7 +389,7 @@ curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo
 
 #### 2. List Resources
 ```bash
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+curl -X POST 'http://localhost:8080/participants/human/messages?space=<your-folder-name>' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer human-token' \
   -d '{
@@ -316,7 +405,7 @@ curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo
 
 #### 3. List Directory Contents
 ```bash
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+curl -X POST 'http://localhost:8080/participants/human/messages?space=<your-folder-name>' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer human-token' \
   -d '{
@@ -338,7 +427,7 @@ curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo
 
 #### 4. Read a File
 ```bash
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+curl -X POST 'http://localhost:8080/participants/human/messages?space=<your-folder-name>' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer human-token' \
   -d '{
@@ -360,7 +449,7 @@ curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo
 
 #### 5. Write a File
 ```bash
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+curl -X POST 'http://localhost:8080/participants/human/messages?space=<your-folder-name>' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer human-token' \
   -d '{
@@ -484,7 +573,7 @@ You can simulate being the human participant to test agent behavior:
 ### Send Chat Messages as Human
 ```bash
 # Ask the agent to perform a task
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+curl -X POST 'http://localhost:8080/participants/human/messages?space=<your-folder-name>' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer human-token' \
   -d '{
@@ -508,7 +597,7 @@ pm2 logs | grep "mcp/proposal"
 2. Then fulfill a proposal by copying its content and sending as human:
 ```bash
 # Example: Fulfill a write_file proposal
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+curl -X POST 'http://localhost:8080/participants/human/messages?space=<your-folder-name>' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer human-token' \
   -d '{
@@ -536,7 +625,7 @@ To test if the agent properly continues its ReAct loop:
 
 ```bash
 # Ask it to do something that requires multiple steps
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder-demo' \
+curl -X POST 'http://localhost:8080/participants/human/messages?space=<your-folder-name>' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer human-token' \
   -d '{
