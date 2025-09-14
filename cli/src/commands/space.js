@@ -245,6 +245,25 @@ function removePidFile(spaceDir) {
 }
 
 /**
+ * Resolve environment variables in an object
+ * Replaces ${VAR_NAME} with process.env.VAR_NAME
+ */
+function resolveEnvVariables(envObj) {
+  const resolved = {};
+  for (const [key, value] of Object.entries(envObj)) {
+    if (typeof value === 'string') {
+      // Replace ${VAR_NAME} with actual environment variable value
+      resolved[key] = value.replace(/\$\{([^}]+)\}/g, (match, varName) => {
+        return process.env[varName] || match; // Keep original if env var doesn't exist
+      });
+    } else {
+      resolved[key] = value;
+    }
+  }
+  return resolved;
+}
+
+/**
  * Create FIFOs for participant if configured
  * @param {boolean} createOutputFifo - Whether to create output FIFO (false when output_log is set)
  */
@@ -330,7 +349,9 @@ space
     console.log(`Starting space in ${spaceDir}...`);
 
     // Load space configuration (will check .mew/space.yaml first)
-    const { config } = loadSpaceConfig(configPath);
+    const { config, configPath: actualConfigPath } = loadSpaceConfig(configPath);
+    // Update configPath to the actual resolved path
+    configPath = actualConfigPath;
     const spaceName = config.space?.name || 'unnamed-space';
     const spaceId = config.space?.id || 'space-' + Date.now();
 
@@ -457,9 +478,13 @@ space
           bridgeArgs.push('--mcp-env', envPairs);
         }
 
-        // Add MCP cwd if present
+        // Add MCP cwd if present (resolve relative paths)
         if (mcpServer.cwd) {
-          bridgeArgs.push('--mcp-cwd', mcpServer.cwd);
+          // If the cwd is relative, resolve it relative to spaceDir
+          const resolvedCwd = path.isAbsolute(mcpServer.cwd)
+            ? mcpServer.cwd
+            : path.resolve(spaceDir, mcpServer.cwd);
+          bridgeArgs.push('--mcp-cwd', resolvedCwd);
         }
 
         // Add bridge config options if present
@@ -504,6 +529,7 @@ space
             env: {
               ...process.env,
               NODE_ENV: process.env.NODE_ENV || 'production',
+              ...resolveEnvVariables(participant.env || {})
             },
           });
 
@@ -544,7 +570,7 @@ space
             time: true,
             env: {
               ...process.env,  // Inherit all environment variables from current shell
-              ...(participant.env || {})  // Override with any specific env from config
+              ...resolveEnvVariables(participant.env || {})  // Override with any specific env from config
             },
           });
 

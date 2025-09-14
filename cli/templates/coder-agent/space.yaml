@@ -29,6 +29,10 @@ participants:
       - kind: "mcp/request"
         payload:
           method: "!tools/call"
+      # Allow agent to discover tools from other participants
+      - kind: "mcp/request"
+        payload:
+          method: "tools/list"
       # Uncomment for YOLO mode - gives agent direct tools/call capability:
       # - kind: "mcp/request"
       #   payload:
@@ -85,7 +89,8 @@ participants:
           params:
             name: "get_file_info"
     env:
-      # OPENAI_API_KEY is inherited from environment automatically
+      # Pass through the OpenAI API key from environment
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
       OPENAI_MODEL: "{{AGENT_MODEL}}"
       # Configure the agent with 100 max iterations for complex multi-step tasks
       # and 1 hour timeout for proposals to allow human review time
