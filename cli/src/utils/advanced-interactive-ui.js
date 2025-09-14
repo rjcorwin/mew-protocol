@@ -353,7 +353,7 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
     return React.createElement(Box, { flexDirection: "column" },
       React.createElement(Text, null, `${contextPrefix}└─ reasoning/thought`),
       React.createElement(Text, {
-        color: "cyan",
+        color: "blueBright",
         marginLeft: 6,
         marginTop: 1,
         wrap: "wrap"
