@@ -1,5 +1,9 @@
 # 🐱 MEW Protocol - Multi-Entity Workspace Protocol 🚀
 
+<div align="center">
+  <img src="docs/mew-protocol-logo.png" alt="MEW Protocol Logo" width="200"/>
+</div>
+
 MEW Protocol (pronounced like a cat's "mew" 🐾) keeps **humans in the loop** - you participate directly in agent workspaces, see every operation, and maintain control through gateway-enforced capabilities.
 
 ## The Problem: Agents Operating in the Dark
