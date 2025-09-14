@@ -96,7 +96,7 @@ participants:
   mcp-fs-bridge:
     type: local
     command: "npx"
-    args: ["@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "mcp-bridge-token", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./workspace", "--mcp-cwd", "./workspace"]
+    args: ["@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "mcp-bridge-token", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./", "--mcp-cwd", "./"]
     auto_start: true
     tokens:
       - mcp-bridge-token
