@@ -4,62 +4,105 @@ This guide covers testing MEW Protocol implementations, including setting up tes
 
 ## Setting Up a Test Space with Local Dependencies
 
-When developing MEW Protocol, you'll want to test with your local packages instead of published npm versions. The coder-agent template provides a complete example of setting up a space with all components.
+When developing MEW Protocol, you'll want to test with your local packages instead of published npm versions. The monorepo uses npm workspaces to automatically link local packages.
 
 ### Quick Start with Local Dependencies
 
-1. **First, link the local CLI (from the root of mew-protocol repo):**
-   ```bash
-   cd cli
-   npm link
-   cd ..
-
-   # Verify you're using the local version
-   mew --version  # Should show the version from cli/package.json
-   ```
-
-2. **Initialize a coder-agent space from the template:**
-   ```bash
-   mew space init --template coder-agent my-test-space
-   cd my-test-space
-   ```
-
-3. **Modify package.json to use local dependencies:**
-
-   Edit `package.json` to point to your local packages:
+1. **Ensure npm workspaces are set up (already configured in the repo):**
+   The root `package.json` includes all packages and test spaces in the workspace:
    ```json
    {
-     "name": "mew-test-space",
-     "version": "1.0.0",
-     "private": true,
-     "dependencies": {
-       "@mew-protocol/agent": "file:../sdk/typescript-sdk/agent",
-       "@mew-protocol/bridge": "file:../bridge",
-       "@mew-protocol/client": "file:../sdk/typescript-sdk/client",
-       "@mew-protocol/participant": "file:../sdk/typescript-sdk/participant",
-       "@mew-protocol/types": "file:../sdk/typescript-sdk/types",
-       "@modelcontextprotocol/server-filesystem": "^0.6.2",
-       "openai": "^5.20.1",
-       "js-yaml": "^4.1.0",
-       "ws": "^8.14.0"
-     }
+     "workspaces": [
+       "sdk/typescript-sdk/*",
+       "bridge",
+       "cli",
+       "tests/*/.mew"
+     ]
    }
    ```
 
-4. **Install dependencies:**
+2. **Create a test space in the tests directory:**
    ```bash
+   # From the root of mew-protocol repo
+   cd tests
+   mkdir my-test-space
+   cd my-test-space
+
+   # Initialize the space using the local CLI
+   # Note: This runs npm install with published packages - we'll override with local packages in step 3
+   ../../cli/bin/mew.js space init --template coder-agent .
+   ```
+
+3. **Install dependencies at the monorepo root:**
+   ```bash
+   # Go back to the root
+   cd ../..
+
+   # This will:
+   # - Override the published packages with symlinks to local versions
+   # - Ensure all @mew-protocol/* packages use your local development code
    npm install
    ```
 
-5. **Set your OpenAI API key:**
+4. **Set your OpenAI API key (optional, only for coder-agent):**
    ```bash
    export OPENAI_API_KEY=sk-your-key-here
    ```
 
-6. **Start the space:**
+5. **Start the space:**
    ```bash
-   mew space up
+   # From your test space directory
+   cd tests/my-test-space
+   ../../cli/bin/mew.js space up
+
+   # Or if port 8080 is in use:
+   ../../cli/bin/mew.js space up --port 8090
    ```
+
+### How It Works
+
+- Any space created in `tests/*/` automatically uses local packages via npm workspaces
+- The `.mew` directory inside each test space contains the actual MEW configuration and dependencies
+- npm workspaces automatically symlinks all local packages, so changes to your code are immediately reflected
+- No need to manually update package.json files or use npm link
+
+### Managing Test Spaces
+
+**Creating multiple test spaces:**
+```bash
+cd tests
+mkdir test-feature-x
+cd test-feature-x
+../../cli/bin/mew.js space init --template coder-agent .
+
+# Create another one
+cd ..
+mkdir test-integration
+cd test-integration
+../../cli/bin/mew.js space init --template coder-agent .
+
+# Run npm install at the root to link the new workspaces
+# (Required once after creating new test spaces)
+cd ../..
+npm install
+```
+
+**Cleaning up test spaces:**
+```bash
+# Stop a running space
+cd tests/my-test-space
+../../cli/bin/mew.js space down
+
+# Remove a test space completely
+cd ../..
+rm -rf tests/my-test-space
+```
+
+**Best Practices:**
+- Name test spaces descriptively: `test-feature-x`, `test-bug-123`, `test-integration`
+- Run `npm install` at the root after creating new test spaces
+- Stop spaces when done testing to free up ports
+- The `tests/` directory is gitignored for test space contents
 
 ### What's in the Coder-Agent Template
 
