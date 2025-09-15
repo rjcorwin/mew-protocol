@@ -1090,7 +1090,6 @@ Optional proposal tracking for fulfillment (maintained by agents, not gateway):
 - ADR-003: Tool Access Control
 - OAuth 2.0 RFC 6749 (for token patterns)
 
-# MEW SDK Specification
 
 **Version:** draft  
 **Status:** Draft  
