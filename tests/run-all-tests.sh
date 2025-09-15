@@ -3,6 +3,30 @@
 
 set -e
 
+# Parse command line arguments
+NO_LLM=false
+for arg in "$@"; do
+  case $arg in
+    --no-llm)
+      NO_LLM=true
+      shift
+      ;;
+    --help)
+      echo "Usage: $0 [--no-llm] [--help]"
+      echo ""
+      echo "Options:"
+      echo "  --no-llm    Skip scenarios that require OPENAI_API_KEY (8, 9, 10)"
+      echo "  --help      Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $arg"
+      echo "Use --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -13,6 +37,10 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}================================================${NC}"
 echo -e "${BLUE}        MEW v0.2 Test Suite Runner              ${NC}"
 echo -e "${BLUE}================================================${NC}"
+if [ "$NO_LLM" = true ]; then
+  echo -e "${YELLOW}        LLM scenarios disabled (--no-llm)       ${NC}"
+  echo -e "${BLUE}================================================${NC}"
+fi
 echo ""
 
 # Track overall results
@@ -101,9 +129,18 @@ run_test "Scenario 4: Dynamic Capability Granting" "./scenario-4-capabilities"
 run_test "Scenario 5: Reasoning with Context Field" "./scenario-5-reasoning"
 run_test "Scenario 6: Error Recovery and Edge Cases" "./scenario-6-errors"
 run_test "Scenario 7: MCP Bridge Integration" "./scenario-7-mcp-bridge"
-run_test "Scenario 8: TypeScript Agent" "./scenario-8-typescript-agent"
-run_test "Scenario 9: TypeScript Proposals" "./scenario-9-typescript-proposals"
-run_test "Scenario 10: Multi-Agent" "./scenario-10-multi-agent"
+
+# LLM-dependent scenarios (require OPENAI_API_KEY)
+if [ "$NO_LLM" = false ]; then
+  run_test "Scenario 8: TypeScript Agent" "./scenario-8-typescript-agent"
+  run_test "Scenario 9: TypeScript Proposals" "./scenario-9-typescript-proposals"
+  run_test "Scenario 10: Multi-Agent" "./scenario-10-multi-agent"
+else
+  echo -e "${YELLOW}Skipping Scenario 8 (TypeScript Agent) - requires OPENAI_API_KEY${NC}"
+  echo -e "${YELLOW}Skipping Scenario 9 (TypeScript Proposals) - requires OPENAI_API_KEY${NC}"
+  echo -e "${YELLOW}Skipping Scenario 10 (Multi-Agent) - requires OPENAI_API_KEY${NC}"
+  echo ""
+fi
 
 # Summary
 echo -e "${BLUE}================================================${NC}"
