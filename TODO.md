@@ -3,22 +3,56 @@
 ## MVP
 - [x] [TD4] `mew init [space template]` command
     - [x] [TD4.1] `mew` by itself launches init if not init'ed, other wise it's up with interactive. if not init'ed, prompts user to pick template, then launches on choice. Space templates for common patterns (see demos/coder-agent for first template). Ok if just one template for now.
-* [ ] Better fulfill UX: CUrrently results in showing an "a" in the input box every time you accept.
+* [x] Better fulfill UX: Fixed input focus issues, added arrow navigation (Phase 1 of ADR-009)
 * [x] Better formatting for thinking (shows thoughts)
 * [x] Better formatting for all messages in general
 - [x] [TD6] publish all npm packages
 - [x] docs: Protocol comparison
 
 ## Fast Follow
+
+### Approval Dialog Enhancements (ADR-009)
+
+#### Phase 2: Tool-Specific Templates
+* [ ] Implement template detection logic in `OperationConfirmation` component
+* [ ] Create file operation templates:
+    * [ ] `write_file` template with content preview
+    * [ ] `read_file` template with access reason
+    * [ ] `delete_file` template with warning
+* [ ] Create command execution templates:
+    * [ ] npm command template with package info
+    * [ ] shell command template with risk assessment
+    * [ ] git operation template
+* [ ] Create network request template with URL/method/headers
+* [ ] Add fallback to generic template for unknown operations
+* [ ] Maintain consistent numbered list interaction across all templates
+
+#### Phase 3: Capability Grants
+* [ ] Add third option "Yes, allow X to Y" to approval dialog
+* [ ] Implement `capability/grant` message sending on approval
+* [ ] Track granted capabilities in participant state
+* [ ] Skip approval prompts for granted operations
+* [ ] Add grant management UI (show active grants, allow revocation)
+* [ ] Implement `capability/grant-ack` handling
+* [ ] Ensure grants are session-scoped (not persistent)
+* [ ] Update participant capabilities dynamically based on grants
+
+### Other Fast Follow Items
 * [ ] mew detects mew installed in space, uses that
+    * Check if .mew/node_modules/@mew-protocol/cli exists
+    * If found, delegate to that version instead of global
+    * Allows spaces to pin specific mew versions
+* [ ] mew detects when running inside mew-protocol monorepo
+    * Check if cwd is within mew-protocol repo (look for root package.json with name: "mew-protocol")
+    * If found, use ./cli/bin/mew.js instead of global
+    * Enables developers to always use local version when developing
+    * Implementation: Check process.cwd() and traverse up looking for package.json
 * [ ] Clean up CLAUDE.md file (incorporate testing)
 * [ ] Support for arrow back and new line (shift-Return) in CLI input
 * [ ] set a default to for participants in space config (for faster resolution)
 * [ ] SPEC cleanup
 * [ ] Repo cleanup
 * [ ] Add --no-install flag to `mew init` for development workflow (prevents npm install during init when using workspaces)
-* [ ] Another option that is "accept and don't ask again" which results in modifying the capabilities for that participant to do that kind of operation again. The thing is not every operation will be the same so it's hard to infer what the "don't ask again" really means. So... ADR for this. But we can also start with an implementation that is literally the MCP request, and we ADR about how to generalize the "do not ask again". 
-    * [ ] When a participant grants, and system responds with accepted, then receiver of grant must update it's knowledge of grant so it no longer propsoses when it doesn't have to.
 
 
 ## CLI

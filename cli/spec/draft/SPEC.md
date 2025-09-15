@@ -1221,42 +1221,92 @@ A lightweight terminal interface for protocol debugging and automated testing. T
 
 ### MCP Operation Confirmation Workflow
 
-The advanced interactive mode includes built-in confirmation dialogs for MCP (Model Context Protocol) operations that require human approval:
+The advanced interactive mode includes built-in confirmation dialogs for MCP (Model Context Protocol) operations that require human approval. The implementation follows a phased approach from [ADR-009: Approval Dialog UX](./decisions/accepted/009-aud-approval-dialog-ux.md).
 
-**Confirmation Dialog Features:**
-- Risk assessment display (safe, caution, dangerous)
-- Operation details with clear parameter formatting
-- Auto-approval rules for trusted operations
-- Persistent approval for similar operations
-- Timeout handling for unattended operations
+#### Phase 1: Generic Template (✅ IMPLEMENTED)
 
-**Auto-approval Rules:**
-- Read-only operations (tools/list, workspace/browse)
-- Operations from trusted participants
-- Previously approved operation patterns
-- Operations below risk threshold
+**Current Features:**
+- Simple numbered list interface with multiple input methods
+- Arrow key navigation (↑↓) with visual selection indicator
+- Enter key to confirm current selection
+- Number key shortcuts (1 for Yes, 2 for No)
+- Clear display of participant context and operation details
+- Generic template that works for all operations
+- Escape key support for quick denial
+- Proper focus management with input composer disabled
 
-**Risk Assessment Criteria:**
-- File system access (read vs write)
-- Network requests (internal vs external)
-- Code execution capabilities
-- Destructive potential
+#### Phase 2: Tool-Specific Templates (🚧 PLANNED)
+
+**Planned Templates:**
+- **File Operations**: Optimized display for read/write/delete with file previews
+- **Command Execution**: Show command, working directory, and risk assessment
+- **Network Requests**: Display URL, method, headers, and payload
+- **Database Operations**: Show query type, affected tables, and data preview
+
+Templates will auto-detect operation type and provide context-appropriate formatting while maintaining the same interaction pattern.
+
+#### Phase 3: Capability Grants (📋 FUTURE)
+
+**Planned Features:**
+- Third option: "Yes, allow [participant] to [operation category]"
+- Sends MEW Protocol `capability/grant` messages
+- Dynamic capability updates for the session
+- Reduces repeated approval prompts
+- Grant tracking and management UI
 
 **Example Confirmation Dialog:**
 ```
-┌─ MCP Operation Approval Required ──────────────────┐
-│ calculator wants to execute: tools/call            │
-│                                                     │
-│ Method: tools/call                                  │
-│ Tool: file_write                                   │
-│ Args: { path: "/tmp/result.txt", content: "42" }   │
-│                                                     │
-│ Risk Level: CAUTION (file system write)            │
-│                                                     │
-│ [a] Approve  [d] Deny  [r] Remember choice         │
-│ [v] View full request  [?] Help                    │
-└─────────────────────────────────────────────────────┘
+╭──────────────────────────────────────────────────────────╮
+│ coder-agent wants to execute operation                  │
+│                                                         │
+│ Method: tools/call                                     │
+│ Tool: write_file                                       │
+│ Target: mcp-fs-bridge                                  │
+│                                                         │
+│ Arguments:                                              │
+│ ╭────────────────────────────────────────────────────╮  │
+│ │ {                                                  │  │
+│ │   "path": "config.json",                          │  │
+│ │   "content": "{\n  \"name\": \"my-app\"\n}"       │  │
+│ │ }                                                  │  │
+│ ╰────────────────────────────────────────────────────╯  │
+│                                                         │
+│ Do you want to allow this?                             │
+│ ❯ 1. Yes                                               │
+│   2. No                                                │
+│                                                         │
+│ Use ↑↓ arrows + Enter, or press 1/2, or Esc to cancel  │
+│                                                         │
+╰──────────────────────────────────────────────────────────╯
 ```
+
+**User Interaction Methods:**
+1. **Arrow Keys + Enter** (recommended):
+   - Use `↑` and `↓` arrow keys to move selection
+   - Press `Enter` to confirm selected option
+   - Visual indicator (`❯`) shows current selection
+
+2. **Number Key Shortcuts**:
+   - Press `1` to immediately approve
+   - Press `2` to immediately deny
+
+3. **Cancel**:
+   - Press `Escape` to cancel (same as deny)
+
+**Approval Flow:**
+1. Agent sends `mcp/proposal` for operations requiring approval
+2. Dialog appears showing operation details
+3. User presses `1` or `2` to decide
+4. If approved (1), CLI fulfills the proposal by sending `mcp/request` with `correlation_id` referencing the proposal
+5. If denied (2), proposal is discarded and no action is taken
+
+This simplified approach provides essential approval functionality without the complexity of:
+- Risk assessment levels
+- Session-level permissions
+- Remember-choice functionality
+- Auto-approval rules
+
+These advanced features can be added in future iterations as the system matures beyond MVP.
 
 ### Input Processing
 

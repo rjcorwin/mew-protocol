@@ -9,8 +9,7 @@
 
 const React = require('react');
 const { render, Box, Text, Static, useInput, useApp, useFocus } = require('ink');
-const { useState, useEffect, useRef } = React;
-const chalk = require('chalk');
+const { useState, useEffect } = React;
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -172,7 +171,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   const handleCommand = (command) => {
-    const [cmd, ...args] = command.split(' ');
+    const [cmd] = command.split(' ');
     
     switch (cmd) {
       case '/help':
@@ -263,7 +262,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         // Send rejection according to MEW spec
         sendMessage({
           kind: 'mcp/reject',
-          correlation_id: pendingOperation.id,
+          to: [pendingOperation.from], // Send rejection back to proposer
+          correlation_id: [pendingOperation.id], // Must be an array
           payload: {
             reason: 'disagree'
           }
@@ -282,14 +282,15 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       reasoning: activeReasoning
     }),
     
-    // Input Composer
+    // Input Composer (disabled when dialog is shown)
     React.createElement(InputComposer, {
       value: inputValue,
       onChange: setInputValue,
       onSubmit: (value) => {
         processInput(value);
         setInputValue('');
-      }
+      },
+      disabled: pendingOperation !== null || showHelp
     }),
     
     // Status Bar
@@ -322,7 +323,6 @@ function MessageDisplay({ item, verbose, useColor }) {
 
   // Add context indicator
   const contextPrefix = message.context ? '  └─ ' : '';
-  const contextIndicator = message.context ? '┌─ ' : '';
 
   if (verbose) {
     return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
@@ -386,39 +386,124 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
 }
 
 /**
- * Operation Confirmation Dialog
+ * Operation Confirmation Dialog - Simple Numbered List (Option 2 from ADR-009)
+ *
+ * Provides a minimal numbered list implementation for MCP operation approval.
+ * Supports both number keys and arrow/enter navigation for better UX.
  */
 function OperationConfirmation({ operation, onApprove, onDeny }) {
+  // Focus management - ensure this component takes priority for input
+  const { isFocused } = useFocus({ autoFocus: true });
+
+  // Track selected option (0 = Yes, 1 = No)
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
   useInput((input, key) => {
-    if (input === 'a') onApprove();
-    if (input === 'd') onDeny();
-    if (key.escape) onDeny();
+    // Only handle input when focused
+    if (!isFocused) return;
+
+    // Number key shortcuts (original behavior)
+    if (input === '1') {
+      onApprove();
+      return;
+    }
+    if (input === '2') {
+      onDeny();
+      return;
+    }
+
+    // Arrow key navigation
+    if (key.upArrow) {
+      setSelectedIndex(0); // Select Yes
+      return;
+    }
+    if (key.downArrow) {
+      setSelectedIndex(1); // Select No
+      return;
+    }
+
+    // Enter key to confirm selection
+    if (key.return) {
+      if (selectedIndex === 0) {
+        onApprove();
+      } else {
+        onDeny();
+      }
+      return;
+    }
+
+    // Escape to cancel
+    if (key.escape) {
+      onDeny();
+      return;
+    }
   });
 
-  const riskLevel = assessRisk(operation.operation);
+  // Format the arguments for display
+  const formatArguments = (args) => {
+    if (!args) return 'none';
+    try {
+      return JSON.stringify(args, null, 2);
+    } catch {
+      return String(args);
+    }
+  };
+
+  // Extract operation details
+  const method = operation.operation?.method || 'unknown';
+  const params = operation.operation?.params || {};
+  const target = operation.to?.[0] || 'unknown';
+
+  // For tools/call, extract the tool name
+  const toolName = params.name || null;
 
   return React.createElement(Box, {
       borderStyle: "round",
       borderColor: "yellow",
-      paddingX: 1,
+      paddingX: 2,
       paddingY: 1,
-      marginY: 1
+      marginY: 1,
+      width: 60
     },
     React.createElement(Box, { flexDirection: "column" },
-      React.createElement(Text, { color: "yellow", bold: true },
-        "MCP Operation Approval Required"
+      // Header
+      React.createElement(Text, { bold: true },
+        `${operation.from} wants to execute operation`
       ),
-      React.createElement(Text, null,
-        `${operation.from} wants to execute: ${operation.operation.method}`
-      ),
-      React.createElement(Box, { marginTop: 1 },
-        React.createElement(Text, null, "Risk Level: "),
-        React.createElement(Text, { color: getRiskColor(riskLevel), bold: true },
-          riskLevel
+      React.createElement(Box, { marginTop: 1 }),
+
+      // Operation details
+      React.createElement(Text, null, `Method: ${method}`),
+      toolName && React.createElement(Text, null, `Tool: ${toolName}`),
+      React.createElement(Text, null, `Target: ${target}`),
+
+      React.createElement(Box, { marginTop: 1 }),
+
+      // Arguments section
+      React.createElement(Text, null, "Arguments:"),
+      React.createElement(Box, {
+        borderStyle: "single",
+        borderColor: "gray",
+        paddingX: 1,
+        marginTop: 0,
+        marginBottom: 1
+      },
+        React.createElement(Text, { color: "cyan" },
+          formatArguments(params.arguments || params)
         )
       ),
-      React.createElement(Box, { marginTop: 1 },
-        React.createElement(Text, null, "[a] Approve  [d] Deny  [Esc] Cancel")
+
+      // Options
+      React.createElement(Text, null, "Do you want to allow this?"),
+      React.createElement(Text, { color: selectedIndex === 0 ? "green" : "white" },
+        `${selectedIndex === 0 ? '❯' : ' '} 1. Yes`
+      ),
+      React.createElement(Text, { color: selectedIndex === 1 ? "red" : "white" },
+        `${selectedIndex === 1 ? '❯' : ' '} 2. No`
+      ),
+      React.createElement(Box, { marginTop: 1 }),
+      React.createElement(Text, { color: "gray", fontSize: 12 },
+        "Use ↑↓ arrows + Enter, or press 1/2, or Esc to cancel"
       )
     )
   );
@@ -502,8 +587,11 @@ function ReasoningStatus({ reasoning }) {
 /**
  * Input Composer Component
  */
-function InputComposer({ value, onChange, onSubmit }) {
+function InputComposer({ value, onChange, onSubmit, disabled }) {
   useInput((input, key) => {
+    // Don't process input when disabled (dialog is shown)
+    if (disabled) return;
+
     if (key.return) {
       onSubmit(value);
     } else if (key.backspace || key.delete) {
@@ -513,10 +601,14 @@ function InputComposer({ value, onChange, onSubmit }) {
     }
   });
 
-  return React.createElement(Box, { borderStyle: "single", paddingX: 1 },
-    React.createElement(Text, { color: "green" }, "> "),
-    React.createElement(Text, null, value),
-    React.createElement(Text, { color: "gray" }, "_")
+  return React.createElement(Box, {
+    borderStyle: "single",
+    paddingX: 1,
+    borderColor: disabled ? "gray" : "white"
+  },
+    React.createElement(Text, { color: disabled ? "gray" : "green" }, "> "),
+    React.createElement(Text, { color: disabled ? "gray" : "white" }, value),
+    React.createElement(Text, { color: "gray" }, disabled ? "" : "_")
   );
 }
 
@@ -650,30 +742,31 @@ function getPayloadPreview(payload, kind) {
   return String(payload);
 }
 
-function assessRisk(operation) {
-  const method = operation.method?.toLowerCase() || '';
-  
-  if (method.includes('read') || method.includes('list') || method.includes('browse')) {
-    return 'SAFE';
-  }
-  if (method.includes('write') || method.includes('create') || method.includes('delete')) {
-    return 'CAUTION';
-  }
-  if (method.includes('execute') || method.includes('run') || method.includes('eval')) {
-    return 'DANGEROUS';
-  }
-  
-  return 'CAUTION';
-}
-
-function getRiskColor(riskLevel) {
-  switch (riskLevel) {
-    case 'SAFE': return 'green';
-    case 'CAUTION': return 'yellow';
-    case 'DANGEROUS': return 'red';
-    default: return 'yellow';
-  }
-}
+// Risk assessment functions - kept for potential future use with more advanced approval dialogs
+// function assessRisk(operation) {
+//   const method = operation.method?.toLowerCase() || '';
+//
+//   if (method.includes('read') || method.includes('list') || method.includes('browse')) {
+//     return 'SAFE';
+//   }
+//   if (method.includes('write') || method.includes('create') || method.includes('delete')) {
+//     return 'CAUTION';
+//   }
+//   if (method.includes('execute') || method.includes('run') || method.includes('eval')) {
+//     return 'DANGEROUS';
+//   }
+//
+//   return 'CAUTION';
+// }
+//
+// function getRiskColor(riskLevel) {
+//   switch (riskLevel) {
+//     case 'SAFE': return 'green';
+//     case 'CAUTION': return 'yellow';
+//     case 'DANGEROUS': return 'red';
+//     default: return 'yellow';
+//   }
+// }
 
 /**
  * Starts the advanced interactive UI
