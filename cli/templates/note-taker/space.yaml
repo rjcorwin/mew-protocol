@@ -19,6 +19,9 @@ participants:
       MEW_SPACE: "{{SPACE_NAME}}"
       MEW_TOKEN: "assistant-token"
       MEW_PARTICIPANT_ID: "assistant"
+      # API configuration - API key reads from environment at runtime
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
       AGENT_MODEL: "{{AGENT_MODEL}}"
       AGENT_PROMPT: "{{AGENT_PROMPT}}"
     capabilities:

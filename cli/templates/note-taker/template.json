@@ -12,8 +12,26 @@
       "prompt": true
     },
     {
+      "name": "AGENT_API_KEY",
+      "description": "API key for the AI model",
+      "env_sources": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "API_KEY"],
+      "default": "",
+      "prompt": true,
+      "sensitive": true,
+      "required": false
+    },
+    {
+      "name": "AGENT_BASE_URL",
+      "description": "Base URL for the AI model API",
+      "env_sources": ["OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "BASE_URL"],
+      "default": "https://api.openai.com/v1",
+      "prompt": true,
+      "sensitive": false
+    },
+    {
       "name": "AGENT_MODEL",
       "description": "AI model to use (e.g., gpt-5, claude-3-opus)",
+      "env_sources": ["AGENT_MODEL", "MODEL_NAME"],
       "default": "gpt-5",
       "prompt": true
     },
@@ -26,7 +44,7 @@
     {
       "name": "AGENT_PROMPT",
       "description": "System prompt for the agent",
-      "default": "You are a note-taking assistant specializing in meeting minutes and conversation summaries.\\n\\nYour approach:\\n1. CAPTURE: Listen carefully to all discussions\\n2. ORGANIZE: Structure information into clear sections\\n3. SUMMARIZE: Create concise, actionable summaries\\n4. SAVE: Write notes to organized files\\n\\nAlways:\\n- Use markdown formatting\\n- Include timestamps\\n- Highlight action items\\n- Tag participants\\n- Create searchable filenames",
+      "default": "You are a note-taking assistant specializing in meeting minutes and conversation summaries.\n\nYour approach:\n1. CAPTURE: Listen carefully to all discussions\n2. ORGANIZE: Structure information into clear sections\n3. SUMMARIZE: Create concise, actionable summaries\n4. SAVE: Write notes to organized files\n\nAlways:\n- Use markdown formatting\n- Include timestamps\n- Highlight action items\n- Tag participants\n- Create searchable filenames",
       "prompt": false
     }
   ]

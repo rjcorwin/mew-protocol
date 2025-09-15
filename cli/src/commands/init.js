@@ -370,46 +370,102 @@ class InitCommand {
     // Get current directory name for default space name
     const dirname = path.basename(process.cwd());
 
+    console.log('\nConfiguring your space...');
+
     for (const variable of templateMeta.variables || []) {
-      let value;
+      // Resolve variable value according to ADR-evd
+      const value = await this.resolveVariable(variable, options, dirname);
 
-      // Check command-line options first
-      // Map common variable names to option names
-      if (variable.name === 'SPACE_NAME' && options.name) {
-        value = options.name;
-      } else if (variable.name === 'AGENT_MODEL' && options.model) {
-        value = options.model;
+      // Only store non-sensitive values in variables
+      if (!variable.sensitive) {
+        variables[variable.name] = value;
       }
-      // Check environment variables
-      else if (process.env[variable.name]) {
-        value = process.env[variable.name];
-      }
-      // Use default or prompt
-      else if (variable.prompt) {
-        value = await this.promptVariable(variable, dirname);
-      } else {
-        value = variable.default;
-      }
-
-      // Resolve special variables
-      if (value && value.startsWith('${')) {
-        value = this.resolveSpecialVariable(value, dirname);
-      }
-
-      variables[variable.name] = value;
+      // Sensitive values remain in environment only
     }
 
     return variables;
   }
 
   /**
+   * Resolve a variable value according to priority order (per ADR-evd)
+   */
+  async resolveVariable(variable, cmdOptions, dirname) {
+    // 1. Check command-line options
+    if (variable.name === 'SPACE_NAME' && cmdOptions.name) {
+      return cmdOptions.name;
+    }
+    if (variable.name === 'AGENT_MODEL' && cmdOptions.model) {
+      return cmdOptions.model;
+    }
+    // Add more command-line mappings as needed
+
+    // 2. Check environment sources
+    if (variable.env_sources && variable.env_sources.length > 0) {
+      for (const envName of variable.env_sources) {
+        if (process.env[envName]) {
+          const value = process.env[envName];
+
+          // For prompts, show where value came from
+          if (variable.prompt && process.stdin.isTTY) {
+            console.log(`\n  Found ${envName} in environment`);
+
+            const displayValue = variable.sensitive
+              ? this.maskValue(value)
+              : value;
+
+            // Allow override even if env var exists
+            const response = await this.promptVariable(
+              variable,
+              dirname,
+              displayValue
+            );
+
+            // If user just pressed enter, use env value
+            return response || value;
+          }
+
+          // No prompt, use env value directly
+          return value;
+        }
+      }
+    }
+
+    // 3. Use default or prompt without env default
+    if (variable.prompt && process.stdin.isTTY) {
+      const defaultValue = this.resolveSpecialVariable(variable.default, dirname);
+      return await this.promptVariable(variable, dirname, defaultValue);
+    }
+
+    // 4. Special resolution for ${...} syntax
+    if (variable.default && variable.default.startsWith('${')) {
+      return this.resolveSpecialVariable(variable.default, dirname);
+    }
+
+    return variable.default || '';
+  }
+
+  /**
+   * Mask sensitive values for display
+   */
+  maskValue(value) {
+    if (!value || value.length < 8) {
+      return '***';
+    }
+
+    // Show first few chars and last few chars
+    const prefix = value.substring(0, Math.min(8, value.length / 3));
+    const suffix = value.length > 20 ? value.substring(value.length - 3) : '';
+    return `${prefix}...${suffix}`;
+  }
+
+  /**
    * Prompt user for a variable value
    */
-  async promptVariable(variable, dirname) {
+  async promptVariable(variable, dirname, defaultValue = null) {
     // Check if stdin is a TTY (interactive)
     if (!process.stdin.isTTY) {
       // Non-interactive mode - use default
-      return this.resolveSpecialVariable(variable.default, dirname);
+      return defaultValue || this.resolveSpecialVariable(variable.default, dirname);
     }
 
     const rl = readline.createInterface({
@@ -418,12 +474,13 @@ class InitCommand {
     });
 
     return new Promise((resolve) => {
-      const defaultValue = this.resolveSpecialVariable(variable.default, dirname);
-      const prompt = `? ${variable.description}: (${defaultValue}) `;
+      const displayDefault = defaultValue || this.resolveSpecialVariable(variable.default, dirname) || '';
+      const defaultHint = displayDefault ? ` (${displayDefault})` : '';
+      const prompt = `? ${variable.description}:${defaultHint} `;
 
       rl.question(prompt, (answer) => {
         rl.close();
-        resolve(answer || defaultValue);
+        resolve(answer || displayDefault);
       });
     });
   }
@@ -444,14 +501,14 @@ class InitCommand {
    * Check environment for required variables
    */
   checkEnvironment() {
-    if (process.env.OPENAI_API_KEY) {
-      console.log('✓ Found OPENAI_API_KEY in environment');
-    } else {
-      console.log('⚠ OPENAI_API_KEY not found - set it before running mew');
-    }
+    // This is now handled during variable collection
+    // Keep method for compatibility but reduce output
+    console.log('');
 
-    const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-    console.log(`✓ Using OPENAI_BASE_URL: ${baseUrl}`);
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+      console.log('Note: API keys are read from environment variables at runtime.');
+      console.log('Set OPENAI_API_KEY or ANTHROPIC_API_KEY before running \'mew space up\'.');
+    }
   }
 
   /**
@@ -466,11 +523,19 @@ class InitCommand {
 
     let content = await fs.readFile(templatePath, 'utf8');
 
-    // Replace variables
+    // Replace only non-sensitive variables
+    // Sensitive variables should be read from environment at runtime
     for (const [key, value] of Object.entries(variables)) {
       const regex = new RegExp(`{{${key}}}`, 'g');
-      content = content.replace(regex, value);
+      content = content.replace(regex, value || '');
     }
+
+    // Remove any remaining sensitive variable placeholders
+    // These will be read from environment at runtime
+    content = content.replace(/{{AGENT_API_KEY}}/g, '');
+    content = content.replace(/{{.*_API_KEY}}/g, '');
+    content = content.replace(/{{.*_SECRET}}/g, '');
+    content = content.replace(/{{.*_PASSWORD}}/g, '');
 
     await fs.writeFile(outputPath, content);
     await fs.unlink(templatePath); // Remove template file

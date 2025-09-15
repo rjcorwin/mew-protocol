@@ -89,8 +89,9 @@ participants:
           params:
             name: "get_file_info"
     env:
-      # Pass through the OpenAI API key from environment
+      # API configuration - these read from environment at runtime
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
       OPENAI_MODEL: "{{AGENT_MODEL}}"
       # Configure the agent with 100 max iterations for complex multi-step tasks
       # and 1 hour timeout for proposals to allow human review time

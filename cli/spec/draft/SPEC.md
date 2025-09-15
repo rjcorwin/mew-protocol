@@ -132,8 +132,26 @@ templates/coder-agent/
     {
       "name": "AGENT_MODEL",
       "description": "AI model to use (e.g., gpt-5, claude-3-opus)",
+      "env_sources": ["AGENT_MODEL", "MODEL_NAME"],
       "default": "gpt-5",
       "prompt": true  // Ask user during init
+    },
+    {
+      "name": "AGENT_API_KEY",
+      "description": "API key for the AI model",
+      "env_sources": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "API_KEY"],
+      "default": "",
+      "prompt": true,
+      "sensitive": true,  // Mask value in prompts, don't store in space.yaml
+      "required": false   // Can be empty, checked at runtime
+    },
+    {
+      "name": "AGENT_BASE_URL",
+      "description": "Base URL for the AI model API",
+      "env_sources": ["OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "BASE_URL"],
+      "default": "https://api.openai.com/v1",
+      "prompt": true,
+      "sensitive": false
     },
     {
       "name": "WORKSPACE_PATH",
@@ -172,12 +190,17 @@ Installing dependencies...
 ✓ Running npm install in .mew/
 ✓ Dependencies installed
 
-? Space name: (my-project)
-? AI model: (gpt-5)
+Configuring your space...
 
-Checking environment...
-✓ Found OPENAI_API_KEY in environment
-✓ Using OPENAI_BASE_URL: https://api.openai.com/v1
+? Space name: (my-project)
+
+  Found OPENAI_API_KEY in environment
+? API key for the AI model: (sk-proj-abc...)  # Press enter to use env value
+
+  Found OPENAI_BASE_URL in environment
+? Base URL for the AI model API: (https://api.openai.com/v1)
+
+? AI model: (gpt-5)  # No env var found, using template default
 
 ✓ Created .mew/space.yaml
 ✓ Copied agent files to .mew/agents/
@@ -186,6 +209,9 @@ Checking environment...
 
 Ready! Your project root remains clean.
 MEW configuration and dependencies are isolated in .mew/
+
+Note: API keys are read from environment variables at runtime.
+Set OPENAI_API_KEY before running 'mew space up'.
 
 Try: mew
 ```
@@ -259,28 +285,66 @@ The key difference between `coder-agent` and `note-taker` templates is the `AGEN
 Template variables are resolved in order:
 
 1. **Command-line options** - Override any variable (e.g., `--name my-space`)
-2. **Interactive prompts** - Only if `prompt: true` in template.json
-3. **Environment variables** - Check for matching env var
+2. **Environment variables** - Check `env_sources` array for available values
+3. **Interactive prompts** - Only if `prompt: true` in template.json (shows env value as default)
 4. **Template defaults** - Use the default value from template.json
 5. **System defaults** - Special variables like `${dirname}` for current directory
 
-**Variable Prompting Logic:**
+**Variable Prompting Logic (per ADR-evd):**
 ```javascript
-for (const variable of template.variables) {
-  if (variable.prompt) {
-    // Ask user for this variable
-    value = await prompt(variable.description, variable.default);
-  } else {
-    // Use default without prompting
-    value = variable.default;
+async function resolveVariable(variable, cmdOptions) {
+  // 1. Check command-line
+  if (cmdOptions[variable.name]) {
+    return cmdOptions[variable.name];
   }
 
-  // Special resolution for ${...} syntax
-  if (value.startsWith('${')) {
-    value = resolveSpecialVariable(value);
+  // 2. Check environment sources
+  if (variable.env_sources) {
+    for (const envName of variable.env_sources) {
+      if (process.env[envName]) {
+        const value = process.env[envName];
+
+        // For prompts, show where value came from
+        if (variable.prompt) {
+          const displayValue = variable.sensitive
+            ? maskValue(value)  // Show "sk-proj-abc..." for sensitive values
+            : value;
+          console.log(`  Found ${envName} in environment`);
+
+          // Allow override even if env var exists
+          const response = await prompt(
+            variable.description,
+            displayValue
+          );
+
+          // If user just pressed enter, use env value
+          return response || value;
+        }
+
+        return value;  // Use env value without prompting
+      }
+    }
   }
+
+  // 3. Use default or prompt without env default
+  if (variable.prompt) {
+    return await prompt(variable.description, variable.default);
+  }
+
+  // 4. Special resolution for ${...} syntax
+  if (variable.default?.startsWith('${')) {
+    return resolveSpecialVariable(variable.default);
+  }
+
+  return variable.default;
 }
 ```
+
+**Sensitive Variable Handling:**
+- Variables marked `sensitive: true` have their values masked in prompts
+- Sensitive values are never stored in space.yaml
+- Only configuration values (model names, URLs) are saved
+- API keys and secrets remain in environment variables
 
 **Special Variables:**
 - `${dirname}` - Current directory name
@@ -295,19 +359,21 @@ MEW uses a simple strategy for configuration:
 **Template Variables (stored in space.yaml):**
 - Space name
 - Model name (e.g., "gpt-5", "claude-3-opus")
+- Base URLs (non-sensitive endpoints)
 - Any other non-sensitive configuration
 
 **Environment Variables (never stored):**
-- `OPENAI_API_KEY` - Your API key
-- `OPENAI_BASE_URL` - Provider endpoint (defaults to OpenAI)
-- Any other sensitive or deployment-specific values
+- `OPENAI_API_KEY` - Your API key (detected via `env_sources`, never saved)
+- Other API keys and secrets
+- Any values marked `sensitive: true` in template
 
-**During Init:**
-1. Prompt for template variables (space name, model)
-2. Substitute variables in template files
-3. Save to `.mew/space.yaml`
-4. Check for required environment variables
-5. Warn if missing (but don't block init)
+**During Init (per ADR-evd):**
+1. Check environment for each variable with `env_sources`
+2. Show detected env values in prompts (masked if sensitive)
+3. Allow user to override or accept env values
+4. Save only non-sensitive values to `.mew/space.yaml`
+5. Sensitive values remain in environment only
+6. Warn if required env vars missing (but don't block init)
 
 **At Runtime:**
 ```bash
