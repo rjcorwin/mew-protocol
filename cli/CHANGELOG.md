@@ -2,6 +2,19 @@
 
 All notable changes to the MEW Protocol CLI will be documented in this file.
 
+## [v0.2.1] - 2025-01-15
+
+### Fixed
+- **Duplicate workspace names** - Templates now use `{{SPACE_NAME}}` variable in package.json to ensure unique workspace names when multiple spaces exist
+- **Init-to-connect flow** - After `mew init`, the command now automatically continues to `mew space up -i` for seamless onboarding
+- **Port conflicts** - Gateway now automatically finds an available port when the default is in use
+- **Space state detection** - Default `mew` command now properly detects if space is already running and connects instead of restarting
+
+### Changed
+- Template package.json files now undergo variable substitution during init
+- Improved default command behavior with three distinct states (no config, config but not running, config and running)
+- CLI spec updated to document these behaviors as intended functionality
+
 ## [v0.2.0] - 2025-01-15
 
 ### Added

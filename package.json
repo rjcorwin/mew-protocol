@@ -12,7 +12,8 @@
     "sdk/typescript-sdk/gateway",
     "bridge",
     "cli",
-    "tests/*/.mew"
+    "tests/*/.mew",
+    "spaces/*/.mew"
   ],
   "scripts": {
     "test": "./tests/run-all-tests.sh --no-llm",
@@ -42,5 +43,26 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "ink": "^3.2.0",
+    "ws": "^8.18.0",
+    "uuid": "^9.0.1",
+    "@types/uuid": "^9.0.8",
+    "js-yaml": "^4.1.0",
+    "commander": "^11.1.0",
+    "debug": "^4.3.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "prettier": "^3.6.2",
+    "eslint": "^9.35.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@types/js-yaml": "^4.0.5",
+    "@types/ws": "^8.5.5",
+    "@types/debug": "^4.1.12"
   }
 }

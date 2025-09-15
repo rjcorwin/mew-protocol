@@ -11,6 +11,11 @@
 
 ## Fast Follow
 
+* [ ] After approval dialog, the input box is in the wrong location with lots of whitespace below it, not on the bottom.
+* [ ] mew command, after initial init process, should connect not stop
+* [ ] running mew in a space that is up should just connect
+* [ ] some kind of race conidition happening where if mcp filsystem joins before coder, the coder doesn't know abou the tools. The race condition is not the problem, the issue is that the coder doesn't ask for the tools before reasoning. Note that it's reasonable for the coder agent to not ask for tools of a participant it has already asked and has tools for, unless that participant rejoins, then destroy cache of that participant's tools
+
 ### Approval Dialog Enhancements (ADR-009)
 
 #### Phase 2: Tool-Specific Templates
@@ -72,3 +77,7 @@
 * [ ] MEW: MEW Protocol ADR for [interruption](spec/v0.3/decisions/proposed/001-r5x-reasoning-interruption.md)
 - [ ] MEW: [TD5] MEW Protocol spec: Support for streams in mew protocol (see proposed ADR)
 * [ ] MEW: Context scoping
+
+
+## Agent
+* [ ] Better context management with rolling history mode, compact at x point mode (configurable), token counting, etc. Needs an ADR(s).

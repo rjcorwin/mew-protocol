@@ -1,11 +1,11 @@
 # Publishing @mew-protocol/cli to npm
 
-## Version 0.2.0 Release Checklist
+## Version 0.2.1 Release Checklist
 
 ### Pre-publish Checklist ✅
-- [x] Version bumped to 0.2.0 in package.json
+- [x] Version bumped to 0.2.1 in package.json
 - [x] CHANGELOG.md updated with release notes
-- [x] Changes committed to git
+- [ ] Changes committed to git
 - [ ] Tests passing (note: some existing lint errors in unrelated files)
 - [x] Package contents verified with `npm pack --dry-run`
 
@@ -29,7 +29,7 @@
    npm pack --dry-run
    ```
 
-   Expected package size: ~45.2 kB
+   Expected package size: ~45.7 kB
    Expected files: 27 files
 
 4. **Publish to npm:**
@@ -39,13 +39,13 @@
 
 5. **Verify the publish:**
    ```bash
-   npm view @mew-protocol/cli@0.2.0
+   npm view @mew-protocol/cli@0.2.1
    ```
 
 6. **Create a git tag:**
    ```bash
-   git tag cli-v0.2.0
-   git push origin cli-v0.2.0
+   git tag cli-v0.2.1
+   git push origin cli-v0.2.1
    ```
 
 7. **Push commits to remote:**
@@ -53,17 +53,18 @@
    git push origin main
    ```
 
-## What's New in v0.2.0
-
-### Major Features
-- **MCP Operation Approval Dialog**: Interactive approval system with arrow navigation and number shortcuts
-- **Enhanced `mew init`**: Template-based initialization with coder-agent and note-taker templates
-- **Improved Interactive UI**: Better message formatting, reasoning display, and visual feedback
+## What's New in v0.2.1 (Patch Release)
 
 ### Bug Fixes
-- Fixed input focus issues during approval dialogs
-- Resolved lint errors in advanced-interactive-ui.js
-- Fixed protocol naming consistency (MEUP → MEW)
+- **Duplicate workspace names**: Fixed npm workspace conflicts when multiple spaces exist in same project
+- **Init-to-connect flow**: `mew init` now automatically continues to start and connect the space
+- **Port conflicts**: Gateway automatically finds available port when default is in use
+- **Space state detection**: Default `mew` command properly detects running spaces
+
+### Improvements
+- Template package.json files now use dynamic naming with `{{SPACE_NAME}}` variable
+- Better default command behavior with three distinct states
+- Seamless onboarding experience for new users
 
 ### Future Roadmap
 - Phase 2: Tool-specific templates for common operations
@@ -89,4 +90,4 @@ If you encounter publish errors:
 
 - Some lint errors exist in legacy files (gateway-enhanced.js, etc.) but don't affect the new features
 - The package includes templates directory which is essential for `mew init` functionality
-- Package size is reasonable at ~45KB compressed
+- Package size is reasonable at ~45.7KB compressed
