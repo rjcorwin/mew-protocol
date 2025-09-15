@@ -425,10 +425,10 @@ The CLI isolates all MEW-related dependencies (MCP servers, agents, etc.) in a `
 **Example Template `package.json`:**
 ```json
 {
-  "name": "mew-coder-agent-space",
+  "name": "mew-space-{{SPACE_NAME}}",
   "version": "1.0.0",
   "private": true,
-  "description": "Dependencies for MEW coder-agent space",
+  "description": "Dependencies for MEW {{SPACE_NAME}} space",
   "dependencies": {
     "@modelcontextprotocol/server-filesystem": "^0.5.0",
     "@mew-protocol/agent": "^0.2.0",
@@ -440,20 +440,26 @@ The CLI isolates all MEW-related dependencies (MCP servers, agents, etc.) in a `
 }
 ```
 
+The package name uses the `{{SPACE_NAME}}` template variable to ensure unique workspace names when multiple spaces are created in the same project or monorepo. This prevents npm workspace conflicts.
+
 #### Post-Initialization Actions
 
 After creating the space configuration:
 
 1. **Create .mew Directory**: Initialize `.mew/` directory structure
 2. **Copy Template Files**:
-   - `template/package.json` → `.mew/package.json`
+   - `template/package.json` → `.mew/package.json` (with variable substitution)
    - `template/agents/*` → `.mew/agents/`
    - `template/space.yaml` → `.mew/space.yaml` (with variable substitution)
-3. **Install Dependencies**: Run `npm install` in `.mew/` directory
-4. **Git Integration**: Add `.mew/node_modules/`, `.mew/pm2/`, `.mew/logs/` to .gitignore
-5. **File Permissions**: Set execute permissions on agent scripts
-6. **Validation**: Verify the generated configuration and dependencies
-7. **Instructions**: Show that project root remains clean, everything MEW-related in `.mew/`
+3. **Process Templates**: Replace all `{{VARIABLE}}` placeholders in:
+   - `space.yaml` - Space configuration with participant settings
+   - `package.json` - Ensures unique package names for npm workspaces
+4. **Install Dependencies**: Run `npm install` in `.mew/` directory
+5. **Git Integration**: Add `.mew/node_modules/`, `.mew/pm2/`, `.mew/logs/` to .gitignore
+6. **File Permissions**: Set execute permissions on agent scripts
+7. **Validation**: Verify the generated configuration and dependencies
+8. **Auto-Continue**: After successful init, automatically run `mew space up -i` to start and connect
+9. **Instructions**: Show that project root remains clean, everything MEW-related in `.mew/`
 
 #### Examples
 
@@ -502,12 +508,16 @@ $ mew
 1. **No space configuration found** (neither `.mew/space.yaml` nor `space.yaml`):
    - Automatically runs `mew init` with interactive template selection
    - Creates configuration in `.mew/space.yaml` by default
-2. **Space configuration exists** (in either location):
+   - After successful init, automatically continues to `mew space up -i`
+2. **Space configuration exists but space not running**:
    - Automatically runs `mew space up -i` to start and connect interactively
+3. **Space configuration exists and space is running**:
+   - Automatically runs `mew space connect` to join the running space
 
 This provides a streamlined experience:
-- New users get guided setup when they first run `mew`
+- New users get guided setup and immediate connection when they first run `mew`
 - Existing spaces start immediately when users run `mew`
+- Running spaces get immediate connection without restarting
 - No need to remember specific commands for common workflows
 
 **Examples:**
@@ -518,11 +528,18 @@ $ mew
 Welcome to MEW Protocol! Let's set up your space.
 ? Choose a template: ...
 # (runs init flow)
+Space initialized! Starting and connecting...
+# (automatically continues to space up -i)
 
-# After init, or in existing space directory
+# After init, space exists but not running
 $ mew
 Starting space and connecting interactively...
 # (runs space up -i automatically)
+
+# Space already running
+$ mew
+Connecting to running space...
+# (runs space connect automatically)
 ```
 
 This behavior can be overridden by explicitly providing a subcommand:

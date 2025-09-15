@@ -128,6 +128,18 @@ function isPortAvailable(port) {
   });
 }
 
+// Find next available port starting from the given port
+async function findAvailablePort(startPort, maxTries = 10) {
+  let port = parseInt(startPort);
+  for (let i = 0; i < maxTries; i++) {
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+    port++;
+  }
+  return null;
+}
+
 // Wait for gateway to be ready
 async function waitForGateway(port, maxRetries = 30) {
   for (let i = 0; i < maxRetries; i++) {
@@ -364,18 +376,24 @@ space
       process.exit(1);
     }
 
-    // Check if port is available
-    const portAvailable = await isPortAvailable(options.port);
+    // Find available port if the requested one is in use
+    let selectedPort = parseInt(options.port);
+    const portAvailable = await isPortAvailable(selectedPort);
     if (!portAvailable) {
-      console.error(`Port ${options.port} is already in use. Choose a different port.`);
-      process.exit(1);
+      console.log(`Port ${selectedPort} is already in use. Finding available port...`);
+      selectedPort = await findAvailablePort(selectedPort);
+      if (!selectedPort) {
+        console.error('Could not find an available port. Please specify a different port with --port');
+        process.exit(1);
+      }
+      console.log(`Using port ${selectedPort}`);
     }
 
     const pids = {
       spaceId,
       spaceName,
       spaceDir,
-      port: options.port,
+      port: selectedPort,
       gateway: null,
       agents: {},
       clients: {},
@@ -397,7 +415,7 @@ space
     }
 
     // Start gateway using PM2
-    console.log(`Starting gateway on port ${options.port}...`);
+    console.log(`Starting gateway on port ${selectedPort}...`);
     const gatewayLogPath = path.join(logsDir, 'gateway.log');
 
     try {
@@ -408,7 +426,7 @@ space
           'gateway',
           'start',
           '--port',
-          options.port,
+          selectedPort,
           '--log-level',
           options.logLevel,
           '--space-config',
@@ -433,7 +451,7 @@ space
 
     // Wait for gateway to be ready
     console.log('Waiting for gateway to be ready...');
-    const gatewayReady = await waitForGateway(options.port);
+    const gatewayReady = await waitForGateway(selectedPort);
     if (!gatewayReady) {
       console.error('Gateway failed to become ready. Check logs/gateway.log for details.');
       await deletePM2Process(`${spaceId}-gateway`);
@@ -454,7 +472,7 @@ space
         // Build bridge arguments
         const bridgeArgs = [
           '--gateway',
-          `ws://localhost:${options.port}`,
+          `ws://localhost:${selectedPort}`,
           '--space',
           spaceId,
           '--participant-id',
@@ -551,7 +569,7 @@ space
         // Replace placeholders in args
         const processedArgs = agentArgs.map((arg) =>
           arg
-            .replace('${PORT}', options.port)
+            .replace('${PORT}', selectedPort)
             .replace('${SPACE}', spaceId)
             .replace('${TOKEN}', participant.tokens?.[0] || 'token'),
         );
@@ -608,7 +626,7 @@ space
             'client',
             'connect',
             '--gateway',
-            `ws://localhost:${options.port}`,
+            `ws://localhost:${selectedPort}`,
             '--space',
             spaceId,
             '--participant-id',
@@ -659,7 +677,7 @@ space
     // Save PID file
     const pidFile = savePidFile(spaceDir, pids);
     console.log(`\n✓ Space is up! (PID file: ${pidFile})`);
-    console.log(`\nGateway: ws://localhost:${options.port}`);
+    console.log(`\nGateway: ws://localhost:${selectedPort}`);
     console.log(`Space ID: ${spaceId}`);
     console.log(`\nTo stop: mew space down`);
 
@@ -707,7 +725,7 @@ space
         const participantConfig = getInteractiveOverrides(participant);
 
         // Connect to gateway
-        const ws = new WebSocket(`ws://localhost:${options.port}`);
+        const ws = new WebSocket(`ws://localhost:${selectedPort}`);
 
         ws.on('open', () => {
           // Send join message

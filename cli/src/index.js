@@ -56,19 +56,58 @@ program.addCommand(agentCommand);
 program.addCommand(tokenCommand);
 program.addCommand(spaceCommand);
 
+// Helper function to check if space is running
+function isSpaceRunning() {
+  const pidFile = path.join(process.cwd(), '.mew', 'pids.json');
+  if (!fs.existsSync(pidFile)) {
+    return false;
+  }
+
+  try {
+    const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
+    // Check if gateway process is still running
+    if (pids.gateway) {
+      try {
+        process.kill(pids.gateway, 0); // Check if process exists
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 // Default behavior when no command is provided
 if (process.argv.length === 2) {
   // No arguments provided - intelligent default behavior
   if (checkSpaceExists()) {
-    // Space exists - start it interactively
-    console.log('Starting space and connecting interactively...');
-    process.argv.push('space', 'up', '-i');
+    // Space exists - check if it's running
+    if (isSpaceRunning()) {
+      // Space is running - connect to it
+      console.log('Connecting to running space...');
+      process.argv.push('space', 'connect');
+    } else {
+      // Space exists but not running - start it interactively
+      console.log('Starting space and connecting interactively...');
+      process.argv.push('space', 'up', '-i');
+    }
   } else {
-    // No space - run init
+    // No space - run init, then connect
     console.log('Welcome to MEW Protocol! Let\'s set up your space.');
     const initCommand = new InitCommand();
     initCommand.execute({}).then(() => {
-      process.exit(0);
+      console.log('\nSpace initialized! Starting and connecting...');
+      // After init, start the space interactively by spawning a new process
+      const { spawn } = require('child_process');
+      const child = spawn(process.argv[0], [process.argv[1], 'space', 'up', '-i'], {
+        stdio: 'inherit'
+      });
+      child.on('exit', (code) => {
+        process.exit(code || 0);
+      });
     }).catch(error => {
       console.error('Error:', error.message);
       process.exit(1);

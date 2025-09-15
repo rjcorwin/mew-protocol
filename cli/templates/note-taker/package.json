@@ -1,5 +1,5 @@
 {
-  "name": "mew-note-taker-space",
+  "name": "mew-space-{{SPACE_NAME}}",
   "version": "1.0.0",
   "private": true,
   "description": "Dependencies for MEW note-taker space",

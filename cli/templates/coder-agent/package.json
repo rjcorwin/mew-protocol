@@ -1,5 +1,5 @@
 {
-  "name": "mew-coder-agent-space",
+  "name": "mew-space-{{SPACE_NAME}}",
   "version": "1.0.0",
   "private": true,
   "description": "MEW Protocol coder agent workspace with MCP filesystem tools",

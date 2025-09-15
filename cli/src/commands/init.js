@@ -474,6 +474,23 @@ class InitCommand {
 
     await fs.writeFile(outputPath, content);
     await fs.unlink(templatePath); // Remove template file
+
+    // Process package.json to replace variables
+    const packagePath = path.join(mewDir, 'package.json');
+    try {
+      let packageContent = await fs.readFile(packagePath, 'utf8');
+
+      // Replace variables in package.json
+      for (const [key, value] of Object.entries(variables)) {
+        const regex = new RegExp(`{{${key}}}`, 'g');
+        packageContent = packageContent.replace(regex, value);
+      }
+
+      await fs.writeFile(packagePath, packageContent);
+    } catch (error) {
+      // Package.json might not exist or have variables
+      console.warn('Could not process package.json:', error.message);
+    }
   }
 
   /**
