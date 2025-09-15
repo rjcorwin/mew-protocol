@@ -699,7 +699,8 @@ space
         resolveParticipant,
         getInteractiveOverrides,
       } = require('../utils/participant-resolver');
-      
+      const { printBanner } = require('../utils/banner');
+
       // Determine UI mode
       const useDebugUI = options.debug || options.simple || options.noUi;
       
@@ -743,6 +744,17 @@ space
           };
 
           ws.send(JSON.stringify(joinMessage));
+
+          // Display banner before starting UI
+          if (!useDebugUI) {
+            printBanner({
+              spaceName: spaceName,
+              spaceId: spaceId,
+              participantId: participant.id,
+              gateway: `ws://localhost:${selectedPort}`,
+              color: process.env.NO_COLOR !== '1'
+            });
+          }
 
           // Start interactive UI
           if (useDebugUI) {
@@ -1324,7 +1336,8 @@ space
       resolveParticipant,
       getInteractiveOverrides,
     } = require('../utils/participant-resolver');
-    
+    const { printBanner } = require('../utils/banner');
+
     // Determine UI mode
     const useDebugUI = options.debug || options.simple || options.noUi;
     
@@ -1368,6 +1381,17 @@ space
         };
 
         ws.send(JSON.stringify(joinMessage));
+
+        // Display banner before starting UI
+        if (!useDebugUI) {
+          printBanner({
+            spaceName: pids.spaceName,
+            spaceId: spaceId,
+            participantId: participant.id,
+            gateway: gatewayUrl,
+            color: process.env.NO_COLOR !== '1'
+          });
+        }
 
         // Start interactive UI
         if (useDebugUI) {
