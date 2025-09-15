@@ -20,6 +20,14 @@
     "test:all": "./tests/run-all-tests.sh",
     "test:llm": "./tests/run-all-tests.sh",
     "build": "echo 'No build required for root package'",
+    "build:sdk": "npm run build:types && npm run build:matcher && npm run build:client && npm run build:participant && npm run build:agent && npm run build:gateway && npm run build:bridge",
+    "build:types": "npm run build --workspace=@mew-protocol/types",
+    "build:matcher": "npm run build --workspace=@mew-protocol/capability-matcher",
+    "build:client": "npm run build --workspace=@mew-protocol/client",
+    "build:participant": "npm run build --workspace=@mew-protocol/participant",
+    "build:agent": "npm run build --workspace=@mew-protocol/agent",
+    "build:gateway": "npm run build --workspace=@mew-protocol/gateway",
+    "build:bridge": "npm run build --workspace=@mew-protocol/bridge",
     "lint": "echo 'Lint individual packages in their directories'"
   },
   "keywords": [
