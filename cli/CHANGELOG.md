@@ -1,6 +1,44 @@
 # CLI Changelog
 
-All notable changes to the MEUP CLI specification will be documented in this file.
+All notable changes to the MEW Protocol CLI will be documented in this file.
+
+## [v0.2.0] - 2025-01-15
+
+### Added
+- **MCP Operation Approval Dialog** - Interactive approval system for MCP proposals
+  - Arrow key navigation with visual selection indicator
+  - Number key shortcuts (1/2) for quick approval/denial
+  - Enter key confirmation and Escape to cancel
+  - Proper focus management with input composer disabled during dialogs
+  - Generic template that works for all operation types
+
+- **Enhanced `mew init` Command**
+  - Template system for space initialization
+  - Built-in templates: `coder-agent` and `note-taker`
+  - Interactive template selection when no template specified
+  - Isolated dependencies in `.mew/` directory
+  - Auto-detection of space configuration in `.mew/space.yaml` or `space.yaml`
+
+- **Improved Interactive UI**
+  - Better formatting for reasoning messages (thinking/thoughts)
+  - Context-aware message display
+  - Visual reasoning status with spinner animation
+  - Improved message formatting for all types
+
+### Fixed
+- Input focus issues during approval dialogs (characters no longer appear in input field)
+- Lint errors in advanced-interactive-ui.js
+- Protocol name consistency (MEUP → MEW Protocol)
+
+### Changed
+- Updated to MEW Protocol v0.3 naming convention
+- Improved default command behavior (`mew` alone now intelligently chooses init or space up)
+- Enhanced space configuration with better defaults
+
+### Documentation
+- ADR-009: Approval Dialog UX (accepted) - Three-phase implementation plan
+- Updated CLI specification with approval dialog documentation
+- Added Phase 2 and 3 implementation tasks to TODO.md
 
 ## [v0.0.0] - 2025-01-05
 
