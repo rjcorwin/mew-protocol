@@ -1,0 +1,46 @@
+{
+  "name": "mew-protocol",
+  "version": "0.3.0",
+  "description": "Multi-Entity Workspace Protocol - A protocol for transparent multi-agent coordination",
+  "private": true,
+  "workspaces": [
+    "sdk/typescript-sdk/agent",
+    "sdk/typescript-sdk/client",
+    "sdk/typescript-sdk/participant",
+    "sdk/typescript-sdk/types",
+    "sdk/typescript-sdk/capability-matcher",
+    "sdk/typescript-sdk/gateway",
+    "bridge",
+    "cli",
+    "tests/*/.mew"
+  ],
+  "scripts": {
+    "test": "./tests/run-all-tests.sh --no-llm",
+    "test:all": "./tests/run-all-tests.sh",
+    "test:llm": "./tests/run-all-tests.sh",
+    "build": "echo 'No build required for root package'",
+    "lint": "echo 'Lint individual packages in their directories'"
+  },
+  "keywords": [
+    "mew",
+    "protocol",
+    "multi-agent",
+    "ai",
+    "coordination",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "author": "MEW Protocol Working Group",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mew-protocol.git"
+  },
+  "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mew-protocol/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
