@@ -58,7 +58,7 @@ MEW Protocol is in experimental phase (v0.x) with breaking changes allowed betwe
 ### Install
 
 ```bash
-npm install -g mew-protocol
+npm install -g @mew-protocol/cli
 ```
 
 ### Create & Launch a Workspace
