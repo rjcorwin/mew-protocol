@@ -2,6 +2,19 @@
 
 All notable changes to the MEW Protocol CLI will be documented in this file.
 
+## [v0.2.2] - 2025-01-15
+
+### Added
+- **MEW Banner**: Happy cat ASCII art banner with 40+ random taglines
+  - Displays when starting interactive mode (not in debug mode)
+  - Shows space name, participant ID, and gateway info
+  - Professional cat herding taglines that rotate on each startup
+  - Color support with cyan/yellow/green theming
+
+### Improved
+- Visual identity for the CLI with playful branding
+- Better startup experience with clear connection information
+
 ## [v0.2.1] - 2025-01-15
 
 ### Fixed
