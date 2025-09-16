@@ -328,21 +328,8 @@ function cleanupFifos(spaceDir) {
   }
 }
 
-// Command: mew space up
-space
-  .command('up')
-  .description('Start a space with gateway and configured participants')
-  .option('-c, --config <path>', 'Path to space.yaml (default: auto-detect)', './space.yaml')
-  .option('-d, --space-dir <path>', 'Space directory', '.')
-  .option('-p, --port <port>', 'Gateway port', '8080')
-  .option('-l, --log-level <level>', 'Log level', 'info')
-  .option('-i, --interactive', 'Connect interactively after starting space')
-  .option('--detach', 'Run in background (default if not interactive)')
-  .option('--participant <id>', 'Connect as this participant (with --interactive)')
-  .option('--debug', 'Use simple debug interface instead of advanced UI')
-  .option('--simple', 'Alias for --debug')
-  .option('--no-ui', 'Disable UI enhancements, use plain interface')
-  .action(async (options) => {
+// Action handler for space up
+async function spaceUpAction(options) {
     // Check for incompatible flags
     if (options.interactive && options.detach) {
       console.error('Error: --interactive and --detach flags are mutually exclusive');
@@ -679,7 +666,7 @@ space
     console.log(`\n✓ Space is up! (PID file: ${pidFile})`);
     console.log(`\nGateway: ws://localhost:${selectedPort}`);
     console.log(`Space ID: ${spaceId}`);
-    console.log(`\nTo stop: mew space down`);
+    console.log(`\nTo stop: mew down`);
 
     // Store running space info
     const runningSpaces = loadRunningSpaces();
@@ -774,14 +761,26 @@ space
         process.exit(1);
       }
     }
-  });
+}
 
-// Command: mew space down
+// Command: mew space up
 space
-  .command('down')
-  .description('Stop a running space')
+  .command('up')
+  .description('Start a space with gateway and configured participants')
+  .option('-c, --config <path>', 'Path to space.yaml (default: auto-detect)', './space.yaml')
   .option('-d, --space-dir <path>', 'Space directory', '.')
-  .action(async (options) => {
+  .option('-p, --port <port>', 'Gateway port', '8080')
+  .option('-l, --log-level <level>', 'Log level', 'info')
+  .option('-i, --interactive', 'Connect interactively after starting space')
+  .option('--detach', 'Run in background (default if not interactive)')
+  .option('--participant <id>', 'Connect as this participant (with --interactive)')
+  .option('--debug', 'Use simple debug interface instead of advanced UI')
+  .option('--simple', 'Alias for --debug')
+  .option('--no-ui', 'Disable UI enhancements, use plain interface')
+  .action(spaceUpAction);
+
+// Action handler for space down
+async function spaceDownAction(options) {
     const spaceDir = path.resolve(options.spaceDir);
 
     console.log(`Stopping space in ${spaceDir}...`);
@@ -869,7 +868,14 @@ space
 
     console.log('\n✓ Space stopped successfully!');
     process.exit(0);
-  });
+}
+
+// Command: mew space down
+space
+  .command('down')
+  .description('Stop a running space')
+  .option('-d, --space-dir <path>', 'Space directory', '.')
+  .action(spaceDownAction);
 
 // Command: mew space status
 space
@@ -1418,4 +1424,7 @@ space
     }
   });
 
+// Export both the command and the action handlers
 module.exports = space;
+module.exports.spaceUpAction = spaceUpAction;
+module.exports.spaceDownAction = spaceDownAction;
