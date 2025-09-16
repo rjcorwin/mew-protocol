@@ -58,12 +58,26 @@ function matches(key, pattern) {
 
   // Check for any printable character
   if (pattern.printable) {
-    // Exclude special keys like Enter from being considered printable
+    // Exclude special keys from being considered printable
     return key.input &&
            key.input !== '\r' &&
            key.input !== '\n' &&
+           key.input !== '\x7F' &&  // DEL character (127)
+           key.input !== '\x1B' &&  // ESC character
            !key.return &&
            !key.enter &&
+           !key.backspace &&
+           !key.delete &&
+           !key.escape &&
+           !key.tab &&
+           !key.up &&
+           !key.down &&
+           !key.left &&
+           !key.right &&
+           !key.home &&
+           !key.end &&
+           !key.pageup &&
+           !key.pagedown &&
            key.ctrl !== true &&
            key.alt !== true &&
            key.meta !== true;

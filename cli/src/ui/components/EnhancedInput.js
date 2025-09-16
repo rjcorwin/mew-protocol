@@ -16,6 +16,18 @@ const TextBuffer = require('../utils/text-buffer');
 const { useKeypress } = require('../hooks/useKeypress');
 const { getCommand } = require('../keyMatchers');
 const { defaultKeyBindings } = require('../../config/keyBindings');
+const fs = require('fs');
+const path = require('path');
+
+// Helper function for debug logging
+const debugLog = (message) => {
+  const logFile = path.join(process.cwd(), '.mew', 'debug.log');
+  const mewDir = path.join(process.cwd(), '.mew');
+  if (!fs.existsSync(mewDir)) {
+    fs.mkdirSync(mewDir, { recursive: true });
+  }
+  fs.appendFileSync(logFile, message);
+};
 
 /**
  * Enhanced Input Component
@@ -63,13 +75,9 @@ function EnhancedInput({
 
   // Handle input submission (defined before handleCommand which uses it)
   const handleSubmit = useCallback(() => {
-    // Log to file for debugging
-    const fs = require('fs');
-    const path = require('path');
-    const logFile = path.join(process.cwd(), '.mew', 'debug.log');
-    fs.appendFileSync(logFile, `\n>>> handleSubmit() FUNCTION CALLED <<<\n`);
+    debugLog(`\n>>> handleSubmit() FUNCTION CALLED <<<\n`);
     const text = buffer.getText();
-    fs.appendFileSync(logFile, `>>> Text to submit: "${text}"\n`);
+    debugLog(`>>> Text to submit: "${text}"\n`);
 
     if (process.env.DEBUG_INPUT) {
       console.error('handleSubmit called with text:', text);
@@ -112,7 +120,9 @@ function EnhancedInput({
         break;
 
       case 'DELETE_FORWARD':
+        debugLog(`Before delete forward: "${buffer.getText()}" cursor: ${JSON.stringify(buffer.getCursorPosition())}\n`);
         buffer.deleteForward();
+        debugLog(`After delete forward: "${buffer.getText()}" cursor: ${JSON.stringify(buffer.getCursorPosition())}\n`);
         update();
         break;
 
@@ -212,18 +222,15 @@ function EnhancedInput({
 
       // Submission
       case 'SUBMIT':
-        const fs = require('fs');
-        const path = require('path');
-        const logFile = path.join(process.cwd(), '.mew', 'debug.log');
-        fs.appendFileSync(logFile, `\n>>> SUBMIT CASE REACHED <<<\n`);
-        fs.appendFileSync(logFile, `>>> Buffer text: "${buffer.getText()}"\n`);
+        debugLog(`\n>>> SUBMIT CASE REACHED <<<\n`);
+        debugLog(`>>> Buffer text: "${buffer.getText()}"\n`);
         if (!multiline || !buffer.getText().includes('\n')) {
-          fs.appendFileSync(logFile, `>>> CALLING handleSubmit() <<<\n`);
+          debugLog(`>>> CALLING handleSubmit() <<<\n`);
           handleSubmit();
         } else if (multiline) {
           // In multiline mode, check if we should submit
           // (e.g., empty line or special key combination)
-          fs.appendFileSync(logFile, `>>> CALLING handleSubmit() (multiline) <<<\n`);
+          debugLog(`>>> CALLING handleSubmit() (multiline) <<<\n`);
           handleSubmit();
         }
         break;
@@ -346,26 +353,28 @@ function EnhancedInput({
 
   // Keyboard input handler
   useKeypress((key) => {
-    // Log every keypress to file in .mew folder
-    const fs = require('fs');
-    const path = require('path');
-    const logFile = path.join(process.cwd(), '.mew', 'debug.log');
 
-    // Ensure .mew directory exists
-    const mewDir = path.join(process.cwd(), '.mew');
-    if (!fs.existsSync(mewDir)) {
-      fs.mkdirSync(mewDir, { recursive: true });
-    }
-
-    fs.appendFileSync(logFile, `\nKEY PRESSED: ${JSON.stringify({
+    // More comprehensive logging for debugging
+    const keyLog = {
       input: key.input,
       name: key.name,
       return: key.return,
-      enter: key.enter
-    })}\n`);
+      enter: key.enter,
+      delete: key.delete,
+      backspace: key.backspace,
+      raw: key.raw
+    };
+
+    // Check if this might be a delete key
+    if (!key.input && !key.name) {
+      keyLog.fullKey = key;  // Log the entire key object
+      keyLog.note = "Empty key - might be delete";
+    }
+
+    debugLog(`\nKEY PRESSED: ${JSON.stringify(keyLog)}\n`);
 
     if (disabled) {
-      fs.appendFileSync(logFile, `>>> INPUT DISABLED, RETURNING <<<\n`);
+      debugLog(`>>> INPUT DISABLED, RETURNING <<<\n`);
       return;
     }
 
@@ -383,8 +392,16 @@ function EnhancedInput({
     }
 
     // Get command from key binding first
-    const command = getCommand(key, keyBindings);
-    fs.appendFileSync(logFile, `Command matched: ${command || 'NONE'}\n`);
+    let command = getCommand(key, keyBindings);
+
+    // Special case: empty key object might be forward delete on Mac
+    // Note: On Mac, the "delete" key often acts like backspace
+    if (!key.input && !key.name && !command) {
+      debugLog(`Detected empty key - treating as DELETE_BACKWARD (Mac delete key)\n`);
+      command = 'DELETE_BACKWARD';  // Changed to backward for Mac compatibility
+    }
+
+    debugLog(`Command matched: ${command || 'NONE'}\n`);
 
     if (process.env.DEBUG_INPUT) {
       console.error('Command matched:', command);
@@ -397,11 +414,8 @@ function EnhancedInput({
 
     // Special handling for Enter key if not matched as SUBMIT
     if ((key.return || key.enter) && !command) {
-      const fs = require('fs');
-      const path = require('path');
-      const logFile = path.join(process.cwd(), '.mew', 'debug.log');
-      fs.appendFileSync(logFile, `\n>>> ENTER KEY FALLBACK - Forcing SUBMIT <<<\n`);
-      fs.appendFileSync(logFile, `key.return: ${key.return}, key.enter: ${key.enter}\n`);
+      debugLog(`\n>>> ENTER KEY FALLBACK - Forcing SUBMIT <<<\n`);
+      debugLog(`key.return: ${key.return}, key.enter: ${key.enter}\n`);
       handleCommand('SUBMIT');
       return;
     }

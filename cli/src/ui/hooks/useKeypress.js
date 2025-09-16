@@ -33,6 +33,14 @@ function useKeypress(handler, options = {}) {
   const processKey = useCallback((input, key) => {
     if (!isActive) return;
 
+    // Debug logging for raw key from Ink
+    if (input === '\x7F' || key.sequence === '\x7F' || key.name === 'delete') {
+      const fs = require('fs');
+      const path = require('path');
+      const logFile = path.join(process.cwd(), '.mew', 'debug.log');
+      fs.appendFileSync(logFile, `\nRAW DELETE KEY FROM INK: ${JSON.stringify({ input, key })}\n`);
+    }
+
     // Build enhanced key object
     const enhancedKey = {
       // Basic key info
@@ -49,8 +57,8 @@ function useKeypress(handler, options = {}) {
       // Check both ways Ink might report the Enter key
       return: key.name === 'return' || key.name === 'enter' || (input === '\r') || (input === '\n'),
       enter: key.name === 'return' || key.name === 'enter' || (input === '\r') || (input === '\n'),
-      backspace: key.name === 'backspace',
-      delete: key.name === 'delete',
+      backspace: key.name === 'backspace' || input === '\x7F' || input === '\b',
+      delete: key.name === 'delete' || key.sequence === '\x1B[3~',
       tab: key.name === 'tab',
       escape: key.name === 'escape' || key.name === 'esc',
       space: key.name === 'space' || input === ' ',
