@@ -134,6 +134,61 @@ class MEWClient extends EventEmitter {
 - `error`: Error occurred
 - `reconnecting`: Attempting to reconnect
 
+### Participant Join Flow and Tool Discovery
+
+When a participant joins a space, the following sequence occurs:
+
+1. **Welcome Message**: Upon connection, the participant receives a `system/welcome` message containing:
+   - Their own participant ID and capabilities
+   - List of all current participants with their IDs and capabilities
+
+2. **Initial Tool Discovery**: After processing the welcome message:
+   - The participant examines each listed participant's capabilities
+   - For any participant with `mcp/response` capability (can respond to MCP requests):
+     - Schedule a `tools/list` request to discover their tools
+     - Use staggered delays to avoid network storms (e.g., 3-5 seconds per participant)
+
+3. **Presence Events**: When new participants join after initial connection:
+   - Receive `system/presence` event with `event: "join"`
+   - Check if the new participant has `mcp/response` capability
+   - If yes, schedule tool discovery for that participant
+
+4. **Persistent Discovery**: For robust operation, participants should:
+   - Retry failed discovery attempts with exponential backoff
+   - Cache successful discoveries with TTL (time-to-live)
+   - Periodically refresh tool lists from long-running participants
+   - Handle participants that take time to initialize (e.g., bridges starting MCP servers)
+
+5. **Tool Discovery Failure Handling**:
+   - If discovery times out, retry up to 3 times with increasing delays
+   - Log warnings but don't fail - participant may not have tools
+   - Continue operation with available tools from successful discoveries
+
+Example flow:
+```typescript
+// On welcome, discover tools from all capable participants
+onWelcome(async (data) => {
+  for (const participant of data.participants) {
+    if (participant.capabilities?.some(c => c.kind === 'mcp/response')) {
+      // Schedule discovery with delay to avoid storms
+      setTimeout(() => this.discoverToolsWithRetry(participant.id), 3000);
+    }
+  }
+});
+
+// Persistent discovery with retry
+async discoverToolsWithRetry(participantId: string, attempt = 1): Promise<void> {
+  try {
+    await this.discoverTools(participantId);
+  } catch (error) {
+    if (attempt < 3) {
+      const delay = attempt * 5000; // 5s, 10s, 15s
+      setTimeout(() => this.discoverToolsWithRetry(participantId, attempt + 1), delay);
+    }
+  }
+}
+```
+
 ## Layer 2: MEWParticipant
 
 ### Purpose
@@ -305,12 +360,29 @@ interface Tool {
 }
 ```
 
-#### Tool Discovery
-MEWParticipant provides tool discovery capabilities that were previously only in MEWAgent:
+#### Tool Discovery and State Management
+MEWParticipant provides sophisticated tool discovery with state tracking:
 
 ```typescript
+// Discovery state tracking
+enum DiscoveryState {
+  NOT_STARTED = 'not_started',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  NO_TOOLS = 'no_tools'  // Participant has no tools
+}
+
+interface ParticipantDiscoveryStatus {
+  state: DiscoveryState;
+  lastAttempt?: Date;
+  attempts: number;
+  hasTools: boolean;
+}
+
 // Discovered tools stored by participant
 discoveredTools: Map<string, Tool[]>;
+participantDiscoveryStatus: Map<string, ParticipantDiscoveryStatus>;
 
 // Tool cache with TTL
 toolCache: {
@@ -322,10 +394,28 @@ toolCache: {
 ```
 
 **Key Features:**
+- **State Tracking**: Track discovery state for each participant separately
+- **Distinguish No Tools vs Failed**: Know if participant has no tools vs discovery failed
 - **Auto-discovery**: Automatically discover tools when participants join (opt-in)
 - **Manual discovery**: Explicitly discover tools from specific participants
 - **Caching**: Cache discovered tools with configurable TTL
 - **Unified access**: All discovered tools available through `getAvailableTools()`
+- **Wait for Discoveries**: Can wait for pending discoveries before proceeding
+
+**Discovery State Management Methods:**
+```typescript
+// Check if any discoveries are in progress
+hasDiscoveriesInProgress(): boolean;
+
+// Wait for pending discoveries (useful before reasoning)
+await waitForPendingDiscoveries(maxWaitMs: number);
+
+// Get discovery status for all participants
+getDiscoveryStatus(): Map<string, ParticipantDiscoveryStatus>;
+
+// Get participants not yet discovered
+getUndiscoveredParticipants(): string[];
+```
 
 **Example usage:**
 ```typescript
@@ -449,6 +539,26 @@ The `participant/tool` notation:
 #### ReAct Loop
 
 The ReAct (Reason + Act) loop is the core decision-making pattern for autonomous agents. This section details the complete flow including LLM calls, MEW Protocol messages, and response formation.
+
+##### Tool Discovery Synchronization
+
+Before starting the ReAct loop, agents SHOULD wait for pending tool discoveries to complete:
+
+```typescript
+// In the reason phase, before first iteration
+if (previousThoughts.length === 0 && this.hasDiscoveriesInProgress()) {
+  // Wait up to 5 seconds for discoveries to complete
+  await this.waitForPendingDiscoveries(5000);
+
+  // Check if we got new tools after waiting
+  const tools = this.getAvailableTools();
+  if (tools.length > 0) {
+    log(`Tool discovery completed. ${tools.length} tools available.`);
+  }
+}
+```
+
+This ensures the agent has the most complete set of tools before reasoning, avoiding situations where it claims "no tools available" when tools are actually being discovered.
 
 ##### Data Structures
 

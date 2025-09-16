@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { MEWAgent, AgentConfig } from './MEWAgent';
-import { Tool } from '@mew-protocol/participant';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
@@ -19,7 +18,6 @@ function parseArgs(): { options: any; configFile?: string } {
     baseURL: process.env.OPENAI_BASE_URL,
     debug: false,
     config: null,
-    noSampleTools: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -60,9 +58,6 @@ function parseArgs(): { options: any; configFile?: string } {
       case '-d':
         options.debug = true;
         break;
-      case '--no-sample-tools':
-        options.noSampleTools = true;
-        break;
       case '--help':
       case '-h':
         printHelp();
@@ -89,7 +84,6 @@ Options:
   --openai-url <url>     Custom OpenAI API base URL (for alternative providers)
   -c, --config <file>    Configuration file (YAML or JSON)
   -d, --debug            Enable debug logging
-  --no-sample-tools      Do not register sample tools
   -h, --help            Show this help message
 
 Environment Variables:
@@ -127,116 +121,6 @@ function loadConfig(filePath: string): Partial<AgentConfig> {
     console.error(`Failed to load config from ${filePath}:`, error.message);
     return {};
   }
-}
-
-// Create sample tools
-function createSampleTools(): Tool[] {
-  return [
-    {
-      name: 'get_time',
-      description: 'Get the current time',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          timezone: {
-            type: 'string',
-            description: 'Timezone (e.g., UTC, America/New_York)',
-          },
-        },
-      },
-      execute: async (input: any) => {
-        const date = new Date();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Current time: ${date.toISOString()}`,
-            },
-          ],
-        };
-      },
-    },
-    {
-      name: 'echo',
-      description: 'Echo back the input',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          message: {
-            type: 'string',
-            description: 'Message to echo',
-          },
-        },
-        required: ['message'],
-      },
-      execute: async (input: any) => {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Echo: ${input.message}`,
-            },
-          ],
-        };
-      },
-    },
-    {
-      name: 'calculate',
-      description: 'Perform basic arithmetic',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          operation: {
-            type: 'string',
-            enum: ['add', 'subtract', 'multiply', 'divide'],
-            description: 'Operation to perform',
-          },
-          a: {
-            type: 'number',
-            description: 'First operand',
-          },
-          b: {
-            type: 'number',
-            description: 'Second operand',
-          },
-        },
-        required: ['operation', 'a', 'b'],
-      },
-      execute: async (input: any) => {
-        const { operation, a, b } = input;
-        let result: number;
-
-        switch (operation) {
-          case 'add':
-            result = a + b;
-            break;
-          case 'subtract':
-            result = a - b;
-            break;
-          case 'multiply':
-            result = a * b;
-            break;
-          case 'divide':
-            if (b === 0) {
-              throw new Error('Division by zero');
-            }
-            result = a / b;
-            break;
-          default:
-            throw new Error(`Unknown operation: ${operation}`);
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `${a} ${operation} ${b} = ${result}`,
-            },
-          ],
-        };
-      },
-    },
-  ];
 }
 
 // Main function
@@ -285,14 +169,7 @@ async function main(): Promise<void> {
 
   const agent = new MEWAgent(agentConfig);
 
-  // Register sample tools if not disabled
-  if (!options.noSampleTools) {
-    const tools = createSampleTools();
-    tools.forEach((tool) => agent.addTool(tool));
-    console.log(`Registered ${tools.length} tools`);
-  } else {
-    console.log('Sample tools disabled - agent will discover tools from other participants');
-  }
+  console.log('Agent will discover tools from other participants');
 
   // Handle graceful shutdown
   process.on('SIGINT', () => {
@@ -326,4 +203,4 @@ if (require.main === module) {
 }
 
 // Export for use as a module
-export { MEWAgent, AgentConfig, createSampleTools };
+export { MEWAgent, AgentConfig };

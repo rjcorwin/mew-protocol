@@ -50,12 +50,28 @@ interface ToolCacheEntry {
   ttl: number;
 }
 
+// Discovery state for each participant
+export enum DiscoveryState {
+  NOT_STARTED = 'not_started',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  NO_TOOLS = 'no_tools'  // Participant responded but has no tools
+}
+
+export interface ParticipantDiscoveryStatus {
+  state: DiscoveryState;
+  lastAttempt?: Date;
+  attempts: number;
+  hasTools: boolean;
+}
+
 export class MEWParticipant extends MEWClient {
   protected participantInfo?: {
     id: string;
     capabilities: Capability[];
   };
-  
+
   protected tools = new Map<string, Tool>();
   protected discoveredTools = new Map<string, DiscoveredTool[]>();
   private resources = new Map<string, Resource>();
@@ -69,6 +85,7 @@ export class MEWParticipant extends MEWClient {
   private toolCache: ToolCacheEntry[] = [];
   private autoDiscoveryEnabled = false;
   private defaultCacheTTL = 300000; // 5 minutes
+  private participantDiscoveryStatus = new Map<string, ParticipantDiscoveryStatus>();
 
   constructor(options: ParticipantOptions) {
     super(options);
@@ -271,22 +288,36 @@ export class MEWParticipant extends MEWClient {
    * Discover tools from a specific participant
    */
   async discoverTools(participantId: string): Promise<DiscoveredTool[]> {
+    // Update discovery state
+    const status = this.participantDiscoveryStatus.get(participantId) || {
+      state: DiscoveryState.NOT_STARTED,
+      attempts: 0,
+      hasTools: false
+    };
+
+    status.state = DiscoveryState.IN_PROGRESS;
+    status.lastAttempt = new Date();
+    this.participantDiscoveryStatus.set(participantId, status);
+
     try {
       // Check cache first
-      const cached = this.toolCache.find(entry => 
-        entry.participant === participantId && 
+      const cached = this.toolCache.find(entry =>
+        entry.participant === participantId &&
         Date.now() - entry.timestamp < entry.ttl
       );
-      
+
       if (cached) {
+        status.state = DiscoveryState.COMPLETED;
+        status.hasTools = cached.tools.length > 0;
+        this.participantDiscoveryStatus.set(participantId, status);
         return cached.tools;
       }
 
-      // Fetch tools from participant
+      // Fetch tools from participant (increased timeout for bridge initialization)
       const result = await this.mcpRequest([participantId], {
         method: 'tools/list'
-      }, 5000);
-      
+      }, 15000);
+
       const tools: DiscoveredTool[] = [];
       if (result?.tools) {
         for (const tool of result.tools) {
@@ -298,7 +329,7 @@ export class MEWParticipant extends MEWClient {
           });
         }
       }
-      
+
       // Update cache
       this.toolCache = this.toolCache.filter(e => e.participant !== participantId);
       this.toolCache.push({
@@ -307,13 +338,24 @@ export class MEWParticipant extends MEWClient {
         timestamp: Date.now(),
         ttl: this.defaultCacheTTL
       });
-      
+
       // Store discovered tools
       this.discoveredTools.set(participantId, tools);
-      
+
+      // Update discovery state
+      status.state = tools.length > 0 ? DiscoveryState.COMPLETED : DiscoveryState.NO_TOOLS;
+      status.hasTools = tools.length > 0;
+      this.participantDiscoveryStatus.set(participantId, status);
+
       return tools;
     } catch (error) {
       console.error(`Failed to discover tools from ${participantId}:`, error);
+
+      // Update discovery state as failed
+      status.state = DiscoveryState.FAILED;
+      status.attempts++;
+      this.participantDiscoveryStatus.set(participantId, status);
+
       return [];
     }
   }
@@ -350,6 +392,116 @@ export class MEWParticipant extends MEWClient {
   }
 
   /**
+   * Get discovery status for all participants
+   */
+  getDiscoveryStatus(): Map<string, ParticipantDiscoveryStatus> {
+    return new Map(this.participantDiscoveryStatus);
+  }
+
+  /**
+   * Check if any discoveries are in progress
+   */
+  hasDiscoveriesInProgress(): boolean {
+    for (const [_, status] of this.participantDiscoveryStatus) {
+      if (status.state === DiscoveryState.IN_PROGRESS) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Wait for all pending discoveries to complete
+   */
+  async waitForPendingDiscoveries(maxWaitMs: number = 10000): Promise<void> {
+    const startTime = Date.now();
+
+    while (this.hasDiscoveriesInProgress() && (Date.now() - startTime) < maxWaitMs) {
+      this.log('debug', 'Waiting for pending tool discoveries to complete...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (this.hasDiscoveriesInProgress()) {
+      this.log('warn', 'Some tool discoveries are still pending after timeout');
+    }
+  }
+
+  /**
+   * Get participants that haven't been discovered yet
+   */
+  getUndiscoveredParticipants(): string[] {
+    const undiscovered: string[] = [];
+    for (const [participantId, status] of this.participantDiscoveryStatus) {
+      if (status.state === DiscoveryState.NOT_STARTED ||
+          (status.state === DiscoveryState.FAILED && status.attempts < 3)) {
+        undiscovered.push(participantId);
+      }
+    }
+    return undiscovered;
+  }
+
+  /**
+   * Check if a participant can respond to MCP requests
+   */
+  private canParticipantRespondToMCP(participant: any): boolean {
+    return participant.capabilities?.some((cap: any) =>
+      cap.kind === 'mcp/response'
+    );
+  }
+
+  /**
+   * Discover tools with retry logic for robustness
+   */
+  private async discoverToolsWithRetry(participantId: string, attempt: number = 1): Promise<void> {
+    const maxAttempts = 3;
+
+    try {
+      this.log('debug', `Attempting to discover tools from ${participantId} (attempt ${attempt}/${maxAttempts})`);
+      const tools = await this.discoverTools(participantId);
+
+      if (tools && tools.length > 0) {
+        this.log('info', `✅ Successfully discovered ${tools.length} tools from ${participantId}`);
+      } else {
+        this.log('debug', `No tools found from ${participantId} (participant may not have tools)`);
+      }
+    } catch (error) {
+      this.log('warn', `Failed to discover tools from ${participantId} (attempt ${attempt}/${maxAttempts}): ${error}`);
+
+      if (attempt < maxAttempts) {
+        const delay = attempt * 5000; // 5s, 10s, 15s
+        this.log('debug', `Will retry discovery from ${participantId} in ${delay}ms`);
+        setTimeout(() => this.discoverToolsWithRetry(participantId, attempt + 1), delay);
+      } else {
+        this.log('error', `Failed to discover tools from ${participantId} after ${maxAttempts} attempts`);
+      }
+    }
+  }
+
+  /**
+   * Log helper (uses console for now, can be extended)
+   */
+  protected log(level: string, message: string): void {
+    const prefix = `[${level.toUpperCase()}] [${this.options.participant_id || 'participant'}]`;
+
+    switch (level) {
+      case 'error':
+        console.error(`${prefix} ${message}`);
+        break;
+      case 'warn':
+        console.warn(`${prefix} ${message}`);
+        break;
+      case 'info':
+        console.log(`${prefix} ${message}`);
+        break;
+      case 'debug':
+        if (process.env.DEBUG) {
+          console.log(`${prefix} ${message}`);
+        }
+        break;
+    }
+  }
+
+  /**
    * Lifecycle hooks for subclasses
    */
   protected async onReady(): Promise<void> {}
@@ -373,6 +525,35 @@ export class MEWParticipant extends MEWClient {
         id: data.you.id,
         capabilities: data.you.capabilities
       };
+
+      // Initialize discovery status for all participants
+      if (data.participants) {
+        for (const participant of data.participants) {
+          if (participant.id !== data.you.id) {
+            // Initialize discovery status if not already tracked
+            if (!this.participantDiscoveryStatus.has(participant.id)) {
+              this.participantDiscoveryStatus.set(participant.id, {
+                state: DiscoveryState.NOT_STARTED,
+                attempts: 0,
+                hasTools: false
+              });
+            }
+          }
+        }
+
+        // Discover tools from existing participants if auto-discovery is enabled
+        if (this.autoDiscoveryEnabled) {
+          this.log('debug', `Discovering tools from ${data.participants.length} existing participants`);
+          for (const participant of data.participants) {
+            if (participant.id !== data.you.id && this.canParticipantRespondToMCP(participant)) {
+              // Stagger discovery to avoid storms
+              const delay = 3000 + Math.random() * 2000; // 3-5 seconds
+              setTimeout(() => this.discoverToolsWithRetry(participant.id), delay);
+            }
+          }
+        }
+      }
+
       await this.onReady();
     });
 
@@ -662,27 +843,33 @@ export class MEWParticipant extends MEWClient {
     const { event, participant } = envelope.payload;
     
     if (event === 'join' && participant.id !== this.options.participant_id) {
+      // Initialize discovery status for new participant
+      if (!this.participantDiscoveryStatus.has(participant.id)) {
+        this.participantDiscoveryStatus.set(participant.id, {
+          state: DiscoveryState.NOT_STARTED,
+          attempts: 0,
+          hasTools: false
+        });
+      }
+
       // Notify join handlers
       for (const handler of this.participantJoinHandlers) {
         handler(participant);
       }
-      
+
       // Auto-discover tools if enabled
       if (this.autoDiscoveryEnabled) {
-        // Check if participant can respond to MCP requests
-        const canRespond = participant.capabilities?.some((cap: any) => 
-          cap.kind === 'mcp/response'
-        );
-        
-        if (canRespond) {
-          // Discover tools with a small delay to avoid storms
-          setTimeout(() => this.discoverTools(participant.id), 1000);
+        if (this.canParticipantRespondToMCP(participant)) {
+          // Discover tools with a delay to let participant fully initialize
+          const delay = 3000 + Math.random() * 2000; // 3-5 seconds
+          setTimeout(() => this.discoverToolsWithRetry(participant.id), delay);
         }
       }
     } else if (event === 'leave') {
-      // Remove cached tools for leaving participant
+      // Remove cached tools and discovery status for leaving participant
       this.discoveredTools.delete(participant.id);
       this.toolCache = this.toolCache.filter(e => e.participant !== participant.id);
+      this.participantDiscoveryStatus.delete(participant.id);
     }
   }
 }

@@ -507,10 +507,40 @@ Return a JSON object:
       throw new Error('OpenAI client not initialized - this should never happen!');
     }
 
+    // Check if there are pending discoveries and wait for them if this is the first reasoning iteration
+    if (previousThoughts.length === 0 && this.hasDiscoveriesInProgress()) {
+      this.log('info', '⏳ Waiting for tool discoveries to complete before reasoning...');
+      await this.waitForPendingDiscoveries(5000); // Wait up to 5 seconds for discoveries
+
+      // After waiting, check if we got any new tools
+      const afterWaitTools = this.getAvailableTools();
+      if (afterWaitTools.length > 0) {
+        this.log('info', `✅ Tool discovery completed. ${afterWaitTools.length} tools now available.`);
+      }
+    }
+
     const tools = this.prepareLLMTools();
 
-    // Warn if no tools are available
+    // LOUDLY warn if no tools are available
     if (tools.length === 0) {
+      console.error('');
+      console.error('🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧');
+      console.error('⚠️  WARNING: NO TOOLS AVAILABLE FOR REASONING! ⚠️');
+      console.error('🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧');
+      console.error('');
+      console.error('The agent is attempting to process a request but has NO TOOLS to work with!');
+      console.error('');
+      console.error('Possible causes:');
+      console.error('  1. No other participants with tools have joined the space yet');
+      console.error('  2. Tool discovery failed or is still in progress');
+      console.error('  3. Other participants are not sharing their tools (no tools/list support)');
+      console.error('');
+      console.error('The agent can only respond with text and cannot perform any actions.');
+      console.error('Waiting for tool-providing participants to join the workspace...');
+      console.error('');
+      console.error('🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧🔧');
+      console.error('');
+
       this.log('warn', '⚠️ No tools available for reasoning! The agent may have limited capabilities.');
       this.log('warn', '   Waiting for other participants to join and share their tools...');
     }
@@ -548,7 +578,7 @@ Return a JSON object:
     
     // Add warning to system prompt if no tools available
     if (tools.length === 0 && messages.length > 0 && messages[0].role === 'system') {
-      messages[0].content += '\n\nIMPORTANT: No tools are currently available. You can only respond with text. If the user asks you to perform actions that would require tools, explain that you are waiting for tool-providing participants to join the workspace.';
+      messages[0].content += '\n\nIMPORTANT: No tools are currently available. You can only respond with text. If the user asks you to perform actions that would require tools, explain that you are waiting for tool-providing participants to join the workspace and cannot perform the requested action yet.';
     }
 
     // Use function calling to let the model decide whether to use tools
@@ -725,7 +755,27 @@ Return a JSON object:
    */
   protected async executeLLMToolCall(namespacedTool: string, args: any): Promise<any> {
     const [participantId, toolName] = namespacedTool.split('/');
-    
+
+    // Check if we have any tools at all
+    const allTools = this.getAvailableTools();
+    if (allTools.length === 0) {
+      console.error('');
+      console.error('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+      console.error('❌ ERROR: ATTEMPTING TO EXECUTE TOOL BUT NONE AVAILABLE! ❌');
+      console.error('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+      console.error('');
+      console.error(`Tried to execute: ${namespacedTool}`);
+      console.error(`With arguments: ${JSON.stringify(args)}`);
+      console.error('');
+      console.error('But there are NO TOOLS available in the workspace!');
+      console.error('Other participants need to join and share their tools first.');
+      console.error('');
+      console.error('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+      console.error('');
+
+      throw new Error(`Cannot execute tool ${namespacedTool}: No tools available in workspace`);
+    }
+
     // Check if this is our own tool
     if (participantId === this.options.participant_id) {
       // Execute our own tool directly
@@ -852,9 +902,9 @@ Return a JSON object:
   }
 
   /**
-   * Logging helper
+   * Logging helper - override parent to add agent-specific formatting
    */
-  private log(level: string, message: string): void {
+  protected log(level: string, message: string): void {
     const levels = ['debug', 'info', 'warn', 'error'];
     const configLevel = levels.indexOf(this.config.logLevel || 'info');
     const msgLevel = levels.indexOf(level);

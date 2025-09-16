@@ -14,10 +14,10 @@ participants:
       - kind: "*"  # Full capabilities including proposal approval
 
   # Coder agent with limited capabilities - creates proposals for file modifications
-  coder-agent:
+  mew:
     type: local
     command: "npx"
-    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "coder-token", "--id", "coder-agent"]
+    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "coder-token", "--id", "mew"]
     auto_start: true
     tokens:
       - coder-token
