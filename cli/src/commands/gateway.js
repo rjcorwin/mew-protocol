@@ -6,6 +6,7 @@ const fs = require('fs');
 const yaml = require('js-yaml');
 const path = require('path');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 
 const gateway = new Command('gateway').description('Gateway server management');
 
@@ -40,6 +41,8 @@ gateway
 
     // Load space configuration (CLI responsibility, not gateway)
     let spaceConfig = null;
+    let tokenMap = new Map(); // Map of participantId -> token
+
     try {
       const configPath = path.resolve(options.spaceConfig);
       const configContent = fs.readFileSync(configPath, 'utf8');
@@ -47,6 +50,45 @@ gateway
       console.log(`Loaded space configuration from ${configPath}`);
       console.log(`Space ID: ${spaceConfig.space.id}`);
       console.log(`Participants configured: ${Object.keys(spaceConfig.participants).length}`);
+
+      // Load tokens from secure storage
+      const spaceDir = path.dirname(configPath);
+      const mewDir = fs.existsSync(path.join(spaceDir, '.mew'))
+        ? path.join(spaceDir, '.mew')
+        : spaceDir;
+      const tokensDir = path.join(mewDir, 'tokens');
+
+      // Load tokens for all participants
+      for (const participantId of Object.keys(spaceConfig.participants)) {
+        const tokenPath = path.join(tokensDir, `${participantId}.token`);
+
+        // Check environment variable override first
+        const envVarName = `MEW_TOKEN_${participantId.toUpperCase().replace(/-/g, '_')}`;
+        if (process.env[envVarName]) {
+          tokenMap.set(participantId, process.env[envVarName]);
+          console.log(`Loaded token for ${participantId} from environment variable`);
+        } else if (fs.existsSync(tokenPath)) {
+          // Load from file
+          const token = fs.readFileSync(tokenPath, 'utf8').trim();
+          tokenMap.set(participantId, token);
+          console.log(`Loaded token for ${participantId} from secure storage`);
+        } else {
+          // Generate new token if not found
+          const token = crypto.randomBytes(32).toString('base64url');
+
+          // Ensure tokens directory exists
+          if (!fs.existsSync(tokensDir)) {
+            fs.mkdirSync(tokensDir, { recursive: true, mode: 0o700 });
+            // Create .gitignore in tokens directory
+            const tokenGitignore = path.join(tokensDir, '.gitignore');
+            fs.writeFileSync(tokenGitignore, '*\n!.gitignore\n', { mode: 0o600 });
+          }
+
+          fs.writeFileSync(tokenPath, token, { mode: 0o600 });
+          tokenMap.set(participantId, token);
+          console.log(`Generated new token for ${participantId}`);
+        }
+      }
     } catch (error) {
       console.error(`Failed to load space configuration: ${error.message}`);
       console.log('Continuing with default configuration...');
@@ -190,7 +232,15 @@ gateway
         return [{ kind: 'chat' }];
       }
 
-      // Find participant by token
+      // Find participant by token (using tokenMap from secure storage)
+      for (const [pid, storedToken] of tokenMap.entries()) {
+        if (storedToken === token) {
+          const config = spaceConfig.participants[pid];
+          return config?.capabilities || spaceConfig.defaults?.capabilities || [];
+        }
+      }
+
+      // Legacy support: check tokens field in config if it exists (backward compatibility)
       for (const [pid, config] of Object.entries(spaceConfig.participants)) {
         if (config.tokens && config.tokens.includes(token)) {
           return config.capabilities || spaceConfig.defaults?.capabilities || [];

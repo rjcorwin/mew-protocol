@@ -5,6 +5,7 @@ space:
 
 participants:
   human:
+    # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
       - kind: "mcp/*"
       - kind: "chat"
@@ -13,11 +14,12 @@ participants:
     command: "node"
     args: ["./.mew/agents/assistant.js"]
     auto_start: true
+    # No tokens field - generated at runtime in .mew/tokens/
     env:
       NODE_PATH: "./.mew/node_modules"
       MEW_GATEWAY: "ws://localhost:8080"
       MEW_SPACE: "{{SPACE_NAME}}"
-      MEW_TOKEN: "assistant-token"
+      MEW_TOKEN: "${TOKEN}"  # Token will be loaded from .mew/tokens/assistant.token
       MEW_PARTICIPANT_ID: "assistant"
       # API configuration - API key reads from environment at runtime
       OPENAI_API_KEY: "${OPENAI_API_KEY}"

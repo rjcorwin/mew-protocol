@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const readline = require('readline');
 const { execSync } = require('child_process');
+const crypto = require('crypto');
 
 /**
  * MEW init command - Initialize a new MEW space from templates
@@ -63,23 +64,31 @@ class InitCommand {
       await this.copyTemplateFiles(template.path);
       console.log('✓ Copied template files to .mew/');
 
-      // Install dependencies
-      console.log('\nInstalling dependencies...');
-      await this.installDependencies();
-      console.log('✓ Dependencies installed');
-
-      // Collect variable values
+      // Collect variable values BEFORE processing templates
+      console.log('\nConfiguring your space...');
       const variables = await this.collectVariables(templateMeta, options);
+
+      // Process template files with variable substitution (including package.json)
+      await this.processTemplateFiles(variables);
+      console.log('✓ Processed template files with configuration');
+
+      // NOW install dependencies after package.json has been processed
+      console.log('\nInstalling dependencies...');
+      const depsInstalled = await this.installDependencies();
+      if (depsInstalled !== false) {
+        console.log('✓ Dependencies installed');
+      }
 
       // Check environment
       console.log('\nChecking environment...');
       this.checkEnvironment();
 
-      // Process template files with variable substitution
-      await this.processTemplateFiles(variables);
       console.log('✓ Created .mew/space.yaml');
-      console.log('✓ Copied agent files to .mew/agents/');
       console.log('✓ Configured isolated dependencies');
+
+      // Create secure token storage
+      await this.createTokenStorage();
+      console.log('✓ Created secure token storage (.mew/tokens/)');
 
       // Update .gitignore
       await this.updateGitignore();
@@ -347,17 +356,66 @@ class InitCommand {
 
   /**
    * Install dependencies in .mew directory
+   * @returns {boolean} true if successful, false if failed
    */
   async installDependencies() {
     const mewDir = path.join(process.cwd(), '.mew');
+
+    // Check if package.json exists
+    const packagePath = path.join(mewDir, 'package.json');
     try {
-      execSync('npm install', {
+      await fs.access(packagePath);
+    } catch {
+      console.warn('⚠ No package.json found in .mew directory');
+      return false;
+    }
+
+    try {
+      // Show installing message
+      console.log('  Running npm install in .mew directory...');
+
+      const result = execSync('npm install --loglevel=error', {
         cwd: mewDir,
-        stdio: 'pipe'
+        stdio: 'pipe',
+        encoding: 'utf8',
+        timeout: 60000 // 60 second timeout
       });
+
+      // If there's any output, it might be warnings
+      if (result) {
+        const lines = result.split('\n').filter(line => line.trim());
+        if (lines.length > 0) {
+          console.log('  npm output:', lines[0]);
+        }
+      }
+      return true; // Success
     } catch (error) {
       console.warn('⚠ Could not install dependencies automatically');
-      console.warn('  Run "cd .mew && npm install" manually later');
+
+      // Show more detailed error information
+      if (error.message) {
+        console.warn('  Error:', error.message);
+      }
+      if (error.stderr) {
+        const stderr = error.stderr.toString().trim();
+        if (stderr) {
+          const lines = stderr.split('\n');
+          console.warn('  Details:', lines[0]);
+          if (lines.length > 1) {
+            console.warn('  ', lines[1]);
+          }
+        }
+      }
+      if (error.stdout) {
+        const stdout = error.stdout.toString().trim();
+        if (stdout) {
+          console.warn('  Output:', stdout.split('\n')[0]);
+        }
+      }
+
+      console.warn('  Run "cd .mew && npm install" manually to complete setup');
+      console.warn('  This is usually due to network issues or npm registry problems');
+      return false; // Failed
     }
   }
 
@@ -369,8 +427,6 @@ class InitCommand {
 
     // Get current directory name for default space name
     const dirname = path.basename(process.cwd());
-
-    console.log('\nConfiguring your space...');
 
     for (const variable of templateMeta.variables || []) {
       // Resolve variable value according to ADR-evd
@@ -559,6 +615,23 @@ class InitCommand {
   }
 
   /**
+   * Create secure token storage directory
+   */
+  async createTokenStorage() {
+    const tokensDir = path.join(process.cwd(), '.mew/tokens');
+
+    // Create tokens directory
+    await fs.mkdir(tokensDir, { recursive: true, mode: 0o700 });
+
+    // Create .gitignore in tokens directory for extra protection
+    const tokenGitignore = path.join(tokensDir, '.gitignore');
+    await fs.writeFile(tokenGitignore, '*\n!.gitignore\n', { mode: 0o600 });
+
+    // Note: Actual tokens will be generated on first use when space starts
+    console.log('Token storage initialized. Tokens will be generated when space starts.');
+  }
+
+  /**
    * Update .gitignore to exclude .mew artifacts
    */
   async updateGitignore() {
@@ -568,6 +641,7 @@ class InitCommand {
       '.mew/pm2/',
       '.mew/logs/',
       '.mew/fifos/',
+      '.mew/tokens/',  // Add tokens directory
       '.mew/.env'
     ];
 

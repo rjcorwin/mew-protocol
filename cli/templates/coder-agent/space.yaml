@@ -8,8 +8,7 @@ space:
 participants:
   # Human participant with full capabilities (can approve proposals)
   human:
-    tokens:
-      - human-token
+    # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
       - kind: "*"  # Full capabilities including proposal approval
 
@@ -17,10 +16,9 @@ participants:
   mew:
     type: local
     command: "npx"
-    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "coder-token", "--id", "mew"]
+    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
     auto_start: true
-    tokens:
-      - coder-token
+    # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
       - kind: "chat"
       - kind: "reasoning/*"
@@ -102,10 +100,9 @@ participants:
   mcp-fs-bridge:
     type: local
     command: "npx"
-    args: ["--yes", "@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "mcp-bridge-token", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./", "--mcp-cwd", "./"]
+    args: ["--yes", "@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./", "--mcp-cwd", "./"]
     auto_start: true
-    tokens:
-      - mcp-bridge-token
+    # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
       - kind: "mcp/request"
       - kind: "mcp/response"
@@ -117,8 +114,7 @@ participants:
     command: "node"
     args: ["./.mew/agents/auto-fulfiller.js"]
     auto_start: false  # Disabled for manual testing
-    tokens:
-      - fulfiller-token
+    # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
       - kind: "mcp/proposal"  # Can see proposals
       - kind: "mcp/request"   # Can execute approved operations
@@ -128,7 +124,7 @@ participants:
       NODE_PATH: "./.mew/node_modules"
       MEW_GATEWAY: "ws://localhost:${PORT}"
       MEW_SPACE: "{{SPACE_NAME}}"
-      MEW_TOKEN: "fulfiller-token"
+      MEW_TOKEN: "${TOKEN}"  # Token will be loaded from .mew/tokens/auto-fulfiller.token
       MEW_PARTICIPANT_ID: "auto-fulfiller"
       AUTO_APPROVE: "false"  # Set to "true" to enable auto-approval
       APPROVAL_DELAY: "2000"  # 2 second delay before auto-approval

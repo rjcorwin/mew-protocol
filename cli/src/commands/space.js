@@ -6,6 +6,7 @@ const { spawn, execSync } = require('child_process');
 const net = require('net');
 const http = require('http');
 const pm2 = require('pm2');
+const crypto = require('crypto');
 
 const space = new Command('space').description('Manage MEW spaces');
 
@@ -72,6 +73,72 @@ function deletePM2Process(name) {
 // PM2 disconnect helper
 function disconnectPM2() {
   pm2.disconnect();
+}
+
+/**
+ * Generate a secure random token
+ */
+function generateSecureToken() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+/**
+ * Ensure a token exists for a participant, generating if needed
+ * @param {string} spaceDir - Directory containing the space
+ * @param {string} participantId - Participant ID to get/generate token for
+ * @returns {Promise<string>} The token
+ */
+async function ensureTokenExists(spaceDir, participantId) {
+  const tokensDir = path.join(spaceDir, '.mew', 'tokens');
+  const tokenPath = path.join(tokensDir, `${participantId}.token`);
+
+  // Check environment variable override first
+  const envVarName = `MEW_TOKEN_${participantId.toUpperCase().replace(/-/g, '_')}`;
+  if (process.env[envVarName]) {
+    console.log(`Using token from environment variable ${envVarName}`);
+    return process.env[envVarName];
+  }
+
+  // Ensure tokens directory exists
+  if (!fs.existsSync(tokensDir)) {
+    fs.mkdirSync(tokensDir, { recursive: true, mode: 0o700 });
+
+    // Create .gitignore in tokens directory
+    const tokenGitignore = path.join(tokensDir, '.gitignore');
+    fs.writeFileSync(tokenGitignore, '*\n!.gitignore\n', { mode: 0o600 });
+  }
+
+  // Check if token file exists
+  if (fs.existsSync(tokenPath)) {
+    const token = fs.readFileSync(tokenPath, 'utf8').trim();
+    console.log(`Loaded existing token for ${participantId}`);
+    return token;
+  }
+
+  // Generate new token
+  const token = generateSecureToken();
+  fs.writeFileSync(tokenPath, token, { mode: 0o600 });
+  console.log(`Generated new token for ${participantId}`);
+
+  return token;
+}
+
+/**
+ * Load participant tokens from secure storage or generate them
+ * @param {string} spaceDir - Directory containing the space
+ * @param {object} config - Space configuration
+ * @returns {Promise<Map>} Map of participant IDs to tokens
+ */
+async function loadParticipantTokens(spaceDir, config) {
+  const tokenMap = new Map();
+
+  for (const [participantId, participantConfig] of Object.entries(config.participants || {})) {
+    // Generate or load token
+    const token = await ensureTokenExists(spaceDir, participantId);
+    tokenMap.set(participantId, token);
+  }
+
+  return tokenMap;
 }
 
 // Get path to store running spaces info
@@ -460,6 +527,11 @@ space
     }
     console.log('✓ Gateway is ready');
 
+    // Load participant tokens from secure storage
+    console.log('Loading participant tokens...');
+    const tokenMap = await loadParticipantTokens(spaceDir, config);
+    console.log('✓ Tokens loaded/generated for all participants');
+
     // Start agents and bridges with auto_start: true
     for (const [participantId, participant] of Object.entries(config.participants || {})) {
       // Handle MCP bridge participants
@@ -478,7 +550,7 @@ space
           '--participant-id',
           participantId,
           '--token',
-          participant.tokens?.[0] || 'token',
+          tokenMap.get(participantId),
           '--mcp-command',
           mcpServer.command,
         ];
@@ -571,7 +643,7 @@ space
           arg
             .replace('${PORT}', selectedPort)
             .replace('${SPACE}', spaceId)
-            .replace('${TOKEN}', participant.tokens?.[0] || 'token'),
+            .replace('${TOKEN}', tokenMap.get(participantId)),
         );
 
         try {
@@ -588,7 +660,9 @@ space
             time: true,
             env: {
               ...process.env,  // Inherit all environment variables from current shell
-              ...resolveEnvVariables(participant.env || {})  // Override with any specific env from config
+              ...resolveEnvVariables(participant.env || {}),  // Override with any specific env from config
+              // Set token as environment variable for participants that read from env
+              [`MEW_TOKEN_${participantId.toUpperCase().replace(/-/g, '_')}`]: tokenMap.get(participantId)
             },
           });
 
@@ -632,7 +706,7 @@ space
             '--participant-id',
             participantId,
             '--token',
-            participant.tokens?.[0] || 'token',
+            tokenMap.get(participantId),
             '--fifo-in',
             inFifo,
           ];
@@ -725,6 +799,9 @@ space
         // Get interactive overrides
         const participantConfig = getInteractiveOverrides(participant);
 
+        // Get token for this participant
+        const token = await ensureTokenExists(spaceDir, participant.id);
+
         // Connect to gateway
         const ws = new WebSocket(`ws://localhost:${selectedPort}`);
 
@@ -738,7 +815,7 @@ space
             payload: {
               space: spaceId,
               participant: participant.id,
-              token: participantConfig.tokens[0],
+              token: token,
               capabilities: participantConfig.capabilities || [],
             },
           };
@@ -1362,6 +1439,9 @@ space
       // Get interactive overrides
       const participantConfig = getInteractiveOverrides(participant);
 
+      // Get token for this participant
+      const token = await ensureTokenExists(spaceDir, participant.id);
+
       // Connect to gateway
       const ws = new WebSocket(gatewayUrl);
 
@@ -1375,7 +1455,7 @@ space
           payload: {
             space: spaceId,
             participant: participant.id,
-            token: participantConfig.tokens[0],
+            token: token,
             capabilities: participantConfig.capabilities || [],
           },
         };
