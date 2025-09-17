@@ -692,6 +692,47 @@ gateway
                   },
                 };
                 recipientWs.send(JSON.stringify(ackMessage));
+
+                // Send updated welcome message with new capabilities
+                // This allows the participant to update their internal capability tracking
+                // Get both static capabilities and runtime capabilities
+                const staticCapabilities = participantCapabilities.get(recipient) || [];
+                const runtimeCaps = runtimeCapabilities.get(recipient);
+                const dynamicCapabilities = runtimeCaps ? Array.from(runtimeCaps.values()).flat() : [];
+
+                // Combine static and dynamic capabilities
+                const updatedCapabilities = [...staticCapabilities, ...dynamicCapabilities];
+
+                const updatedWelcomeMessage = {
+                  protocol: 'mew/v0.3',
+                  id: `welcome-update-${Date.now()}`,
+                  ts: new Date().toISOString(),
+                  from: 'system:gateway',
+                  to: [recipient],
+                  kind: 'system/welcome',
+                  payload: {
+                    you: {
+                      id: recipient,
+                      capabilities: updatedCapabilities,
+                    },
+                    participants: Array.from(space.participants.keys())
+                      .filter((pid) => pid !== recipient)
+                      .map((pid) => {
+                        // Also include runtime capabilities for other participants
+                        const otherStatic = participantCapabilities.get(pid) || [];
+                        const otherRuntime = runtimeCapabilities.get(pid);
+                        const otherDynamic = otherRuntime ? Array.from(otherRuntime.values()).flat() : [];
+                        return {
+                          id: pid,
+                          capabilities: [...otherStatic, ...otherDynamic],
+                        };
+                      }),
+                  },
+                };
+                recipientWs.send(JSON.stringify(updatedWelcomeMessage));
+                console.log(`Sent updated welcome message to ${recipient} with ${updatedCapabilities.length} total capabilities`);
+                console.log('  Static capabilities:', staticCapabilities.length);
+                console.log('  Granted capabilities:', dynamicCapabilities.length);
               }
             }
           } else if (message.kind === 'capability/revoke') {

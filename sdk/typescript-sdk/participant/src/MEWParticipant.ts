@@ -519,12 +519,20 @@ export class MEWParticipant extends MEWClient {
       }
     });
 
-    // Handle welcome message
+    // Handle welcome message (including updates after grants)
     this.onWelcome(async (data: any) => {
+      const previousCapabilities = this.participantInfo?.capabilities?.length || 0;
       this.participantInfo = {
         id: data.you.id,
         capabilities: data.you.capabilities
       };
+
+      // Log capability updates
+      const newCapabilities = data.you.capabilities?.length || 0;
+      if (previousCapabilities > 0 && newCapabilities !== previousCapabilities) {
+        console.log(`[MEWParticipant] Capabilities updated: ${previousCapabilities} -> ${newCapabilities}`);
+        console.log('[MEWParticipant] New capabilities:', JSON.stringify(data.you.capabilities, null, 2));
+      }
 
       // Initialize discovery status for all participants
       if (data.participants) {

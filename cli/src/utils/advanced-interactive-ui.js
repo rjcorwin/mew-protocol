@@ -24,6 +24,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [showHelp, setShowHelp] = useState(false);
   const [verbose, setVerbose] = useState(false);
   const [activeReasoning, setActiveReasoning] = useState(null); // Track active reasoning sessions
+  const [grantedCapabilities, setGrantedCapabilities] = useState(new Map()); // Track granted capabilities by participant
   const { exit } = useApp();
 
   // Environment configuration
@@ -64,9 +65,21 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     };
   }, [ws, exit]);
 
+  const addMessage = (message, sent = false) => {
+    setMessages(prev => [...prev, {
+      id: message.id || uuidv4(),
+      message,
+      sent,
+      timestamp: new Date(),
+    }]);
+  };
+
   const handleIncomingMessage = (message) => {
     // Filter out echo messages - don't show messages from ourselves coming back
-    if (message.from === participantId) {
+    // EXCEPT for errors and grant acknowledgments which we want to see
+    if (message.from === participantId &&
+        message.kind !== 'system/error' &&
+        message.kind !== 'capability/grant-ack') {
       return;
     }
 
@@ -102,25 +115,112 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       setActiveReasoning(null);
     }
 
+    // Handle capability grant acknowledgments
+    if (message.kind === 'capability/grant-ack') {
+      console.error('[DEBUG] Received grant acknowledgment:', JSON.stringify(message.payload));
+      addMessage({
+        kind: 'system/info',
+        from: 'system',
+        payload: { text: `✅ Capability grant acknowledged by ${message.from}` }
+      }, false);
+    }
+
+    // Handle welcome message updates (after capability grants)
+    if (message.kind === 'system/welcome' && message.to?.includes(participantId)) {
+      // This could be an updated welcome after a grant
+      const capabilities = message.payload?.you?.capabilities || [];
+      console.error('[DEBUG] Received welcome with capabilities:', capabilities.length);
+
+      // Check if this is an update (not the initial welcome)
+      if (messages.length > 5) { // Heuristic: not the initial connection
+        addMessage({
+          kind: 'system/info',
+          from: 'system',
+          payload: { text: `📋 Your capabilities have been updated (${capabilities.length} total)` }
+        }, false);
+      }
+    }
+
+    // Handle errors (especially for capability violations)
+    if (message.kind === 'system/error') {
+      console.error('[DEBUG] Received error:', JSON.stringify(message.payload));
+      if (message.payload?.error === 'capability_violation' &&
+          message.payload?.attempted_kind === 'capability/grant') {
+        addMessage({
+          kind: 'system/error',
+          from: 'system',
+          payload: { text: `❌ Cannot grant capabilities: You lack the 'capability/grant' permission` }
+        }, false);
+      }
+    }
+
     // Check if this is an MCP proposal requiring confirmation
     // In MEW v0.3, mcp/proposal contains operation details that need approval
     if (message.kind === 'mcp/proposal') {
-      setPendingOperation({
-        id: message.id,
-        from: message.from,
-        to: message.to,  // Capture the target participant(s)
-        operation: message.payload,
-        timestamp: new Date(),
-        correlationId: message.correlation_id,
+      // Check if we've already granted this capability
+      const proposerGrants = grantedCapabilities.get(message.from) || [];
+      const method = message.payload?.method;
+      const toolName = message.payload?.params?.name;
+
+      // Check if we have a matching grant for this operation
+      const hasGrant = proposerGrants.some(grant => {
+        // Check if the granted capability matches this proposal
+        if (grant.kind === 'mcp/request' || grant.kind === 'mcp/*') {
+          // Check method match
+          if (!grant.payload || !grant.payload.method) return true; // Broad grant
+          if (grant.payload.method === method || grant.payload.method === '*') {
+            // Check tool name match for tools/call
+            if (method === 'tools/call' && grant.payload.params?.name) {
+              return grant.payload.params.name === toolName ||
+                     grant.payload.params.name === '*' ||
+                     (grant.payload.params.name.endsWith('*') &&
+                      toolName?.startsWith(grant.payload.params.name.slice(0, -1)));
+            }
+            return true;
+          }
+        }
+        return false;
       });
+
+      if (hasGrant) {
+        // Auto-approve based on grant
+        const fulfillmentMessage = {
+          kind: 'mcp/request',
+          correlation_id: [message.id],
+          payload: {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: method,
+            params: message.payload?.params
+          }
+        };
+
+        if (message.to && message.to.length > 0) {
+          fulfillmentMessage.to = message.to;
+        }
+
+        sendMessage(fulfillmentMessage);
+
+        // Add a system message indicating auto-approval
+        addMessage({
+          kind: 'system/info',
+          from: 'system',
+          payload: { text: `Auto-approved ${method} from ${message.from} (capability granted)` }
+        }, false);
+      } else {
+        // Show dialog for manual approval
+        setPendingOperation({
+          id: message.id,
+          from: message.from,
+          to: message.to,  // Capture the target participant(s)
+          operation: message.payload,
+          timestamp: new Date(),
+          correlationId: message.correlation_id,
+        });
+      }
     }
 
-    setMessages(prev => [...prev, {
-      id: message.id || uuidv4(),
-      message,
-      sent: false,
-      timestamp: new Date(),
-    }]);
+    addMessage(message, false);
   };
 
   const sendMessage = (message) => {
@@ -130,6 +230,12 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     }
 
     const envelope = wrapEnvelope(message);
+
+    // Debug log for capability/grant messages
+    if (message.kind === 'capability/grant') {
+      console.error('[DEBUG] Sending wrapped grant envelope:', JSON.stringify(envelope, null, 2));
+    }
+
     ws.send(JSON.stringify(envelope));
     
     setMessages(prev => [...prev, {
@@ -243,7 +349,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         if (pendingOperation.operation) {
           // Extract the method and params from the proposal payload
           const { method, params } = pendingOperation.operation;
-          
+
           // Send the MCP request with correlation_id pointing to the proposal
           // IMPORTANT: Send to the participant specified in the proposal's 'to' field
           const message = {
@@ -256,14 +362,87 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
               params: params
             }
           };
-          
+
           // If the proposal specified a target participant, send to them
           if (pendingOperation.to && pendingOperation.to.length > 0) {
             message.to = pendingOperation.to;
           }
-          
+
           sendMessage(message);
         }
+        setPendingOperation(null);
+      },
+      onGrant: () => {
+        // Grant capability for this operation type
+        const proposer = pendingOperation.from;
+        const method = pendingOperation.operation?.method;
+        const params = pendingOperation.operation?.params;
+        const toolName = params?.name;
+
+        // Create capability pattern for this specific operation
+        const capabilityPattern = {
+          kind: 'mcp/request',
+          payload: {
+            method: method
+          }
+        };
+
+        // For tools/call, include the specific tool name pattern
+        if (method === 'tools/call' && toolName) {
+          capabilityPattern.payload.params = {
+            name: toolName
+          };
+        }
+
+        // Update local grant tracking
+        setGrantedCapabilities(prev => {
+          const existing = prev.get(proposer) || [];
+          return new Map(prev).set(proposer, [...existing, capabilityPattern]);
+        });
+
+        // Send capability grant message
+        const grantMessage = {
+          kind: 'capability/grant',
+          to: [proposer],
+          payload: {
+            recipient: proposer,
+            capabilities: [capabilityPattern],
+            reason: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} for this session`
+          }
+        };
+
+        // Debug: Log the grant message being sent
+        console.error('[DEBUG] Sending capability grant:', JSON.stringify(grantMessage, null, 2));
+        sendMessage(grantMessage);
+
+        // Add a visible message to confirm grant was sent
+        addMessage({
+          kind: 'system/info',
+          from: 'system',
+          payload: { text: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} to ${proposer} for this session` }
+        }, true);
+
+        // Also fulfill the current proposal
+        if (pendingOperation.operation) {
+          const { method, params } = pendingOperation.operation;
+          const fulfillMessage = {
+            kind: 'mcp/request',
+            correlation_id: [pendingOperation.id],
+            payload: {
+              jsonrpc: '2.0',
+              id: Date.now(),
+              method: method,
+              params: params
+            }
+          };
+
+          if (pendingOperation.to && pendingOperation.to.length > 0) {
+            fulfillMessage.to = pendingOperation.to;
+          }
+
+          sendMessage(fulfillMessage);
+        }
+
         setPendingOperation(null);
       },
       onDeny: () => {
@@ -399,35 +578,40 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
  *
  * Provides a minimal numbered list implementation for MCP operation approval.
  * Supports both number keys and arrow/enter navigation for better UX.
+ * Phase 3: Includes capability grant option
  */
-function OperationConfirmation({ operation, onApprove, onDeny }) {
+function OperationConfirmation({ operation, onApprove, onDeny, onGrant }) {
   // Focus management - ensure this component takes priority for input
   const { isFocused } = useFocus({ autoFocus: true });
 
-  // Track selected option (0 = Yes, 1 = No)
+  // Track selected option (0 = Yes once, 1 = Grant, 2 = No)
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useInput((input, key) => {
     // Only handle input when focused
     if (!isFocused) return;
 
-    // Number key shortcuts (original behavior)
+    // Number key shortcuts
     if (input === '1') {
       onApprove();
       return;
     }
     if (input === '2') {
+      onGrant();
+      return;
+    }
+    if (input === '3') {
       onDeny();
       return;
     }
 
     // Arrow key navigation
     if (key.upArrow) {
-      setSelectedIndex(0); // Select Yes
+      setSelectedIndex(Math.max(0, selectedIndex - 1));
       return;
     }
     if (key.downArrow) {
-      setSelectedIndex(1); // Select No
+      setSelectedIndex(Math.min(2, selectedIndex + 1));
       return;
     }
 
@@ -435,6 +619,8 @@ function OperationConfirmation({ operation, onApprove, onDeny }) {
     if (key.return) {
       if (selectedIndex === 0) {
         onApprove();
+      } else if (selectedIndex === 1) {
+        onGrant();
       } else {
         onDeny();
       }
@@ -505,14 +691,17 @@ function OperationConfirmation({ operation, onApprove, onDeny }) {
       // Options
       React.createElement(Text, null, "Do you want to allow this?"),
       React.createElement(Text, { color: selectedIndex === 0 ? "green" : "white" },
-        `${selectedIndex === 0 ? '❯' : ' '} 1. Yes`
+        `${selectedIndex === 0 ? '❯' : ' '} 1. Yes (this time only)`
       ),
-      React.createElement(Text, { color: selectedIndex === 1 ? "red" : "white" },
-        `${selectedIndex === 1 ? '❯' : ' '} 2. No`
+      React.createElement(Text, { color: selectedIndex === 1 ? "cyan" : "white" },
+        `${selectedIndex === 1 ? '❯' : ' '} 2. Yes, allow ${operation.from} to ${method === 'tools/call' && toolName ? `use '${toolName}'` : method} for this session`
+      ),
+      React.createElement(Text, { color: selectedIndex === 2 ? "red" : "white" },
+        `${selectedIndex === 2 ? '❯' : ' '} 3. No`
       ),
       React.createElement(Box, { marginTop: 1 }),
       React.createElement(Text, { color: "gray", fontSize: 12 },
-        "Use ↑↓ arrows + Enter, or press 1/2, or Esc to cancel"
+        "Use ↑↓ arrows + Enter, or press 1/2/3, or Esc to cancel"
       )
     )
   );
