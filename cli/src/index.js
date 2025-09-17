@@ -56,6 +56,28 @@ program.addCommand(agentCommand);
 program.addCommand(tokenCommand);
 program.addCommand(spaceCommand);
 
+// Add aliases for common space commands
+program
+  .command('up')
+  .description('Alias for "space up" - Start a space')
+  .option('-c, --config <path>', 'Path to space.yaml (default: auto-detect)', './space.yaml')
+  .option('-d, --space-dir <path>', 'Space directory', '.')
+  .option('-p, --port <port>', 'Gateway port', '8080')
+  .option('-l, --log-level <level>', 'Log level', 'info')
+  .option('-i, --interactive', 'Connect interactively after starting space')
+  .option('--detach', 'Run in background (default if not interactive)')
+  .option('--participant <id>', 'Connect as this participant (with --interactive)')
+  .option('--debug', 'Use simple debug interface instead of advanced UI')
+  .option('--simple', 'Alias for --debug')
+  .option('--no-ui', 'Disable UI enhancements, use plain interface')
+  .action(spaceCommand.spaceUpAction);
+
+program
+  .command('down')
+  .description('Alias for "space down" - Stop a running space')
+  .option('-d, --space-dir <path>', 'Space directory', '.')
+  .action(spaceCommand.spaceDownAction);
+
 // Helper function to check if space is running
 function isSpaceRunning() {
   const pidFile = path.join(process.cwd(), '.mew', 'pids.json');
