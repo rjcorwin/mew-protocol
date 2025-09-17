@@ -67,6 +67,7 @@
 * [ ] CLI: Some kind of hook system so folks can decide what command to run "say hi" when an proposal is up
 * [ ] CLI: reconcile cli gateway and sdk gateway
 * [ ] CLI: Spaces will break on version changes. Could make mew version/deps a dep of the space so they can be upgraded.
+* [ ] Choosing a template currently being skipped
 
 ## SDK
 * [?] SDK: consider having types package built out first and incorporated into sdk spec
@@ -81,3 +82,6 @@
 
 ## Agent
 * [ ] Better context management with rolling history mode, compact at x point mode (configurable), token counting, etc. Needs an ADR(s).
+
+## Docs
+* [ ] Tutorial: How to create a space template
