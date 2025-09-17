@@ -45,6 +45,9 @@ tests/test-results.log
 .mew/
 **/.mew/
 
+# Space folders (keep the directory, ignore contents)
+spaces/*/
+
 # IDE
 .vscode/
 .idea/
