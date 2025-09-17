@@ -1,6 +1,6 @@
 {
   "name": "@mew-protocol/cli",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "MEW Protocol CLI - Minimal implementation for testing",
   "bin": {
     "mew": "./bin/mew.js"
