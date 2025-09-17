@@ -51,6 +51,7 @@ All test scenarios are located in this directory. Each scenario is self-containe
 - **scenario-5-reasoning** - Reasoning with context field
 - **scenario-6-errors** - Error recovery and edge cases
 - **scenario-7-mcp-bridge** - MCP server integration via bridge
+- **scenario-8-grant** - Capability grant workflow (proposal → grant → direct request)
 
 ## Test Agents
 
