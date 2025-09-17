@@ -7,22 +7,30 @@ Implemented Milestones 1 and 2 from ADRs 010 and 011 for enhanced terminal input
 
 ## Completed Work
 
-### Latest Updates (2025-01-16) ✅
+### Latest Updates (2025-01-17) ✅
 
-#### Message History Navigation
-- **Implementation Complete**: Arrow keys now navigate through command history
-- **Smart Context Switching**:
-  - Single-line mode: Up/Down arrows navigate history
-  - Multi-line mode: Up/Down arrows move cursor between lines
-- **History Preservation**: Current input saved as temporary when navigating
-- **Location**: Integrated in `/cli/src/ui/components/EnhancedInput.js`
+#### Message History Navigation (COMPLETE)
+- **Arrow Keys Working**: Up/Down arrows successfully navigate through command history
+- **Smart Multi-line Handling**:
+  - When at first line of multi-line text: Up arrow continues to previous history
+  - When at last line of multi-line text: Down arrow continues to next history
+  - Middle lines: Arrows move cursor within the text
+- **No More Getting Stuck**: Fixed issue where multi-line history entries would trap navigation
+- **History Preservation**: Current input saved when starting navigation
 
-#### Multi-line Input Support
-- **Shift+Enter**: Insert new lines without submitting message
-- **Enter**: Submit message (works with single or multi-line content)
-- **Visual Feedback**: Multi-line input area expands with bordered display
-- **Configuration**: Enabled in `/cli/src/utils/advanced-interactive-ui.js`
-- **Key Bindings**: Configured in `/cli/src/config/keyBindings.js`
+#### Multi-line Input Support (COMPLETE)
+- **Shift+Enter Working**: Creates new lines without submitting
+  - Fixed escape sequence detection for `[27;2;13~`
+  - Added fallback to Alt/Option+Enter
+- **Enter**: Submits message (single or multi-line)
+- **Visual Polish**: Fixed placeholder text appearing on every new line
+- **Border Display**: Multi-line mode shows rounded border
+
+#### Bug Fixes
+- **Arrow Key Detection**: Fixed Ink's arrow key properties not being detected
+- **Shift+Enter Recognition**: Added escape sequence pattern matching
+- **Placeholder Rendering**: Only shows on first line when completely empty
+- **Multi-line Navigation**: Smart boundary detection prevents getting stuck
 
 ### Milestone 1: Core Text Buffer ✅
 **Objective:** Create the foundation for multi-line text editing with cursor management
