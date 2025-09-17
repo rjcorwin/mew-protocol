@@ -9,15 +9,17 @@
 
 const React = require('react');
 const { render, Box, Text, Static, useInput, useApp, useFocus } = require('ink');
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 const { v4: uuidv4 } = require('uuid');
+const EnhancedInput = require('../ui/components/EnhancedInput');
+const SimpleInput = require('../ui/components/SimpleInput'); // Temporary for debugging
 
 /**
  * Main Advanced Interactive UI Component
  */
 function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [messages, setMessages] = useState([]);
-  const [inputValue, setInputValue] = useState('');
+  const [commandHistory, setCommandHistory] = useState([]);
   const [pendingOperation, setPendingOperation] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [verbose, setVerbose] = useState(false);
@@ -146,7 +148,13 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   const processInput = (input) => {
-    if (!input.trim()) return;
+    // Allow empty input to clear the input field
+    // but don't send empty messages
+    if (!input || !input.trim()) {
+      // Just return without sending anything
+      // The input component already cleared itself
+      return;
+    }
 
     // Handle commands
     if (input.startsWith('/')) {
@@ -282,15 +290,16 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       reasoning: activeReasoning
     }),
     
-    // Input Composer (disabled when dialog is shown)
-    React.createElement(InputComposer, {
-      value: inputValue,
-      onChange: setInputValue,
-      onSubmit: (value) => {
-        processInput(value);
-        setInputValue('');
-      },
-      disabled: pendingOperation !== null || showHelp
+    // Enhanced Input Component (disabled when dialog is shown)
+    React.createElement(EnhancedInput, {
+      onSubmit: processInput,
+      placeholder: 'Type a message or /help for commands...',
+      multiline: false,  // Single-line for CLI
+      disabled: pendingOperation !== null || showHelp,
+      history: commandHistory,
+      onHistoryChange: setCommandHistory,
+      prompt: '> ',
+      showCursor: true
     }),
     
     // Status Bar
@@ -587,30 +596,7 @@ function ReasoningStatus({ reasoning }) {
 /**
  * Input Composer Component
  */
-function InputComposer({ value, onChange, onSubmit, disabled }) {
-  useInput((input, key) => {
-    // Don't process input when disabled (dialog is shown)
-    if (disabled) return;
-
-    if (key.return) {
-      onSubmit(value);
-    } else if (key.backspace || key.delete) {
-      onChange(value.slice(0, -1));
-    } else if (input && !key.ctrl && !key.meta) {
-      onChange(value + input);
-    }
-  });
-
-  return React.createElement(Box, {
-    borderStyle: "single",
-    paddingX: 1,
-    borderColor: disabled ? "gray" : "white"
-  },
-    React.createElement(Text, { color: disabled ? "gray" : "green" }, "> "),
-    React.createElement(Text, { color: disabled ? "gray" : "white" }, value),
-    React.createElement(Text, { color: "gray" }, disabled ? "" : "_")
-  );
-}
+// InputComposer replaced by EnhancedInput component
 
 /**
  * Status Bar Component

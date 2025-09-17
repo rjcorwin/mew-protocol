@@ -2,6 +2,29 @@
 
 All notable changes to the MEW Protocol CLI will be documented in this file.
 
+## [v0.3.2] - 2025-01-16
+
+### Added
+- **Enhanced Terminal Input** - Complete rewrite of the CLI input system
+  - Multi-line text buffer with proper cursor management
+  - Full Unicode/emoji support with correct width calculations
+  - Comprehensive keyboard shortcuts (Ctrl+A/E, Alt+arrows, etc.)
+  - Word navigation and deletion commands (Ctrl+W, Ctrl+K, Ctrl+U)
+  - Command history navigation with up/down arrows (in-memory for now)
+  - Debug logging to `.mew/debug.log` for troubleshooting
+
+### Fixed
+- **Enter key submission** - Enter key now properly submits messages instead of being treated as printable character
+- **Mac delete key** - Delete key on Mac keyboards now works correctly (mapped to backward delete)
+- **Special key handling** - Arrow keys, escape, tab, and other special keys no longer incorrectly matched as printable
+- **Input visibility** - Text input is now properly visible while typing
+- **Backspace functionality** - Backspace key works correctly in all contexts
+
+### Technical
+- Implemented ADR-010 and ADR-011 for terminal input enhancements
+- Added comprehensive test suite for text buffer operations
+- Improved key pattern matching to properly exclude special characters
+
 ## [v0.2.2] - 2025-01-15
 
 ### Added
