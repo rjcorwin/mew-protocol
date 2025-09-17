@@ -7,6 +7,23 @@ Implemented Milestones 1 and 2 from ADRs 010 and 011 for enhanced terminal input
 
 ## Completed Work
 
+### Latest Updates (2025-01-16) ✅
+
+#### Message History Navigation
+- **Implementation Complete**: Arrow keys now navigate through command history
+- **Smart Context Switching**:
+  - Single-line mode: Up/Down arrows navigate history
+  - Multi-line mode: Up/Down arrows move cursor between lines
+- **History Preservation**: Current input saved as temporary when navigating
+- **Location**: Integrated in `/cli/src/ui/components/EnhancedInput.js`
+
+#### Multi-line Input Support
+- **Shift+Enter**: Insert new lines without submitting message
+- **Enter**: Submit message (works with single or multi-line content)
+- **Visual Feedback**: Multi-line input area expands with bordered display
+- **Configuration**: Enabled in `/cli/src/utils/advanced-interactive-ui.js`
+- **Key Bindings**: Configured in `/cli/src/config/keyBindings.js`
+
 ### Milestone 1: Core Text Buffer ✅
 **Objective:** Create the foundation for multi-line text editing with cursor management
 

@@ -175,8 +175,24 @@ function EnhancedInput({
       // Multi-line navigation
       case 'MOVE_UP':
         if (multiline && buffer.lines.length > 1) {
-          buffer.move('up');
-          update();
+          const cursorPos = buffer.getCursorPosition();
+          // If at the first line, navigate to previous history instead
+          if (cursorPos.line === 0) {
+            // Handle history prev
+            if (history.length > 0) {
+              if (historyIndex === -1) {
+                setTempInput(buffer.getText());
+              }
+              const newIndex = Math.min(historyIndex + 1, history.length - 1);
+              setHistoryIndex(newIndex);
+              buffer.setText(history[history.length - 1 - newIndex]);
+              buffer.move('bufferEnd');
+              update();
+            }
+          } else {
+            buffer.move('up');
+            update();
+          }
         } else {
           // Handle history prev
           if (history.length > 0) {
@@ -194,8 +210,25 @@ function EnhancedInput({
 
       case 'MOVE_DOWN':
         if (multiline && buffer.lines.length > 1) {
-          buffer.move('down');
-          update();
+          const cursorPos = buffer.getCursorPosition();
+          // If at the last line, navigate to next history instead
+          if (cursorPos.line === buffer.lines.length - 1) {
+            // Handle history next
+            if (historyIndex !== -1) {
+              const newIndex = historyIndex - 1;
+              setHistoryIndex(newIndex);
+              if (newIndex === -1) {
+                buffer.setText(tempInput);
+              } else {
+                buffer.setText(history[history.length - 1 - newIndex]);
+              }
+              buffer.move('bufferEnd');
+              update();
+            }
+          } else {
+            buffer.move('down');
+            update();
+          }
         } else {
           // Handle history next
           if (historyIndex !== -1) {
@@ -214,6 +247,7 @@ function EnhancedInput({
 
       // Multi-line input
       case 'INSERT_NEWLINE':
+        debugLog(`>>> INSERT_NEWLINE triggered, multiline: ${multiline}\n`);
         if (multiline) {
           buffer.insertNewline();
           update();
@@ -412,6 +446,22 @@ function EnhancedInput({
       }
     }
 
+    // Special handling for Shift+Enter (detected via escape sequence or shiftEnter flag)
+    if (key.shiftEnter || (key.input === '[27;2;13~') || (key.input === '\x1b[27;2;13~')) {
+      debugLog(`\n>>> SHIFT+ENTER detected - Inserting newline <<<\n`);
+      if (multiline) {
+        handleCommand('INSERT_NEWLINE');
+        return;
+      }
+    }
+
+    // Special handling for Alt+Enter or Option+Enter for multiline
+    if ((key.return || key.enter) && (key.alt || key.meta) && multiline && !command) {
+      debugLog(`\n>>> ALT/OPTION+ENTER detected - Inserting newline <<<\n`);
+      handleCommand('INSERT_NEWLINE');
+      return;
+    }
+
     // Special handling for Enter key if not matched as SUBMIT
     if ((key.return || key.enter) && !command) {
       debugLog(`\n>>> ENTER KEY FALLBACK - Forcing SUBMIT <<<\n`);
@@ -452,7 +502,7 @@ function EnhancedInput({
             lineIndex === 0 && React.createElement(Text, { color: 'green' }, prompt),
             lineIndex > 0 && React.createElement(Text, null, '  '),
             React.createElement(Text, null,
-              renderLineWithCursor(line, lineIndex === cursor.line ? cursor.column : -1)
+              renderLineWithCursor(line, lineIndex === cursor.line ? cursor.column : -1, lineIndex === 0)
             )
           )
         )
@@ -463,21 +513,25 @@ function EnhancedInput({
       return React.createElement(Box, null,
         React.createElement(Text, { color: 'green' }, prompt),
         React.createElement(Text, null,
-          renderLineWithCursor(line, cursor.column)
+          renderLineWithCursor(line, cursor.column, true)
         )
       );
     }
   };
 
   // Render line with cursor
-  const renderLineWithCursor = (line, cursorPos) => {
+  const renderLineWithCursor = (line, cursorPos, isFirstLine = false) => {
     const displayText = line || '';
 
     if (!showCursor || cursorPos < 0) {
-      return displayText || placeholder;
+      // Only show placeholder on the first line when completely empty
+      if (isFirstLine && buffer.getText().length === 0) {
+        return placeholder;
+      }
+      return displayText;
     }
 
-    // Handle empty line
+    // Handle empty line with cursor
     if (displayText.length === 0) {
       return React.createElement(Text, { inverse: true }, ' ');
     }

@@ -55,19 +55,21 @@ function useKeypress(handler, options = {}) {
 
       // Special keys
       // Check both ways Ink might report the Enter key
+      // Also check for Shift+Enter escape sequence: ESC[27;2;13~ or just [27;2;13~
       return: key.name === 'return' || key.name === 'enter' || (input === '\r') || (input === '\n'),
       enter: key.name === 'return' || key.name === 'enter' || (input === '\r') || (input === '\n'),
+      shiftEnter: input === '\x1b[27;2;13~' || input === '[27;2;13~' || (key.shift && (key.return || key.enter)),
       backspace: key.name === 'backspace' || input === '\x7F' || input === '\b',
       delete: key.name === 'delete' || key.sequence === '\x1B[3~',
       tab: key.name === 'tab',
       escape: key.name === 'escape' || key.name === 'esc',
       space: key.name === 'space' || input === ' ',
 
-      // Arrow keys
-      up: key.name === 'up',
-      down: key.name === 'down',
-      left: key.name === 'left',
-      right: key.name === 'right',
+      // Arrow keys - check both name and arrow properties from Ink
+      up: key.name === 'up' || Boolean(key.upArrow),
+      down: key.name === 'down' || Boolean(key.downArrow),
+      left: key.name === 'left' || Boolean(key.leftArrow),
+      right: key.name === 'right' || Boolean(key.rightArrow),
 
       // Navigation keys
       home: key.name === 'home',

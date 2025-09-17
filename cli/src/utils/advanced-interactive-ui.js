@@ -473,7 +473,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     React.createElement(EnhancedInput, {
       onSubmit: processInput,
       placeholder: 'Type a message or /help for commands...',
-      multiline: false,  // Single-line for CLI
+      multiline: true,  // Enable multi-line for Shift+Enter support
       disabled: pendingOperation !== null || showHelp,
       history: commandHistory,
       onHistoryChange: setCommandHistory,
