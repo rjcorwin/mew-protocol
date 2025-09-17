@@ -1,9 +1,9 @@
 # ADR-f4x: Safe FIFO Input Mechanism for Automated Agents
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-01-11
 **Context:** MEW CLI v0.2.0
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete (v0.2.0)
 
 ## Context
 

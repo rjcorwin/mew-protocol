@@ -1,8 +1,8 @@
 # ADR-012-stg: Secure Token Generation for Templates
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-09-16
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete (v0.3.3)
 
 ## Context
 

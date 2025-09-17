@@ -1,8 +1,8 @@
 # MEW CLI Specification - Minimal Test Implementation
 
-**Version:** draft (for v0.2.0)  
-**Status:** Draft  
-**Last Updated:** 2025-01-10
+**Version:** draft (for v0.4.2)
+**Status:** Draft
+**Last Updated:** 2025-01-17
 
 ## Overview
 
@@ -713,9 +713,9 @@ participants:
     tokens: ["echo-token"]
 ```
 
-### `mew token create`
+### `mew token create` (Enhanced in v0.3.3)
 
-Creates a simple test token.
+Creates cryptographically secure tokens for MEW participants with proper storage and lifecycle management.
 
 ```bash
 mew token create [options]
@@ -723,13 +723,38 @@ mew token create [options]
 Options:
   --participant-id <id>  Participant ID (required)
   --capabilities <json>  JSON array of capabilities (required)
+  --space <name>         Space name (uses current directory name by default)
+  --output <format>      Output format: text, json, env (default: text)
 ```
+
+**Security Enhancements (v0.3.3+):**
+- Uses Node.js `crypto.randomBytes` for cryptographically secure generation
+- Generates 32-byte random values encoded as base64url (43 characters)
+- Collision probability: < 10^-57 (negligible for production use)
+- Protected storage with 0600 permissions (owner read/write only)
+
+**Token Storage and Management:**
+- Tokens stored in `.mew/tokens/` directory
+- Each token saved as `<participant-id>.token` file
+- Automatically gitignored to prevent accidental commits
+- Persistent across space restarts
+- Cleaned up with `mew space clean` command
+
+**Automatic Token Generation:**
+- `mew space up` automatically generates tokens for all participants
+- Tokens are reused if they already exist
+- Each participant gets a unique, secure token
 
 **Example:**
 ```bash
-mew token create \
-  --participant-id echo-agent \
-  --capabilities '[{"kind":"chat"}]'
+# Manual token creation
+mew token create --participant-id echo-agent --capabilities '[{"kind":"chat"}]'
+
+# Automatic during space startup
+mew space up  # Generates tokens for all participants in space.yaml
+
+# View generated tokens
+ls -la .mew/tokens/
 ```
 
 
@@ -1282,7 +1307,7 @@ The CLI provides two interactive modes for different use cases:
 
 ### Advanced Interactive Mode (Default)
 
-The default interactive mode uses Ink (React for CLI) to provide a modern terminal interface that preserves native scrolling behavior while adding rich UI components for operation confirmations and status display.
+The default interactive mode uses Ink (React for CLI) to provide a modern terminal interface that preserves native scrolling behavior while adding rich UI components for operation confirmations, status display, and comprehensive terminal input features.
 
 **Key Features:**
 - Native terminal scrolling for message history
@@ -1328,16 +1353,18 @@ The advanced interactive mode includes built-in confirmation dialogs for MCP (Mo
 
 Templates will auto-detect operation type and provide context-appropriate formatting while maintaining the same interaction pattern.
 
-#### Phase 3: Capability Grants (📋 FUTURE)
+#### Phase 3: Capability Grants (✅ IMPLEMENTED in v0.4.0)
 
-**Planned Features:**
-- Third option: "Yes, allow [participant] to [operation category]"
-- Sends MEW Protocol `capability/grant` messages
-- Dynamic capability updates for the session
-- Reduces repeated approval prompts
-- Grant tracking and management UI
+**Implemented Features:**
+- Third option: "Yes, allow [participant] to [operation category] for this session"
+- Sends MEW Protocol `capability/grant` messages with specific patterns
+- Dynamic capability updates via gateway runtime capabilities
+- Automatically approves future matching operations (no repeated prompts)
+- Grant tracking in UI state with pattern matching
+- Gateway sends updated welcome messages after grants
+- Agents receive and process capability updates in real-time
 
-**Example Confirmation Dialog:**
+**Current Confirmation Dialog (with grants):**
 ```
 ╭──────────────────────────────────────────────────────────╮
 │ coder-agent wants to execute operation                  │
@@ -1390,6 +1417,47 @@ This simplified approach provides essential approval functionality without the c
 - Auto-approval rules
 
 These advanced features can be added in future iterations as the system matures beyond MVP.
+
+### Terminal Input Features (v0.4.2)
+
+The CLI provides comprehensive terminal input capabilities through the EnhancedInput component, adapted from Google's Gemini CLI patterns. These features significantly improve the user experience for composing messages and commands.
+
+#### Message History Navigation
+- **Arrow Keys**: Up/Down arrows navigate through previously sent messages
+- **Smart Context**:
+  - Single-line text: Arrows navigate history
+  - Multi-line text: Arrows move cursor between lines
+  - At text boundaries: Continue history navigation
+- **History Preservation**: Current input saved when starting navigation
+- **Session-based**: History maintained for duration of session (persistence planned for future)
+
+#### Multi-line Input Support
+- **Shift+Enter**: Insert new lines without submitting message
+- **Alt/Option+Enter**: Alternative key binding for terminals where Shift+Enter doesn't work
+- **Enter**: Submit message (works with both single and multi-line content)
+- **Visual Feedback**: Multi-line area expands with rounded border
+- **Smart Rendering**: Placeholder text only appears on first line when empty
+
+#### Text Editing Shortcuts
+- **Cursor Movement**:
+  - Left/Right arrows: Character-by-character movement
+  - Alt/Option + Left/Right: Move by word
+  - Ctrl+A / Home: Move to beginning of line
+  - Ctrl+E / End: Move to end of line
+- **Text Deletion**:
+  - Backspace: Delete character before cursor
+  - Delete: Delete character at cursor
+  - Ctrl+W: Delete word before cursor
+  - Ctrl+K: Delete from cursor to end of line
+  - Ctrl+U: Delete from cursor to beginning of line
+- **Special Keys**:
+  - Escape: Clear current input
+  - Ctrl+L: Clear screen (preserves input)
+
+#### Terminal Compatibility
+- **Escape Sequence Detection**: Properly handles terminal escape sequences like `[27;2;13~` for Shift+Enter
+- **Cross-platform Support**: Works across macOS, Linux, and Windows terminals
+- **Fallback Options**: Alternative key bindings when primary ones don't work
 
 ### Input Processing
 

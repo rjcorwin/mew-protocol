@@ -1,8 +1,8 @@
 # ADR-007: Advanced Interactive Mode with MCP Confirmations
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2025-01-10  
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete (v0.2.0)
 
 ## Context
 

@@ -1,8 +1,8 @@
 # ADR-agi: Adapt Gemini CLI Input Implementation
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-01-16
-**Incorporation:** Not Incorporated
+**Incorporation:** Complete (v0.4.2)
 
 ## Context
 
