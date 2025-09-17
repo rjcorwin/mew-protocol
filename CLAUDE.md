@@ -11,17 +11,10 @@ Please collab with me on managing tasks in TODO.md.
 2. When you finish something on the TODO list, check it off.
 
 
-
 # Development
+See DEVELOPMENT.md for instructions on how to test mew spaces.
 
-When helping with development, please follow these rules.
-
-1. Always lint and run tests as you change dev files.
-2. Use the packages/cli in fifo mode to kick the tires on your changes.
-3. USE HTTP TO ACCESS GATEWAY AND SIMULATE BEHAVIORS. See tests folder scenarios for examples. Otherwise you get stuck and we have to restart when using fifo.
-
-# MEW Protocol v0.3 Specification
-
+# MEW Protocols Specification
 Version: v0.3  
 Status: Released  
 Release Date: 2025-09-10
