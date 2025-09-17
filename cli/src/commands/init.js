@@ -257,17 +257,7 @@ class InitCommand {
     }
 
     // Interactive selection
-    console.log('\n? Choose a template:');
-    for (let i = 0; i < templates.length; i++) {
-      const t = templates[i];
-      const meta = await this.loadTemplateMetadata(t);
-      const indicator = i === 0 ? '❯' : ' ';
-      console.log(`${indicator} ${t.name} - ${meta.description}`);
-    }
-
-    // For now, default to first template (coder-agent)
-    // In a real implementation, we'd use a proper interactive selection
-    return templates.find(t => t.name === 'coder-agent') || templates[0];
+    return await this.promptTemplateSelection(templates);
   }
 
   /**
@@ -517,6 +507,114 @@ class InitCommand {
   /**
    * Prompt user for a variable value
    */
+  /**
+   * Interactive template selection with arrow keys
+   */
+  async promptTemplateSelection(templates) {
+    // Prepare template metadata
+    const templatesWithMeta = [];
+    for (const t of templates) {
+      const meta = await this.loadTemplateMetadata(t);
+      templatesWithMeta.push({ ...t, meta });
+    }
+
+    return new Promise((resolve) => {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+
+      let selectedIndex = 0;
+
+      // Function to render the menu
+      const renderMenu = () => {
+        console.log('\n? Choose a template:');
+        for (let i = 0; i < templatesWithMeta.length; i++) {
+          const t = templatesWithMeta[i];
+          const indicator = i === selectedIndex ? '❯' : ' ';
+          console.log(`${indicator} ${t.name} - ${t.meta.description}`);
+        }
+        console.log('\n(Use arrow keys to move, Enter to select)');
+      };
+
+      // Initial render
+      renderMenu();
+
+      // Enable raw mode for arrow key detection
+      if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(true);
+      }
+      process.stdin.resume();
+
+      // Handle key presses
+      const keyHandler = (key) => {
+        if (key) {
+          const keyStr = key.toString();
+
+          // Handle Ctrl+C
+          if (keyStr === '\u0003') {
+            process.exit(0);
+          }
+
+          // Handle arrow keys
+          if (keyStr === '\u001b[A') { // Up arrow
+            selectedIndex = Math.max(0, selectedIndex - 1);
+            // Clear previous output and re-render
+            process.stdout.write('\u001b[' + (templatesWithMeta.length + 3) + 'A');
+            process.stdout.write('\u001b[0J');
+            renderMenu();
+          } else if (keyStr === '\u001b[B') { // Down arrow
+            selectedIndex = Math.min(templatesWithMeta.length - 1, selectedIndex + 1);
+            // Clear previous output and re-render
+            process.stdout.write('\u001b[' + (templatesWithMeta.length + 3) + 'A');
+            process.stdout.write('\u001b[0J');
+            renderMenu();
+          } else if (keyStr === '\r' || keyStr === '\n') { // Enter key
+            // Clean up
+            process.stdin.removeListener('data', keyHandler);
+            if (process.stdin.setRawMode) {
+              process.stdin.setRawMode(false);
+            }
+            process.stdin.pause();
+            rl.close();
+
+            console.log('');
+            resolve(templatesWithMeta[selectedIndex]);
+          } else if (keyStr >= '1' && keyStr <= '9') {
+            // Number key selection
+            const num = parseInt(keyStr) - 1;
+            if (num < templatesWithMeta.length) {
+              selectedIndex = num;
+
+              // Clean up
+              process.stdin.removeListener('data', keyHandler);
+              if (process.stdin.setRawMode) {
+                process.stdin.setRawMode(false);
+              }
+              process.stdin.pause();
+              rl.close();
+
+              // Clear and show final selection
+              process.stdout.write('\u001b[' + (templatesWithMeta.length + 3) + 'A');
+              process.stdout.write('\u001b[0J');
+              console.log('\n? Choose a template:');
+              for (let i = 0; i < templatesWithMeta.length; i++) {
+                const t = templatesWithMeta[i];
+                const indicator = i === selectedIndex ? '❯' : ' ';
+                console.log(`${indicator} ${t.name} - ${t.meta.description}`);
+              }
+              console.log('');
+
+              resolve(templatesWithMeta[selectedIndex]);
+            }
+          }
+        }
+      };
+
+      process.stdin.on('data', keyHandler);
+    });
+  }
+
   async promptVariable(variable, dirname, defaultValue = null) {
     // Check if stdin is a TTY (interactive)
     if (!process.stdin.isTTY) {
