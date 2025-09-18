@@ -79,6 +79,12 @@ Field semantics:
   - `system/presence` - Join/leave events
   - `system/welcome` - Welcome message for new participants
   - `system/error` - System error messages
+  - `stream/announce` - Declare intent to open a namespaced stream
+  - `stream/ready` - Gateway-assigned stream metadata and namespace
+  - `stream/start` - Creator confirmation that the stream is live
+  - `stream/data` - Sequenced payload packets scoped to a stream
+  - `stream/complete` - Clean shutdown of a stream
+  - `stream/error` - Error condition associated with a stream
 - `correlation_id`: array of message IDs this message relates to (always an array, even for single values)
   - Response → Request: `mcp/response` MUST reference the originating `mcp/request`
   - Fulfillment → Proposal: `mcp/request` MAY reference a `mcp/proposal` when fulfilling it
@@ -697,6 +703,72 @@ When a participant attempts an operation they lack capability for:
 }
 ```
 
+- `error`: Machine-readable error code describing why the gateway rejected the action
+- `attempted_kind`: Envelope kind that triggered the violation
+- `your_capabilities`: Gateway's authoritative view of the sender's capabilities
+
+### 3.9 Stream Lifecycle
+
+Streams provide coordinated, high-frequency data delivery (multiplayer movement updates, audio/video frames, incremental LLM tokens, token metering). Streams stay inside the originating space but receive a dedicated namespace `spaceId/streamId` so that participants can filter traffic or route it into specialized handlers. Every stream envelope MUST include a `payload.stream` object that captures the canonical namespace and metadata:
+
+- `stream_id` – Gateway-assigned identifier unique within the space.
+- `namespace` – Canonical namespace string `"${spaceId}/${stream_id}"`.
+- `creator` – Participant ID of the entity that initiated the stream.
+- `formats` – Array of descriptors describing payload shapes (see §3.9.2).
+- `status` – Gateway-maintained lifecycle state (`pending`, `ready`, `live`, `complete`, `error`).
+- Optional capability grants (e.g., `stream/write:{streamId}`, `stream/read:{streamId}`) that the gateway MAY attach.
+
+Gateways SHOULD also mirror the namespace in the envelope `context` field when forwarding stream traffic so participants can reuse existing context-based filters.
+
+#### 3.9.1 Stream Handshake
+
+The gateway mediates stream creation through a three-step sequence:
+
+1. **Announcement (`stream/announce`)** – The creator broadcasts intent and proposed metadata.
+   - `payload.intent` MAY describe the purpose of the stream (`"movement/2d"`, `"llm/tokens"`, `"audio/live"`).
+   - `payload.formats` MUST include at least one format descriptor.
+   - `payload.desired_id` MAY hint at a human-friendly suffix; the gateway MAY ignore it.
+   - `payload.scope` MAY list participants to highlight (implementations MAY treat this as a hint for UI or routing).
+   - The creator MUST possess a capability pattern covering `stream/announce` (commonly expressed as `stream/manage`).
+2. **Gateway Ready (`stream/ready`)** – Emitted by `system:gateway` with the assigned identifiers.
+   - Includes definitive `stream_id`, computed `namespace`, echoed metadata, and any derived capability grants.
+   - Broadcast to the entire space so all participants discover the stream before data flows.
+3. **Start (`stream/start`)** – The creator confirms production is live.
+   - MUST reference the `stream_id` supplied by the gateway.
+   - MAY include `payload.start_ts` for precise activation timestamps.
+
+If the gateway later revokes the stream (policy, quota, capability change) it MUST send `stream/error` referencing the initial announcement. Lifecycle states progress `pending → ready → live` and terminate with `complete` or `error`.
+
+#### 3.9.2 Format Descriptors
+
+Format entries mirror tool metadata so consumers can prepare codecs or parsers before subscribing:
+
+- `id` – Stable identifier such as `"audio/opus"`, `"video/h264"`, `"llm/tokens"`, `"metrics/token-count"`.
+- `description` – Human-readable explanation of the payload.
+- `mime_type` – Optional MIME type when the payload maps to a standard media format.
+- `schema` – Optional JSON Schema describing `payload.content` for `stream/data` envelopes.
+- `metadata` – Optional arbitrary object (bitrate, sample rate, coordinate frame, etc.).
+
+Creators MAY advertise multiple formats in a single stream (e.g., raw audio frames plus synchronized transcripts, or gameplay positions plus derived analytics).
+
+#### 3.9.3 Data Packets (`stream/data`)
+
+Once `stream/start` is broadcast, the creator and any participants granted `stream/write:{streamId}` MAY emit `stream/data` envelopes:
+
+- `payload.sequence` MUST monotonically increase for the lifetime of the stream. Receivers SHOULD detect gaps to infer packet loss.
+- `payload.format_id` SHOULD reference one of the announced format descriptors.
+- `payload.content` carries the actual sample/chunk (JSON payload, base64-encoded binary, etc.) consistent with the declared schema.
+- Additional metadata fields (`payload.timestamp`, `payload.part`) MAY be included provided they remain compatible with the schema.
+
+Gateways MUST reject `stream/data` envelopes for unknown streams, streams not in `live` status, or senders lacking appropriate write capability, returning a `system/error` referencing the offending envelope.
+
+#### 3.9.4 Completion and Errors
+
+- **`stream/complete`** – Sent by the creator to declare a graceful shutdown. The gateway updates status to `complete` and MAY recycle the identifier after notifying the space.
+- **`stream/error`** – Sent by the creator or the gateway when the stream terminates unexpectedly. Payload MUST include `code` and `message` fields and MAY include remediation hints (`retry_after_ms`, `next_steps`).
+
+After `stream/complete` or `stream/error`, any further `stream/data` envelopes for that `stream_id` MUST be rejected with `system/error`. Participants SHOULD discard cached state associated with the namespace once termination is acknowledged.
+
 ---
 
 ## 4. Security Model
@@ -768,6 +840,23 @@ Gateways may implement various capability profiles using JSON patterns:
    ```
    Can only call tools matching `read_*` pattern
 
+4. **Stream Producer** example:
+   ```json
+   [
+     {"kind": "stream/announce"},
+     {"kind": "stream/start"},
+     {
+       "kind": "stream/data",
+       "payload": {
+         "stream": {
+           "stream_id": "gameplay-*"
+         }
+       }
+     }
+   ]
+   ```
+   Allows a participant to negotiate and publish streams whose identifiers begin with `gameplay-`
+
 **Progressive Trust Example:**
 
 Capabilities can be expanded as trust increases:
@@ -781,10 +870,11 @@ Capabilities can be expanded as trust increases:
 The gateway enforces capabilities using JSON pattern matching against the message structure:
 
 **What the Gateway Does:**
-- Matches the message's `kind` and `payload` against participant's capability patterns
+- Matches the message's `kind` and `payload` against participant capability patterns
 - Uses wildcards, regex patterns, and JSONPath for flexible matching
-- Blocks messages if no capability matches
-- Returns error responses for capability violations
+- Tracks stream lifecycle state and enforces the `stream/announce → stream/ready → stream/start` handshake before accepting `stream/data`
+- Blocks messages if no capability matches or a stream is not in the appropriate state
+- Returns error responses for capability and lifecycle violations
 
 **What the Gateway Does NOT Do:**
 - Parse or validate JSON-RPC payloads
@@ -1105,6 +1195,25 @@ Minimal state required per connection:
   "connected_at": "2025-08-26T14:00:00Z"
 }
 ```
+
+Gateway implementations MUST also maintain stream registry state covering at least:
+
+```json
+{
+  "stream_id": "stream-42",
+  "namespace": "space-1/stream-42",
+  "creator": "agent-a",
+  "status": "live",
+  "formats": [
+    {"id": "llm/tokens", "mime_type": "application/json"}
+  ],
+  "writers": ["agent-a"],
+  "read_scopes": ["*"],
+  "last_sequence": 1204
+}
+```
+
+This registry enables the gateway to validate `stream/data`, broadcast `stream/ready`, and emit lifecycle transitions (`stream/complete`, `stream/error`).
 
 ### 10.2 Proposal Tracking
 

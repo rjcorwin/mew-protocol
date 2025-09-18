@@ -1,6 +1,6 @@
 # ADR-REN: Rename Participant to Entity
 
-**Status:** Proposed
+**Status:** Proposed (TODO: Postpone)
 **Date:** 2025-01-10
 **Context:** MEW Protocol v0.3
 **Incorporation:** Not Incorporated

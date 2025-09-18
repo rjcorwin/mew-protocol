@@ -1,6 +1,6 @@
 # ADR-CTX: Simplify Context Terminology
 
-**Status:** Proposed
+**Status:** Proposed (TODO: Incorporate and Accept)
 **Date:** 2025-01-10
 **Context:** MEW Protocol v0.3
 **Incorporation:** Not Incorporated

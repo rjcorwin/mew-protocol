@@ -833,6 +833,7 @@ The test plan uses the CLI as follows:
 - Route messages between participants in same space
 - Load space.yaml for capability configuration
 - Provide hooks for capability resolution
+- Maintain stream registry and enforce stream handshake (`stream/announce → stream/ready → stream/start`) before allowing `stream/data`
 
 ### Client
 - Connect to gateway WebSocket
@@ -958,6 +959,20 @@ gateway.setAuthorizationHook(async (participantId, messageKind, capabilities) =>
   return hasCapability(capabilities, required);
 });
 ```
+
+#### Stream Coordination
+
+The CLI gateway MUST implement the MEW stream handshake as follows:
+
+- Maintain an in-memory `streams` registry keyed by `stream_id` with creator, namespace, formats, lifecycle status (`pending`, `ready`, `live`, `complete`, `error`), last sequence number, and authorized writer/reader sets.
+- On `stream/announce`, verify the sender has a capability covering `stream/announce` (e.g., `stream/manage`), normalize metadata, and ensure there is no conflicting active stream.
+- Generate the canonical namespace (`"${spaceId}/${stream_id}"`), store the entry, and broadcast `stream/ready` from `system:gateway` with the finalized identifiers, metadata, and any runtime capability grants (such as `stream/write:{streamId}`).
+- Accept `stream/start` only from the creator (or participants granted stream management for that stream) and transition the entry to `live`.
+- For every `stream/data` envelope, ensure the stream is `live`, the sender is authorized, the sequence number is monotonic, and then broadcast the packet while mirroring the namespace in the `context` field.
+- Emit `stream/complete` or `stream/error` when the creator closes the stream or a policy violation occurs, then remove the registry entry after notifying the space.
+
+The gateway SHOULD log stream lifecycle transitions (`announce`, `ready`, `start`, `data`, `complete`, `error`) to simplify debugging in automated scenarios.
+
 
 #### Participant Lifecycle Management
 

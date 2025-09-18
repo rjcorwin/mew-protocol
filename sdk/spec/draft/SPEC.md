@@ -116,6 +116,15 @@ class MEWClient extends EventEmitter {
   onMessage(handler: (envelope: Envelope) => void): void;
   onWelcome(handler: (data: any) => void): void;
   onError(handler: (error: Error) => void): void;
+
+  // Stream lifecycle helpers
+  getStream(streamId: string): StreamRecord | undefined;
+  listStreams(): StreamRecord[];
+  onStreamReady(handler: (envelope: Envelope) => void): void;
+  onStreamStart(handler: (envelope: Envelope) => void): void;
+  onStreamData(handler: (envelope: Envelope) => void): void;
+  onStreamComplete(handler: (envelope: Envelope) => void): void;
+  onStreamError(handler: (envelope: Envelope) => void): void;
 }
 ```
 
@@ -133,6 +142,47 @@ class MEWClient extends EventEmitter {
 - `welcome`: Welcome message received
 - `error`: Error occurred
 - `reconnecting`: Attempting to reconnect
+- `stream/ready`, `stream/start`, `stream/data`, `stream/complete`, `stream/error`: Stream lifecycle events emitted after the registry updates
+
+### Stream Registry
+
+`MEWClient` maintains an in-memory registry of streams announced within the space. Each entry is exposed as a `StreamRecord`:
+
+```typescript
+interface StreamRecord {
+  stream_id: string;
+  namespace: string;
+  creator: string;
+  status: 'pending' | 'ready' | 'live' | 'complete' | 'error';
+  formats: StreamFormatDescriptor[];
+  capabilities?: {
+    write?: string[];
+    read?: string[];
+  };
+  intent?: string;
+  scope?: string[];
+  lastSequence: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface StreamFormatDescriptor {
+  id: string;
+  description?: string;
+  mime_type?: string;
+  schema?: any;
+  metadata?: Record<string, unknown>;
+}
+```
+
+Registry behaviours:
+- `stream/ready` replaces or creates an entry and resets `lastSequence` to `-1`.
+- `stream/start` updates the entry status to `live`.
+- `stream/data` advances `lastSequence` (enforcing monotonic increase).
+- `stream/complete` and `stream/error` update the status and retain the record for post-mortem inspection.
+- Consumers can read the registry via `getStream(streamId)` or `listStreams()`.
+
+Stream events are emitted **after** the registry mutates, ensuring listeners see canonical namespaces and status.
 
 ### Participant Join Flow and Tool Discovery
 
@@ -203,6 +253,7 @@ Provides protocol-aware participant functionality with MCP support, tool/resourc
 - **Smart Routing**: Route requests via direct send or proposals
 - **Request Tracking**: Track pending requests with timeouts
 - **Tool Invocation**: Send tools/call requests to other participants (if has capability)
+- **Stream Lifecycle**: Provide helpers for announcing, emitting, and completing streams
 
 ### Interface
 
@@ -248,6 +299,13 @@ class MEWParticipant {
   onMCPProposal(handler: MCPProposalHandler): () => void;
   onMCPRequest(handler: MCPRequestHandler): () => void;
   onParticipantJoin(handler: (participant: any) => void): () => void;
+
+  // Stream producers
+  announceStream(options: StreamAnnouncementOptions): Promise<StreamHandle>;
+  startStream(streamId: string, options?: StreamStartOptions): void;
+  sendStreamData(streamId: string, content: any, options?: StreamDataOptions): void;
+  completeStream(streamId: string, options?: StreamCompleteOptions): void;
+  failStream(streamId: string, error: StreamErrorOptions): void;
   
   // Lifecycle hooks (for subclasses)
   protected onReady(): Promise<void>;
@@ -292,6 +350,55 @@ const result = await participant.mcpRequest(
   5000 // timeout
 );
 ```
+
+#### Stream Helpers
+
+Participants can manage streams without manually handling handshake envelopes. Stream helper types:
+
+```typescript
+interface StreamAnnouncementOptions {
+  intent?: string;
+  desiredId?: string;
+  formats: StreamFormatDescriptor[];
+  scope?: string[];
+  timeoutMs?: number; // default 5000
+}
+
+interface StreamHandle {
+  streamId: string;
+  namespace: string;
+  formats: StreamFormatDescriptor[];
+  intent?: string;
+  scope?: string[];
+}
+
+interface StreamStartOptions {
+  startTs?: string;
+}
+
+interface StreamDataOptions {
+  sequence?: number;
+  formatId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface StreamCompleteOptions {
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface StreamErrorOptions extends StreamCompleteOptions {
+  code: string;
+  message: string;
+}
+```
+
+- `announceStream(options)` sends `stream/announce`, waits for the matching `stream/ready` (via `correlation_id`), registers the stream, and resolves with the assigned identifiers.
+- `startStream(streamId, options)` emits `stream/start`; if omitted, `startTs` defaults to `new Date().toISOString()`.
+- `sendStreamData(streamId, content, options)` emits `stream/data`. When `sequence` is absent, the participant increments an internal counter per stream (starting at 1), ensuring monotonic sequences. Namespace metadata is injected automatically.
+- `completeStream` and `failStream` emit `stream/complete` and `stream/error`, clearing internal sequence counters.
+- Because `MEWParticipant` extends `MEWClient`, callers can inspect registry state using `getStream(streamId)` or subscribe to `onStreamData()` when acting as consumers.
+
 
 #### Proposal Pattern
 When a participant lacks capability for direct requests:
@@ -449,6 +556,7 @@ Provides autonomous agent functionality with reasoning, tool discovery, and deci
 - **LLM Tool Preparation**: Format discovered tools for LLM consumption
 - **Dynamic Tool Use**: Use discovered tools without hardcoding
 - **Own Tools**: Can also register own tools (inherited from MEWParticipant)
+- **Stream Awareness**: Listen to stream lifecycle events, log telemetry, and make stream metadata available to reasoning loops
 
 ### Interface
 

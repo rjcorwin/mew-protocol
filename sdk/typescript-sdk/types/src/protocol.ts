@@ -169,6 +169,79 @@ export interface ChatPayload {
 }
 
 // ============================================================================
+// Stream Message Types
+// ============================================================================
+
+export type StreamStatus = 'pending' | 'ready' | 'live' | 'complete' | 'error';
+
+export interface StreamCapabilitiesDescriptor {
+  write?: string[];
+  read?: string[];
+}
+
+export interface StreamFormatDescriptor {
+  id: string;
+  description?: string;
+  mime_type?: string;
+  schema?: any;
+  metadata?: Record<string, unknown>;
+}
+
+export interface StreamMetadata {
+  stream_id: string;
+  namespace: string;
+  creator: string;
+  status: StreamStatus;
+  formats: StreamFormatDescriptor[];
+  capabilities?: StreamCapabilitiesDescriptor;
+  intent?: string;
+  scope?: string[];
+}
+
+export interface StreamAnnouncePayload {
+  intent?: string;
+  desired_id?: string;
+  formats: StreamFormatDescriptor[];
+  scope?: string[];
+}
+
+export interface StreamReadyPayload {
+  stream: StreamMetadata;
+  intent?: string;
+  scope?: string[];
+}
+
+export interface StreamReference {
+  stream_id: string;
+  namespace?: string;
+}
+
+export interface StreamStartPayload {
+  stream: StreamReference;
+  start_ts?: string;
+  [key: string]: any;
+}
+
+export interface StreamDataPayload {
+  stream: StreamReference;
+  sequence: number;
+  format_id?: string;
+  content: any;
+  [key: string]: any;
+}
+
+export interface StreamCompletePayload {
+  stream: StreamReference;
+  reason?: string;
+  [key: string]: any;
+}
+
+export interface StreamErrorPayload extends StreamCompletePayload {
+  code: string;
+  message: string;
+}
+
+// ============================================================================
 // Message Kind Constants
 // ============================================================================
 
@@ -191,6 +264,14 @@ export const MessageKinds = {
   MEW_CAPABILITY_GRANT: 'mew/capability/grant',
   MEW_CAPABILITY_REVOKE: 'mew/capability/revoke',
   MEW_CONTEXT: 'mew/context',
+  
+  // Stream messages
+  STREAM_ANNOUNCE: 'stream/announce',
+  STREAM_READY: 'stream/ready',
+  STREAM_START: 'stream/start',
+  STREAM_DATA: 'stream/data',
+  STREAM_COMPLETE: 'stream/complete',
+  STREAM_ERROR: 'stream/error',
   
   // Application messages
   CHAT: 'chat',

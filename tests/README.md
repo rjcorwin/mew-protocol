@@ -52,6 +52,8 @@ All test scenarios are located in this directory. Each scenario is self-containe
 - **scenario-6-errors** - Error recovery and edge cases
 - **scenario-7-mcp-bridge** - MCP server integration via bridge
 - **scenario-8-grant** - Capability grant workflow (proposal → grant → direct request)
+- **scenario-11-streams** - Stream handshake, namespace enforcement, and data sequencing
+- **scenario-12-sdk-streams** - SDK-level producer/consumer exercising stream helpers
 
 ## Test Agents
 

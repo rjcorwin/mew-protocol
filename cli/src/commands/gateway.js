@@ -196,6 +196,7 @@ gateway
 
     // Track spaces and participants
     const spaces = new Map(); // spaceId -> { participants: Map(participantId -> ws) }
+    const streamRegistry = new Map(); // spaceId -> Map(streamId -> metadata)
 
     // Track participant info
     const participantTokens = new Map(); // participantId -> token
@@ -204,6 +205,50 @@ gateway
 
     // Track spawned processes
     const spawnedProcesses = new Map(); // participantId -> ChildProcess
+
+    function getSpaceStreams(id) {
+      if (!streamRegistry.has(id)) {
+        streamRegistry.set(id, new Map());
+      }
+      return streamRegistry.get(id);
+    }
+
+    function broadcastToSpace(spaceId, envelope) {
+      const space = spaces.get(spaceId);
+      if (!space) {
+        return;
+      }
+
+      const serialized = JSON.stringify(envelope);
+      for (const [pid, pws] of space.participants.entries()) {
+        if (pws.readyState === WebSocket.OPEN) {
+          pws.send(serialized);
+        }
+      }
+    }
+
+    function sanitizeStreamId(input) {
+      if (!input || typeof input !== 'string') {
+        return null;
+      }
+      const trimmed = input.trim().toLowerCase();
+      if (!trimmed) {
+        return null;
+      }
+      const cleaned = trimmed
+        .replace(/[^a-z0-9-_]+/g, '-')
+        .replace(/-{2,}/g, '-')
+        .replace(/^-+|-+$/g, '');
+      if (!cleaned) {
+        return null;
+      }
+      return cleaned.slice(0, 64);
+    }
+
+    function generateStreamId(seed = 'stream') {
+      const suffix = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 10) : crypto.randomBytes(5).toString('hex');
+      return `${seed}-${suffix}`;
+    }
 
     // Gateway hooks for external configuration
     let capabilityResolver = null;
@@ -440,8 +485,17 @@ gateway
             arg.replace('${PORT}', port.toString())
           );
 
+          const envVars = Object.entries(config.env || {}).reduce((acc, [key, value]) => {
+            if (typeof value === 'string') {
+              acc[key] = value.replace(/\$\{PORT\}/g, port.toString());
+            } else {
+              acc[key] = value;
+            }
+            return acc;
+          }, {});
+
           const child = spawn(config.command, args, {
-            env: { ...process.env, PORT: port.toString(), ...config.env },
+            env: { ...process.env, PORT: port.toString(), ...envVars },
             stdio: 'inherit',
           });
 
@@ -485,6 +539,26 @@ gateway
         return 'MCP request requires payload.method';
       }
 
+      if (message.kind === 'stream/announce') {
+        if (!Array.isArray(message.payload?.formats) || message.payload.formats.length === 0) {
+          return 'stream/announce requires payload.formats[]';
+        }
+      }
+
+      if (message.kind && message.kind.startsWith('stream/') && message.kind !== 'stream/announce') {
+        const streamId =
+          message.payload?.stream?.stream_id ||
+          message.payload?.stream_id ||
+          message.payload?.streamId;
+        if (!streamId) {
+          return `${message.kind} requires payload.stream.stream_id`;
+        }
+      }
+
+      if (message.kind === 'stream/data' && typeof message.payload?.sequence !== 'number') {
+        return 'stream/data requires numeric payload.sequence';
+      }
+
       return null; // Valid
     }
 
@@ -492,6 +566,226 @@ gateway
     wss.on('connection', (ws, req) => {
       let participantId = null;
       let spaceId = null;
+
+      function sendStreamError(code, messageText, attemptedKind, correlationId, details = {}) {
+        const errorEnvelope = {
+          protocol: 'mew/v0.3',
+          id: `stream-error-${Date.now()}`,
+          ts: new Date().toISOString(),
+          from: 'system:gateway',
+          to: participantId ? [participantId] : undefined,
+          kind: 'system/error',
+          correlation_id: correlationId ? [correlationId] : undefined,
+          payload: {
+            error: code,
+            message: messageText,
+            attempted_kind: attemptedKind,
+            ...details,
+          },
+        };
+        ws.send(JSON.stringify(errorEnvelope));
+      }
+
+      function canonicalizeStreamPayload(entry, statusOverride) {
+        return {
+          stream_id: entry.stream_id,
+          namespace: entry.namespace,
+          creator: entry.creator,
+          status: statusOverride || entry.status,
+          formats: entry.formats,
+        };
+      }
+
+      function scheduleStreamCleanup(streams, streamId) {
+        setTimeout(() => {
+          streams.delete(streamId);
+        }, 5000);
+      }
+
+      function extractStreamId(payload = {}) {
+        if (payload.stream && typeof payload.stream.stream_id === 'string') {
+          return payload.stream.stream_id;
+        }
+        if (typeof payload.stream_id === 'string') {
+          return payload.stream_id;
+        }
+        if (typeof payload.streamId === 'string') {
+          return payload.streamId;
+        }
+        return null;
+      }
+
+      async function handleStreamMessage(message) {
+        if (!spaceId) {
+          sendStreamError('stream/no-space', 'Stream messages require a joined space', message.kind, message.id);
+          return false;
+        }
+
+        const streams = getSpaceStreams(spaceId);
+        const kind = message.kind;
+        const payload = message.payload || {};
+        const nowIso = new Date().toISOString();
+
+        if (kind === 'stream/ready') {
+          sendStreamError('stream/ready-not-allowed', 'Participants cannot emit stream/ready', kind, message.id);
+          return false;
+        }
+
+        if (kind === 'stream/announce') {
+          const formats = Array.isArray(payload.formats) ? payload.formats : [];
+          if (formats.length === 0) {
+            sendStreamError('stream/no-formats', 'stream/announce requires at least one format descriptor', kind, message.id);
+            return false;
+          }
+
+          const scope = Array.isArray(payload.scope)
+            ? payload.scope.filter((id) => typeof id === 'string' && id.length > 0)
+            : [];
+          const desiredSeed =
+            sanitizeStreamId(payload.desired_id) ||
+            sanitizeStreamId(payload.stream?.stream_id) ||
+            sanitizeStreamId(`${participantId}-stream`);
+
+          let candidateId = desiredSeed || 'stream';
+          while (streams.has(candidateId)) {
+            candidateId = generateStreamId(candidateId);
+          }
+
+          const namespace = `${spaceId}/${candidateId}`;
+          const entry = {
+            stream_id: candidateId,
+            namespace,
+            creator: participantId,
+            status: 'ready',
+            formats,
+            intent: payload.intent,
+            scope,
+            createdAt: nowIso,
+            startedAt: null,
+            completedAt: null,
+            lastSequence: -1,
+            writers: new Set([participantId]),
+            readers: new Set(),
+          };
+          streams.set(candidateId, entry);
+
+          if (options.logLevel === 'debug' || options.logLevel === 'info') {
+            console.log(`Registered stream ${namespace} for ${participantId}`);
+          }
+
+          const readyEnvelope = {
+            protocol: 'mew/v0.3',
+            id: `stream-ready-${Date.now()}`,
+            ts: nowIso,
+            from: 'system:gateway',
+            kind: 'stream/ready',
+            context: namespace,
+            correlation_id: message.id ? [message.id] : undefined,
+            payload: {
+              stream: {
+                stream_id: candidateId,
+                namespace,
+                creator: participantId,
+                status: 'ready',
+                formats,
+                capabilities: {
+                  write: [`stream/write:${candidateId}`],
+                  read: [],
+                },
+              },
+              intent: payload.intent,
+              scope,
+            },
+          };
+
+          broadcastToSpace(spaceId, readyEnvelope);
+          return true;
+        }
+
+        const streamId = extractStreamId(payload);
+        if (!streamId) {
+          sendStreamError('stream/missing-id', 'Stream messages must include payload.stream.stream_id', kind, message.id);
+          return false;
+        }
+
+        const entry = streams.get(streamId);
+        if (!entry) {
+          sendStreamError('stream/not-found', `Stream ${streamId} is not registered in this space`, kind, message.id);
+          return false;
+        }
+
+        const isCreator = entry.creator === participantId;
+        const isWriter = entry.writers.has(participantId);
+
+        switch (kind) {
+          case 'stream/start': {
+            if (!isCreator && !isWriter) {
+              sendStreamError('stream/not-authorized', 'Only the creator or authorized writers can start the stream', kind, message.id);
+              return false;
+            }
+            if (entry.status === 'complete' || entry.status === 'error') {
+              sendStreamError('stream/finalized', 'Cannot restart a finalized stream', kind, message.id);
+              return false;
+            }
+            entry.status = 'live';
+            entry.startedAt = nowIso;
+            message.payload.stream = canonicalizeStreamPayload(entry);
+            message.context = message.context || entry.namespace;
+            return true;
+          }
+          case 'stream/data': {
+            if (entry.status !== 'live') {
+              sendStreamError('stream/not-live', 'Stream is not live', kind, message.id, { expected_status: 'live', actual_status: entry.status });
+              return false;
+            }
+            if (!isCreator && !isWriter) {
+              sendStreamError('stream/not-authorized', 'Only authorized writers can emit stream/data', kind, message.id);
+              return false;
+            }
+            const sequence = payload.sequence;
+            if (typeof sequence !== 'number') {
+              sendStreamError('stream/invalid-sequence', 'stream/data requires numeric payload.sequence', kind, message.id);
+              return false;
+            }
+            if (sequence <= entry.lastSequence) {
+              sendStreamError('stream/out-of-order', `Sequence ${sequence} must be greater than ${entry.lastSequence}`, kind, message.id);
+              return false;
+            }
+            entry.lastSequence = sequence;
+            message.payload.stream = canonicalizeStreamPayload(entry, 'live');
+            message.context = message.context || entry.namespace;
+            return true;
+          }
+          case 'stream/complete': {
+            if (!isCreator && !isWriter) {
+              sendStreamError('stream/not-authorized', 'Only the creator or authorized writers can complete the stream', kind, message.id);
+              return false;
+            }
+            entry.status = 'complete';
+            entry.completedAt = nowIso;
+            message.payload.stream = canonicalizeStreamPayload(entry, 'complete');
+            message.context = message.context || entry.namespace;
+            scheduleStreamCleanup(streams, streamId);
+            return true;
+          }
+          case 'stream/error': {
+            if (!isCreator && !isWriter) {
+              sendStreamError('stream/not-authorized', 'Only the creator or authorized writers can error the stream', kind, message.id);
+              return false;
+            }
+            entry.status = 'error';
+            entry.completedAt = nowIso;
+            message.payload.stream = canonicalizeStreamPayload(entry, 'error');
+            message.context = message.context || entry.namespace;
+            scheduleStreamCleanup(streams, streamId);
+            return true;
+          }
+          default: {
+            sendStreamError('stream/unsupported-kind', `Unsupported stream message kind: ${kind}`, kind, message.id);
+            return false;
+          }
+        }
+      }
 
       if (options.logLevel === 'debug') {
         console.log('New WebSocket connection');
@@ -624,6 +918,14 @@ gateway
               console.log(`Capability denied for ${participantId}: ${message.kind}`);
             }
             return;
+          }
+
+          // Handle stream lifecycle messages before general routing
+          if (message.kind && message.kind.startsWith('stream/')) {
+            const shouldBroadcast = await handleStreamMessage(message);
+            if (!shouldBroadcast) {
+              return;
+            }
           }
 
           // Handle capability management messages
@@ -864,6 +1166,30 @@ gateway
 
       ws.on('close', () => {
         if (participantId && spaceId && spaces.has(spaceId)) {
+          const streams = getSpaceStreams(spaceId);
+          const nowIso = new Date().toISOString();
+          for (const [streamId, entry] of streams.entries()) {
+            if (entry.creator === participantId && (entry.status === 'ready' || entry.status === 'live')) {
+              entry.status = 'error';
+              entry.completedAt = nowIso;
+              const errorEnvelope = {
+                protocol: 'mew/v0.3',
+                id: `stream-error-${Date.now()}`,
+                ts: nowIso,
+                from: 'system:gateway',
+                kind: 'stream/error',
+                context: entry.namespace,
+                payload: {
+                  stream: canonicalizeStreamPayload(entry, 'error'),
+                  code: 'stream/creator-disconnected',
+                  message: 'Stream terminated because creator disconnected',
+                },
+              };
+              broadcastToSpace(spaceId, errorEnvelope);
+              streams.delete(streamId);
+            }
+          }
+
           const space = spaces.get(spaceId);
           space.participants.delete(participantId);
           participantTokens.delete(participantId);

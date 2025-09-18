@@ -22,6 +22,17 @@ export type {
   Capability,
   CapabilityGrant,
   Proposal,
+  StreamStatus,
+  StreamCapabilitiesDescriptor,
+  StreamFormatDescriptor,
+  StreamMetadata,
+  StreamReference,
+  StreamAnnouncePayload,
+  StreamReadyPayload,
+  StreamStartPayload,
+  StreamDataPayload,
+  StreamCompletePayload,
+  StreamErrorPayload,
   
   // System payloads
   SystemWelcomePayload,

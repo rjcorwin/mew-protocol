@@ -1,7 +1,16 @@
 import { MEWClient, ClientOptions } from '@mew-protocol/client';
+import type { StreamRecord } from '@mew-protocol/client';
 import { Envelope, Capability } from '@mew-protocol/types';
 import { PatternMatcher } from '@mew-protocol/capability-matcher';
 import { v4 as uuidv4 } from 'uuid';
+import type {
+  StreamAnnouncementOptions,
+  StreamHandle,
+  StreamStartOptions,
+  StreamDataOptions,
+  StreamCompleteOptions,
+  StreamErrorOptions,
+} from './types';
 
 const PROTOCOL_VERSION = 'mew/v0.3';
 
@@ -50,6 +59,13 @@ interface ToolCacheEntry {
   ttl: number;
 }
 
+interface PendingStreamAnnouncement {
+  resolve: (handle: StreamHandle) => void;
+  reject: (error: Error) => void;
+  timer: NodeJS.Timeout;
+  options: StreamAnnouncementOptions;
+}
+
 // Discovery state for each participant
 export enum DiscoveryState {
   NOT_STARTED = 'not_started',
@@ -86,11 +102,16 @@ export class MEWParticipant extends MEWClient {
   private autoDiscoveryEnabled = false;
   private defaultCacheTTL = 300000; // 5 minutes
   private participantDiscoveryStatus = new Map<string, ParticipantDiscoveryStatus>();
+  private pendingStreamAnnouncements = new Map<string, PendingStreamAnnouncement>();
+  private streamSequences = new Map<string, number>();
 
   constructor(options: ParticipantOptions) {
     super(options);
     this.options = { requestTimeout: 30000, ...options };
     this.setupLifecycle();
+    this.onStreamReady((envelope) => this.handleStreamReady(envelope));
+    this.onStreamError((envelope) => this.handleStreamError(envelope));
+    this.onStreamComplete((envelope) => this.handleStreamComplete(envelope));
   }
 
   /**
@@ -244,6 +265,117 @@ export class MEWParticipant extends MEWClient {
     }
 
     this.send(envelope);
+  }
+
+  async announceStream(options: StreamAnnouncementOptions): Promise<StreamHandle> {
+    if (!this.canSend({ kind: 'stream/announce', payload: { formats: options.formats } })) {
+      throw new Error('No capability to announce streams');
+    }
+
+    if (!options.formats || options.formats.length === 0) {
+      throw new Error('announceStream requires at least one format descriptor');
+    }
+
+    const announcementId = uuidv4();
+    const payload: any = {
+      intent: options.intent,
+      desired_id: options.desiredId,
+      formats: options.formats,
+    };
+
+    if (options.scope && options.scope.length > 0) {
+      payload.scope = options.scope;
+    }
+
+    const timeoutMs = options.timeoutMs ?? 5000;
+
+    return new Promise<StreamHandle>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingStreamAnnouncements.delete(announcementId);
+        reject(new Error(`Timed out waiting for stream/ready (${announcementId})`));
+      }, timeoutMs);
+
+      this.pendingStreamAnnouncements.set(announcementId, { resolve, reject, timer, options });
+
+      this.send({
+        id: announcementId,
+        kind: 'stream/announce',
+        payload,
+      });
+    });
+  }
+
+  startStream(streamId: string, options: StreamStartOptions = {}): void {
+    if (!this.canSend({ kind: 'stream/start', payload: { stream: { stream_id: streamId } } })) {
+      throw new Error('No capability to start streams');
+    }
+
+    const payload: any = {
+      stream: { stream_id: streamId },
+      start_ts: options.startTs || new Date().toISOString(),
+    };
+    this.send({ kind: 'stream/start', payload });
+  }
+
+  sendStreamData(streamId: string, content: any, options: StreamDataOptions = {}): void {
+    if (!this.canSend({ kind: 'stream/data', payload: { stream: { stream_id: streamId } } })) {
+      throw new Error('No capability to send stream data');
+    }
+
+    const payload: any = {
+      stream: { stream_id: streamId },
+      sequence: options.sequence ?? this.nextStreamSequence(streamId),
+      content,
+    };
+
+    if (options.formatId) {
+      payload.format_id = options.formatId;
+    }
+    if (options.metadata) {
+      Object.assign(payload, options.metadata);
+    }
+
+    this.send({ kind: 'stream/data', payload });
+  }
+
+  completeStream(streamId: string, options: StreamCompleteOptions = {}): void {
+    if (!this.canSend({ kind: 'stream/complete', payload: { stream: { stream_id: streamId } } })) {
+      throw new Error('No capability to complete streams');
+    }
+
+    const payload: any = {
+      stream: { stream_id: streamId },
+    };
+    if (options.reason) {
+      payload.reason = options.reason;
+    }
+    if (options.metadata) {
+      Object.assign(payload, options.metadata);
+    }
+
+    this.send({ kind: 'stream/complete', payload });
+    this.streamSequences.delete(streamId);
+  }
+
+  failStream(streamId: string, error: StreamErrorOptions): void {
+    if (!this.canSend({ kind: 'stream/error', payload: { stream: { stream_id: streamId } } })) {
+      throw new Error('No capability to fail streams');
+    }
+
+    const payload: any = {
+      stream: { stream_id: streamId },
+      code: error.code,
+      message: error.message,
+    };
+    if (error.reason) {
+      payload.reason = error.reason;
+    }
+    if (error.metadata) {
+      Object.assign(payload, error.metadata);
+    }
+
+    this.send({ kind: 'stream/error', payload });
+    this.streamSequences.delete(streamId);
   }
 
   /**
@@ -842,6 +974,83 @@ export class MEWParticipant extends MEWClient {
       mimeType: resource.mimeType,
       contents
     };
+  }
+
+  private handleStreamReady(envelope: Envelope): void {
+    const correlationId = this.extractCorrelationId(envelope);
+    if (correlationId && this.pendingStreamAnnouncements.has(correlationId)) {
+      const pending = this.pendingStreamAnnouncements.get(correlationId)!;
+      clearTimeout(pending.timer);
+      this.pendingStreamAnnouncements.delete(correlationId);
+
+      const streamPayload: any = envelope.payload?.stream;
+      if (!streamPayload) {
+        pending.reject(new Error('stream/ready missing stream payload'));
+        return;
+      }
+
+      const record = this.getStream(streamPayload.stream_id) as StreamRecord | undefined;
+      this.streamSequences.set(streamPayload.stream_id, 0);
+
+      const namespace = record?.namespace || streamPayload.namespace || `${this.options.space}/${streamPayload.stream_id}`;
+      const formats = (record?.formats && record.formats.length > 0)
+        ? record.formats
+        : streamPayload.formats || [];
+      const payloadIntent = (envelope as any).payload?.intent;
+      const payloadScope = (envelope as any).payload?.scope;
+
+      pending.resolve({
+        streamId: streamPayload.stream_id,
+        namespace,
+        formats,
+        intent: payloadIntent ?? pending.options.intent,
+        scope: payloadScope ?? pending.options.scope,
+      });
+      return;
+    }
+
+    const streamId = envelope.payload?.stream?.stream_id;
+    if (streamId) {
+      this.streamSequences.set(streamId, 0);
+    }
+  }
+
+  private handleStreamError(envelope: Envelope): void {
+    const correlationId = this.extractCorrelationId(envelope);
+    if (correlationId && this.pendingStreamAnnouncements.has(correlationId)) {
+      const pending = this.pendingStreamAnnouncements.get(correlationId)!;
+      clearTimeout(pending.timer);
+      this.pendingStreamAnnouncements.delete(correlationId);
+      const message = envelope.payload?.message || 'stream error';
+      pending.reject(new Error(message));
+    }
+
+    const streamId = envelope.payload?.stream?.stream_id;
+    if (streamId) {
+      this.streamSequences.delete(streamId);
+    }
+  }
+
+  private handleStreamComplete(envelope: Envelope): void {
+    const streamId = envelope.payload?.stream?.stream_id;
+    if (streamId) {
+      this.streamSequences.delete(streamId);
+    }
+  }
+
+  private extractCorrelationId(envelope: Envelope): string | undefined {
+    const correlation = envelope.correlation_id;
+    if (!correlation) {
+      return undefined;
+    }
+    return Array.isArray(correlation) ? correlation[0] : correlation;
+  }
+
+  private nextStreamSequence(streamId: string): number {
+    const current = this.streamSequences.get(streamId) ?? 0;
+    const next = current + 1;
+    this.streamSequences.set(streamId, next);
+    return next;
   }
 
   /**

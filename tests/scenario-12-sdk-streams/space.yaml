@@ -1,0 +1,44 @@
+space:
+  id: sdk-streams-space
+  name: "Scenario 12 - SDK Streams"
+  description: "Validate SDK stream helpers via producer/consumer"
+
+participants:
+  sdk-producer:
+    tokens: ["sdk-producer-token"]
+    capabilities:
+      - kind: stream/*
+      - kind: chat
+      - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["../agents/sdk-stream-producer.js"]
+    env:
+      MEW_GATEWAY: "ws://localhost:${PORT}"
+      MEW_SPACE: "sdk-streams-space"
+      MEW_TOKEN: "sdk-producer-token"
+      MEW_PARTICIPANT: "sdk-producer"
+    restart_policy: on-failure
+
+  sdk-consumer:
+    tokens: ["sdk-consumer-token"]
+    capabilities:
+      - kind: stream/*
+      - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["../agents/sdk-stream-consumer.js"]
+    env:
+      MEW_GATEWAY: "ws://localhost:${PORT}"
+      MEW_SPACE: "sdk-streams-space"
+      MEW_TOKEN: "sdk-consumer-token"
+      MEW_PARTICIPANT: "sdk-consumer"
+      STREAM_LOG: "./logs/sdk-consumer.log"
+    restart_policy: on-failure
+
+  observer:
+    tokens: ["observer-token"]
+    capabilities:
+      - kind: "*"
+    output_log: "./logs/observer.log"
+    auto_connect: true

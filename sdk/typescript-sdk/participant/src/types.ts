@@ -1,5 +1,5 @@
-import { ConnectionOptions, Envelope } from '@mew-protocol/client';
-import { Capability } from '@mew-protocol/types';
+import { ConnectionOptions, Envelope, StreamRecord } from '@mew-protocol/client';
+import { Capability, StreamFormatDescriptor } from '@mew-protocol/types';
 
 export interface Tool {
   name: string;
@@ -51,4 +51,40 @@ export interface PendingRequest {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
+}
+
+export interface StreamAnnouncementOptions {
+  intent?: string;
+  desiredId?: string;
+  formats: StreamFormatDescriptor[];
+  scope?: string[];
+  timeoutMs?: number;
+}
+
+export interface StreamHandle {
+  streamId: string;
+  namespace: string;
+  formats: StreamFormatDescriptor[];
+  intent?: string;
+  scope?: string[];
+}
+
+export interface StreamStartOptions {
+  startTs?: string;
+}
+
+export interface StreamDataOptions {
+  sequence?: number;
+  formatId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface StreamCompleteOptions {
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface StreamErrorOptions extends StreamCompleteOptions {
+  code: string;
+  message: string;
 }

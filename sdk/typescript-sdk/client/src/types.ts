@@ -9,6 +9,7 @@ import type {
   Proposal,
   SystemWelcomePayload,
   ChatPayload,
+  StreamMetadata,
 } from '@mew-protocol/types';
 
 // Re-export commonly used types from the shared types package (relative path for monorepo dev)
@@ -116,4 +117,12 @@ export interface SpaceInfo {
 export interface HistoryOptions {
   limit?: number;
   before?: string;
+}
+
+export interface StreamRecord extends StreamMetadata {
+  intent?: string;
+  scope?: string[];
+  lastSequence: number;
+  createdAt: string;
+  updatedAt: string;
 }

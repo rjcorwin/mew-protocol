@@ -1,6 +1,6 @@
 # ADR-002: Join Protocol Extension for Space Participation
 
-**Status:** Proposed
+**Status:** Proposed (TODO: Reject)
 **Date:** 2025-01-15
 **Context:** MEW Protocol Draft (post v0.3)
 **Incorporation:** Not Incorporated

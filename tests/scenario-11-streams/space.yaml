@@ -1,0 +1,28 @@
+space:
+  id: streams-space
+  name: "Scenario 11 - Stream Handshake"
+  description: "Exercise MEW stream handshake and data flow"
+
+participants:
+  streamer:
+    tokens: ["streamer-token"]
+    capabilities:
+      - kind: stream/*
+      - kind: chat
+      - kind: system/*
+    auto_start: true
+    command: "node"
+    args: ["../agents/streamer.js"]
+    env:
+      MEW_GATEWAY: "ws://localhost:${PORT}"
+      MEW_SPACE: "streams-space"
+      MEW_TOKEN: "streamer-token"
+      MEW_PARTICIPANT: "streamer"
+    restart_policy: on-failure
+
+  observer:
+    tokens: ["observer-token"]
+    capabilities:
+      - kind: "*"
+    output_log: "./logs/observer.log"
+    auto_connect: true

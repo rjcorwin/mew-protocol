@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import WebSocket from 'ws';
-import { Envelope, Capability } from '@mew-protocol/types';
+import { Envelope, Capability, StreamMetadata } from '@mew-protocol/types';
+import type { StreamRecord } from './types';
 
 const PROTOCOL_VERSION = 'mew/v0.3';
 
@@ -26,6 +27,7 @@ export class MEWClient extends EventEmitter {
   protected heartbeatTimer?: NodeJS.Timeout;
   protected reconnectTimer?: NodeJS.Timeout;
   protected messageCounter = 0;
+  protected streams = new Map<string, StreamRecord>();
 
   constructor(options: ClientOptions) {
     super();
@@ -156,6 +158,34 @@ export class MEWClient extends EventEmitter {
     this.on('error', handler);
   }
 
+  getStream(streamId: string): StreamRecord | undefined {
+    return this.streams.get(streamId);
+  }
+
+  listStreams(): StreamRecord[] {
+    return Array.from(this.streams.values());
+  }
+
+  onStreamReady(handler: (envelope: Envelope) => void): void {
+    this.on('stream/ready', handler);
+  }
+
+  onStreamStart(handler: (envelope: Envelope) => void): void {
+    this.on('stream/start', handler);
+  }
+
+  onStreamData(handler: (envelope: Envelope) => void): void {
+    this.on('stream/data', handler);
+  }
+
+  onStreamComplete(handler: (envelope: Envelope) => void): void {
+    this.on('stream/complete', handler);
+  }
+
+  onStreamError(handler: (envelope: Envelope) => void): void {
+    this.on('stream/error', handler);
+  }
+
   /**
    * Send join message
    */
@@ -193,13 +223,123 @@ export class MEWClient extends EventEmitter {
 
     // Handle envelopes
     if (message.protocol && message.kind) {
-      this.emit('message', message as Envelope);
+      if (typeof message.kind === 'string' && message.kind.startsWith('stream/')) {
+        this.processStreamEnvelope(message as Envelope);
+      }
+
+      const envelope = message as Envelope;
+      this.emit('message', envelope);
       
       // Emit specific events for different kinds
       if (message.kind) {
-        this.emit(message.kind, message);
+        this.emit(message.kind, envelope);
       }
     }
+  }
+
+  private processStreamEnvelope(envelope: Envelope): void {
+    const kind = envelope.kind;
+    const payload: any = envelope.payload || {};
+
+    if (kind === 'stream/announce') {
+      return;
+    }
+
+    const streamPayload = payload?.stream;
+    const streamId: string | undefined =
+      streamPayload?.stream_id ?? payload?.stream_id ?? payload?.streamId;
+
+    if (!streamId) {
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+
+    if (kind === 'stream/ready') {
+      const metadata = streamPayload as StreamMetadata | undefined;
+      if (!metadata) {
+        return;
+      }
+      const record: StreamRecord = {
+        ...metadata,
+        intent: payload.intent,
+        scope: payload.scope,
+        lastSequence: -1,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      this.streams.set(streamId, record);
+      envelope.payload.stream = this.buildStreamPayload(record, streamPayload);
+      return;
+    }
+
+    let record = this.streams.get(streamId);
+    if (!record) {
+      record = {
+        stream_id: streamId,
+        namespace: streamPayload?.namespace || `${this.options.space}/${streamId}`,
+        creator: streamPayload?.creator || envelope.from,
+        status: 'pending',
+        formats: streamPayload?.formats || [],
+        capabilities: streamPayload?.capabilities,
+        intent: payload.intent,
+        scope: payload.scope,
+        lastSequence: -1,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      this.streams.set(streamId, record);
+    } else {
+      record.updatedAt = nowIso;
+      if (streamPayload?.namespace) {
+        record.namespace = streamPayload.namespace;
+      }
+      if (streamPayload?.creator) {
+        record.creator = streamPayload.creator;
+      }
+      if (streamPayload?.formats?.length) {
+        record.formats = streamPayload.formats;
+      }
+      if (streamPayload?.capabilities) {
+        record.capabilities = streamPayload.capabilities;
+      }
+    }
+
+    const streamRecord: StreamRecord = record;
+
+    switch (kind) {
+      case 'stream/start':
+        streamRecord.status = 'live';
+        break;
+      case 'stream/data':
+        streamRecord.status = 'live';
+        if (typeof payload.sequence === 'number') {
+          streamRecord.lastSequence = Math.max(streamRecord.lastSequence, payload.sequence);
+        }
+        break;
+      case 'stream/complete':
+        streamRecord.status = 'complete';
+        break;
+      case 'stream/error':
+        streamRecord.status = 'error';
+        break;
+      default:
+        break;
+    }
+
+    envelope.payload.stream = this.buildStreamPayload(streamRecord, streamPayload);
+  }
+
+  private buildStreamPayload(record: StreamRecord, overrides: any = {}) {
+    return {
+      ...overrides,
+      stream_id: record.stream_id,
+      namespace: record.namespace,
+      creator: record.creator,
+      status: record.status,
+      formats: record.formats,
+      capabilities: record.capabilities,
+    };
   }
 
   /**

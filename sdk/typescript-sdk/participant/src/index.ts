@@ -14,5 +14,11 @@ export type {
   MCPRequest,
   MCPResponse,
   ProposalHandler,
-  RequestHandler
+  RequestHandler,
+  StreamAnnouncementOptions,
+  StreamHandle,
+  StreamStartOptions,
+  StreamDataOptions,
+  StreamCompleteOptions,
+  StreamErrorOptions,
 } from './types';

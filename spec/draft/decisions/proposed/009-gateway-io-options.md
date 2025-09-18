@@ -1,7 +1,7 @@
 # ADR-009: Gateway I/O Options for Participant Communication
 
 ## Status
-Proposed
+Proposed (TODO: Is incorporated right? Move to accepted)
 
 ## Context
 Currently, the MEW Protocol gateway only accepts WebSocket connections for participants. This creates limitations:

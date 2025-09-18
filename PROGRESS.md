@@ -49,6 +49,24 @@
 - Context-aware message display
 - Enhanced message formatting for all types
 
+#### Phase 3: Capability Grants (✅ COMPLETE - 2025-01-16)
+- **Implementation Complete**: Full session-scoped capability grant system
+- **Features Delivered**:
+  - Added third option "Yes, allow X to Y for this session" in approval dialog
+  - Keyboard navigation works for all three options (↑↓ arrows, 1/2/3 keys)
+  - Sends proper MEW Protocol `capability/grant` messages
+  - Tracks granted capabilities per participant in UI state
+  - Auto-approves future matching operations without dialog
+  - Gateway combines static and runtime capabilities correctly
+  - Agents receive updated capabilities via new welcome messages
+  - Session-scoped permissions (not persistent across restarts)
+- **Technical Details**:
+  - Modified `cli/src/utils/advanced-interactive-ui.js` for UI and grant tracking
+  - Fixed `cli/src/commands/gateway.js` to send welcome updates on grant
+  - Pattern matching supports wildcards for flexible permissions
+  - Runtime capabilities tracked separately from static configuration
+- **Testing**: Created comprehensive test scripts in `/tests/`
+
 ### 🚧 Known Issues to Address
 
 1. **UI Layout Issue**: After approval dialog, input box position is incorrect with whitespace below
@@ -66,13 +84,6 @@
   - Network requests (URL/method/headers display)
   - Database operations (query preview)
 - Maintain consistent interaction pattern across all templates
-
-#### Phase 3: Capability Grants (Future)
-- Add "Yes, allow X to Y" option (3rd choice in dialog)
-- Send MEW Protocol `capability/grant` messages
-- Track granted capabilities per participant
-- Skip approval prompts for granted operations
-- Session-scoped permissions (not persistent)
 
 ### 📦 Repository Structure
 
@@ -143,6 +154,6 @@ The MEW Protocol is evolving toward a sophisticated multi-agent coordination sys
 
 ---
 
-*Last Updated: 2025-01-15*
+*Last Updated: 2025-01-16*
 *Version: 0.2.0*
 *Status: Active Development*

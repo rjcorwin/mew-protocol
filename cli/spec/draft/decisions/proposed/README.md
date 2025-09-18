@@ -4,7 +4,7 @@ This directory contains Architecture Decision Records (ADRs) that are under cons
 
 ## Current Proposals
 
-*No pending proposals - all ADRs have been accepted and incorporated*
+- **013-ssc**: CLI-Managed STDIO Shim Connector
 
 ## Recently Accepted (moved to accepted/)
 

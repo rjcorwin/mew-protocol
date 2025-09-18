@@ -115,6 +115,37 @@ export class MEWAgent extends MEWParticipant {
     
     // Set up participant join handler for tracking
     this.onParticipantJoin((participant) => {
+    this.onStreamReady((envelope) => {
+      const stream = envelope.payload?.stream;
+      if (stream) {
+        this.log('info', `📡 Stream ready: ${stream.namespace || stream.stream_id} (creator: ${stream.creator})`);
+      }
+    });
+
+    this.onStreamData((envelope) => {
+      const stream = envelope.payload?.stream;
+      const seq = envelope.payload?.sequence;
+      if (stream) {
+        this.log('debug', `🔄 stream/data ${stream.stream_id} seq=${typeof seq === 'number' ? seq : '?'} from ${envelope.from}`);
+      }
+    });
+
+    this.onStreamComplete((envelope) => {
+      const stream = envelope.payload?.stream;
+      if (stream) {
+        this.log('info', `✅ Stream completed: ${stream.namespace || stream.stream_id}`);
+      }
+    });
+
+    this.onStreamError((envelope) => {
+      const stream = envelope.payload?.stream;
+      const code = envelope.payload?.code;
+      const message = envelope.payload?.message;
+      if (stream) {
+        this.log('warn', `⚠️ Stream error (${code || 'unknown'}): ${message || 'no message'} [${stream.namespace || stream.stream_id}]`);
+      }
+    });
+
       if (participant.id !== this.options.participant_id) {
         this.log('info', `New participant joined: ${participant.id}`);
         this.otherParticipants.set(participant.id, {
