@@ -5,6 +5,7 @@ const yaml = require('js-yaml');
 const crypto = require('crypto');
 const { GatewayCore } = require('../gateway/core');
 const { FIFOTransport } = require('../gateway/transports/fifo');
+const { WebSocketTransport } = require('../gateway/transports/websocket');
 
 function createLogger(level) {
   const levels = ['error', 'warn', 'info', 'debug'];
@@ -74,23 +75,43 @@ async function startGateway(options) {
   }
 
   const spaceId = config.space.id;
-  const spaceDir = path.dirname(configPath);
+  let spaceDir = path.dirname(configPath);
+  if (path.basename(spaceDir) === '.mew') {
+    spaceDir = path.dirname(spaceDir);
+  }
+  const transportConfig = config.space?.transport || {};
+  const defaultTransport = transportConfig.default || 'stdio';
+  const transportOverrides = transportConfig.overrides || {};
+
   const fifoDir = options.fifoDir
     ? path.resolve(options.fifoDir)
     : path.join(spaceDir, '.mew', 'fifos');
 
-  logger.log(`Starting STDIO gateway for space ${spaceId}`);
-  logger.log(`Using FIFO directory ${fifoDir}`);
+  const participantEntries = Object.entries(config.participants || {});
+  const participantConfigs = new Map();
+  const tokensByParticipant = new Map();
+  const stdioParticipants = [];
+  const websocketParticipants = [];
 
   ensureDirectory(fifoDir);
 
-  const participantEntries = Object.entries(config.participants || {});
-  const participantConfigs = new Map(participantEntries);
-  const tokensByParticipant = new Map();
+  for (const [participantId, participantConfigRaw] of participantEntries) {
+    const resolvedTransport =
+      participantConfigRaw.transport || transportOverrides[participantId] || defaultTransport;
+    const participantConfig = {
+      ...participantConfigRaw,
+      transport: resolvedTransport,
+    };
+    participantConfigs.set(participantId, participantConfig);
 
-  for (const [participantId, participantConfig] of participantEntries) {
     const token = resolveToken(spaceDir, participantId, participantConfig, logger);
     tokensByParticipant.set(participantId, token);
+
+    if (resolvedTransport === 'websocket') {
+      websocketParticipants.push(participantId);
+    } else {
+      stdioParticipants.push(participantId);
+    }
   }
 
   const gatewayCore = new GatewayCore({
@@ -100,16 +121,64 @@ async function startGateway(options) {
     logger,
   });
 
-  const transport = new FIFOTransport({
-    fifoDir,
-    participantIds: participantEntries.map(([participantId]) => participantId),
-    logger,
-  });
+  logger.debug?.(
+    'Participant tokens:',
+    Array.from(tokensByParticipant.entries()).map(([pid, token]) => [pid, token.slice(0, 8)]),
+  );
 
-  gatewayCore.attachTransport(transport);
-  await transport.start();
+  const transports = [];
 
-  logger.log('Gateway ready and attached to FIFO transport');
+  if (stdioParticipants.length > 0) {
+    logger.log(`Starting STDIO gateway for space ${spaceId}`);
+    logger.log(`Using FIFO directory ${fifoDir}`);
+
+    const fifoTransport = new FIFOTransport({
+      fifoDir,
+      participantIds: stdioParticipants,
+      logger,
+    });
+    transports.push(fifoTransport);
+    gatewayCore.attachTransport(fifoTransport);
+    await fifoTransport.start();
+    logger.log('STDIO transport ready');
+  }
+
+  const shouldStartWebSocket = websocketParticipants.length > 0 || transportConfig.default === 'websocket';
+  let websocketTransport = null;
+
+  if (shouldStartWebSocket) {
+    const listenValue = config.gateway?.websocket?.listen || '127.0.0.1:4700';
+    let host = '127.0.0.1';
+    let port = 4700;
+
+    if (typeof listenValue === 'number') {
+      port = listenValue;
+    } else if (typeof listenValue === 'string') {
+      if (listenValue.includes(':')) {
+        const [hostPart, portPart] = listenValue.split(':');
+        if (hostPart) host = hostPart;
+        if (portPart) port = Number(portPart);
+      } else {
+        port = Number(listenValue);
+      }
+    }
+
+    if (Number.isNaN(port) || port <= 0) {
+      throw new Error(`Invalid websocket listen port: ${listenValue}`);
+    }
+
+    websocketTransport = new WebSocketTransport({ host, port, logger });
+    transports.push(websocketTransport);
+    gatewayCore.attachTransport(websocketTransport);
+    await websocketTransport.start();
+    logger.log(`WebSocket transport ready on ws://${host}:${port}`);
+  }
+
+  if (transports.length === 0) {
+    logger.warn('No transports configured; gateway will not accept connections');
+  }
+
+  logger.log('Gateway ready');
 
   return new Promise((resolve, reject) => {
     const shutdown = (signal) => {
@@ -119,8 +188,11 @@ async function startGateway(options) {
           const connection = gatewayCore.connections.get(participantId);
           connection?.channel?.close?.();
         }
+        Promise.all(transports.map((t) => t.stop?.().catch(() => {}))).finally(() => {
+          resolve();
+        });
       } finally {
-        resolve();
+        // resolved above
       }
     };
 
@@ -137,7 +209,7 @@ const gateway = new Command('gateway').description('Gateway server management');
 
 gateway
   .command('start')
-  .description('Start the MEW gateway using STDIO transport')
+  .description('Start the MEW gateway (STDIO/WebSocket based on configuration)')
   .option('-s, --space-config <path>', 'Path to space.yaml configuration', './space.yaml')
   .option('-f, --fifo-dir <path>', 'Directory containing participant FIFO pairs')
   .option('-l, --log-level <level>', 'Log level (error|warn|info|debug)', 'info')

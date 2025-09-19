@@ -55,10 +55,31 @@ class GatewayCore extends EventEmitter {
    * Core handles envelope routing, performing join authentication on first message.
    */
   _handleIncomingEnvelope(participantId, envelope, channel) {
-    const connection = this.connections.get(participantId);
+    let effectiveParticipantId = participantId;
+
+    if (!effectiveParticipantId) {
+      const joinPayload = envelope?.payload || envelope;
+      const token = joinPayload?.token || envelope?.token;
+      if (token && this.participantByToken.has(token)) {
+        effectiveParticipantId = this.participantByToken.get(token);
+      }
+    }
+
+    if (!effectiveParticipantId) {
+      this.logger.warn('Received envelope without participant resolution');
+      channel.send?.({
+        protocol: 'mew/v0.3',
+        kind: 'system/error',
+        payload: { message: 'Unable to resolve participant for connection' },
+      });
+      channel.close?.();
+      return;
+    }
+
+    const connection = this.connections.get(effectiveParticipantId);
 
     if (!connection) {
-      this._handleJoin(participantId, envelope, channel);
+      this._handleJoin(effectiveParticipantId, envelope, channel);
       return;
     }
 
@@ -66,12 +87,12 @@ class GatewayCore extends EventEmitter {
     const enrichedEnvelope = {
       ...envelope,
       space: this.spaceId,
-      from: participantId,
+      from: effectiveParticipantId,
       protocol: envelope.protocol || 'mew/v0.3',
       ts: envelope.ts || new Date().toISOString(),
     };
 
-    this._broadcast(enrichedEnvelope, { exclude: participantId });
+    this._broadcast(enrichedEnvelope, { exclude: effectiveParticipantId });
   }
 
   _handleJoin(participantId, envelope, channel) {
@@ -106,7 +127,9 @@ class GatewayCore extends EventEmitter {
 
     const expectedParticipant = this.participantByToken.get(token);
     if (!expectedParticipant || expectedParticipant !== participantId) {
-      this.logger.warn(`Authentication failed for participant ${participantId}`);
+      this.logger.warn(
+        `Authentication failed for participant ${participantId} (token=${token?.slice(0, 8) || 'none'})`,
+      );
       channel.send({
         protocol: 'mew/v0.3',
         kind: 'system/error',
@@ -137,6 +160,14 @@ class GatewayCore extends EventEmitter {
       capabilities: config.capabilities || [],
     };
     this.connections.set(participantId, connectionState);
+
+    if (typeof channel.setParticipantId === 'function') {
+      try {
+        channel.setParticipantId(participantId);
+      } catch (error) {
+        this.logger.warn('Failed to propagate participantId to transport channel:', error.message);
+      }
+    }
 
     this.logger.log(`Participant ${participantId} joined space ${this.spaceId}`);
 

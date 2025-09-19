@@ -1,12 +1,27 @@
-# STDIO Gateway Refactor Plan
+# STDIO Transition Plan
 
 ## Goal
-Replace the CLI gateway runtime with a pure STDIO transport (using FIFO pairs) while keeping the design modular enough to add WebSocket support later. Tests (scenarios 1–7) should pass in this transport without relying on PM2 or Unix domain sockets.
+Finish migrating the MEW CLI, space lifecycle, and test suite to a pure STDIO transport so developers can start, inspect, and interact with local spaces without WebSocket or PM2 dependencies.
 
-## Tasks
-1. **Transport abstraction** – Refactor the CLI gateway to use a pluggable connection layer. Implement a FIFO-based transport (paired FIFOs per participant) that the gateway can attach to.
-2. **Participant adapters** – Implement an adapter process that bridges each participant’s STDIO to the FIFO pair, framing messages as MCP-style envelopes.
-3. **CLI orchestration** – Update `mew space up/down/status/clean` to manage processes directly (spawn, track PIDs, tear down) and create/remove FIFOs under `space/.mew/fifos/`.
-4. **Test agents** – Convert the core test agents (echo, driver, etc.) to speak framed STDIO so they can run under the new transport. Remove dependencies on WebSocket/HTTP in the scenarios up through test 7.
-5. **Test scenarios** – Adjust `tests/scenario-1` through `scenario-7` to use the new flow (space configs, setup/teardown scripts, expectations). Run the tests locally and ensure they pass.
-6. **Optional future work** – Leave the gateway transport abstraction ready for a WebSocket backend that can be toggled via config later.
+## ✅ Completed
+- Transport abstraction and FIFO-based gateway (`cli/src/gateway/*`, `cli/src/commands/gateway.js`).
+- Adapter shim for STDIO participants (`cli/bin/mew-stdio-adapter.js`).
+- `mew space up/down/status/clean` rewritten to spawn/manage gateway + adapters directly (`cli/src/commands/space.js`).
+- All regression scenarios (1–12) converted to STDIO drivers and agents; `tests/run-all-tests.sh` passes end-to-end.
+- `mew` command defaults updated to auto-run `space up` and reuse `.mew/space.yaml` in new spaces.
+- Human interactive CLI wired via `mew space connect` and `mew --interactive` defaults, using an Ink-powered terminal UI (with `/simple` fallback) on top of STDIO FIFOs.
+- Configurable transports so spaces can mix local STDIO adapters with WebSocket participants (`space.transport`, per-participant overrides, optional gateway listener).
+
+## 🚧 In Progress / Next
+1. **Interactive UX polish** – Upgrade the terminal experience (slash commands, better message formatting, optional TUI/Ink front-end) and capture transcripts/logging options.
+2. **Template polish** – Ensure `mew init` templates install cleanly (package name templating, dependency bootstrap) and document the STDIO workflow in generated READMEs.
+3. **Gateway lifecycle UX** – Surface `space status` summaries and logs (e.g., `mew space status --follow`) to make it easy to observe running adapters.
+4. **Remote participant docs/tooling** – Document WebSocket setup, token distribution, and ship helper scripts for remote participants.
+
+## 📌 Stretch Ideas
+- Space inspector TUI driven by the new STDIO channel.
+- Scriptable hooks for adapters (auto-tail logs, health summaries).
+- Capability-grant UX built on the STDIO approval flow once the human client exists.
+
+---
+*Last updated: 2025-09-19*

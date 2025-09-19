@@ -70,6 +70,7 @@ program
   .option('--debug', 'Use simple debug interface instead of advanced UI')
   .option('--simple', 'Alias for --debug')
   .option('--no-ui', 'Disable UI enhancements, use plain interface')
+  .option('--no-color', 'Disable colored output in interactive mode')
   .action(spaceCommand.spaceUpAction);
 
 program
@@ -80,62 +81,53 @@ program
 
 // Helper function to check if space is running
 function isSpaceRunning() {
-  const pidFile = path.join(process.cwd(), '.mew', 'pids.json');
-  if (!fs.existsSync(pidFile)) {
+  const runStatePath = path.join(process.cwd(), '.mew', 'run', 'state.json');
+  if (!fs.existsSync(runStatePath)) {
     return false;
   }
 
   try {
-    const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
-    // Check if gateway process is still running
-    if (pids.gateway) {
-      try {
-        process.kill(pids.gateway, 0); // Check if process exists
-        return true;
-      } catch {
-        return false;
-      }
+    const state = JSON.parse(fs.readFileSync(runStatePath, 'utf8'));
+    const pid = state?.gateway?.pid;
+    if (!pid) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      return false;
     }
-  } catch {
+  } catch (error) {
     return false;
   }
-  return false;
 }
 
 // Default behavior when no command is provided
 if (process.argv.length === 2) {
-  // No arguments provided - intelligent default behavior
-  if (checkSpaceExists()) {
-    // Space exists - check if it's running
-    if (isSpaceRunning()) {
-      // Space is running - connect to it
-      console.log('Connecting to running space...');
-      process.argv.push('space', 'connect');
-    } else {
-      // Space exists but not running - start it interactively
+  (async () => {
+    try {
+      if (!checkSpaceExists()) {
+        console.log('Welcome to MEW Protocol! Let\'s set up your space.');
+        const initCommand = new InitCommand();
+        await initCommand.execute({});
+        console.log('\nSpace initialized! Starting interactive session...');
+        await spaceCommand.spaceUpAction({ interactive: true });
+        return;
+      }
+
+      if (isSpaceRunning()) {
+        console.log('Space is running. Connecting interactively...');
+        await spaceCommand.spaceConnectAction({});
+        return;
+      }
+
       console.log('Starting space and connecting interactively...');
-      process.argv.push('space', 'up', '-i');
-    }
-  } else {
-    // No space - run init, then connect
-    console.log('Welcome to MEW Protocol! Let\'s set up your space.');
-    const initCommand = new InitCommand();
-    initCommand.execute({}).then(() => {
-      console.log('\nSpace initialized! Starting and connecting...');
-      // After init, start the space interactively by spawning a new process
-      const { spawn } = require('child_process');
-      const child = spawn(process.argv[0], [process.argv[1], 'space', 'up', '-i'], {
-        stdio: 'inherit'
-      });
-      child.on('exit', (code) => {
-        process.exit(code || 0);
-      });
-    }).catch(error => {
+      await spaceCommand.spaceUpAction({ interactive: true });
+    } catch (error) {
       console.error('Error:', error.message);
       process.exit(1);
-    });
-    return; // Don't parse args since we're handling it
-  }
+    }
+  })();
+  return;
 }
 
 // Parse arguments
