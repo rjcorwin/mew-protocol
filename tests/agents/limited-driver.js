@@ -61,11 +61,12 @@ const parser = new FrameParser((envelope) => {
     return;
   }
 
-  if (
+ if (
     envelope.kind === 'mcp/response' &&
     envelope.from === 'calculator-agent' &&
     awaitingResponse &&
-    envelope.correlation_id === awaitingResponse
+    (envelope.correlation_id === awaitingResponse ||
+      (Array.isArray(envelope.correlation_id) && envelope.correlation_id.includes(awaitingResponse)))
   ) {
     awaitingResponse = false;
     const result = envelope.payload?.result;

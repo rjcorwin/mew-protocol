@@ -183,11 +183,14 @@ const parser = new FrameParser((envelope) => {
   }
 
   if (envelope.kind === 'mcp/response' && envelope.from === 'calculator-agent') {
-    const pendingEntry = pending.get(envelope.correlation_id);
+    const correlation = Array.isArray(envelope.correlation_id)
+      ? envelope.correlation_id[0]
+      : envelope.correlation_id;
+    const pendingEntry = pending.get(correlation);
     if (!pendingEntry) {
       return;
     }
-    pending.delete(envelope.correlation_id);
+    pending.delete(correlation);
 
     const { expected, name } = pendingEntry;
     const result = envelope.payload?.result;

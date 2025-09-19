@@ -112,7 +112,9 @@ const parser = new FrameParser((envelope) => {
     return;
   }
 
-  const correlation = envelope.correlation_id;
+  const correlation = Array.isArray(envelope.correlation_id)
+    ? envelope.correlation_id[0]
+    : envelope.correlation_id;
   if (!correlation) {
     return;
   }
