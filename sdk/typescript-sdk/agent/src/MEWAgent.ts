@@ -1,5 +1,5 @@
-import { MEWParticipant, ParticipantOptions, Tool, Resource } from '../../participant/src';
-import { Envelope } from '../../types/src';
+import { MEWParticipant, ParticipantOptions, Tool, Resource } from '@mew-protocol/participant';
+import { Envelope } from '@mew-protocol/types';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
