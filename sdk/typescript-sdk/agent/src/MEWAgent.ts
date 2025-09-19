@@ -1,5 +1,5 @@
-import { MEWParticipant, ParticipantOptions, Tool, Resource } from '@mew-protocol/participant';
-import { Envelope } from '@mew-protocol/types';
+import { MEWParticipant, ParticipantOptions, Tool, Resource } from '../../participant/src';
+import { Envelope } from '../../types/src';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
@@ -15,9 +15,8 @@ export interface AgentConfig extends ParticipantOptions {
   autoRespond?: boolean;
   maxIterations?: number;
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
-  reasoningFormat?: 'native' | 'scratchpad';  // How to format previous thoughts for LLM (default: 'native')
   conversationHistoryLength?: number;  // Number of previous messages to include in context (default: 0 = only current)
-  
+
   // Chat response configuration
   chatResponse?: {
     respondToQuestions?: boolean;    // Respond to questions (default: true)
@@ -26,7 +25,16 @@ export interface AgentConfig extends ParticipantOptions {
     confidenceThreshold?: number;    // Min confidence to respond (0-1, default: 0.5)
     contextWindow?: number;          // Messages to consider for context (default: 10)
   };
-  
+
+  // Message queue configuration
+  messageQueue?: {
+    enableQueueing?: boolean;          // Enable message queueing (default: true)
+    maxQueueSize?: number;             // Maximum messages to queue (default: 5)
+    dropStrategy?: 'oldest' | 'newest' | 'none';  // What to do when queue is full (default: 'oldest')
+    notifyQueueing?: boolean;          // Emit events when messages are queued (default: true)
+    includeQueuedSenderNotification?: boolean;  // Add system message about additional senders (default: true)
+  };
+
   // Overridable prompts for different phases (ReAct pattern)
   prompts?: {
     system?: string;    // Override the base system prompt
@@ -66,6 +74,10 @@ export class MEWAgent extends MEWParticipant {
   private currentConversation: Array<{ role: string; content: string }> = [];
   private conversationHistory: any[] = [];  // Full conversation history for context
 
+  // Message queueing properties
+  private messageQueue: Envelope[] = [];
+  private isProcessing = false;
+
   constructor(config: AgentConfig) {
     super(config);
     this.config = {
@@ -74,8 +86,15 @@ export class MEWAgent extends MEWParticipant {
       maxIterations: 10,
       logLevel: 'debug',
       model: 'gpt-4o',
-      reasoningFormat: 'native',
       conversationHistoryLength: 0,
+      messageQueue: {
+        enableQueueing: true,
+        maxQueueSize: 5,
+        dropStrategy: 'oldest',
+        notifyQueueing: true,
+        includeQueuedSenderNotification: true,
+        ...config.messageQueue
+      },
       ...config
     };
 
@@ -250,41 +269,105 @@ export class MEWAgent extends MEWParticipant {
    * Handle chat messages
    */
   private async handleChat(envelope: Envelope): Promise<void> {
+    // Check if message queueing is enabled and we're currently processing
+    if (this.config.messageQueue?.enableQueueing && this.isProcessing) {
+      // Check queue size limit
+      const maxSize = this.config.messageQueue.maxQueueSize || 5;
+
+      if (this.messageQueue.length >= maxSize) {
+        // Handle queue overflow
+        const dropStrategy = this.config.messageQueue.dropStrategy || 'oldest';
+
+        if (dropStrategy === 'oldest') {
+          const dropped = this.messageQueue.shift(); // Remove oldest
+          this.log('warn', `Queue full, dropped oldest message from ${dropped?.from}`);
+          if (this.config.messageQueue.notifyQueueing) {
+            this.emitQueueEvent('queue-overflow', { dropped: dropped?.from, strategy: 'oldest' });
+          }
+        } else if (dropStrategy === 'newest') {
+          this.log('warn', `Queue full, dropping newest message from ${envelope.from}`);
+          if (this.config.messageQueue.notifyQueueing) {
+            this.emitQueueEvent('queue-overflow', { dropped: envelope.from, strategy: 'newest' });
+          }
+          return; // Don't queue this message
+        } else {
+          // 'none' strategy - reject the message
+          this.log('error', `Queue full, rejecting message from ${envelope.from}`);
+          return;
+        }
+      }
+
+      // Queue the message
+      this.messageQueue.push(envelope);
+      this.log('debug', `Message queued from ${envelope.from}, queue size: ${this.messageQueue.length}`);
+
+      // Emit queue event if configured
+      if (this.config.messageQueue.notifyQueueing) {
+        this.emitQueueEvent('message-queued', {
+          from: envelope.from,
+          queueSize: this.messageQueue.length
+        });
+      }
+      return;
+    }
+
     const { text } = envelope.payload;
-    
+
     // Track conversation history
     this.conversationHistory.push({
       role: 'user',
       content: text,
       name: envelope.from  // Track who sent the message
     });
-    
+
     // Check if we should respond to this message
     const shouldRespond = await this.shouldRespondToChat(envelope);
-    
+
     if (!shouldRespond) {
       this.log('debug', `Skipping response to chat from ${envelope.from}: did not meet response criteria`);
       return;
     }
-    
-    // Start reasoning if enabled
-    if (this.config.reasoningEnabled) {
-      this.emitReasoning('reasoning/start', { input: text });
-      
-      try {
-        const response = await this.processWithReAct(text);
-        this.log('info', `Processed response: ${response}`);
-        await this.sendResponse(response, envelope.from);
-        this.log('info', `Sent response to ${envelope.from}`);
-      } catch (error) {
-        this.log('error', `Failed to process chat: ${error}`);
-        await this.sendResponse(
-          `I encountered an error processing your request: ${error}`,
-          envelope.from
-        );
+
+    // Mark as processing
+    this.isProcessing = true;
+    if (this.config.messageQueue?.notifyQueueing) {
+      this.emitQueueEvent('processing-started', { originalFrom: envelope.from });
+    }
+
+    try {
+      // Start reasoning if enabled
+      if (this.config.reasoningEnabled) {
+        this.emitReasoning('reasoning/start', { input: text });
+
+        try {
+          const response = await this.processWithReAct(text);
+          this.log('info', `Processed response: ${response}`);
+          await this.sendResponse(response, envelope.from);
+          this.log('info', `Sent response to ${envelope.from}`);
+        } catch (error) {
+          this.log('error', `Failed to process chat: ${error}`);
+          await this.sendResponse(
+            `I encountered an error processing your request: ${error}`,
+            envelope.from
+          );
+        }
+
+        this.emitReasoning('reasoning/conclusion', {});
       }
-      
-      this.emitReasoning('reasoning/conclusion', {});
+    } finally {
+      // Mark as no longer processing
+      this.isProcessing = false;
+      if (this.config.messageQueue?.notifyQueueing) {
+        this.emitQueueEvent('processing-completed', { originalFrom: envelope.from });
+      }
+
+      // Process any queued messages
+      if (this.messageQueue.length > 0) {
+        const nextMessage = this.messageQueue.shift()!;
+        this.log('debug', `Processing next queued message from ${nextMessage.from}`);
+        // Process the next message (this will set isProcessing again)
+        await this.handleChat(nextMessage);
+      }
     }
   }
   
@@ -545,16 +628,8 @@ Return a JSON object:
       this.log('warn', '   Waiting for other participants to join and share their tools...');
     }
 
-    // Build messages based on configured format
-    let messages: any[];
-    
-    if (this.config.reasoningFormat === 'native') {
-      // Native OpenAI format with proper tool call/result messages
-      messages = this.buildNativeFormatMessages(input, previousThoughts);
-    } else {
-      // Scratchpad format (original implementation)
-      messages = this.buildScratchpadFormatMessages(input, previousThoughts);
-    }
+    // Build messages - always use native format (scratchpad deprecated)
+    const messages = this.buildNativeFormatMessages(input, previousThoughts);
     
     // Add guidance about proposal timeouts if we've encountered them
     const hasProposalTimeout = previousThoughts.some(t => 
@@ -623,15 +698,15 @@ Return a JSON object:
    */
   private buildNativeFormatMessages(input: string, previousThoughts: Thought[]): any[] {
     const messages: any[] = [
-      { 
-        role: 'system', 
-        content: this.config.systemPrompt || 'You are a helpful assistant. When asked to perform calculations or tasks, use the available tools. Only respond directly if no tool is needed.' 
+      {
+        role: 'system',
+        content: this.config.systemPrompt || 'You are a helpful assistant. When asked to perform calculations or tasks, use the available tools. Only respond directly if no tool is needed.'
       }
     ];
-    
+
     // Add the original user request
     messages.push({ role: 'user', content: input });
-    
+
     // Add previous thoughts as proper assistant/tool messages
     for (const thought of previousThoughts) {
       if (thought.action === 'tool' && thought.actionInput?.toolCallId) {
@@ -648,7 +723,7 @@ Return a JSON object:
             }
           }]
         });
-        
+
         // Tool result message
         if (thought.observation) {
           messages.push({
@@ -665,46 +740,50 @@ Return a JSON object:
         });
       }
     }
-    
+
+    // INJECT QUEUED MESSAGES HERE
+    if (this.messageQueue.length > 0) {
+      // Add queued messages as additional user messages
+      const queuedMessages = [...this.messageQueue];
+      this.messageQueue = []; // Clear queue after consuming
+
+      this.log('debug', `Injecting ${queuedMessages.length} queued message(s) into LLM context`);
+
+      for (const queued of queuedMessages) {
+        messages.push({
+          role: 'user',
+          content: queued.payload.text,
+          name: queued.from // Track sender
+        });
+
+        // Also add to conversation history for persistence
+        this.conversationHistory.push({
+          role: 'user',
+          content: queued.payload.text,
+          name: queued.from
+        });
+      }
+
+      // Add a system message to help LLM understand context if configured
+      if (this.config.messageQueue?.includeQueuedSenderNotification && queuedMessages.length > 0) {
+        messages.push({
+          role: 'system',
+          content: `${queuedMessages.length} additional message(s) were received while you were processing. Please consider them in your response.`
+        });
+      }
+
+      // Emit event for queue injection
+      if (this.config.messageQueue?.notifyQueueing) {
+        this.emitQueueEvent('queue-injected', {
+          count: queuedMessages.length,
+          senders: queuedMessages.map(m => m.from)
+        });
+      }
+    }
+
     return messages;
   }
 
-  /**
-   * Build messages in scratchpad format (original implementation)
-   */
-  private buildScratchpadFormatMessages(input: string, previousThoughts: Thought[]): any[] {
-    const messages: any[] = [
-      { 
-        role: 'system', 
-        content: this.config.systemPrompt || 'You are a helpful assistant. When asked to perform calculations or tasks, use the available tools. Only respond directly if no tool is needed.' 
-      }
-    ];
-    
-    // Add the original user request
-    messages.push({ role: 'user', content: input });
-    
-    // Add previous thoughts and observations to maintain context
-    if (previousThoughts.length > 0) {
-      // Build context from previous iterations
-      let context = "Previous actions and observations:\n";
-      for (const thought of previousThoughts) {
-        context += `\nReasoning: ${thought.reasoning}\n`;
-        context += `Action: ${thought.action}\n`;
-        if (thought.action === 'tool' && thought.actionInput?.tool) {
-          context += `Tool used: ${thought.actionInput.tool}\n`;
-        }
-        if (thought.observation) {
-          context += `Observation: ${thought.observation}\n`;
-        }
-      }
-      context += "\nBased on the above context, continue processing the user's request.";
-      
-      messages.push({ role: 'assistant', content: context });
-      messages.push({ role: 'user', content: "Continue with the next step, or provide the final response if all tasks are complete." });
-    }
-    
-    return messages;
-  }
 
   
   /**
@@ -922,9 +1001,19 @@ Return a JSON object:
       kind: event as any,
       payload: data
     };
-    
+
     if (this.canSend(envelope)) {
       this.send(envelope);
     }
+  }
+
+  /**
+   * Emit queue events
+   */
+  private emitQueueEvent(event: string, data: any): void {
+    // Queue events are internal events, not sent as MEW messages
+    // They can be used by UI or monitoring systems
+    this.log('debug', `Queue event: ${event} - ${JSON.stringify(data)}`);
+    // Could emit via EventEmitter if needed in the future
   }
 }
