@@ -468,7 +468,13 @@ async function spaceUpAction(options) {
       process.exit(1);
     }
 
-    // Start gateway using PM2
+    // IMPORTANT: Load/generate tokens BEFORE starting gateway
+    // This ensures both gateway and space.js use the same tokens
+    console.log('Loading participant tokens...');
+    const tokenMap = await loadParticipantTokens(spaceDir, config);
+    console.log('✓ Tokens loaded/generated for all participants');
+
+    // Start gateway using PM2 (it will load the same tokens from disk)
     console.log(`Starting gateway on port ${selectedPort}...`);
     const gatewayLogPath = path.join(logsDir, 'gateway.log');
 
@@ -513,11 +519,6 @@ async function spaceUpAction(options) {
       process.exit(1);
     }
     console.log('✓ Gateway is ready');
-
-    // Load participant tokens from secure storage
-    console.log('Loading participant tokens...');
-    const tokenMap = await loadParticipantTokens(spaceDir, config);
-    console.log('✓ Tokens loaded/generated for all participants');
 
     // Start agents and bridges with auto_start: true
     for (const [participantId, participant] of Object.entries(config.participants || {})) {
