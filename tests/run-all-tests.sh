@@ -129,18 +129,11 @@ run_test "Scenario 4: Dynamic Capability Granting" "./scenario-4-capabilities"
 run_test "Scenario 5: Reasoning with Context Field" "./scenario-5-reasoning"
 run_test "Scenario 6: Error Recovery and Edge Cases" "./scenario-6-errors"
 run_test "Scenario 7: MCP Bridge Integration" "./scenario-7-mcp-bridge"
-
-# LLM-dependent scenarios (require OPENAI_API_KEY)
-if [ "$NO_LLM" = false ]; then
-  run_test "Scenario 8: TypeScript Agent" "./scenario-8-typescript-agent"
-  run_test "Scenario 9: TypeScript Proposals" "./scenario-9-typescript-proposals"
-  run_test "Scenario 10: Multi-Agent" "./scenario-10-multi-agent"
-else
-  echo -e "${YELLOW}Skipping Scenario 8 (TypeScript Agent) - requires OPENAI_API_KEY${NC}"
-  echo -e "${YELLOW}Skipping Scenario 9 (TypeScript Proposals) - requires OPENAI_API_KEY${NC}"
-  echo -e "${YELLOW}Skipping Scenario 10 (Multi-Agent) - requires OPENAI_API_KEY${NC}"
-  echo ""
-fi
+run_test "Scenario 8: TypeScript Agent" "./scenario-8-typescript-agent"
+run_test "Scenario 9: TypeScript Proposals" "./scenario-9-typescript-proposals"
+run_test "Scenario 10: Multi-Agent" "./scenario-10-multi-agent"
+run_test "Scenario 11: Streams" "./scenario-11-streams"
+run_test "Scenario 12: Batch Streaming" "./scenario-12-sdk-streams"
 
 # Summary
 echo -e "${BLUE}================================================${NC}"

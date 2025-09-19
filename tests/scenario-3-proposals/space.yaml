@@ -1,39 +1,43 @@
 space:
-  id: test-space
-  name: "Scenario 3 - Proposals with Capability Blocking"
-  description: "Test proposal flow with capability restrictions"
+  id: scenario-3
+  name: "Scenario 3 - STDIO Proposals"
+  description: "Tests proposal fulfillment via fulfiller and calculator agents"
 
 participants:
   calculator-agent:
-    tokens: ["calculator-token"]
-    capabilities:
-      - kind: mcp/request
-        payload:
-          method: tools/*
-      - kind: mcp/response
-      - kind: system/*
     auto_start: true
     command: "node"
-    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "calculator-token"]
-    
-  fulfiller:
-    tokens: ["fulfiller-token"]
+    args: ["../agents/calculator-participant.js"]
+    env:
+      MEW_PARTICIPANT_ID: "calculator-agent"
+      CALCULATOR_LOG: "./logs/calculator.log"
     capabilities:
       - kind: mcp/request
-        payload:
-          method: tools/*
       - kind: mcp/response
+      - kind: system/*
+
+  fulfiller-agent:
+    auto_start: true
+    command: "node"
+    args: ["../agents/fulfiller-participant.js"]
+    env:
+      MEW_PARTICIPANT_ID: "fulfiller-agent"
+      FULFILLER_LOG: "./logs/fulfiller.log"
+    capabilities:
+      - kind: mcp/proposal
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: chat
+      - kind: system/*
+
+  proposal-driver:
+    auto_start: true
+    command: "node"
+    args: ["../agents/proposal-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "proposal-driver"
+      DRIVER_LOG: "./logs/proposal-driver.log"
+    capabilities:
       - kind: mcp/proposal
       - kind: chat
       - kind: system/*
-    auto_start: true
-    command: "node"
-    args: ["../agents/fulfiller-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "fulfiller-token"]
-    
-  proposer:
-    tokens: ["proposer-token"]
-    capabilities:
-      - kind: mcp/proposal
-      - kind: system/*
-    output_log: "./logs/proposer-output.log"
-    auto_connect: true

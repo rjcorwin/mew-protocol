@@ -1,41 +1,30 @@
 space:
-  id: test-space
-  name: "Scenario 9 - TypeScript Agent Proposals Only"
-  description: "Test TypeScript agent with proposal-only permissions, requiring fulfillment by test client"
+  id: scenario-9
+  name: "Scenario 9 - STDIO TypeScript Proposals"
+  description: "Simulate proposal-only agent fulfilled by driver"
 
 participants:
-  typescript-agent:
-    tokens: ["ts-agent-token"]
+  typescript-proposal-agent:
+    auto_start: true
+    command: "node"
+    args: ["../agents/typescript-proposal-agent.js"]
+    env:
+      MEW_PARTICIPANT_ID: "typescript-proposal-agent"
+      TS_PROPOSAL_LOG: "./logs/typescript-proposal-agent.log"
+      REQUESTER_ID: "ts-proposal-driver"
     capabilities:
-      # Can request any mcp method except tools/call
-      - kind: mcp/request
-        payload:
-          method: "!tools/call"
-      # Instead of doing an mcp request with method tools/call, it can create a proposal with method tools/call
       - kind: mcp/proposal
-      - kind: mcp/response
       - kind: chat
-      # When reasoning capability is enabled, the agent will automatically expose its thought process between tool calls by sending reasoning/start, reasoning/thought, and reasoning/conclusion messages
-      - kind: reasoning/*
+      - kind: system/*
+
+  ts-proposal-driver:
     auto_start: true
     command: "node"
-    args: ["../../sdk/typescript-sdk/agent/dist/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "ts-agent-token", "--id", "typescript-agent", "--no-sample-tools"]
-    
-  fulfiller-agent:
-    tokens: ["fulfiller-token"]
+    args: ["../agents/ts-proposal-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "ts-proposal-driver"
+      DRIVER_LOG: "./logs/ts-proposal-driver.log"
+      AGENT_ID: "typescript-proposal-agent"
     capabilities:
-      - kind: mcp/request
-      - kind: mcp/response
       - kind: chat
-    auto_start: true
-    command: "node"
-    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "fulfiller-token", "--id", "fulfiller-agent"]
-    
-  test-client:
-    tokens: ["test-token"]
-    capabilities:
-      - kind: mcp/request
-      - kind: mcp/response
-      - kind: chat
-    output_log: "./logs/test-client-output.log"
-    auto_connect: true
+      - kind: system/*

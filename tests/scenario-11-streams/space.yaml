@@ -1,0 +1,30 @@
+space:
+  id: scenario-11
+  name: "Scenario 11 - STDIO Streams"
+  description: "Streaming agent emits reasoning sequence to driver"
+
+participants:
+  streaming-agent:
+    auto_start: true
+    command: "node"
+    args: ["../agents/streaming-agent.js"]
+    env:
+      MEW_PARTICIPANT_ID: "streaming-agent"
+      STREAM_AGENT_LOG: "./logs/streaming-agent.log"
+      DRIVER_ID: "stream-driver"
+    capabilities:
+      - kind: reasoning/*
+      - kind: chat
+      - kind: system/*
+
+  stream-driver:
+    auto_start: true
+    command: "node"
+    args: ["../agents/streaming-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "stream-driver"
+      STREAM_DRIVER_LOG: "./logs/stream-driver.log"
+      AGENT_ID: "streaming-agent"
+    capabilities:
+      - kind: chat
+      - kind: system/*

@@ -1,78 +1,41 @@
 space:
   id: scenario-10
-  name: "Multi-Agent Coordination Test"
-  description: "Test multiple TypeScript agents coordinating tasks"
+  name: "Scenario 10 - STDIO Multi-Agent Coordination"
+  description: "Coordinator delegates work to worker and relays result back to driver"
 
 participants:
-  # TypeScript coordinator agent
   coordinator-agent:
-    tokens: ["coordinator-token"]
-    capabilities:
-      - kind: "chat"
-      - kind: "mcp/request"
-        payload:
-          method: "tools/*"
-      - kind: "mcp/response"
-      - kind: "mcp/proposal"
-      - kind: "reasoning/*"
-      - kind: "system/*"
     auto_start: true
     command: "node"
-    args: 
-      - "../../sdk/typescript-sdk/agent/dist/index.js"
-      - "--gateway"
-      - "ws://localhost:${PORT}"
-      - "--space"
-      - "scenario-10"
-      - "--token"
-      - "coordinator-token"
-      - "--id"
-      - "coordinator-agent"
-    
-  # TypeScript worker agent
-  worker-agent:
-    tokens: ["worker-token"]
+    args: ["../agents/multi-coordinator.js"]
+    env:
+      MEW_PARTICIPANT_ID: "coordinator-agent"
+      WORKER_ID: "worker-agent"
+      DRIVER_ID: "multi-driver"
+      COORDINATOR_LOG: "./logs/coordinator.log"
     capabilities:
-      - kind: "chat"
-      - kind: "mcp/request"
-        payload:
-          method: "tools/*"
-      - kind: "mcp/response"
-      - kind: "reasoning/*"
-      - kind: "system/*"
-    auto_start: true
-    command: "node"
-    args: 
-      - "../../sdk/typescript-sdk/agent/dist/index.js"
-      - "--gateway"
-      - "ws://localhost:${PORT}"
-      - "--space"
-      - "scenario-10"
-      - "--token"
-      - "worker-token"
-      - "--id"
-      - "worker-agent"
-    
-  # Calculator agent (from previous scenarios)
-  calculator-agent:
-    tokens: ["calculator-token"]
-    capabilities:
-      - kind: mcp/response
+      - kind: chat
       - kind: system/*
+
+  worker-agent:
     auto_start: true
     command: "node"
-    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "scenario-10", "--token", "calculator-token"]
-    
-  # Test client for coordinating tests
-  test-client:
-    tokens: ["test-token"]
+    args: ["../agents/multi-worker.js"]
+    env:
+      MEW_PARTICIPANT_ID: "worker-agent"
+      WORKER_LOG: "./logs/worker.log"
     capabilities:
-      - kind: "chat"
-      - kind: "mcp/request"
-        payload:
-          method: "tools/*"
-      - kind: "mcp/response"
-      - kind: "mcp/proposal"
-      - kind: "system/*"
-    output_log: "./logs/test-client-output.log"
-    auto_connect: true
+      - kind: chat
+      - kind: system/*
+
+  multi-driver:
+    auto_start: true
+    command: "node"
+    args: ["../agents/multi-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "multi-driver"
+      DRIVER_LOG: "./logs/multi-driver.log"
+      COORDINATOR_ID: "coordinator-agent"
+    capabilities:
+      - kind: chat
+      - kind: system/*

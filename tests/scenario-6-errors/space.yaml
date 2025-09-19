@@ -1,13 +1,30 @@
 space:
-  id: test-space
-  name: "Scenario 6 - Error Recovery and Edge Cases"
-  description: "Test error recovery and edge cases"
+  id: scenario-6
+  name: "Scenario 6 - STDIO Error Handling"
+  description: "Exercises error and recovery paths"
 
 participants:
-  test-client:
-    tokens: ["test-token"]
+  calculator-agent:
+    auto_start: true
+    command: "node"
+    args: ["../agents/calculator-participant.js"]
+    env:
+      MEW_PARTICIPANT_ID: "calculator-agent"
+      CALCULATOR_LOG: "./logs/calculator.log"
     capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: system/*
+
+  error-driver:
+    auto_start: true
+    command: "node"
+    args: ["../agents/error-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "error-driver"
+      DRIVER_LOG: "./logs/error-driver.log"
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
       - kind: chat
       - kind: system/*
-    output_log: "./logs/test-client-output.log"
-    auto_connect: true

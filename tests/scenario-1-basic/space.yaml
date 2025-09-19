@@ -1,23 +1,26 @@
 space:
-  id: test-space
-  name: "Scenario 1 - Basic Message Flow"
-  description: "Test basic message flow with echo agent"
+  id: scenario-1
+  name: "Scenario 1 - Basic STDIO Message Flow"
+  description: "Test basic message flow using STDIO transport"
 
 participants:
   echo-agent:
-    tokens: ["echo-token"]
-    capabilities:
-      - kind: chat
-      - kind: system/*
-    fifo: false  # Agent doesn't need FIFOs
     auto_start: true
     command: "node"
-    args: ["../agents/echo.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "echo-token"]
-    
-  test-client:
-    tokens: ["test-token"]
+    args: ["../agents/echo.js"]
+    env:
+      MEW_PARTICIPANT_ID: "echo-agent"
     capabilities:
       - kind: chat
       - kind: system/*
-    output_log: "./logs/test-client-output.log"  # Output to file
-    auto_connect: true  # Auto-connect via WebSocket to receive messages
+
+  basic-driver:
+    auto_start: true
+    command: "node"
+    args: ["../agents/basic-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "basic-driver"
+      DRIVER_LOG: "./logs/basic-driver.log"
+    capabilities:
+      - kind: chat
+      - kind: system/*

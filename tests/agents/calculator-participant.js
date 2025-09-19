@@ -1,137 +1,189 @@
 #!/usr/bin/env node
-/**
- * Calculator Agent - Provides MCP math tools (add, multiply, evaluate)
- * Using MEWParticipant base class for cleaner, promise-based code
- */
-
+const { FrameParser, encodeEnvelope } = require('../../cli/src/stdio/utils');
+const fs = require('fs');
 const path = require('path');
 
-// Import MEWParticipant from the SDK
-const participantPath = path.resolve(__dirname, '../../sdk/typescript-sdk/participant/dist/index.js');
-const { MEWParticipant } = require(participantPath);
+const participantId = process.env.MEW_PARTICIPANT_ID || 'calculator-agent';
+const logPath = process.env.CALCULATOR_LOG || null;
 
-class CalculatorAgent extends MEWParticipant {
-  constructor(options) {
-    super(options);
-    
-    // Register calculator tools - they'll be automatically handled
-    this.registerTool({
-      name: 'add',
-      description: 'Add two numbers',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          a: { type: 'number', description: 'First number' },
-          b: { type: 'number', description: 'Second number' }
-        },
-        required: ['a', 'b']
-      },
-      execute: async (args) => {
-        return args.a + args.b;
-      }
-    });
-    
-    this.registerTool({
-      name: 'multiply',
-      description: 'Multiply two numbers',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          a: { type: 'number', description: 'First number' },
-          b: { type: 'number', description: 'Second number' }
-        },
-        required: ['a', 'b']
-      },
-      execute: async (args) => {
-        return args.a * args.b;
-      }
-    });
-    
-    this.registerTool({
-      name: 'evaluate',
-      description: 'Evaluate a mathematical expression',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          expression: { type: 'string', description: 'Mathematical expression to evaluate' }
-        },
-        required: ['expression']
-      },
-      execute: async (args) => {
-        try {
-          // Simple safe eval for basic math expressions
-          const result = Function('"use strict"; return (' + args.expression + ')')();
-          // Convert Infinity to a string for JSON serialization
-          if (!isFinite(result)) {
-            return result.toString(); // Returns "Infinity" or "-Infinity" 
-          }
-          return result;
-        } catch (error) {
-          throw new Error(`Invalid expression: ${error.message}`);
-        }
-      }
-    });
-  }
-  
-  async onReady() {
-    console.log('Calculator agent ready!');
-    console.log('Registered 3 tools: add, multiply, evaluate');
-    
-    // Add debug logging for all incoming messages
-    this.onMessage((envelope) => {
-      console.log(`Calculator received ${envelope.kind} from ${envelope.from}:`, JSON.stringify(envelope.payload));
-    });
-  }
-  
-  async onShutdown() {
-    console.log('Calculator agent shutting down...');
+function appendLog(line) {
+  if (!logPath) return;
+  try {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.appendFileSync(logPath, `${line}\n`);
+  } catch (error) {
+    // Ignore logging errors in tests
   }
 }
 
-// Parse command line arguments
-const args = process.argv.slice(2);
-const options = {
-  gateway: 'ws://localhost:8080',
-  space: 'test-space',
-  token: 'calculator-token',
-  participant_id: 'calculator-agent'
-};
+const tools = [
+  {
+    name: 'add',
+    description: 'Add two numbers',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        a: { type: 'number' },
+        b: { type: 'number' },
+      },
+      required: ['a', 'b'],
+    },
+  },
+  {
+    name: 'multiply',
+    description: 'Multiply two numbers',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        a: { type: 'number' },
+        b: { type: 'number' },
+      },
+      required: ['a', 'b'],
+    },
+  },
+  {
+    name: 'evaluate',
+    description: 'Evaluate a mathematical expression',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        expression: { type: 'string' },
+      },
+      required: ['expression'],
+    },
+  },
+];
 
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--gateway' || args[i] === '-g') {
-    options.gateway = args[i + 1];
-    i++;
-  } else if (args[i] === '--space' || args[i] === '-s') {
-    options.space = args[i + 1];
-    i++;
-  } else if (args[i] === '--token' || args[i] === '-t') {
-    options.token = args[i + 1];
-    i++;
-  } else if (args[i] === '--id') {
-    options.participant_id = args[i + 1];
-    i++;
+function send(envelope) {
+  process.stdout.write(encodeEnvelope({ protocol: 'mew/v0.3', ...envelope }));
+}
+
+function isTargeted(envelope) {
+  if (!envelope.to || envelope.to.length === 0) {
+    return true;
+  }
+  return envelope.to.includes(participantId);
+}
+
+function handleRequest(envelope) {
+  const requestId = envelope.id || envelope.correlation_id || `req-${Date.now()}`;
+  const context = envelope.context;
+  const responseBase = {
+    kind: 'mcp/response',
+    correlation_id: requestId ? [requestId] : undefined,
+    context,
+  };
+
+  if (!isTargeted(envelope)) {
+    return;
+  }
+
+  const method = envelope.payload?.method;
+  const params = envelope.payload?.params || {};
+  appendLog(`REQUEST ${method}`);
+
+  switch (method) {
+    case 'tools/list':
+      send({
+        ...responseBase,
+        payload: {
+          success: true,
+          result: {
+            tools,
+          },
+        },
+      });
+      break;
+    case 'tools/call': {
+      const toolName = params.name;
+      const args = params.arguments || {};
+      handleToolCall(toolName, args, responseBase);
+      break;
+    }
+    default:
+      send({
+        ...responseBase,
+        payload: {
+          success: false,
+          error: `Unsupported method: ${method}`,
+        },
+      });
   }
 }
 
-// Create and start the agent
-const agent = new CalculatorAgent(options);
+function handleToolCall(toolName, args, responseBase) {
+  try {
+    let result;
+    switch (toolName) {
+      case 'add':
+        result = (Number(args.a) || 0) + (Number(args.b) || 0);
+        break;
+      case 'multiply':
+        result = (Number(args.a) || 0) * (Number(args.b) || 0);
+        break;
+      case 'evaluate':
+        result = evaluateExpression(args.expression);
+        break;
+      default:
+        send({
+          ...responseBase,
+          payload: {
+            success: false,
+            error: `Tool not found: ${toolName}`,
+          },
+        });
+        return;
+    }
 
-console.log(`Starting calculator agent with MEWParticipant...`);
-console.log(`Gateway: ${options.gateway}`);
-console.log(`Space: ${options.space}`);
+    send({
+      ...responseBase,
+      payload: {
+        success: true,
+        result,
+      },
+    });
+  } catch (error) {
+    send({
+      ...responseBase,
+      payload: {
+        success: false,
+        error: error.message,
+      },
+    });
+  }
+}
 
-agent.connect()
-  .then(() => {
-    console.log('Calculator agent connected successfully');
-  })
-  .catch(error => {
-    console.error('Failed to connect:', error);
-    process.exit(1);
-  });
+function evaluateExpression(expression) {
+  if (typeof expression !== 'string' || !expression.trim()) {
+    throw new Error('Invalid expression');
+  }
 
-// Handle shutdown
-process.on('SIGINT', () => {
-  console.log('\nReceived SIGINT, shutting down...');
-  agent.disconnect();
-  process.exit(0);
+  // Basic validation: allow numbers, operators, parentheses, whitespace
+  if (!/^[-+*/()0-9.\s]+$/.test(expression)) {
+    throw new Error('Expression contains unsupported characters');
+  }
+
+  const result = Function(`"use strict"; return (${expression})`)();
+  if (Number.isFinite(result)) {
+    return result;
+  }
+  return result.toString();
+}
+
+const parser = new FrameParser((envelope) => {
+  if (envelope.kind === 'mcp/request') {
+    handleRequest(envelope);
+  }
 });
+
+process.stdin.on('data', (chunk) => {
+  try {
+    parser.push(chunk);
+  } catch (error) {
+    appendLog(`ERROR ${error.message}`);
+  }
+});
+
+process.stdin.on('close', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
+process.on('SIGTERM', () => process.exit(0));
