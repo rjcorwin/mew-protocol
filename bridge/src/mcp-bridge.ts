@@ -24,24 +24,26 @@ export class MCPBridge extends MEWParticipant {
   private isShuttingDown = false;
   private restartAttempts = 0;
   private maxRestartAttempts = 3;
+  private mcpServerConfig: MCPServerConfig;
 
   constructor(options: MCPBridgeOptions) {
     // Initialize parent with connection options
+    const participantId = options.participantId || 'mcp-bridge';
+    console.log(`Bridge: Initializing with participant_id: "${participantId}"`);
+
     super({
       gateway: options.gateway,
       space: options.space,
-      participant_id: options.participantId || 'mcp-bridge',
+      participant_id: participantId,
       token: options.token,
     });
 
     this.initTimeout = options.initTimeout || 30000;
+    this.mcpServerConfig = options.mcpServer;
 
     console.log('Bridge: Using MEWParticipant base class for MCP request handling');
 
-    // Start MCP server after constructor
-    this.startMCPServer(options.mcpServer).catch((error) => {
-      console.error('Failed to start MCP server:', error);
-    });
+    // MCP server will be started in start() method for proper sequencing
   }
 
   /**
@@ -51,7 +53,12 @@ export class MCPBridge extends MEWParticipant {
     debug('Starting MCP-MEW bridge with participant base class');
 
     try {
-      // Connect to MEW gateway
+      // Initialize MCP server first, before connecting to gateway
+      console.log('Bridge: Initializing MCP server before connecting to gateway...');
+      await this.startMCPServer(this.mcpServerConfig);
+
+      // Now connect to MEW gateway after MCP is ready
+      console.log('Bridge: MCP server ready, connecting to gateway...');
       await this.connect();
 
       debug('Bridge started successfully');
@@ -86,7 +93,7 @@ export class MCPBridge extends MEWParticipant {
       if (!this.isShuttingDown) {
         // MEWParticipant handles reconnection to gateway
         // We may need to restart MCP server
-        this.restartMCPServer(config);
+        this.restartMCPServer(this.mcpServerConfig);
       }
     });
 
@@ -195,6 +202,9 @@ export class MCPBridge extends MEWParticipant {
    * Called when participant is ready (connected and welcomed)
    */
   protected async onReady(): Promise<void> {
+    console.log('Bridge: onReady called!');
+    console.log('Bridge: Participant info:', JSON.stringify(this.participantInfo, null, 2));
+
     debug('MCP Bridge participant ready!');
     debug('Participant ID:', this.participantInfo?.id);
     debug(

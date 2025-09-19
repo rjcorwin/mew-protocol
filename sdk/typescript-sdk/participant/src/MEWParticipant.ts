@@ -567,6 +567,14 @@ export class MEWParticipant extends MEWClient {
 
     // Handle incoming messages
     this.onMessage(async (envelope: Envelope) => {
+      // Debug logging for message reception
+      console.log(`[MEWParticipant "${this.options.participant_id}"] Received message:`, {
+        kind: envelope.kind,
+        from: envelope.from,
+        to: envelope.to,
+        id: envelope.id
+      });
+
       // Handle MCP responses
       if (envelope.kind === 'mcp/response') {
         // Debug: Received MCP response
@@ -585,7 +593,10 @@ export class MEWParticipant extends MEWClient {
         }
         
         if (this.shouldHandleRequest(envelope)) {
+          console.log(`[MEWParticipant "${this.options.participant_id}"] Handling MCP request from ${envelope.from}`);
           await this.handleMCPRequest(envelope);
+        } else {
+          console.log(`[MEWParticipant "${this.options.participant_id}"] Ignoring MCP request (not addressed to us)`);
         }
       }
 
