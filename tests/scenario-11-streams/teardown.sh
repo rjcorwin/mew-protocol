@@ -11,7 +11,7 @@ fi
 
 cd "$TEST_DIR"
 
-echo -e "${YELLOW}=== Tearing down multi-agent scenario ===${NC}"
+echo -e "${YELLOW}=== Tearing down streaming scenario ===${NC}"
 
 ../../cli/bin/mew.js space down >/dev/null 2>&1 || true
 ../../cli/bin/mew.js space clean >/dev/null 2>&1 || true

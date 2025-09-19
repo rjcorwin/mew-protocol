@@ -51,6 +51,12 @@ All test scenarios are located in this directory. Each scenario is self-containe
 - **scenario-5-reasoning** - Reasoning sequence with context preservation
 - **scenario-6-errors** - Error handling and recovery behaviors
 - **scenario-7-mcp-bridge** - MCP bridge simulation over STDIO
+- **scenario-8-grant** - Capability grant workflow with CLI-managed adapters
+- **scenario-8-typescript-agent** - STDIO TypeScript agent exercising MCP tools
+- **scenario-9-typescript-proposals** - Proposal-only TypeScript agent fulfilled via STDIO driver
+- **scenario-10-multi-agent** - Coordinator/worker/driver collaboration over STDIO
+- **scenario-11-streams** - Streaming reasoning events delivered via framed STDIO
+- **scenario-12-sdk-streams** - Batched data streaming between STDIO participants
 - **scenario-8-grant** - Capability grant workflow (proposal → grant → direct request)
 
 ## Test Agents

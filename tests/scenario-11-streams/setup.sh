@@ -12,7 +12,7 @@ fi
 
 cd "$TEST_DIR"
 
-echo -e "${YELLOW}=== Setting up STDIO multi-agent scenario ===${NC}";
+echo -e "${YELLOW}=== Setting up STDIO streaming scenario ===${NC}";
 
 rm -rf logs
 mkdir -p logs
@@ -34,6 +34,6 @@ fi
 
 ../../cli/bin/mew.js space status
 
-touch ./logs/coordinator.log ./logs/worker.log ./logs/multi-driver.log
+touch ./logs/streaming-agent.log ./logs/stream-driver.log
 
 echo -e "${GREEN}✓ Setup complete${NC}";
