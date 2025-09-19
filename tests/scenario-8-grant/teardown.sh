@@ -1,23 +1,21 @@
 #!/bin/bash
+set -e
 
-# Teardown script for scenario-8-grant
-# Can be run standalone for manual cleanup
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
 
-DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$DIR"
+if [ -z "$TEST_DIR" ]; then
+  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 
-echo "Tearing down scenario-8-grant test space..."
+cd "$TEST_DIR"
 
-# Stop the space
-../../cli/bin/mew.js space down 2>/dev/null || true
+echo -e "${YELLOW}=== Tearing down capability grant scenario ===${NC}"
 
-# Kill any lingering processes
-pkill -f "scenario-8-grant" 2>/dev/null || true
+../../cli/bin/mew.js space down >/dev/null 2>&1 || true
+../../cli/bin/mew.js space clean >/dev/null 2>&1 || true
 
-# Clean up FIFOs
-rm -f fifos/human-input fifos/human-output 2>/dev/null || true
+rm -rf .mew >/dev/null 2>&1 || true
 
-# Clean up test files (optional, comment out to preserve for inspection)
-# rm -f foo.txt bar.txt
-
-echo "Teardown complete!"
+echo -e "${GREEN}✓ Cleanup complete${NC}"

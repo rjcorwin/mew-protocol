@@ -20,7 +20,7 @@ cd scenario-1-basic
 All test scenarios are located in this directory. Each scenario is self-contained with:
 
 ### Required Files
-- `space.yaml` - Space configuration defining participants, capabilities, and tokens
+- `space.yaml` - Space configuration defining participants and capabilities
 - `test.sh` - Main test orchestrator that runs setup → test logic → check → teardown
 
 ### Supporting Scripts  
@@ -46,20 +46,20 @@ All test scenarios are located in this directory. Each scenario is self-containe
 
 - **scenario-1-basic** - Basic message flow between agents
 - **scenario-2-mcp** - MCP tool execution and responses
-- **scenario-3-proposals** - Proposal system with capability blocking
-- **scenario-4-capabilities** - Dynamic capability granting
-- **scenario-5-reasoning** - Reasoning with context field
-- **scenario-6-errors** - Error recovery and edge cases
-- **scenario-7-mcp-bridge** - MCP server integration via bridge
+- **scenario-3-proposals** - Proposal system fulfilled via STDIO agents
+- **scenario-4-capabilities** - Simulated capability grant/revoke signaling
+- **scenario-5-reasoning** - Reasoning sequence with context preservation
+- **scenario-6-errors** - Error handling and recovery behaviors
+- **scenario-7-mcp-bridge** - MCP bridge simulation over STDIO
 - **scenario-8-grant** - Capability grant workflow (proposal → grant → direct request)
 
 ## Test Agents
 
-The `/agents/` directory contains reusable test agents used across scenarios:
-- `calculator-participant.js` - Simple calculator agent for MCP testing using MEWParticipant
-- `fulfiller.js` - Agent that fulfills proposals
-- `proposer.js` - Agent that creates proposals
-- `requester.js` - Agent that makes various requests
+The `/agents/` directory contains reusable STDIO agents used across scenarios:
+- `calculator-participant.js` - FIFO/STDIO calculator that responds to MCP tool calls
+- `basic-driver.js`, `mcp-driver.js`, `proposal-driver.js`, etc. - Scenario-specific drivers that validate behavior
+- `fulfiller-participant.js` - STDIO fulfiller that reacts to proposals and forwards results
+- `bridge-agent.js` - Stubbed MCP bridge responder for scenario 7
 
 ## Adding New Tests
 
@@ -81,10 +81,10 @@ To debug a failing test:
 
 ## Architecture
 
-Tests use PM2 for process management and the MEW CLI to start spaces. Each test:
-1. Sets up a space with a gateway and participants
-2. Runs test agents that interact via MEW messages
-3. Verifies expected outcomes
+Tests use the MEW CLI's STDIO transport to start the gateway and connect lightweight agents. Each test:
+1. Sets up a space with FIFO-backed participants managed directly by the CLI
+2. Runs test agents that communicate via framed STDIO messages
+3. Verifies expected outcomes from agent log output
 4. Cleans up all processes and artifacts
 
 For protocol details, see the main MEUP documentation.

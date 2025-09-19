@@ -1,34 +1,51 @@
-# Test scenario for capability grant workflow
-# Tests: proposal → fulfill with grant → direct request with granted capability
-
 space:
-  id: scenario-8-grant
-  name: "Capability Grant Workflow Test"
-  description: "Tests granting capabilities and subsequent direct requests"
+  id: scenario-8
+  name: "Scenario 8 - STDIO Capability Grant"
+  description: "Exercise capability grants enabling direct MCP calls"
 
 participants:
-  human:
-    capabilities:
-      - kind: "mcp/*"
-      - kind: "capability/*"
-      - kind: "chat"
-    token: "human-token"
-
-  test-agent:
-    capabilities:
-      - kind: "mcp/proposal"
-      - kind: "mcp/response"
-      - kind: "chat"
-    command: "node"
-    args: ["agent.js"]
-    token: "agent-token"
-    auto_start: true
-
   file-server:
-    capabilities:
-      - kind: "mcp/response"
-      - kind: "chat"
-    command: "node"
-    args: ["file-server.js"]
-    token: "file-server-token"
     auto_start: true
+    command: "node"
+    args: ["../agents/filesystem-server.js"]
+    env:
+      MEW_PARTICIPANT_ID: "file-server"
+      FS_ROOT: "./"
+      FS_LOG: "./logs/file-server.log"
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: system/*
+
+  grant-coordinator:
+    auto_start: true
+    command: "node"
+    args: ["../agents/grant-coordinator.js"]
+    env:
+      MEW_PARTICIPANT_ID: "grant-coordinator"
+      GRANT_LOG: "./logs/grant-coordinator.log"
+      FILE_SERVER_ID: "file-server"
+      AGENT_ID: "grant-agent"
+    capabilities:
+      - kind: mcp/proposal
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: capability/*
+      - kind: system/*
+
+  grant-agent:
+    auto_start: true
+    command: "node"
+    args: ["../agents/grant-agent.js"]
+    env:
+      MEW_PARTICIPANT_ID: "grant-agent"
+      DRIVER_LOG: "./logs/grant-agent.log"
+      FILE_SERVER_ID: "file-server"
+      COORDINATOR_ID: "grant-coordinator"
+    capabilities:
+      - kind: mcp/proposal
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: capability/*
+      - kind: chat
+      - kind: system/*

@@ -1,24 +1,29 @@
 space:
-  id: test-space
-  name: "Scenario 2 - MCP Tool Execution"
-  description: "Test MCP tool execution with calculator agent"
+  id: scenario-2
+  name: "Scenario 2 - STDIO MCP Tool Execution"
+  description: "Tests MCP tool requests against the calculator agent"
 
 participants:
   calculator-agent:
-    tokens: ["calculator-token"]
-    capabilities:
-      - kind: mcp/response
-      - kind: system/*
     auto_start: true
     command: "node"
-    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "calculator-token"]
-    
-  test-client:
-    tokens: ["test-token"]
+    args: ["../agents/calculator-participant.js"]
+    env:
+      MEW_PARTICIPANT_ID: "calculator-agent"
+      CALCULATOR_LOG: "./logs/calculator.log"
     capabilities:
       - kind: mcp/request
-        payload:
-          method: tools/*
+      - kind: mcp/response
       - kind: system/*
-    output_log: "./logs/test-client-output.log"
-    auto_connect: true
+
+  mcp-driver:
+    auto_start: true
+    command: "node"
+    args: ["../agents/mcp-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "mcp-driver"
+      DRIVER_LOG: "./logs/mcp-driver.log"
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: system/*
