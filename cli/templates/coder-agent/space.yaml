@@ -15,8 +15,8 @@ participants:
   # Coder agent with limited capabilities - creates proposals for file modifications
   mew:
     type: local
-    command: "npx"
-    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
+    command: "node"
+    args: ["../../node_modules/@mew-protocol/agent/dist/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
     auto_start: true
     # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
@@ -32,9 +32,9 @@ participants:
         payload:
           method: "tools/list"
       # Uncomment for YOLO mode - gives agent direct tools/call capability:
-      # - kind: "mcp/request"
-      #   payload:
-      #     method: "tools/call"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
       # Allow direct calls to read-only operations without approval
       - kind: "mcp/request"
         payload:
@@ -94,7 +94,7 @@ participants:
       # Configure the agent with 100 max iterations for complex multi-step tasks
       # and 1 hour timeout for proposals to allow human review time
       # and 50 message conversation history for context across interactions
-      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 3600000, "conversationHistoryLength": 50, "reasoningEnabled": true, "systemPrompt": "{{AGENT_PROMPT}}"}'
+      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 3600000, "conversationHistoryLength": 50, "reasoningEnabled": true}'
 
   # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:

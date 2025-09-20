@@ -153,19 +153,25 @@ async function main(): Promise<void> {
   }
 
   // Apply environment variable overrides
+  console.log('🔍 Checking for MEW_AGENT_CONFIG environment variable...');
   if (process.env.MEW_AGENT_CONFIG) {
+    console.log('📦 Found MEW_AGENT_CONFIG:', process.env.MEW_AGENT_CONFIG.substring(0, 100) + '...');
     try {
       const envConfig = JSON.parse(process.env.MEW_AGENT_CONFIG);
+      console.log('✅ Parsed config - maxIterations:', envConfig.maxIterations);
       agentConfig = { ...agentConfig, ...envConfig };
       console.log('Applied configuration from MEW_AGENT_CONFIG');
     } catch (error: any) {
       console.error('Failed to parse MEW_AGENT_CONFIG:', error.message);
     }
+  } else {
+    console.log('⚠️  No MEW_AGENT_CONFIG found in environment');
   }
 
   // Create the agent
   console.log(`Starting MEW TypeScript Agent: ${agentConfig.participant_id}`);
   console.log(`Connecting to ${agentConfig.gateway} (space: ${agentConfig.space})`);
+  console.log(`🎯 Final configuration - maxIterations: ${agentConfig.maxIterations}`);
 
   const agent = new MEWAgent(agentConfig);
 

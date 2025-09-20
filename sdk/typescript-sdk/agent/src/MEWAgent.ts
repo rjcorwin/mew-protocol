@@ -98,6 +98,9 @@ export class MEWAgent extends MEWParticipant {
       ...config
     };
 
+    // Log the actual maxIterations value being used
+    console.log(`🔢 MEWAgent initialized with maxIterations: ${this.config.maxIterations}`);
+
     // LOUDLY FAIL if no API key provided
     if (!this.config.apiKey) {
       console.error('');
@@ -577,7 +580,8 @@ Return a JSON object:
         // Continue the loop - let the LLM decide if it can recover or needs to respond with error
       }
     }
-    
+
+    this.log('error', `❌ Exceeded maximum iterations: ${iterations} >= ${this.config.maxIterations}`);
     return 'I exceeded the maximum number of reasoning iterations.';
   }
 
