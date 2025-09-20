@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mew-protocol/participant": "^0.1.0",
+    "@mew-protocol/participant": "^0.2.0",
     "@mew-protocol/types": "^0.2.0",
     "commander": "^11.1.0",
     "debug": "^4.3.4",
