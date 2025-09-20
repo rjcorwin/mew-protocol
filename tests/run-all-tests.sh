@@ -10,18 +10,24 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Parse command line arguments
 NO_LLM=false
+VERBOSE=false
 for arg in "$@"; do
   case $arg in
     --no-llm)
       NO_LLM=true
       shift
       ;;
+    --verbose|-v)
+      VERBOSE=true
+      shift
+      ;;
     --help)
-      echo "Usage: $0 [--no-llm] [--help]"
+      echo "Usage: $0 [--no-llm] [--verbose|-v] [--help]"
       echo ""
       echo "Options:"
-      echo "  --no-llm    Skip scenarios that require OPENAI_API_KEY (8, 9, 10)"
-      echo "  --help      Show this help message"
+      echo "  --no-llm       Skip scenarios that require OPENAI_API_KEY (8, 9, 10)"
+      echo "  --verbose, -v  Show detailed test output (useful for CI debugging)"
+      echo "  --help         Show this help message"
       exit 0
       ;;
     *)
@@ -44,6 +50,10 @@ echo -e "${BLUE}        MEW v0.2 Test Suite Runner              ${NC}"
 echo -e "${BLUE}================================================${NC}"
 if [ "$NO_LLM" = true ]; then
   echo -e "${YELLOW}        LLM scenarios disabled (--no-llm)       ${NC}"
+  echo -e "${BLUE}================================================${NC}"
+fi
+if [ "$VERBOSE" = true ]; then
+  echo -e "${YELLOW}        Verbose mode enabled                    ${NC}"
   echo -e "${BLUE}================================================${NC}"
 fi
 echo ""
@@ -74,12 +84,29 @@ run_test() {
     mkdir -p logs
     
     # Run the test with timeout directly
-    if timeout 60 ./test.sh > ./logs/test-output.log 2>&1; then
+    if [ "$VERBOSE" = true ]; then
+      # In verbose mode, show output directly
+      if timeout 60 ./test.sh 2>&1 | tee ./logs/test-output.log; then
+        TEST_SUCCESS=true
+      else
+        TEST_SUCCESS=false
+        EXIT_CODE=$?
+      fi
+    else
+      # Normal mode - capture output to log file only
+      if timeout 60 ./test.sh > ./logs/test-output.log 2>&1; then
+        TEST_SUCCESS=true
+      else
+        TEST_SUCCESS=false
+        EXIT_CODE=$?
+      fi
+    fi
+
+    if [ "$TEST_SUCCESS" = true ]; then
       echo -e "${GREEN}✅ $test_name PASSED${NC}"
       echo "Status: PASSED" >> "$TEST_RESULTS_LOG"
       TOTAL_PASS=$((TOTAL_PASS + 1))
     else
-      EXIT_CODE=$?
       if [ $EXIT_CODE -eq 124 ]; then
         echo -e "${RED}❌ $test_name TIMEOUT${NC}"
         echo "Status: TIMEOUT" >> "$TEST_RESULTS_LOG"
@@ -91,6 +118,14 @@ run_test() {
         echo "Status: FAILED (exit code: $EXIT_CODE)" >> "$TEST_RESULTS_LOG"
       fi
       echo "   See $test_dir/logs/test-output.log for details"
+
+      # In verbose mode, also show the last 20 lines of the log
+      if [ "$VERBOSE" = true ] && [ -f "$test_dir/logs/test-output.log" ]; then
+        echo -e "${YELLOW}--- Last 20 lines of test output ---${NC}"
+        tail -20 "$test_dir/logs/test-output.log"
+        echo -e "${YELLOW}--- End of test output ---${NC}"
+      fi
+
       TOTAL_FAIL=$((TOTAL_FAIL + 1))
       FAILED_TESTS="$FAILED_TESTS\n  - $test_name"
     fi
