@@ -61,6 +61,14 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$REPO_ROOT"
 
+# FIRST: Ensure workspace links are correct before updating anything
+if [ -f "$REPO_ROOT/package.json" ]; then
+    echo -e "${YELLOW}🔗 Setting up workspace links...${NC}"
+    npm install
+    echo -e "${GREEN}✓ Workspace links ready${NC}"
+    echo ""
+fi
+
 # Update root package if it exists
 if [ -f "package.json" ]; then
     echo -e "${YELLOW}📦 Updating root package...${NC}"
@@ -85,7 +93,7 @@ echo "🔧 Updating CLI..."
 update_package "cli"
 
 # Update Bridge
-echo "🔧 Updating Bridge..."  
+echo "🔧 Updating Bridge..."
 update_package "bridge"
 
 # Update Gateway
@@ -104,9 +112,9 @@ done
 echo "🔧 Updating evals..."
 update_package "evals"
 
-# Run npm install at root to ensure workspace links are correct (if root package exists)
+# Run npm install again to ensure everything is linked after updates
 if [ -f "$REPO_ROOT/package.json" ]; then
-    echo -e "${YELLOW}🔗 Updating workspace links...${NC}"
+    echo -e "${YELLOW}🔗 Refreshing workspace links after updates...${NC}"
     cd "$REPO_ROOT"
     npm install
     echo -e "${GREEN}✓ Workspace links updated${NC}"
