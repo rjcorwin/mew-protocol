@@ -120,40 +120,10 @@ if [ -f "$REPO_ROOT/package.json" ]; then
     echo -e "${GREEN}✓ Workspace links updated${NC}"
     echo ""
     
-    # Build everything to ensure compatibility
-    echo -e "${YELLOW}🏗️  Building all packages...${NC}"
-    npm run build || {
-        echo -e "${YELLOW}⚠️  Build had some warnings/errors - this is normal during dependency updates${NC}"
-        echo -e "${YELLOW}   Run 'npm run build' separately after updates complete${NC}"
-    }
-    echo ""
-else
-    # Build each package individually if no root package.json
-    echo -e "${YELLOW}🏗️  Building packages individually...${NC}"
-    
-    # Build SDK packages in order (types first, then others)
-    for package in types client participant agent gateway capability-matcher; do
-        if [ -d "sdk/typescript-sdk/$package" ]; then
-            echo "  Building $package..."
-            cd "sdk/typescript-sdk/$package"
-            npm run build 2>/dev/null || true
-            cd "$REPO_ROOT"
-        fi
-    done
-    
-    # Build other packages
-    for dir in cli bridge gateway; do
-        if [ -d "$dir" ] && [ -f "$dir/package.json" ]; then
-            echo "  Building $dir..."
-            cd "$dir"
-            npm run build 2>/dev/null || true
-            cd "$REPO_ROOT"
-        fi
-    done
-    
-    echo -e "${GREEN}✓ Packages built${NC}"
-    echo ""
 fi
+
+# Note: We don't build packages during dependency updates
+# Building should be done separately after updates are complete
 
 echo -e "${GREEN}✅ All dependencies updated successfully!${NC}"
 echo ""

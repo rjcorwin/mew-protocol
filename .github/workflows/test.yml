@@ -28,8 +28,11 @@ jobs:
         chmod +x ./tests/run-all-tests.sh
         chmod +x ./update-deps.sh
 
-    - name: Install dependencies and build packages
-      run: ./update-deps.sh
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build packages
+      run: npm run build
 
     - name: Run tests (without LLM scenarios)
       run: npm test
