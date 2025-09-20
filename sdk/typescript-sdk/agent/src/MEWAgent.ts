@@ -33,6 +33,7 @@ export interface AgentConfig extends ParticipantOptions {
     dropStrategy?: 'oldest' | 'newest' | 'none';  // What to do when queue is full (default: 'oldest')
     notifyQueueing?: boolean;          // Emit events when messages are queued (default: true)
     includeQueuedSenderNotification?: boolean;  // Add system message about additional senders (default: true)
+    queueInjectionPrompt?: string;     // Custom prompt for queue injection (default: "{count} additional message(s) were received while you were processing. Please consider them in your response.")
   };
 
   // Overridable prompts for different phases (ReAct pattern)
@@ -97,9 +98,6 @@ export class MEWAgent extends MEWParticipant {
       },
       ...config
     };
-
-    // Log the actual maxIterations value being used
-    console.log(`🔢 MEWAgent initialized with maxIterations: ${this.config.maxIterations}`);
 
     // LOUDLY FAIL if no API key provided
     if (!this.config.apiKey) {
@@ -581,7 +579,6 @@ Return a JSON object:
       }
     }
 
-    this.log('error', `❌ Exceeded maximum iterations: ${iterations} >= ${this.config.maxIterations}`);
     return 'I exceeded the maximum number of reasoning iterations.';
   }
 
@@ -770,9 +767,13 @@ Return a JSON object:
 
       // Add a system message to help LLM understand context if configured
       if (this.config.messageQueue?.includeQueuedSenderNotification && queuedMessages.length > 0) {
+        const defaultPrompt = `{count} additional message(s) were received while you were processing. Please consider them in your response.`;
+        const promptTemplate = this.config.messageQueue?.queueInjectionPrompt || defaultPrompt;
+        const prompt = promptTemplate.replace('{count}', queuedMessages.length.toString());
+
         messages.push({
           role: 'system',
-          content: `${queuedMessages.length} additional message(s) were received while you were processing. Please consider them in your response.`
+          content: prompt
         });
       }
 
