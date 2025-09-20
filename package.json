@@ -19,7 +19,7 @@
     "test": "./tests/run-all-tests.sh --no-llm",
     "test:all": "./tests/run-all-tests.sh",
     "test:llm": "./tests/run-all-tests.sh",
-    "build": "echo 'No build required for root package'",
+    "build": "npm run build:sdk",
     "build:sdk": "npm run build:types && npm run build:matcher && npm run build:client && npm run build:participant && npm run build:agent && npm run build:gateway && npm run build:bridge",
     "build:types": "npm run build --workspace=@mew-protocol/types",
     "build:matcher": "npm run build --workspace=@mew-protocol/capability-matcher",

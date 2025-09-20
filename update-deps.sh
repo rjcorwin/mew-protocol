@@ -61,6 +61,14 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$REPO_ROOT"
 
+# FIRST: Ensure workspace links are correct before updating anything
+if [ -f "$REPO_ROOT/package.json" ]; then
+    echo -e "${YELLOW}🔗 Setting up workspace links...${NC}"
+    npm install
+    echo -e "${GREEN}✓ Workspace links ready${NC}"
+    echo ""
+fi
+
 # Update root package if it exists
 if [ -f "package.json" ]; then
     echo -e "${YELLOW}📦 Updating root package...${NC}"
@@ -85,7 +93,7 @@ echo "🔧 Updating CLI..."
 update_package "cli"
 
 # Update Bridge
-echo "🔧 Updating Bridge..."  
+echo "🔧 Updating Bridge..."
 update_package "bridge"
 
 # Update Gateway
@@ -104,46 +112,18 @@ done
 echo "🔧 Updating evals..."
 update_package "evals"
 
-# Run npm install at root to ensure workspace links are correct (if root package exists)
+# Run npm install again to ensure everything is linked after updates
 if [ -f "$REPO_ROOT/package.json" ]; then
-    echo -e "${YELLOW}🔗 Updating workspace links...${NC}"
+    echo -e "${YELLOW}🔗 Refreshing workspace links after updates...${NC}"
     cd "$REPO_ROOT"
     npm install
     echo -e "${GREEN}✓ Workspace links updated${NC}"
     echo ""
     
-    # Build everything to ensure compatibility
-    echo -e "${YELLOW}🏗️  Building all packages...${NC}"
-    npm run build
-    echo -e "${GREEN}✓ Build successful${NC}"
-    echo ""
-else
-    # Build each package individually if no root package.json
-    echo -e "${YELLOW}🏗️  Building packages individually...${NC}"
-    
-    # Build SDK packages in order (types first, then others)
-    for package in types client participant agent gateway capability-matcher; do
-        if [ -d "sdk/typescript-sdk/$package" ]; then
-            echo "  Building $package..."
-            cd "sdk/typescript-sdk/$package"
-            npm run build 2>/dev/null || true
-            cd "$REPO_ROOT"
-        fi
-    done
-    
-    # Build other packages
-    for dir in cli bridge gateway; do
-        if [ -d "$dir" ] && [ -f "$dir/package.json" ]; then
-            echo "  Building $dir..."
-            cd "$dir"
-            npm run build 2>/dev/null || true
-            cd "$REPO_ROOT"
-        fi
-    done
-    
-    echo -e "${GREEN}✓ Packages built${NC}"
-    echo ""
 fi
+
+# Note: We don't build packages during dependency updates
+# Building should be done separately after updates are complete
 
 echo -e "${GREEN}✅ All dependencies updated successfully!${NC}"
 echo ""

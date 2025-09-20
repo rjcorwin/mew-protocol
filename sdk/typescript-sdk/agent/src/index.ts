@@ -169,7 +169,63 @@ async function main(): Promise<void> {
 
   const agent = new MEWAgent(agentConfig);
 
-  console.log('Agent will discover tools from other participants');
+  // Add example tools for testing
+  agent.addTool({
+    name: 'echo',
+    description: 'Echo back the provided message',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'Message to echo' }
+      },
+      required: ['message']
+    },
+    execute: async (args: any) => {
+      return `Echo: ${args.message}`;
+    }
+  });
+
+  agent.addTool({
+    name: 'calculate',
+    description: 'Perform basic arithmetic operations',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: { type: 'string', enum: ['add', 'subtract', 'multiply', 'divide'] },
+        a: { type: 'number', description: 'First operand' },
+        b: { type: 'number', description: 'Second operand' }
+      },
+      required: ['operation', 'a', 'b']
+    },
+    execute: async (args: any) => {
+      const { operation, a, b } = args;
+      let result: number;
+      switch (operation) {
+        case 'add': result = a + b; break;
+        case 'subtract': result = a - b; break;
+        case 'multiply': result = a * b; break;
+        case 'divide': result = a / b; break;
+        default: throw new Error(`Unknown operation: ${operation}`);
+      }
+      return `${a} ${operation} ${b} = ${result}`;
+    }
+  });
+
+  agent.addTool({
+    name: 'get_time',
+    description: 'Get the current time',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    },
+    execute: async () => {
+      return new Date().toISOString();
+    }
+  });
+
+  console.log('Agent configured with example tools: echo, calculate, get_time');
+  console.log('Agent will also discover tools from other participants');
 
   // Handle graceful shutdown
   process.on('SIGINT', () => {

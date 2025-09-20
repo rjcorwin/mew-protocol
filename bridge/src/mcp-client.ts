@@ -69,11 +69,19 @@ export class MCPClient extends EventEmitter {
 
       this.process.on('exit', (code, signal) => {
         debug(`MCP server exited: code=${code}, signal=${signal}`);
+        console.error(`MCP server exited unexpectedly: code=${code}, signal=${signal}`);
         this.emit('close');
       });
 
       this.process.stderr?.on('data', (data) => {
-        debug('MCP server stderr:', data.toString());
+        const stderr = data.toString();
+        console.error('MCP server stderr:', stderr);
+        debug('MCP server stderr:', stderr);
+      });
+
+      // Also capture raw stdout for debugging
+      this.process.stdout?.on('data', (data) => {
+        console.log('MCP server stdout (raw):', data.toString());
       });
 
       // Set up readline interface for JSON-RPC
@@ -83,6 +91,7 @@ export class MCPClient extends EventEmitter {
       });
 
       this.rl.on('line', (line) => {
+        console.log('MCP server line:', line);
         try {
           const message = JSON.parse(line);
           console.log('MCP Server -> Client:', JSON.stringify(message));
@@ -94,7 +103,7 @@ export class MCPClient extends EventEmitter {
       });
 
       // Process is started
-      resolve();
+      setTimeout(() => resolve(), 100); // Give process time to start
     });
   }
 
