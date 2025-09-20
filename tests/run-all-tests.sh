@@ -77,7 +77,7 @@ run_test() {
     if timeout 60 ./test.sh > ./logs/test-output.log 2>&1; then
       echo -e "${GREEN}✅ $test_name PASSED${NC}"
       echo "Status: PASSED" >> "$TEST_RESULTS_LOG"
-      ((TOTAL_PASS++))
+      TOTAL_PASS=$((TOTAL_PASS + 1))
     else
       EXIT_CODE=$?
       if [ $EXIT_CODE -eq 124 ]; then
@@ -91,7 +91,7 @@ run_test() {
         echo "Status: FAILED (exit code: $EXIT_CODE)" >> "$TEST_RESULTS_LOG"
       fi
       echo "   See $test_dir/logs/test-output.log for details"
-      ((TOTAL_FAIL++))
+      TOTAL_FAIL=$((TOTAL_FAIL + 1))
       FAILED_TESTS="$FAILED_TESTS\n  - $test_name"
     fi
     
@@ -99,7 +99,7 @@ run_test() {
   else
     echo -e "${RED}❌ $test_name directory or script not found${NC}"
     echo "Status: NOT FOUND" >> "$TEST_RESULTS_LOG"
-    ((TOTAL_FAIL++))
+    TOTAL_FAIL=$((TOTAL_FAIL + 1))
     FAILED_TESTS="$FAILED_TESTS\n  - $test_name (not found)"
   fi
   
