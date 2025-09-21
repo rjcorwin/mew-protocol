@@ -70,6 +70,20 @@ All ADRs in this directory are currently **proposed** and under review. They doc
 - ⚠️ Breaking change requiring client migration
 - ⚠️ Temporary dual-format complexity during transition
 
+---
+
+### [ADR-006: Interactive Envelope Authoring in the MEW Protocol CLI](./ADR-006-interactive-envelope-authoring.md)
+**Decision**: Add an Ink-powered interactive authoring flow for composing and reviewing MEW envelopes inside the CLI.
+
+**Context**: Manual JSON entry is error-prone for complex envelopes (e.g., streaming or tool interactions) and slows down human-in-the-loop workflows.
+
+**Impact**:
+- ✅ Keyboard shortcuts launch guided forms for common envelope kinds
+- ✅ Schema-driven prompts reduce mistakes and improve validation
+- ✅ Drafts can be saved and resumed from `.mew/drafts/`
+- ⚠️ Requires ongoing maintenance to track protocol schema updates
+- ⚠️ Adds UI complexity that must work in both debug and advanced modes
+
 ## Architecture Overview
 
 The ADRs collectively document a **layered architecture** that separates protocol implementation from operational concerns:

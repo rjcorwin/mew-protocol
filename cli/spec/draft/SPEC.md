@@ -1317,6 +1317,18 @@ The default interactive mode uses Ink (React for CLI) to provide a modern termin
 - Real-time participant status and typing indicators
 - Auto-approval rules for trusted operations
 
+#### Interactive Envelope Authoring (ADR-006)
+
+The advanced UI includes a guided **Envelope Editor** that can be launched from anywhere in the session without breaking focus.
+
+- **Hotkeys**: `Ctrl+E` opens the generic editor, while `Ctrl+P` (or `Ctrl+Shift+P` for tool-centric flows) jumps directly to proposal-oriented templates.
+- **Type Selection**: Users pick the envelope kind first; the form adapts in real time using schema metadata declared in `src/config/envelopeForms.js`.
+- **Field Editing**: Each envelope kind exposes a curated set of fields (recipients, payload summaries, JSON arguments, etc.) with inline validation and helpers for lists and JSON blobs.
+- **Preview**: Before submission the editor renders the final MEW envelope (including protocol metadata) so operators can confirm exactly what will be sent.
+- **Drafts**: Pressing `s`/`d` in the preview saves the envelope JSON to `.mew/drafts/<timestamp>-<kind>.json`, allowing later reuse via a forthcoming draft browser.
+
+The editor is implemented as an Ink overlay component (`EnvelopeEditor`) that suspends the main input composer while active, ensuring a focused authoring workflow that still shares history and validation utilities with the rest of the UI.
+
 **Architecture:**
 - Message history uses Ink's `Static` component for native scrolling
 - Persistent bottom panel stays fixed during scrolling

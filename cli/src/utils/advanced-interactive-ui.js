@@ -11,8 +11,10 @@ const React = require('react');
 const { render, Box, Text, Static, useInput, useApp, useFocus } = require('ink');
 const { useState, useEffect, useRef } = React;
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
 const EnhancedInput = require('../ui/components/EnhancedInput');
-const SimpleInput = require('../ui/components/SimpleInput'); // Temporary for debugging
+const EnvelopeEditor = require('../ui/components/EnvelopeEditor');
 
 /**
  * Main Advanced Interactive UI Component
@@ -25,6 +27,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [verbose, setVerbose] = useState(false);
   const [activeReasoning, setActiveReasoning] = useState(null); // Track active reasoning sessions
   const [grantedCapabilities, setGrantedCapabilities] = useState(new Map()); // Track granted capabilities by participant
+  const [isEnvelopeEditorOpen, setEnvelopeEditorOpen] = useState(false);
+  const [envelopeEditorType, setEnvelopeEditorType] = useState(null);
   const { exit } = useApp();
 
   // Environment configuration
@@ -65,6 +69,28 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     };
   }, [ws, exit]);
 
+  useInput((input, key) => {
+    if (isEnvelopeEditorOpen) {
+      return;
+    }
+    if (pendingOperation || showHelp) {
+      return;
+    }
+
+    const keyName = (key && key.name ? key.name : input || '').toLowerCase();
+
+    if (key.ctrl && keyName === 'e') {
+      setEnvelopeEditorType(null);
+      setEnvelopeEditorOpen(true);
+      return;
+    }
+
+    if (key.ctrl && keyName === 'p') {
+      setEnvelopeEditorType(key.shift ? 'tool/request' : 'message/propose');
+      setEnvelopeEditorOpen(true);
+    }
+  });
+
   const addMessage = (message, sent = false) => {
     setMessages(prev => [...prev, {
       id: message.id || uuidv4(),
@@ -72,6 +98,11 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       sent,
       timestamp: new Date(),
     }]);
+  };
+
+  const closeEnvelopeEditor = () => {
+    setEnvelopeEditorOpen(false);
+    setEnvelopeEditorType(null);
   };
 
   const handleIncomingMessage = (message) => {
@@ -246,6 +277,10 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     }]);
   };
 
+  const handleEnvelopeSubmit = (message) => {
+    sendMessage(message);
+  };
+
   const sendChat = (text) => {
     sendMessage({
       kind: 'chat',
@@ -321,6 +356,38 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       payload: message.payload,
       ...message,
     };
+  };
+
+  const saveEnvelopeDraftToDisk = (message) => {
+    try {
+      const mewDir = path.join(process.cwd(), '.mew');
+      const draftsDir = path.join(mewDir, 'drafts');
+      fs.mkdirSync(draftsDir, { recursive: true });
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const safeKind = (message.kind || 'draft').replace(/[\\/]/g, '-');
+      const fileName = `${timestamp}-${safeKind}.json`;
+      const filePath = path.join(draftsDir, fileName);
+
+      const envelope = wrapEnvelope(message);
+      fs.writeFileSync(filePath, JSON.stringify(envelope, null, 2));
+
+      const relativePath = path.relative(process.cwd(), filePath);
+      addMessage({
+        kind: 'system/info',
+        from: 'system',
+        payload: { text: `💾 Draft saved to ${relativePath}` }
+      }, false);
+
+      return { path: filePath, relativePath };
+    } catch (error) {
+      addMessage({
+        kind: 'system/error',
+        from: 'system',
+        payload: { text: `Failed to save draft: ${error.message}` }
+      }, false);
+      throw error;
+    }
   };
 
   const isValidEnvelope = (obj) => {
@@ -463,18 +530,27 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     showHelp && React.createElement(HelpModal, {
       onClose: () => setShowHelp(false)
     }),
-    
+
+    // Envelope Editor Overlay
+    isEnvelopeEditorOpen && React.createElement(EnvelopeEditor, {
+      initialType: envelopeEditorType,
+      onClose: closeEnvelopeEditor,
+      onSubmit: handleEnvelopeSubmit,
+      onSaveDraft: saveEnvelopeDraftToDisk,
+      wrapEnvelope
+    }),
+
     // Reasoning Status
     activeReasoning && React.createElement(ReasoningStatus, {
       reasoning: activeReasoning
     }),
-    
+
     // Enhanced Input Component (disabled when dialog is shown)
     React.createElement(EnhancedInput, {
       onSubmit: processInput,
-      placeholder: 'Type a message or /help for commands...',
+      placeholder: 'Type a message, /help, or press Ctrl+E for the editor...',
       multiline: true,  // Enable multi-line for Shift+Enter support
-      disabled: pendingOperation !== null || showHelp,
+      disabled: pendingOperation !== null || showHelp || isEnvelopeEditorOpen,
       history: commandHistory,
       onHistoryChange: setCommandHistory,
       prompt: '> ',
