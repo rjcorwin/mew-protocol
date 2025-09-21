@@ -978,11 +978,30 @@ Return a JSON object:
   }
 
   private handleReasoningCancelEvent(envelope: Envelope): void {
-    if (this.reasoningContextId && envelope.context === this.reasoningContextId) {
+    if (this.matchesReasoningContext(envelope.context)) {
       this.reasoningCancelled = true;
       this.reasoningCancelReason = envelope.payload?.reason || 'cancelled';
       this.closeReasoningStream('cancelled');
     }
+  }
+
+  private matchesReasoningContext(context: Envelope['context']): boolean {
+    if (!this.reasoningContextId || !context) {
+      return false;
+    }
+
+    if (typeof context === 'string') {
+      return context === this.reasoningContextId;
+    }
+
+    if (typeof context === 'object') {
+      return (
+        context?.correlation_id === this.reasoningContextId ||
+        context?.topic === this.reasoningContextId
+      );
+    }
+
+    return false;
   }
 
   private ensureContextHeadroom(): void {

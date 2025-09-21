@@ -42,13 +42,22 @@ export interface PartialEnvelope {
 }
 
 /**
- * Context field for sub-context protocol
+ * Structured context operations for sub-context protocol management.
+ *
+ * The type system allows both legacy string context identifiers and the
+ * expanded operation objects so existing agents continue to function while we
+ * phase in richer context semantics.
  */
-export interface ContextField {
+export interface ContextOperation {
   operation: 'push' | 'pop' | 'resume';
   topic?: string;
   correlation_id?: string;
 }
+
+/**
+ * Context field for sub-context protocol
+ */
+export type ContextField = string | ContextOperation;
 
 // ============================================================================
 // Participant and Capability Types
