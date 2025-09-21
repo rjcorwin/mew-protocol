@@ -9,10 +9,9 @@
 
 const React = require('react');
 const { render, Box, Text, Static, useInput, useApp, useFocus } = require('ink');
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useMemo } = React;
 const { v4: uuidv4 } = require('uuid');
 const EnhancedInput = require('../ui/components/EnhancedInput');
-const SimpleInput = require('../ui/components/SimpleInput'); // Temporary for debugging
 
 /**
  * Main Advanced Interactive UI Component
@@ -25,6 +24,12 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [verbose, setVerbose] = useState(false);
   const [activeReasoning, setActiveReasoning] = useState(null); // Track active reasoning sessions
   const [grantedCapabilities, setGrantedCapabilities] = useState(new Map()); // Track granted capabilities by participant
+  const [pendingAcknowledgements, setPendingAcknowledgements] = useState([]);
+  const [participantStatuses, setParticipantStatuses] = useState(new Map());
+  const [pauseState, setPauseState] = useState(null);
+  const [activeStreams, setActiveStreams] = useState(new Map());
+  const [streamFrames, setStreamFrames] = useState([]);
+  const contextUsageEntries = useMemo(() => buildContextUsageEntries(participantStatuses), [participantStatuses]);
   const { exit } = useApp();
 
   // Environment configuration
@@ -37,8 +42,18 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     if (!ws) return;
 
     const handleMessage = (data) => {
+      const raw = typeof data === 'string' ? data : data.toString();
+
+      if (raw.startsWith('#')) {
+        const match = raw.match(/^#([^#]+)#([\s\S]*)$/);
+        if (match) {
+          handleStreamFrame(match[1], match[2]);
+          return;
+        }
+      }
+
       try {
-        const message = JSON.parse(data);
+        const message = JSON.parse(raw);
         handleIncomingMessage(message);
       } catch (err) {
         console.error('Failed to parse message:', err);
@@ -74,6 +89,42 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     }]);
   };
 
+  const handleStreamFrame = (streamId, payload) => {
+    const frame = {
+      streamId,
+      payload,
+      timestamp: new Date()
+    };
+
+    setStreamFrames(prev => {
+      const next = [...prev, frame];
+      return next.slice(-50);
+    });
+
+    setActiveStreams(prev => {
+      const next = new Map(prev);
+      const existing = next.get(streamId);
+      const now = new Date();
+      if (existing) {
+        next.set(streamId, { ...existing, lastActivityAt: now });
+      } else {
+        next.set(streamId, {
+          streamId,
+          openedBy: 'unknown',
+          openedAt: now,
+          lastActivityAt: now,
+        });
+      }
+      return next;
+    });
+
+    addMessage({
+      kind: 'stream/data',
+      from: streamId,
+      payload: { data: payload }
+    }, false);
+  };
+
   const handleIncomingMessage = (message) => {
     // Filter out echo messages - don't show messages from ourselves coming back
     // EXCEPT for errors and grant acknowledgments which we want to see
@@ -81,6 +132,103 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         message.kind !== 'system/error' &&
         message.kind !== 'capability/grant-ack') {
       return;
+    }
+
+    const addressedToMe = !message.to || message.to.length === 0 || message.to.includes(participantId);
+
+    if (message.kind === 'chat' && message.from !== participantId) {
+      const text = message.payload?.text || '';
+      setPendingAcknowledgements(prev => {
+        if (prev.some(entry => entry.id === message.id)) {
+          return prev;
+        }
+        return [...prev, {
+          id: message.id,
+          from: message.from,
+          text,
+          timestamp: message.ts ? new Date(message.ts) : new Date(),
+          to: message.to
+        }];
+      });
+    }
+
+    if (message.kind === 'chat/acknowledge' || message.kind === 'chat/cancel') {
+      const target = message.correlation_id?.[0];
+      if (target) {
+        setPendingAcknowledgements(prev => prev.filter(entry => entry.id !== target));
+      }
+    }
+
+    if (message.kind === 'participant/pause' && addressedToMe) {
+      const timeoutSeconds = message.payload?.timeout_seconds;
+      const until = timeoutSeconds ? Date.now() + timeoutSeconds * 1000 : null;
+      setPauseState({
+        reason: message.payload?.reason,
+        from: message.from,
+        until
+      });
+    }
+
+    if (message.kind === 'participant/resume' && addressedToMe) {
+      setPauseState(null);
+    }
+
+    if (message.kind === 'participant/status') {
+      setParticipantStatuses(prev => {
+        const next = new Map(prev);
+        next.set(message.from, {
+          payload: message.payload,
+          timestamp: message.ts ? new Date(message.ts) : new Date()
+        });
+        return next;
+      });
+    }
+
+    if (message.kind === 'stream/open') {
+      const streamId = message.payload?.stream_id;
+      if (streamId) {
+        setActiveStreams(prev => {
+          const next = new Map(prev);
+          next.set(streamId, {
+            streamId,
+            description: message.payload?.description,
+            encoding: message.payload?.encoding,
+            correlationId: message.correlation_id?.[0],
+            openEnvelopeId: message.id,
+            openedBy: message.from,
+            openedAt: message.ts ? new Date(message.ts) : new Date(),
+            lastActivityAt: new Date()
+          });
+          return next;
+        });
+      }
+    }
+
+    if (message.kind === 'stream/close') {
+      const correlationId = message.correlation_id?.[0];
+      const streamId = message.payload?.stream_id;
+      const reason = message.payload?.reason;
+      setActiveStreams(prev => {
+        const next = new Map(prev);
+        if (streamId && next.has(streamId)) {
+          next.delete(streamId);
+        } else if (correlationId) {
+          for (const [id, meta] of next.entries()) {
+            if (meta.openEnvelopeId === correlationId || meta.correlationId === correlationId || id === correlationId) {
+              next.delete(id);
+            }
+          }
+        }
+        return next;
+      });
+
+      if (reason) {
+        addMessage({
+          kind: 'system/info',
+          from: 'system',
+          payload: { text: `Stream closed (${reason})` }
+        }, false);
+      }
     }
 
     // Filter messages based on configuration
@@ -98,21 +246,40 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
 
     // Handle reasoning messages
     if (message.kind === 'reasoning/start') {
+      const tokenMetrics = extractReasoningTokenMetrics(message.payload);
       setActiveReasoning({
         id: message.id,
         from: message.from,
         message: message.payload?.message || 'Thinking...',
         startTime: new Date(),
-        thoughtCount: 0
+        thoughtCount: 0,
+        tokenMetrics,
+        lastTokenUpdate: tokenMetrics ? new Date() : null
       });
     } else if (message.kind === 'reasoning/thought') {
-      setActiveReasoning(prev => prev ? {
-        ...prev,
-        message: message.payload?.message || prev.message,
-        thoughtCount: prev.thoughtCount + 1
-      } : null);
+      setActiveReasoning(prev => {
+        if (!prev) return null;
+        const tokenUpdate = extractReasoningTokenMetrics(message.payload);
+        const { metrics, changed } = mergeReasoningTokenMetrics(prev.tokenMetrics, tokenUpdate);
+        return {
+          ...prev,
+          message: message.payload?.message || prev.message,
+          thoughtCount: prev.thoughtCount + 1,
+          tokenMetrics: metrics,
+          lastTokenUpdate: changed ? new Date() : prev.lastTokenUpdate
+        };
+      });
     } else if (message.kind === 'reasoning/conclusion') {
       setActiveReasoning(null);
+    } else if (message.kind === 'reasoning/cancel') {
+      setActiveReasoning(null);
+      if (message.payload?.reason) {
+        addMessage({
+          kind: 'system/info',
+          from: 'system',
+          payload: { text: `Reasoning cancelled (${message.payload.reason})` }
+        }, false);
+      }
     }
 
     // Handle capability grant acknowledgments
@@ -226,7 +393,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const sendMessage = (message) => {
     if (ws.readyState !== 1) {
       console.error('WebSocket is not connected');
-      return;
+      return null;
     }
 
     const envelope = wrapEnvelope(message);
@@ -244,6 +411,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       sent: true,
       timestamp: new Date(),
     }]);
+
+    return envelope;
   };
 
   const sendChat = (text) => {
@@ -251,6 +420,76 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       kind: 'chat',
       payload: { text },
     });
+  };
+
+  const addSystemMessage = (text) => {
+    setMessages(prev => [...prev, {
+      id: uuidv4(),
+      message: { kind: 'system/info', payload: { text } },
+      sent: false,
+      timestamp: new Date(),
+    }]);
+  };
+
+  const pickAcknowledgementEntries = (args) => {
+    if (pendingAcknowledgements.length === 0) {
+      return { entries: [], rest: [] };
+    }
+
+    if (!args || args.length === 0) {
+      return { entries: pendingAcknowledgements, rest: [] };
+    }
+
+    const [selector, ...rest] = args;
+    if (!selector || selector === 'all') {
+      return { entries: pendingAcknowledgements, rest };
+    }
+
+    const index = Number.parseInt(selector, 10);
+    if (!Number.isNaN(index) && index > 0) {
+      const entry = pendingAcknowledgements[index - 1];
+      return { entries: entry ? [entry] : [], rest };
+    }
+
+    const matches = pendingAcknowledgements.filter(entry =>
+      entry.id.startsWith(selector) ||
+      (entry.from && entry.from.includes(selector))
+    );
+
+    return { entries: matches, rest };
+  };
+
+  const acknowledgeEntries = (entries, status = 'received') => {
+    entries.forEach(entry => {
+      const payload = status ? { status } : {};
+      const ackEnvelope = {
+        kind: 'chat/acknowledge',
+        correlation_id: [entry.id],
+        payload,
+      };
+      if (entry.from) {
+        ackEnvelope.to = [entry.from];
+      }
+      sendMessage(ackEnvelope);
+    });
+
+    setPendingAcknowledgements(prev => prev.filter(item => !entries.some(entry => entry.id === item.id)));
+  };
+
+  const cancelEntries = (entries, reason = 'cleared') => {
+    entries.forEach(entry => {
+      const cancelEnvelope = {
+        kind: 'chat/cancel',
+        correlation_id: [entry.id],
+        payload: reason ? { reason } : {},
+      };
+      if (entry.from) {
+        cancelEnvelope.to = [entry.from];
+      }
+      sendMessage(cancelEnvelope);
+    });
+
+    setPendingAcknowledgements(prev => prev.filter(item => !entries.some(entry => entry.id === item.id)));
   };
 
   const processInput = (input) => {
@@ -285,29 +524,305 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   const handleCommand = (command) => {
-    const [cmd] = command.split(' ');
-    
+    const parts = command.trim().split(/\s+/);
+    const cmd = parts[0];
+    const args = parts.slice(1);
+
     switch (cmd) {
       case '/help':
         setShowHelp(true);
         break;
       case '/verbose':
-        setVerbose(!verbose);
+        setVerbose(prev => !prev);
+        addSystemMessage(`Verbose mode ${!verbose ? 'enabled' : 'disabled'}.`);
         break;
-      case '/clear':
+      case '/ui-clear':
         setMessages([]);
+        setPendingAcknowledgements([]);
+        setParticipantStatuses(new Map());
+        setActiveStreams(new Map());
+        setStreamFrames([]);
+        addSystemMessage('Cleared local UI state.');
         break;
       case '/exit':
         exit();
         break;
+      case '/ack': {
+        const { entries, rest } = pickAcknowledgementEntries(args);
+        if (entries.length === 0) {
+          addSystemMessage('No chat messages matched for acknowledgement.');
+          break;
+        }
+        const status = rest.length > 0 ? rest.join(' ') : 'received';
+        acknowledgeEntries(entries, status);
+        addSystemMessage(`Acknowledged ${entries.length} chat message${entries.length === 1 ? '' : 's'}${status ? ` (${status})` : ''}.`);
+        break;
+      }
+      case '/cancel': {
+        const { entries, rest } = pickAcknowledgementEntries(args);
+        if (entries.length === 0) {
+          addSystemMessage('No chat messages matched for cancellation.');
+          break;
+        }
+        const reason = rest.length > 0 ? rest.join(' ') : 'cleared';
+        cancelEntries(entries, reason);
+        addSystemMessage(`Cancelled ${entries.length} chat message${entries.length === 1 ? '' : 's'}${reason ? ` (${reason})` : ''}.`);
+        break;
+      }
+      case '/reason-cancel': {
+        if (!activeReasoning) {
+          addSystemMessage('No active reasoning session to cancel.');
+          break;
+        }
+        const reason = args.length > 0 ? args.join(' ') : undefined;
+        sendMessage({
+          kind: 'reasoning/cancel',
+          context: activeReasoning.id,
+          payload: reason ? { reason } : {}
+        });
+        setActiveReasoning(null);
+        addSystemMessage(`Sent reasoning cancel${reason ? ` (${reason})` : ''}.`);
+        break;
+      }
+      case '/status': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /status <participant> [field ...]');
+          break;
+        }
+        const target = args[0];
+        const fields = args.slice(1);
+        sendMessage({
+          kind: 'participant/request-status',
+          to: [target],
+          payload: fields.length > 0 ? { fields } : {}
+        });
+        addSystemMessage(`Requested status from ${target}${fields.length ? ` (${fields.join(', ')})` : ''}.`);
+        break;
+      }
+      case '/pause': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /pause <participant> [timeoutSeconds] [reason]');
+          break;
+        }
+        const target = args[0];
+        let timeout;
+        let reasonParts = [];
+        if (args.length > 1) {
+          const maybeTimeout = Number.parseInt(args[1], 10);
+          if (!Number.isNaN(maybeTimeout)) {
+            timeout = maybeTimeout;
+            reasonParts = args.slice(2);
+          } else {
+            reasonParts = args.slice(1);
+          }
+        }
+        const payload = {};
+        if (timeout !== undefined) {
+          payload.timeout_seconds = timeout;
+        }
+        if (reasonParts.length > 0) {
+          payload.reason = reasonParts.join(' ');
+        }
+        sendMessage({
+          kind: 'participant/pause',
+          to: [target],
+          payload
+        });
+        addSystemMessage(`Pause requested for ${target}${payload.reason ? ` (${payload.reason})` : ''}${timeout ? ` for ${timeout}s` : ''}.`);
+        break;
+      }
+      case '/resume': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /resume <participant> [reason]');
+          break;
+        }
+        const target = args[0];
+        const reason = args.slice(1).join(' ');
+        const payload = reason ? { reason } : {};
+        sendMessage({
+          kind: 'participant/resume',
+          to: [target],
+          payload
+        });
+        addSystemMessage(`Resume requested for ${target}${reason ? ` (${reason})` : ''}.`);
+        break;
+      }
+      case '/forget': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /forget <participant> [oldest|newest] [entries]');
+          break;
+        }
+        const target = args[0];
+        let direction = 'oldest';
+        let entriesCount;
+        if (args.length > 1) {
+          if (args[1] === 'oldest' || args[1] === 'newest') {
+            direction = args[1];
+            if (args.length > 2) {
+              const maybeEntries = Number.parseInt(args[2], 10);
+              if (!Number.isNaN(maybeEntries)) {
+                entriesCount = maybeEntries;
+              }
+            }
+          } else {
+            const maybeEntries = Number.parseInt(args[1], 10);
+            if (!Number.isNaN(maybeEntries)) {
+              entriesCount = maybeEntries;
+            }
+          }
+        }
+        const payload = { direction };
+        if (entriesCount !== undefined) {
+          payload.entries = entriesCount;
+        }
+        sendMessage({
+          kind: 'participant/forget',
+          to: [target],
+          payload
+        });
+        addSystemMessage(`Forget requested for ${target} (${direction}${entriesCount !== undefined ? `, ${entriesCount}` : ''}).`);
+        break;
+      }
+      case '/clear': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /clear <participant> [reason]');
+          break;
+        }
+        const target = args[0];
+        const reason = args.slice(1).join(' ');
+        sendMessage({
+          kind: 'participant/clear',
+          to: [target],
+          payload: reason ? { reason } : {}
+        });
+        addSystemMessage(`Clear requested for ${target}${reason ? ` (${reason})` : ''}.`);
+        break;
+      }
+      case '/restart': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /restart <participant> [mode] [reason]');
+          break;
+        }
+        const target = args[0];
+        let mode;
+        let reasonParts = [];
+        if (args.length > 1) {
+          mode = args[1];
+          reasonParts = args.slice(2);
+        }
+        const payload = {};
+        if (mode) {
+          payload.mode = mode;
+        }
+        if (reasonParts.length > 0) {
+          payload.reason = reasonParts.join(' ');
+        }
+        sendMessage({
+          kind: 'participant/restart',
+          to: [target],
+          payload
+        });
+        addSystemMessage(`Restart requested for ${target}${mode ? ` (${mode})` : ''}${payload.reason ? ` - ${payload.reason}` : ''}.`);
+        break;
+      }
+      case '/shutdown': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /shutdown <participant> [reason]');
+          break;
+        }
+        const target = args[0];
+        const reason = args.slice(1).join(' ');
+        sendMessage({
+          kind: 'participant/shutdown',
+          to: [target],
+          payload: reason ? { reason } : {}
+        });
+        addSystemMessage(`Shutdown requested for ${target}${reason ? ` (${reason})` : ''}.`);
+        break;
+      }
+      case '/stream': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /stream request <participant> <direction> [description] [size=bytes] | /stream close <streamId> [reason]');
+          break;
+        }
+        const subcommand = args[0];
+        if (subcommand === 'request') {
+          if (args.length < 3) {
+            addSystemMessage('Usage: /stream request <participant> <direction> [description] [size=bytes]');
+            break;
+          }
+          const target = args[1];
+          const direction = args[2];
+          const rest = args.slice(3);
+          const payload = { direction };
+          const descriptionParts = [];
+          rest.forEach(part => {
+            if (part.startsWith('size=')) {
+              const maybeSize = Number.parseInt(part.slice(5), 10);
+              if (!Number.isNaN(maybeSize)) {
+                payload.expected_size_bytes = maybeSize;
+              }
+            } else if (part.startsWith('bytes=')) {
+              const maybeSize = Number.parseInt(part.slice(6), 10);
+              if (!Number.isNaN(maybeSize)) {
+                payload.expected_size_bytes = maybeSize;
+              }
+            } else {
+              descriptionParts.push(part);
+            }
+          });
+          if (descriptionParts.length > 0) {
+            payload.description = descriptionParts.join(' ');
+          }
+          sendMessage({
+            kind: 'stream/request',
+            to: [target],
+            payload
+          });
+          addSystemMessage(`Stream request sent to ${target} (${direction}${payload.description ? ` - ${payload.description}` : ''}${payload.expected_size_bytes ? `, ~${payload.expected_size_bytes} bytes` : ''}).`);
+        } else if (subcommand === 'close') {
+          if (args.length < 2) {
+            addSystemMessage('Usage: /stream close <streamId> [reason]');
+            break;
+          }
+          const streamId = args[1];
+          const reason = args.slice(2).join(' ');
+          const streamMeta = activeStreams.get(streamId);
+          const correlation = streamMeta?.openEnvelopeId || streamMeta?.correlationId || streamId;
+          const payload = reason ? { reason, stream_id: streamId } : { stream_id: streamId };
+          const envelope = {
+            kind: 'stream/close',
+            payload
+          };
+          if (correlation) {
+            envelope.correlation_id = [correlation];
+          }
+          sendMessage(envelope);
+          setActiveStreams(prev => {
+            const next = new Map(prev);
+            next.delete(streamId);
+            return next;
+          });
+          addSystemMessage(`Requested stream close for ${streamId}${reason ? ` (${reason})` : ''}.`);
+        } else {
+          addSystemMessage(`Unknown /stream subcommand: ${subcommand}`);
+        }
+        break;
+      }
+      case '/streams': {
+        if (activeStreams.size === 0) {
+          addSystemMessage('No active streams.');
+          break;
+        }
+        const summaries = Array.from(activeStreams.values()).map(meta => {
+          const description = meta.description ? ` - ${meta.description}` : '';
+          return `${meta.streamId || ''} (${meta.openedBy || 'unknown'}${description})`;
+        });
+        addSystemMessage(`Active streams: ${summaries.join('; ')}`);
+        break;
+      }
       default:
-        // Add message about unknown command
-        setMessages(prev => [...prev, {
-          id: uuidv4(),
-          message: { kind: 'system/info', payload: { text: `Unknown command: ${cmd}` } },
-          sent: false,
-          timestamp: new Date(),
-        }]);
+        addSystemMessage(`Unknown command: ${cmd}`);
     }
   };
 
@@ -328,18 +843,26 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   return React.createElement(Box, { flexDirection: "column", height: "100%" },
-    // Message History with Native Scrolling (no header box)
-    React.createElement(Box, { flexGrow: 1, flexDirection: "column", marginTop: 1 },
-      React.createElement(Static, { items: messages }, (item) =>
-        React.createElement(MessageDisplay, {
-          key: item.id,
-          item: item,
-          verbose: verbose,
-          useColor: useColor
-        })
-      )
+    React.createElement(Box, { flexDirection: "row", flexGrow: 1, marginTop: 1 },
+      React.createElement(Box, { flexGrow: 1, flexDirection: "column", marginRight: 1 },
+        React.createElement(Static, { items: messages }, (item) =>
+          React.createElement(MessageDisplay, {
+            key: item.id,
+            item: item,
+            verbose: verbose,
+            useColor: useColor
+          })
+        )
+      ),
+      React.createElement(SidePanel, {
+        pendingAcknowledgements,
+        participantStatuses,
+        pauseState,
+        activeStreams,
+        streamFrames
+      })
     ),
-    
+
     // MCP Operation Confirmation
     pendingOperation && React.createElement(OperationConfirmation, {
       operation: pendingOperation,
@@ -488,7 +1011,11 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       verbose: verbose,
       pendingOperation: !!pendingOperation,
       spaceId: spaceId,
-      participantId: participantId
+      participantId: participantId,
+      ackCount: pendingAcknowledgements.length,
+      pauseState: pauseState,
+      activeStreamCount: activeStreams.size,
+      contextUsage: contextUsageEntries
     })
   );
 }
@@ -719,7 +1246,7 @@ function HelpModal({ onClose }) {
 
   return React.createElement(Box, {
       borderStyle: "round",
-      borderColor: "blue", 
+      borderColor: "blue",
       paddingX: 2,
       paddingY: 1,
       position: "absolute",
@@ -729,10 +1256,36 @@ function HelpModal({ onClose }) {
     },
     React.createElement(Box, { flexDirection: "column" },
       React.createElement(Text, { color: "blue", bold: true }, "Available Commands"),
-      React.createElement(Text, null, "/help              Show this help"),
-      React.createElement(Text, null, "/verbose           Toggle verbose output"),
-      React.createElement(Text, null, "/clear             Clear screen"),
-      React.createElement(Text, null, "/exit              Exit application"),
+      React.createElement(Text, null, "/help                       Show this help"),
+      React.createElement(Text, null, "/verbose                    Toggle verbose output"),
+      React.createElement(Text, null, "/ui-clear                   Clear local UI buffers"),
+      React.createElement(Text, null, "/exit                       Exit application"),
+
+      React.createElement(Box, { marginTop: 1 }),
+      React.createElement(Text, { color: "yellow", bold: true }, "Chat Queue"),
+      React.createElement(Text, null, "/ack [selector] [status]     Acknowledge chat messages"),
+      React.createElement(Text, null, "/cancel [selector] [reason]  Cancel pending chat entries"),
+
+      React.createElement(Box, { marginTop: 1 }),
+      React.createElement(Text, { color: "magenta", bold: true }, "Reasoning"),
+      React.createElement(Text, null, "/reason-cancel [reason]      Cancel active reasoning"),
+
+      React.createElement(Box, { marginTop: 1 }),
+      React.createElement(Text, { color: "green", bold: true }, "Participant Controls"),
+      React.createElement(Text, null, "/status <participant> [fields...]      Request status"),
+      React.createElement(Text, null, "/pause <participant> [timeout] [reason]"),
+      React.createElement(Text, null, "/resume <participant> [reason]"),
+      React.createElement(Text, null, "/forget <participant> [oldest|newest] [count]"),
+      React.createElement(Text, null, "/clear <participant> [reason]"),
+      React.createElement(Text, null, "/restart <participant> [mode] [reason]"),
+      React.createElement(Text, null, "/shutdown <participant> [reason]"),
+
+      React.createElement(Box, { marginTop: 1 }),
+      React.createElement(Text, { color: "cyan", bold: true }, "Streams"),
+      React.createElement(Text, null, "/stream request <participant> <direction> [description] [size=bytes]"),
+      React.createElement(Text, null, "/stream close <streamId> [reason]"),
+      React.createElement(Text, null, "/streams                    List active streams"),
+
       React.createElement(Box, { marginTop: 1 },
         React.createElement(Text, { color: "gray" }, "Press Esc or 'q' to close")
       )
@@ -746,7 +1299,7 @@ function HelpModal({ onClose }) {
 function ReasoningStatus({ reasoning }) {
   const [spinnerIndex, setSpinnerIndex] = useState(0);
   const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  
+
   // Animate the thinking indicator with a rotating spinner
   useEffect(() => {
     const interval = setInterval(() => {
@@ -754,10 +1307,12 @@ function ReasoningStatus({ reasoning }) {
     }, 100);
     return () => clearInterval(interval);
   }, []);
-  
+
   const elapsedTime = Math.floor((Date.now() - reasoning.startTime) / 1000);
-  
-  return React.createElement(Box, { 
+  const tokenSummary = formatReasoningTokenSummary(reasoning.tokenMetrics);
+  const tokenUpdatedAgo = reasoning.lastTokenUpdate ? formatRelativeTime(reasoning.lastTokenUpdate) : null;
+
+  return React.createElement(Box, {
     borderStyle: "round",
     borderColor: "cyan",
     paddingX: 1,
@@ -769,15 +1324,30 @@ function ReasoningStatus({ reasoning }) {
         React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`)
       ),
       React.createElement(Box, null,
-        React.createElement(Text, { color: "gray" }, 
+        React.createElement(Text, { color: "gray" },
           `${elapsedTime}s | ${reasoning.thoughtCount} thoughts`
         )
       )
     ),
     reasoning.message && React.createElement(Box, { marginTop: 0 },
-      React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" }, 
+      React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" },
         `"${reasoning.message.slice(0, 300)}${reasoning.message.length > 300 ? '...' : ''}"`
       )
+    ),
+    tokenSummary?.summary && React.createElement(Box, { marginTop: 1 },
+      React.createElement(Text, { color: "cyan" }, `Tokens: ${tokenSummary.summary}`)
+    ),
+    tokenSummary?.deltas && React.createElement(Box, { marginTop: 0 },
+      React.createElement(Text, { color: "cyan" }, `Δ ${tokenSummary.deltas}`)
+    ),
+    tokenSummary?.details && React.createElement(Box, { marginTop: 0 },
+      React.createElement(Text, { color: "gray" }, tokenSummary.details)
+    ),
+    tokenSummary && tokenUpdatedAgo && React.createElement(Box, { marginTop: 0 },
+      React.createElement(Text, { color: "gray" }, `Updated ${tokenUpdatedAgo}`)
+    ),
+    React.createElement(Box, { marginTop: 1 },
+      React.createElement(Text, { color: "gray" }, 'Use /reason-cancel to interrupt reasoning.')
     )
   );
 }
@@ -790,9 +1360,37 @@ function ReasoningStatus({ reasoning }) {
 /**
  * Status Bar Component
  */
-function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId }) {
+function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, ackCount = 0, pauseState, activeStreamCount = 0, contextUsage = [] }) {
   const status = connected ? 'Connected' : 'Disconnected';
   const statusColor = connected ? 'green' : 'red';
+
+  const extras = [];
+  extras.push(`${messageCount} msgs`);
+  if (ackCount > 0) {
+    extras.push(`${ackCount} ack${ackCount === 1 ? '' : 's'}`);
+  }
+  if (activeStreamCount > 0) {
+    extras.push(`${activeStreamCount} stream${activeStreamCount === 1 ? '' : 's'}`);
+  }
+  if (pendingOperation) {
+    extras.push('pending op');
+  }
+  if (verbose) {
+    extras.push('verbose');
+  }
+  if (pauseState) {
+    const reason = pauseState.reason ? `: ${pauseState.reason}` : '';
+    const remaining = pauseState.until ? ` (${formatTimeRemaining(pauseState.until)})` : '';
+    extras.push(`paused${reason}${remaining}`);
+  }
+  if (contextUsage.length > 0) {
+    const ctxSegments = contextUsage.slice(0, 3).map(formatContextUsageForBar).filter(Boolean);
+    if (ctxSegments.length > 0) {
+      extras.push(`ctx ${ctxSegments.join(', ')}`);
+    }
+  }
+
+  const extrasText = extras.length > 0 ? ` | ${extras.join(' | ')}` : '';
 
   return React.createElement(Box, { justifyContent: "space-between", paddingX: 1 },
     React.createElement(Text, null,
@@ -802,10 +1400,7 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId
       React.createElement(Text, { color: "cyan" }, spaceId),
       " | ",
       React.createElement(Text, { color: "blue" }, participantId),
-      " | ",
-      React.createElement(Text, null, `${messageCount} msgs`),
-      verbose && " | Verbose",
-      pendingOperation && React.createElement(Text, { color: "yellow" }, " | Pending Op")
+      extrasText
     ),
     React.createElement(Text, { color: "gray" }, "Ctrl+C to exit")
   );
@@ -915,6 +1510,488 @@ function getPayloadPreview(payload, kind) {
     return `{${keys.slice(0, 2).join(', ')}${keys.length > 2 ? '...' : ''}}`;
   }
   return String(payload);
+}
+
+function truncateText(text, maxLength = 40) {
+  if (!text) return '(no text)';
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+function formatRelativeTime(date) {
+  if (!date) return 'unknown';
+  const value = date instanceof Date ? date.getTime() : date;
+  const diff = Date.now() - value;
+  if (diff < 1000) return 'just now';
+  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
+
+function formatTimeRemaining(timestamp) {
+  const now = Date.now();
+  const remaining = timestamp - now;
+  if (remaining <= 0) return 'expired';
+  if (remaining < 60000) {
+    return `${Math.ceil(remaining / 1000)}s remaining`;
+  }
+  if (remaining < 3600000) {
+    return `${Math.ceil(remaining / 60000)}m remaining`;
+  }
+  return `${Math.ceil(remaining / 3600000)}h remaining`;
+}
+
+function formatStatusPayload(payload) {
+  if (!payload) return 'unknown';
+  const parts = [];
+  if (typeof payload.tokens === 'number') {
+    if (typeof payload.max_tokens === 'number') {
+      parts.push(`tokens ${payload.tokens}/${payload.max_tokens}`);
+    } else {
+      parts.push(`tokens ${payload.tokens}`);
+    }
+  }
+  if (typeof payload.messages_in_context === 'number') {
+    parts.push(`${payload.messages_in_context} msgs`);
+  }
+  if (typeof payload.latency_ms === 'number') {
+    parts.push(`${payload.latency_ms}ms`);
+  }
+  if (payload.status) {
+    parts.push(payload.status);
+  }
+  return parts.length > 0 ? parts.join(' | ') : 'status received';
+}
+
+function formatNumber(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return String(value);
+  }
+  if (Number.isInteger(value)) {
+    return value.toLocaleString();
+  }
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function normalizeTokenKey(rawKey) {
+  if (!rawKey) return '';
+  const segments = rawKey
+    .split(/[.\-_]/)
+    .filter(segment => segment && !/^\d+$/.test(segment) &&
+      !/^(delta|deltas|increment|increments|inc)$/i.test(segment));
+  return segments.join('_');
+}
+
+function extractReasoningTokenMetrics(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const absolute = new Map();
+  const deltas = new Map();
+
+  const visit = (value, pathSegments) => {
+    if (value === null || value === undefined) {
+      return;
+    }
+
+    if (typeof value === 'number') {
+      const key = pathSegments.join('_');
+      const lowerKey = key.toLowerCase();
+      if (!lowerKey.includes('token')) {
+        return;
+      }
+
+      const normalized = normalizeTokenKey(key);
+      if (!normalized) {
+        return;
+      }
+
+      const hasDeltaSegment = pathSegments.some(segment => segment && segment.toLowerCase().includes('delta')) ||
+        lowerKey.includes('delta') || lowerKey.includes('increment') || lowerKey.includes('inc');
+
+      if (hasDeltaSegment) {
+        deltas.set(normalized, (deltas.get(normalized) || 0) + value);
+      } else {
+        absolute.set(normalized, value);
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        if (typeof item === 'number') {
+          // Skip bare numeric arrays without context
+          return;
+        }
+        if (typeof item === 'object' && item !== null) {
+          visit(item, pathSegments.concat(String(index)));
+        }
+      });
+      return;
+    }
+
+    if (typeof value === 'object') {
+      Object.entries(value).forEach(([key, child]) => {
+        visit(child, pathSegments.concat(key));
+      });
+    }
+  };
+
+  visit(payload, []);
+
+  if (absolute.size === 0 && deltas.size === 0) {
+    return null;
+  }
+
+  return {
+    absolute,
+    deltas
+  };
+}
+
+function mergeReasoningTokenMetrics(existingMetrics, update) {
+  if (!existingMetrics && !update) {
+    return { metrics: null, changed: false };
+  }
+
+  if (!existingMetrics) {
+    if (!update) {
+      return { metrics: null, changed: false };
+    }
+    return {
+      metrics: {
+        absolute: new Map(update.absolute || []),
+        deltaTotals: new Map(update.deltas || []),
+        lastDeltas: new Map(update.deltas || [])
+      },
+      changed: true
+    };
+  }
+
+  if (!update) {
+    return { metrics: existingMetrics, changed: false };
+  }
+
+  const absolute = new Map(existingMetrics.absolute || []);
+  const deltaTotals = new Map(existingMetrics.deltaTotals || []);
+  const lastDeltas = new Map(existingMetrics.lastDeltas || []);
+  let changed = false;
+
+  update.absolute?.forEach((value, key) => {
+    if (absolute.get(key) !== value) {
+      absolute.set(key, value);
+      changed = true;
+    }
+  });
+
+  update.deltas?.forEach((value, key) => {
+    const nextTotal = (deltaTotals.get(key) || 0) + value;
+    deltaTotals.set(key, nextTotal);
+    lastDeltas.set(key, value);
+    if (value !== 0) {
+      changed = true;
+    }
+  });
+
+  return {
+    metrics: {
+      absolute,
+      deltaTotals,
+      lastDeltas
+    },
+    changed
+  };
+}
+
+function findTokenEntry(entries, substrings) {
+  if (!entries || entries.length === 0) {
+    return null;
+  }
+  const lowered = substrings.map(sub => sub.toLowerCase());
+  for (const [key, value] of entries) {
+    const lowerKey = key.toLowerCase();
+    if (lowered.every(sub => lowerKey.includes(sub))) {
+      return { key, value };
+    }
+  }
+  return null;
+}
+
+function formatTokenLabel(key) {
+  if (!key) {
+    return '';
+  }
+  return key.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function formatReasoningTokenSummary(tokenMetrics) {
+  if (!tokenMetrics) {
+    return null;
+  }
+
+  const absoluteEntries = tokenMetrics.absolute ? Array.from(tokenMetrics.absolute.entries()) : [];
+  const deltaTotalEntries = tokenMetrics.deltaTotals ? Array.from(tokenMetrics.deltaTotals.entries()) : [];
+  const lastDeltaEntries = tokenMetrics.lastDeltas ? Array.from(tokenMetrics.lastDeltas.entries()) : [];
+
+  if (absoluteEntries.length === 0 && deltaTotalEntries.length === 0 && lastDeltaEntries.length === 0) {
+    return null;
+  }
+
+  const usedAbsoluteKeys = new Set();
+  const summaryParts = [];
+
+  let totalEntry = findTokenEntry(absoluteEntries, ['total', 'token']) || findTokenEntry(absoluteEntries, ['tokens']);
+  let totalSource = 'absolute';
+  if (!totalEntry) {
+    totalEntry = findTokenEntry(deltaTotalEntries, ['total', 'token']) || findTokenEntry(deltaTotalEntries, ['tokens']);
+    totalSource = 'delta';
+  }
+  if (totalEntry) {
+    summaryParts.push(`total ${formatNumber(totalEntry.value)}`);
+    if (totalSource === 'absolute') {
+      usedAbsoluteKeys.add(totalEntry.key);
+    }
+  }
+
+  const promptEntry = findTokenEntry(absoluteEntries, ['prompt', 'token']) || findTokenEntry(absoluteEntries, ['input', 'token']);
+  if (promptEntry) {
+    summaryParts.push(`prompt ${formatNumber(promptEntry.value)}`);
+    usedAbsoluteKeys.add(promptEntry.key);
+  }
+
+  const completionEntry = findTokenEntry(absoluteEntries, ['completion', 'token']) || findTokenEntry(absoluteEntries, ['output', 'token']);
+  if (completionEntry) {
+    summaryParts.push(`completion ${formatNumber(completionEntry.value)}`);
+    usedAbsoluteKeys.add(completionEntry.key);
+  }
+
+  let reasoningEntry = findTokenEntry(absoluteEntries, ['reasoning', 'token']);
+  let reasoningSource = 'absolute';
+  if (!reasoningEntry) {
+    reasoningEntry = findTokenEntry(deltaTotalEntries, ['reasoning', 'token']) || findTokenEntry(deltaTotalEntries, ['reasoning']);
+    reasoningSource = 'delta';
+  }
+  if (reasoningEntry) {
+    summaryParts.push(`reasoning ${formatNumber(reasoningEntry.value)}`);
+    if (reasoningSource === 'absolute') {
+      usedAbsoluteKeys.add(reasoningEntry.key);
+    }
+  }
+
+  let streamEntry = findTokenEntry(deltaTotalEntries, ['stream']) || findTokenEntry(absoluteEntries, ['stream', 'token']);
+  if (!streamEntry) {
+    streamEntry = findTokenEntry(deltaTotalEntries, ['reasoning']);
+  }
+  if (streamEntry) {
+    summaryParts.push(`stream ${formatNumber(streamEntry.value)}`);
+    if (absoluteEntries.some(([key]) => key === streamEntry.key)) {
+      usedAbsoluteKeys.add(streamEntry.key);
+    }
+  }
+
+  if (summaryParts.length === 0 && absoluteEntries.length > 0) {
+    absoluteEntries.slice(0, 3).forEach(([key, value]) => {
+      summaryParts.push(`${formatTokenLabel(key)} ${formatNumber(value)}`);
+      usedAbsoluteKeys.add(key);
+    });
+  }
+
+  const deltaParts = [];
+  const reasoningDelta = findTokenEntry(lastDeltaEntries, ['reasoning']);
+  if (reasoningDelta && reasoningDelta.value !== 0) {
+    deltaParts.push(`reasoning +${formatNumber(reasoningDelta.value)}`);
+  }
+  const streamDelta = findTokenEntry(lastDeltaEntries, ['stream']);
+  if (streamDelta && streamDelta.value !== 0 && (!reasoningDelta || streamDelta.key !== reasoningDelta.key || streamDelta.value !== reasoningDelta.value)) {
+    deltaParts.push(`stream +${formatNumber(streamDelta.value)}`);
+  }
+  const totalDelta = findTokenEntry(lastDeltaEntries, ['total', 'token']) || findTokenEntry(lastDeltaEntries, ['tokens']);
+  if (totalDelta && totalDelta.value !== 0 && (!reasoningDelta || totalDelta.key !== reasoningDelta.key || totalDelta.value !== reasoningDelta.value) && (!streamDelta || totalDelta.key !== streamDelta.key || totalDelta.value !== streamDelta.value)) {
+    deltaParts.push(`total +${formatNumber(totalDelta.value)}`);
+  }
+
+  const detailEntries = absoluteEntries.filter(([key]) => !usedAbsoluteKeys.has(key));
+  const detailParts = detailEntries.slice(0, 3).map(([key, value]) => `${formatTokenLabel(key)} ${formatNumber(value)}`);
+
+  const summary = summaryParts.length > 0 ? summaryParts.join(' | ') : null;
+  const deltas = deltaParts.length > 0 ? deltaParts.join(' | ') : null;
+  const details = detailParts.length > 0 ? `Details: ${detailParts.join(' | ')}` : null;
+
+  if (!summary && !deltas && !details) {
+    return null;
+  }
+
+  return { summary, deltas, details };
+}
+
+function clampPercent(value) {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+}
+
+function buildContextUsageEntries(participantStatuses) {
+  if (!participantStatuses || participantStatuses.size === 0) {
+    return [];
+  }
+
+  const entries = [];
+  for (const [id, info] of participantStatuses.entries()) {
+    const payload = info?.payload || {};
+    const tokens = typeof payload.tokens === 'number' ? payload.tokens : null;
+    const maxTokens = typeof payload.max_tokens === 'number' ? payload.max_tokens : null;
+    const contextTokens = typeof payload.context_tokens === 'number' ? payload.context_tokens : null;
+    const maxContextTokens = typeof payload.max_context_tokens === 'number' ? payload.max_context_tokens : null;
+    const messages = typeof payload.messages_in_context === 'number' ? payload.messages_in_context : null;
+    const maxMessages = typeof payload.max_messages_in_context === 'number' ? payload.max_messages_in_context : null;
+
+    let percent = null;
+    if (tokens !== null && maxTokens) {
+      const maybe = clampPercent((tokens / maxTokens) * 100);
+      percent = maybe === null ? null : maybe;
+    } else if (contextTokens !== null && maxContextTokens) {
+      const maybe = clampPercent((contextTokens / maxContextTokens) * 100);
+      percent = maybe === null ? null : maybe;
+    } else if (messages !== null && maxMessages) {
+      const maybe = clampPercent((messages / maxMessages) * 100);
+      percent = maybe === null ? null : maybe;
+    }
+
+    const timestamp = info?.timestamp instanceof Date ? info.timestamp.getTime() : Date.now();
+
+    entries.push({
+      id,
+      percent,
+      tokens,
+      maxTokens,
+      contextTokens,
+      maxContextTokens,
+      messages,
+      maxMessages,
+      timestamp
+    });
+  }
+
+  entries.sort((a, b) => b.timestamp - a.timestamp);
+  return entries;
+}
+
+function formatPercent(value) {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  const normalized = clampPercent(value);
+  if (normalized === null) {
+    return null;
+  }
+  if (normalized >= 99.5) {
+    return '100%';
+  }
+  if (normalized >= 10) {
+    return `${Math.round(normalized)}%`;
+  }
+  return `${normalized.toFixed(1)}%`;
+}
+
+function formatContextUsageForBar(entry) {
+  if (!entry) {
+    return null;
+  }
+
+  const pieces = [];
+  const percentText = formatPercent(entry.percent);
+  if (percentText) {
+    pieces.push(percentText);
+  }
+
+  if (entry.tokens !== null && entry.tokens !== undefined) {
+    if (entry.maxTokens) {
+      pieces.push(`${formatNumber(entry.tokens)}/${formatNumber(entry.maxTokens)} tok`);
+    } else {
+      pieces.push(`${formatNumber(entry.tokens)} tok`);
+    }
+  } else if (entry.contextTokens !== null && entry.contextTokens !== undefined) {
+    if (entry.maxContextTokens) {
+      pieces.push(`${formatNumber(entry.contextTokens)}/${formatNumber(entry.maxContextTokens)} ctx`);
+    } else {
+      pieces.push(`${formatNumber(entry.contextTokens)} ctx`);
+    }
+  } else if (entry.messages !== null && entry.messages !== undefined) {
+    pieces.push(`${formatNumber(entry.messages)} msgs`);
+  }
+
+  if (pieces.length === 0) {
+    return null;
+  }
+
+  return `${entry.id} ${pieces.join(' ')}`.trim();
+}
+
+function SidePanel({ pendingAcknowledgements, participantStatuses, pauseState, activeStreams, streamFrames }) {
+  const ackEntries = pendingAcknowledgements.slice(0, 5);
+  const statusEntries = Array.from(participantStatuses.entries())
+    .sort(([, a], [, b]) => {
+      const at = a.timestamp ? a.timestamp.getTime() : 0;
+      const bt = b.timestamp ? b.timestamp.getTime() : 0;
+      return bt - at;
+    })
+    .slice(0, 5);
+  const streamEntries = Array.from(activeStreams.values());
+  const latestFrames = streamFrames.slice(-3);
+
+  return React.createElement(Box, {
+    width: 42,
+    flexDirection: "column",
+    borderStyle: "round",
+    borderColor: "gray",
+    paddingX: 1,
+    paddingY: 0
+  },
+    React.createElement(Text, { color: "cyan", bold: true }, "Signal Board"),
+
+    React.createElement(Box, { marginTop: 1 }),
+    React.createElement(Text, { color: "yellow", bold: true }, `Pending Acks (${pendingAcknowledgements.length})`),
+    ackEntries.length > 0
+      ? ackEntries.map((entry, index) => React.createElement(Text, { key: entry.id, color: "yellow" },
+          `${index + 1}. ${entry.from || 'unknown'} – ${truncateText(entry.text, 28)} (${formatRelativeTime(entry.timestamp)})`
+        ))
+      : React.createElement(Text, { color: "gray" }, 'None'),
+
+    React.createElement(Box, { marginTop: 1 }),
+    React.createElement(Text, { color: "green", bold: true }, `Participant Status (${participantStatuses.size})`),
+    statusEntries.length > 0
+      ? statusEntries.map(([id, info]) => React.createElement(Text, { key: id, color: "green" },
+          `${id}: ${truncateText(formatStatusPayload(info.payload), 34)} (${formatRelativeTime(info.timestamp)})`
+        ))
+      : React.createElement(Text, { color: "gray" }, 'No status reported'),
+
+    React.createElement(Box, { marginTop: 1 }),
+    React.createElement(Text, { color: "magenta", bold: true }, 'Pause State'),
+    pauseState
+      ? React.createElement(Text, { color: "magenta" },
+          `Paused by ${pauseState.from || 'unknown'}${pauseState.reason ? `: ${pauseState.reason}` : ''}${pauseState.until ? ` (${formatTimeRemaining(pauseState.until)})` : ''}`
+        )
+      : React.createElement(Text, { color: "gray" }, 'Active'),
+
+    React.createElement(Box, { marginTop: 1 }),
+    React.createElement(Text, { color: "blue", bold: true }, `Streams (${activeStreams.size})`),
+    streamEntries.length > 0
+      ? streamEntries.slice(0, 4).map(entry => React.createElement(Text, { key: entry.streamId, color: "blue" },
+          `${entry.streamId}: ${entry.openedBy || 'unknown'}${entry.description ? ` – ${truncateText(entry.description, 24)}` : ''}`
+        ))
+      : React.createElement(Text, { color: "gray" }, 'No active streams'),
+
+    latestFrames.length > 0 && React.createElement(Box, { marginTop: 1, flexDirection: "column" },
+      React.createElement(Text, { color: "blue", bold: true }, 'Last Frames'),
+      latestFrames.map((frame, index) => React.createElement(Text, { key: `${frame.streamId}-${index}`, color: "blue" },
+        `${frame.streamId}: ${truncateText(frame.payload, 30)}`
+      ))
+    )
+  );
 }
 
 // Risk assessment functions - kept for potential future use with more advanced approval dialogs
