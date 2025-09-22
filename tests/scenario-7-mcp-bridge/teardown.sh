@@ -42,14 +42,17 @@ fi
 # Clean up test artifacts using mew space clean
 if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
   echo "Cleaning test artifacts..."
-  
+
+  # Clean up test files directory
+  rm -rf test-files 2>/dev/null || true
+
   # Use the new mew space clean command
   ../../cli/bin/mew.js space clean --all --force 2>/dev/null || {
     # Fallback to manual cleanup if clean command fails
     echo "Clean command failed, using manual cleanup..."
     rm -rf logs fifos .mew 2>/dev/null || true
   }
-  
+
   echo -e "${GREEN}✓ Test artifacts removed${NC}"
 else
   echo -e "${YELLOW}Preserving logs (PRESERVE_LOGS=true)${NC}"
