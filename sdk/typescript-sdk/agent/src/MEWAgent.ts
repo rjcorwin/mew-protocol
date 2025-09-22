@@ -1,5 +1,5 @@
 import { MEWParticipant, ParticipantOptions, Tool, Resource } from '@mew-protocol/participant';
-import { Envelope } from '@mew-protocol/types';
+import { Envelope, ParticipantRestartPayload } from '@mew-protocol/types';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
@@ -16,7 +16,8 @@ export interface AgentConfig extends ParticipantOptions {
   maxIterations?: number;
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
   conversationHistoryLength?: number;  // Number of previous messages to include in context (default: 0 = only current)
-
+  contextTokenLimit?: number;          // Soft limit before automatic compaction/status updates
+  
   // Chat response configuration
   chatResponse?: {
     respondToQuestions?: boolean;    // Respond to questions (default: true)
@@ -74,6 +75,11 @@ export class MEWAgent extends MEWParticipant {
   private isRunning = false;
   private currentConversation: Array<{ role: string; content: string }> = [];
   private conversationHistory: any[] = [];  // Full conversation history for context
+  private reasoningContextId?: string;
+  private reasoningCancelled = false;
+  private reasoningCancelReason?: string;
+  private reasoningStreamInfo?: { description: string; requestId?: string; streamId?: string };
+  private compacting = false;
 
   // Message queueing properties
   private messageQueue: Envelope[] = [];
@@ -129,10 +135,19 @@ export class MEWAgent extends MEWParticipant {
     this.openai = new OpenAI(openaiConfig);
 
     this.setupAgentBehavior();
-    
+
     // Enable auto-discovery for agents
     this.enableAutoDiscovery();
-    
+
+    if (this.config.contextTokenLimit) {
+      this.setContextTokenLimit(this.config.contextTokenLimit);
+    }
+
+    this.on('stream/request', (envelope: Envelope) => this.handleStreamRequestEvent(envelope));
+    this.on('stream/open', (envelope: Envelope) => this.handleStreamOpenEvent(envelope));
+    this.on('stream/close', (envelope: Envelope) => this.handleStreamCloseEvent(envelope));
+    this.on('reasoning/cancel', (envelope: Envelope) => this.handleReasoningCancelEvent(envelope));
+
     // Set up participant join handler for tracking
     this.onParticipantJoin((participant) => {
       if (participant.id !== this.options.participant_id) {
@@ -321,6 +336,9 @@ export class MEWAgent extends MEWParticipant {
       name: envelope.from  // Track who sent the message
     });
 
+    this.recordContextUsage({ tokens: this.estimateTokens(text), messages: 1 });
+    this.ensureContextHeadroom();
+    
     // Check if we should respond to this message
     const shouldRespond = await this.shouldRespondToChat(envelope);
 
@@ -504,14 +522,21 @@ Return a JSON object:
   private async processWithReAct(input: string): Promise<string> {
     const thoughts: Thought[] = [];
     let iterations = 0;
-    
+
     while (iterations < this.config.maxIterations!) {
       iterations++;
       this.log('debug', `ReAct iteration ${iterations}/${this.config.maxIterations}`);
-      
+
+      if (this.reasoningCancelled) {
+        this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: this.reasoningCancelReason });
+        this.reasoningCancelled = false;
+        this.reasoningCancelReason = undefined;
+        return 'Reasoning cancelled.';
+      }
+
       // Reason phase
       const thought = await this.reason(input, thoughts);
-      
+
       // Generate tool call ID if not provided (for non-native format)
       if (thought.action === 'tool' && !thought.actionInput?.toolCallId) {
         thought.actionInput.toolCallId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -528,7 +553,9 @@ Return a JSON object:
         content: `[Reasoning] ${thought.reasoning}`,
         metadata: { type: 'reasoning', thought }
       });
-      
+      this.recordContextUsage({ tokens: this.estimateTokens(`[Reasoning] ${thought.reasoning}`), messages: 1 });
+      this.ensureContextHeadroom();
+
       // Act phase
       if (thought.action === 'respond') {
         return thought.actionInput;
@@ -541,8 +568,10 @@ Return a JSON object:
           content: `[Tool Call] ${thought.actionInput.tool}: ${JSON.stringify(thought.actionInput.arguments)}`,
           metadata: { type: 'tool_call', tool: thought.actionInput.tool, arguments: thought.actionInput.arguments }
         });
+        this.recordContextUsage({ tokens: this.estimateTokens(`[Tool Call] ${thought.actionInput.tool}: ${JSON.stringify(thought.actionInput.arguments)}`), messages: 1 });
+        this.ensureContextHeadroom();
       }
-      
+
       try {
         const observation = await this.act(thought.action, thought.actionInput);
         this.log('debug', `Observation: ${observation}`);
@@ -556,7 +585,9 @@ Return a JSON object:
           content: `[Observation] ${observation}`,
           metadata: { type: 'observation' }
         });
-        
+        this.recordContextUsage({ tokens: this.estimateTokens(`[Observation] ${observation}`), messages: 1 });
+        this.ensureContextHeadroom();
+
         // Don't immediately return on tool results - let the LLM decide if more work is needed
         // The LLM will analyze the observation and decide whether to:
         // 1. Continue with more tool calls
@@ -574,7 +605,9 @@ Return a JSON object:
           content: `[Error] ${error}`,
           metadata: { type: 'error' }
         });
-        
+        this.recordContextUsage({ tokens: this.estimateTokens(`[Error] ${error}`), messages: 1 });
+        this.ensureContextHeadroom();
+
         // Continue the loop - let the LLM decide if it can recover or needs to respond with error
       }
     }
@@ -923,13 +956,16 @@ Return a JSON object:
     this.log('info', `Attempting to send chat response to ${to}: ${text}`);
     try {
       this.chat(text, to);
-      
+
       // Track assistant's response in conversation history
       this.conversationHistory.push({
         role: 'assistant',
         content: text
       });
-      
+
+      this.recordContextUsage({ tokens: this.estimateTokens(text), messages: 1 });
+      this.ensureContextHeadroom();
+
       this.log('info', `Chat message sent successfully to ${to}`);
     } catch (error) {
       this.log('error', `Failed to send chat to ${to}: ${error}`);
@@ -954,7 +990,7 @@ Return a JSON object:
    */
   private async fulfillProposal(envelope: Envelope): Promise<void> {
     const { method, params } = envelope.payload;
-    
+
     try {
       // Find target that can handle this
       // For now, just try first available participant with the tool
@@ -998,18 +1034,175 @@ Return a JSON object:
     }
   }
 
+  private handleStreamRequestEvent(envelope: Envelope): void {
+    if (!this.reasoningStreamInfo) return;
+    if (envelope.from === this.options.participant_id && envelope.payload?.description === this.reasoningStreamInfo.description) {
+      this.reasoningStreamInfo.requestId = envelope.id;
+    }
+  }
+
+  private handleStreamOpenEvent(envelope: Envelope): void {
+    if (!this.reasoningStreamInfo) return;
+    const correlationId = envelope.correlation_id?.[0];
+    if (correlationId && correlationId === this.reasoningStreamInfo.requestId) {
+      this.reasoningStreamInfo.streamId = envelope.payload?.stream_id;
+    }
+  }
+
+  private handleStreamCloseEvent(envelope: Envelope): void {
+    if (!this.reasoningStreamInfo) return;
+    const correlationId = envelope.correlation_id?.[0];
+    if (!correlationId) return;
+    const streamId = this.reasoningStreamInfo.streamId;
+    if (streamId && (correlationId === streamId || correlationId === this.reasoningStreamInfo.requestId)) {
+      this.reasoningStreamInfo = undefined;
+    }
+  }
+
+  private handleReasoningCancelEvent(envelope: Envelope): void {
+    if (this.matchesReasoningContext(envelope.context)) {
+      this.reasoningCancelled = true;
+      this.reasoningCancelReason = envelope.payload?.reason || 'cancelled';
+      this.closeReasoningStream('cancelled');
+    }
+  }
+
+  private matchesReasoningContext(context: Envelope['context']): boolean {
+    if (!this.reasoningContextId || !context) {
+      return false;
+    }
+
+    if (typeof context === 'string') {
+      return context === this.reasoningContextId;
+    }
+
+    if (typeof context === 'object') {
+      return (
+        context?.correlation_id === this.reasoningContextId ||
+        context?.topic === this.reasoningContextId
+      );
+    }
+
+    return false;
+  }
+
+  private ensureContextHeadroom(): void {
+    if (this.compacting) {
+      return;
+    }
+
+    const limit = this.getContextTokenLimit();
+    if (this.getContextTokens() <= limit * 0.95) {
+      return;
+    }
+
+    this.compacting = true;
+    this.reportStatus('compacting');
+    const result = this.compactConversationHistory();
+    if (result.tokens > 0 || result.messages > 0) {
+      this.recordContextUsage({ tokens: -result.tokens, messages: -result.messages });
+    }
+    this.reportStatus('compacted');
+    this.compacting = false;
+  }
+
+  private compactConversationHistory(): { tokens: number; messages: number } {
+    let tokensFreed = 0;
+    let messagesRemoved = 0;
+    let projectedTokens = this.getContextTokens();
+    const target = this.getContextTokenLimit() * 0.7;
+
+    while (projectedTokens > target && this.conversationHistory.length > 0) {
+      const entry = this.conversationHistory.shift();
+      messagesRemoved++;
+      if (entry?.content) {
+        const estimate = this.estimateTokens(entry.content);
+        tokensFreed += estimate;
+        projectedTokens -= estimate;
+      }
+    }
+
+    return { tokens: tokensFreed, messages: messagesRemoved };
+  }
+
+  protected async onForget(direction: 'oldest' | 'newest', entries?: number): Promise<{ messagesRemoved: number; tokensFreed: number }> {
+    const count = entries ?? Math.ceil(this.conversationHistory.length / 2);
+    let tokensFreed = 0;
+    let messagesRemoved = 0;
+
+    for (let i = 0; i < count && this.conversationHistory.length > 0; i++) {
+      const entry = direction === 'oldest' ? this.conversationHistory.shift() : this.conversationHistory.pop();
+      if (entry?.content) {
+        tokensFreed += this.estimateTokens(entry.content);
+      }
+      messagesRemoved++;
+    }
+
+    return { messagesRemoved, tokensFreed };
+  }
+
+  protected async onClear(): Promise<void> {
+    this.conversationHistory = [];
+    this.reasoningContextId = undefined;
+    this.reasoningStreamInfo = undefined;
+    this.reasoningCancelled = false;
+    await super.onClear();
+  }
+
+  protected async onRestart(payload?: ParticipantRestartPayload): Promise<void> {
+    await this.onClear();
+    await super.onRestart(payload);
+  }
+
+  private closeReasoningStream(_reason: string): void {
+    this.reasoningStreamInfo = undefined;
+  }
+
   /**
    * Emit reasoning events
    */
-  private emitReasoning(event: string, data: any): void {
+  private emitReasoning(event: string, data: any): string | undefined {
+    if (event !== 'reasoning/start' && this.reasoningCancelled && event !== 'reasoning/conclusion') {
+      return undefined;
+    }
+
     const envelope: Partial<Envelope> = {
       kind: event as any,
       payload: data
     };
 
-    if (this.canSend(envelope)) {
-      this.send(envelope);
+    if (event === 'reasoning/start') {
+      const id = `reason-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      envelope.id = id;
+      this.reasoningContextId = id;
+      this.reasoningCancelled = false;
+      this.reasoningCancelReason = undefined;
+
+      if (this.canSend({ kind: 'stream/request', payload: { direction: 'upload' } })) {
+        const description = `reasoning:${id}`;
+        this.reasoningStreamInfo = { description };
+        this.requestStream({ direction: 'upload', description });
+      }
+    } else if (this.reasoningContextId) {
+      envelope.context = this.reasoningContextId;
     }
+
+    if (!this.canSend(envelope)) {
+      return envelope.id as string | undefined;
+    }
+
+    this.send(envelope);
+
+    if (event === 'reasoning/thought' && this.reasoningStreamInfo?.streamId) {
+      this.sendStreamData(this.reasoningStreamInfo.streamId, JSON.stringify(data));
+    }
+
+    if (event === 'reasoning/conclusion') {
+      this.closeReasoningStream('complete');
+      this.reasoningContextId = undefined;
+    }
+
+    return envelope.id as string | undefined;
   }
 
   /**

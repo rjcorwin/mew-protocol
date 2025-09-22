@@ -1,5 +1,16 @@
 import { MEWClient, ClientOptions } from '@mew-protocol/client';
-import { Envelope, Capability } from '@mew-protocol/types';
+import {
+  Envelope,
+  Capability,
+  ParticipantStatusPayload,
+  ParticipantForgetPayload,
+  ParticipantRequestStatusPayload,
+  ParticipantPausePayload,
+  ParticipantClearPayload,
+  ParticipantRestartPayload,
+  ParticipantShutdownPayload,
+  StreamRequestPayload,
+} from '@mew-protocol/types';
 import { PatternMatcher } from '@mew-protocol/capability-matcher';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -86,11 +97,34 @@ export class MEWParticipant extends MEWClient {
   private autoDiscoveryEnabled = false;
   private defaultCacheTTL = 300000; // 5 minutes
   private participantDiscoveryStatus = new Map<string, ParticipantDiscoveryStatus>();
+  private pauseState?: { id: string; reason?: string; until?: number; from: string };
+  private contextTokens = 0;
+  private contextMaxTokens = 20000;
+  private contextMessages = 0;
+  private thresholdAlertActive = false;
+  private lastStatusBroadcastAt = 0;
+  private proactiveStatusCooldownMs = 60000;
+  private pendingStreamRequests = new Map<string, { description?: string; target?: string | string[] }>();
+  private activeStreams = new Map<string, { description?: string; correlationId?: string }>();
+  private openToStream = new Map<string, string>();
 
   constructor(options: ParticipantOptions) {
     super(options);
-    this.options = { requestTimeout: 30000, ...options };
+    this.options = {
+      ...this.options,
+      requestTimeout: options.requestTimeout ?? 30000,
+    } as ParticipantOptions;
     this.setupLifecycle();
+  }
+
+  async send(envelope: Envelope | Partial<Envelope>): Promise<void> {
+    const kind = (envelope as Envelope).kind || (envelope as any).kind;
+    if (kind && this.isPauseActive() && !this.isAllowedDuringPause(kind)) {
+      const reason = this.pauseState?.reason ? ` (${this.pauseState?.reason})` : '';
+      throw new Error(`Participant is paused${reason}`);
+    }
+
+    await super.send(envelope);
   }
 
   /**
@@ -229,7 +263,7 @@ export class MEWParticipant extends MEWClient {
   /**
    * Send a chat message
    */
-  chat(text: string, to?: string | string[]): void {
+  chat(text: string, to?: string | string[], format: 'plain' | 'markdown' = 'plain'): void {
     if (!this.canSend({ kind: 'chat', payload: { text } })) {
       throw new Error('No capability to send chat messages');
     }
@@ -239,11 +273,64 @@ export class MEWParticipant extends MEWClient {
       payload: { text }
     };
 
+    if (format && format !== 'plain') {
+      (envelope.payload as any).format = format;
+    }
+
     if (to) {
       envelope.to = Array.isArray(to) ? to : [to];
     }
 
     this.send(envelope);
+
+    this.recordContextUsage({ tokens: this.estimateTokens(text), messages: 1 });
+  }
+
+  acknowledgeChat(messageId: string, target: string | string[], status: string = 'received'): void {
+    const to = Array.isArray(target) ? target : [target];
+    this.send({
+      kind: 'chat/acknowledge',
+      to,
+      correlation_id: [messageId],
+      payload: status ? { status } : {}
+    });
+  }
+
+  cancelChat(messageId: string, target?: string | string[], reason: string = 'cancelled'): void {
+    const envelope: Partial<Envelope> = {
+      kind: 'chat/cancel',
+      correlation_id: [messageId],
+      payload: reason ? { reason } : {}
+    };
+
+    if (target) {
+      envelope.to = Array.isArray(target) ? target : [target];
+    }
+
+    this.send(envelope);
+  }
+
+  requestParticipantStatus(target: string | string[], fields?: string[]): void {
+    const to = Array.isArray(target) ? target : [target];
+    const payload: ParticipantRequestStatusPayload = {};
+    if (fields && fields.length > 0) {
+      payload.fields = fields;
+    }
+
+    this.send({
+      kind: 'participant/request-status',
+      to,
+      payload
+    });
+  }
+
+  requestStream(payload: StreamRequestPayload, target: string | string[] = 'gateway'): void {
+    const to = Array.isArray(target) ? target : [target];
+    this.send({
+      kind: 'stream/request',
+      to,
+      payload
+    });
   }
 
   /**
@@ -501,6 +588,255 @@ export class MEWParticipant extends MEWClient {
     }
   }
 
+  protected setContextTokenLimit(limit: number): void {
+    this.contextMaxTokens = limit;
+    this.checkContextThreshold();
+  }
+
+  protected recordContextUsage(delta: { tokens?: number; messages?: number }): void {
+    if (typeof delta.tokens === 'number' && !Number.isNaN(delta.tokens)) {
+      this.contextTokens = Math.max(0, this.contextTokens + delta.tokens);
+    }
+
+    if (typeof delta.messages === 'number' && !Number.isNaN(delta.messages)) {
+      this.contextMessages = Math.max(0, this.contextMessages + delta.messages);
+    }
+
+    this.checkContextThreshold();
+  }
+
+  protected resetContextUsage(): void {
+    this.contextTokens = 0;
+    this.contextMessages = 0;
+    this.thresholdAlertActive = false;
+  }
+
+  protected getContextTokens(): number {
+    return this.contextTokens;
+  }
+
+  protected getContextTokenLimit(): number {
+    return this.contextMaxTokens;
+  }
+
+  protected getContextMessageCount(): number {
+    return this.contextMessages;
+  }
+
+  protected estimateTokens(text: string): number {
+    if (!text) return 0;
+    return Math.max(1, Math.ceil(text.length / 4));
+  }
+
+  protected buildStatusPayload(status?: string): ParticipantStatusPayload {
+    const payload: ParticipantStatusPayload = {
+      tokens: Math.round(this.contextTokens),
+      max_tokens: this.contextMaxTokens,
+      messages_in_context: Math.round(this.contextMessages)
+    };
+
+    const activeStatus = status || (this.isPauseActive() ? 'paused' : 'active');
+    if (activeStatus) {
+      payload.status = activeStatus;
+    }
+
+    return payload;
+  }
+
+  protected reportStatus(status?: string, correlationId?: string[]): void {
+    const payload = this.buildStatusPayload(status);
+
+    if (!this.canSend({ kind: 'participant/status', payload })) {
+      return;
+    }
+
+    const envelope: Partial<Envelope> = {
+      kind: 'participant/status',
+      payload
+    };
+
+    if (correlationId && correlationId.length > 0) {
+      envelope.correlation_id = correlationId;
+    }
+
+    this.lastStatusBroadcastAt = Date.now();
+    this.send(envelope);
+  }
+
+  protected async onForget(direction: 'oldest' | 'newest', entries?: number): Promise<{ messagesRemoved: number; tokensFreed: number }> {
+    return { messagesRemoved: 0, tokensFreed: 0 };
+  }
+
+  protected async onClear(): Promise<void> {
+    this.resetContextUsage();
+  }
+
+  protected async onRestart(_payload?: ParticipantRestartPayload): Promise<void> {
+    await this.onClear();
+  }
+
+  private isAddressedToSelf(envelope: Envelope): boolean {
+    if (!envelope.to || envelope.to.length === 0) {
+      return true;
+    }
+
+    return envelope.to.includes(this.options.participant_id!);
+  }
+
+  private trackInboundEnvelope(envelope: Envelope): void {
+    if (envelope.from === this.options.participant_id) {
+      if (envelope.kind === 'stream/request') {
+        this.pendingStreamRequests.set(envelope.id, {
+          description: envelope.payload?.description,
+          target: envelope.to
+        });
+      }
+      return;
+    }
+
+    if (envelope.kind === 'chat' && this.isAddressedToSelf(envelope)) {
+      const text = envelope.payload?.text;
+      if (typeof text === 'string') {
+        this.recordContextUsage({ tokens: this.estimateTokens(text), messages: 1 });
+      }
+    }
+  }
+
+  private handleParticipantPauseMessage(envelope: Envelope): void {
+    const payload = (envelope.payload || {}) as ParticipantPausePayload;
+    const timeoutSeconds = payload.timeout_seconds;
+    const until = timeoutSeconds ? Date.now() + timeoutSeconds * 1000 : undefined;
+
+    this.pauseState = {
+      id: envelope.id,
+      reason: payload.reason,
+      until,
+      from: envelope.from
+    };
+
+    this.reportStatus('paused', [envelope.id]);
+  }
+
+  private handleParticipantResumeMessage(envelope: Envelope): void {
+    this.pauseState = undefined;
+    this.reportStatus('active', [envelope.id]);
+  }
+
+  private async handleParticipantForgetMessage(envelope: Envelope): Promise<void> {
+    const payload = (envelope.payload || {}) as ParticipantForgetPayload;
+    this.reportStatus('compacting', [envelope.id]);
+
+    const result = await this.onForget(payload.direction, payload.entries);
+    if (result) {
+      this.recordContextUsage({
+        tokens: result.tokensFreed ? -result.tokensFreed : 0,
+        messages: result.messagesRemoved ? -result.messagesRemoved : 0
+      });
+    }
+
+    this.reportStatus('compacted', [envelope.id]);
+  }
+
+  private async handleParticipantClearMessage(envelope: Envelope): Promise<void> {
+    const payload = (envelope.payload || {}) as ParticipantClearPayload;
+    await this.onClear();
+    this.resetContextUsage();
+    const status = payload?.reason ? `cleared:${payload.reason}` : 'cleared';
+    this.reportStatus(status, [envelope.id]);
+  }
+
+  private async handleParticipantRestartMessage(envelope: Envelope): Promise<void> {
+    const payload = (envelope.payload || {}) as ParticipantRestartPayload;
+    await this.onRestart(payload);
+    this.resetContextUsage();
+    this.reportStatus('restarted', [envelope.id]);
+  }
+
+  private async handleParticipantShutdownMessage(envelope: Envelope): Promise<void> {
+    const payload = (envelope.payload || {}) as ParticipantShutdownPayload;
+    this.reportStatus(payload?.reason ? `shutting_down:${payload.reason}` : 'shutting_down', [envelope.id]);
+    await this.onShutdown();
+    this.disconnect();
+  }
+
+  private handleParticipantRequestStatusMessage(envelope: Envelope): void {
+    const request = (envelope.payload || {}) as ParticipantRequestStatusPayload;
+    const payload = this.buildStatusPayload();
+
+    let filtered: ParticipantStatusPayload = { ...payload };
+    if (request.fields && request.fields.length > 0) {
+      filtered = { messages_in_context: payload.messages_in_context } as ParticipantStatusPayload;
+      for (const field of request.fields) {
+        if (field in payload) {
+          (filtered as any)[field] = (payload as any)[field];
+        }
+      }
+
+      filtered.status = payload.status;
+      if (!request.fields.includes('messages_in_context')) {
+        filtered.messages_in_context = payload.messages_in_context;
+      }
+    }
+
+    if (!this.canSend({ kind: 'participant/status', payload: filtered })) {
+      return;
+    }
+
+    this.send({
+      kind: 'participant/status',
+      to: [envelope.from],
+      correlation_id: [envelope.id],
+      payload: filtered
+    });
+  }
+
+  private isPauseActive(): boolean {
+    if (!this.pauseState) {
+      return false;
+    }
+
+    if (this.pauseState.until && Date.now() > this.pauseState.until) {
+      this.pauseState = undefined;
+      return false;
+    }
+
+    return true;
+  }
+
+  private isAllowedDuringPause(kind: string): boolean {
+    const allowedKinds = new Set([
+      'participant/status',
+      'participant/resume',
+      'participant/request-status',
+      'chat/acknowledge',
+      'chat/cancel',
+      'reasoning/cancel',
+      'participant/clear',
+      'participant/forget',
+      'participant/shutdown',
+      'system/presence',
+      'system/error'
+    ]);
+
+    if (allowedKinds.has(kind)) {
+      return true;
+    }
+
+    return kind.startsWith('system/');
+  }
+
+  private checkContextThreshold(): void {
+    const threshold = this.contextMaxTokens * 0.9;
+    if (this.contextTokens >= threshold) {
+      if (!this.thresholdAlertActive && Date.now() - this.lastStatusBroadcastAt > this.proactiveStatusCooldownMs) {
+        this.thresholdAlertActive = true;
+        this.reportStatus('near_limit');
+      }
+    } else if (this.thresholdAlertActive && this.contextTokens < this.contextMaxTokens * 0.75) {
+      this.thresholdAlertActive = false;
+    }
+  }
+
   /**
    * Lifecycle hooks for subclasses
    */
@@ -574,6 +910,50 @@ export class MEWParticipant extends MEWClient {
         to: envelope.to,
         id: envelope.id
       });
+      this.trackInboundEnvelope(envelope);
+
+      if (envelope.kind === 'stream/open') {
+        const correlationId = envelope.correlation_id?.[0];
+        const streamId = envelope.payload?.stream_id;
+        if (correlationId && streamId) {
+          const meta = this.pendingStreamRequests.get(correlationId);
+          if (meta) {
+            this.pendingStreamRequests.delete(correlationId);
+            this.activeStreams.set(streamId, { description: meta.description, correlationId });
+          } else {
+            this.activeStreams.set(streamId, { description: envelope.payload?.description, correlationId });
+          }
+          this.openToStream.set(envelope.id, streamId);
+        }
+      }
+
+      if (envelope.kind === 'stream/close') {
+        const correlationId = envelope.correlation_id?.[0];
+        if (correlationId) {
+          const streamId = this.openToStream.get(correlationId) || correlationId;
+          this.activeStreams.delete(streamId);
+          this.openToStream.delete(correlationId);
+        }
+      }
+
+      if (this.isAddressedToSelf(envelope)) {
+        if (envelope.kind === 'participant/pause') {
+          this.handleParticipantPauseMessage(envelope);
+        } else if (envelope.kind === 'participant/resume') {
+          this.handleParticipantResumeMessage(envelope);
+        } else if (envelope.kind === 'participant/request-status') {
+          this.handleParticipantRequestStatusMessage(envelope);
+        } else if (envelope.kind === 'participant/forget') {
+          await this.handleParticipantForgetMessage(envelope);
+        } else if (envelope.kind === 'participant/clear') {
+          await this.handleParticipantClearMessage(envelope);
+        } else if (envelope.kind === 'participant/restart') {
+          await this.handleParticipantRestartMessage(envelope);
+        } else if (envelope.kind === 'participant/shutdown') {
+          await this.handleParticipantShutdownMessage(envelope);
+          return;
+        }
+      }
 
       // Handle MCP responses
       if (envelope.kind === 'mcp/response') {

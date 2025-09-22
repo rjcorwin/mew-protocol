@@ -55,7 +55,7 @@ echo "Waiting for components to initialize..."
 sleep 3
 
 # Export paths for check.sh to use
-export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
+export OUTPUT_LOG="$TEST_DIR/logs/research-agent-output.log"
 
 # Create output log file if it doesn't exist
 mkdir -p "$(dirname "$OUTPUT_LOG")"

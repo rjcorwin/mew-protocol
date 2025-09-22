@@ -1,8 +1,42 @@
 import Debug from 'debug';
 import { MEWParticipant } from '@mew-protocol/participant';
+import type { Capability } from '@mew-protocol/types';
 import { MCPClient, MCPServerConfig } from './mcp-client';
 
 const debug = Debug('mew:bridge');
+
+const DEFAULT_CAPABILITIES: Capability[] = [
+  { id: 'system-register', kind: 'system/register' },
+  { id: 'system-heartbeat', kind: 'system/heartbeat' },
+  { id: 'chat', kind: 'chat' },
+  { id: 'mcp-response', kind: 'mcp/response' },
+];
+
+function mergeCapabilities(...groups: Array<Capability[] | undefined>): Capability[] {
+  const merged = new Map<string, Capability>();
+  for (const group of groups) {
+    if (!group) continue;
+    for (const capability of group) {
+      if (!capability || typeof capability.kind !== 'string') {
+        continue;
+      }
+      const key = JSON.stringify(capability);
+      if (!merged.has(key)) {
+        merged.set(key, capability);
+      }
+    }
+  }
+
+  // Ensure default capabilities are always present so we can re-register later
+  for (const capability of DEFAULT_CAPABILITIES) {
+    const key = JSON.stringify(capability);
+    if (!merged.has(key)) {
+      merged.set(key, capability);
+    }
+  }
+
+  return Array.from(merged.values());
+}
 
 export interface MCPBridgeOptions {
   gateway: string;
@@ -11,6 +45,7 @@ export interface MCPBridgeOptions {
   token: string;
   mcpServer: MCPServerConfig;
   initTimeout?: number;
+  capabilities?: Capability[];
 }
 
 /**
@@ -19,14 +54,16 @@ export interface MCPBridgeOptions {
  */
 export class MCPBridge extends MEWParticipant {
   private mcpClient?: MCPClient;
-  private mcpCapabilities: any[] = [];
+  private mcpCapabilities: Capability[] = [];
   private initTimeout: number;
   private isShuttingDown = false;
   private restartAttempts = 0;
   private maxRestartAttempts = 3;
   private mcpServerConfig: MCPServerConfig;
+  private advertisedCapabilities: Capability[];
 
   constructor(options: MCPBridgeOptions) {
+    const initialCapabilities = mergeCapabilities(options.capabilities);
     // Initialize parent with connection options
     const participantId = options.participantId || 'mcp-bridge';
     console.log(`Bridge: Initializing with participant_id: "${participantId}"`);
@@ -36,10 +73,17 @@ export class MCPBridge extends MEWParticipant {
       space: options.space,
       participant_id: participantId,
       token: options.token,
+      capabilities: initialCapabilities,
     });
 
     this.initTimeout = options.initTimeout || 30000;
     this.mcpServerConfig = options.mcpServer;
+    this.advertisedCapabilities = initialCapabilities;
+
+    this.participantInfo = {
+      id: options.participantId || 'mcp-bridge',
+      capabilities: initialCapabilities,
+    };
 
     console.log('Bridge: Using MEWParticipant base class for MCP request handling');
 
@@ -118,17 +162,13 @@ export class MCPBridge extends MEWParticipant {
   /**
    * Translate MCP capabilities to MEW capabilities
    */
-  private translateMCPCapabilities(mcpCaps: any): any[] {
-    const capabilities: any[] = [];
-
-    // Always support MCP response
-    capabilities.push({
-      kind: 'mcp/response',
-    });
+  private translateMCPCapabilities(mcpCaps: any): Capability[] {
+    const capabilities: Capability[] = [];
 
     // Add tool capabilities if supported
     if (mcpCaps?.tools) {
       capabilities.push({
+        id: 'mcp-request-tools',
         kind: 'mcp/request',
         payload: {
           method: 'tools/*',
@@ -139,6 +179,7 @@ export class MCPBridge extends MEWParticipant {
     // Add resource capabilities if supported
     if (mcpCaps?.resources) {
       capabilities.push({
+        id: 'mcp-request-resources',
         kind: 'mcp/request',
         payload: {
           method: 'resources/*',
@@ -212,21 +253,57 @@ export class MCPBridge extends MEWParticipant {
       this.participantInfo?.capabilities?.map((c) => c.kind),
     );
 
+    const merged = new Map<string, Capability>();
+    const existingCapabilities = this.participantInfo?.capabilities || this.advertisedCapabilities;
+    const requiredCapabilities: Capability[] = [
+      { id: 'mcp-request-tools', kind: 'mcp/request', payload: { method: 'tools/*' } },
+    ];
+
+    const capabilityCandidates = [
+      ...existingCapabilities,
+      ...this.advertisedCapabilities,
+      ...this.mcpCapabilities,
+      ...requiredCapabilities,
+    ];
+
+    for (const capability of capabilityCandidates) {
+      merged.set(JSON.stringify(capability), capability);
+    }
+
+    const combinedCapabilities = Array.from(merged.values());
+
+    if (this.participantInfo) {
+      this.participantInfo.capabilities = combinedCapabilities;
+    } else {
+      this.participantInfo = {
+        id: this.options.participant_id || 'mcp-bridge',
+        capabilities: combinedCapabilities,
+      };
+    }
+
+    console.log('Bridge: Effective capabilities:', JSON.stringify(combinedCapabilities));
+
     // Send registration with MCP capabilities
-    this.sendRegistration();
+    this.advertisedCapabilities = combinedCapabilities;
+
+    this.sendRegistration(combinedCapabilities);
   }
 
   /**
    * Send registration message with MCP server capabilities
    */
-  private sendRegistration(): void {
+  private sendRegistration(capabilities: Capability[]): void {
     const envelope = {
       kind: 'system/register',
       payload: {
-        capabilities: this.mcpCapabilities,
+        capabilities,
       },
     };
 
+    console.log(
+      'Bridge: Sending system/register with capabilities:',
+      JSON.stringify(capabilities),
+    );
     debug('Sending registration with MCP capabilities:', envelope);
     this.send(envelope);
   }
@@ -290,7 +367,7 @@ export class MCPBridge extends MEWParticipant {
 
       // Re-send registration with updated capabilities
       if (this.participantInfo) {
-        this.sendRegistration();
+        this.sendRegistration(this.participantInfo.capabilities);
       }
     } catch (error) {
       console.error(`Failed to restart MCP server (attempt ${this.restartAttempts}):`, error);

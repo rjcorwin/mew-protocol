@@ -51,6 +51,10 @@ All test scenarios are located in this directory. Each scenario is self-containe
 - **scenario-5-reasoning** - Reasoning with context field
 - **scenario-6-errors** - Error recovery and edge cases
 - **scenario-7-mcp-bridge** - MCP server integration via bridge
+- **scenario-8-grant** - Capability grant workflow (proposal → grant → direct request)
+- **scenario-11-chat-controls** - Chat acknowledgement and reasoning cancellation flows
+- **scenario-12-stream-controls** - Stream request negotiation with open/close confirmations
+- **scenario-13-participant-controls** - Participant clear, restart, and shutdown statuses
 
 ## Test Agents
 

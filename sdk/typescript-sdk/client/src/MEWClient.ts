@@ -1,8 +1,13 @@
 import { EventEmitter } from 'events';
-import WebSocket from 'ws';
+import WebSocket, { RawData as WebSocketData } from 'ws';
 import { Envelope, Capability } from '@mew-protocol/types';
 
 const PROTOCOL_VERSION = 'mew/v0.3';
+
+export interface StreamFrame {
+  streamId: string;
+  payload: string;
+}
 
 export interface ClientOptions {
   gateway: string;          // WebSocket URL
@@ -71,9 +76,20 @@ export class MEWClient extends EventEmitter {
           resolve();
         });
 
-        this.ws.on('message', (data: WebSocket.Data) => {
+        this.ws.on('message', (data: WebSocketData) => {
+          const raw = typeof data === 'string' ? data : data.toString();
+
+          if (raw.startsWith('#')) {
+            const frame = raw.match(/^#([^#]+)#([\s\S]*)$/);
+            if (frame) {
+              const [, streamId, payload] = frame;
+              this.emitStreamData({ streamId, payload });
+              return;
+            }
+          }
+
           try {
-            const message = JSON.parse(data.toString());
+            const message = JSON.parse(raw);
             this.handleMessage(message);
           } catch (error) {
             console.error('Failed to parse message:', error);
@@ -133,6 +149,15 @@ export class MEWClient extends EventEmitter {
     this.ws.send(JSON.stringify(fullEnvelope));
   }
 
+  sendStreamData(streamId: string, payload: string | Buffer): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Not connected to gateway');
+    }
+
+    const data = typeof payload === 'string' ? payload : payload.toString();
+    this.ws.send(`#${streamId}#${data}`);
+  }
+
   /**
    * Event handler helpers for subclasses
    */
@@ -154,6 +179,10 @@ export class MEWClient extends EventEmitter {
 
   onError(handler: (error: Error) => void): void {
     this.on('error', handler);
+  }
+
+  onStreamData(handler: (frame: StreamFrame) => void): void {
+    this.on('stream/data', handler);
   }
 
   /**
@@ -194,12 +223,17 @@ export class MEWClient extends EventEmitter {
     // Handle envelopes
     if (message.protocol && message.kind) {
       this.emit('message', message as Envelope);
-      
+
       // Emit specific events for different kinds
       if (message.kind) {
         this.emit(message.kind, message);
       }
     }
+  }
+
+  private emitStreamData(frame: StreamFrame): void {
+    this.emit('stream/data', frame);
+    this.emit(`stream/data/${frame.streamId}`, frame);
   }
 
   /**

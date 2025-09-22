@@ -143,6 +143,15 @@ gateway
         spaces.set(actualSpaceName, space);
       }
       
+      if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+        return res.status(400).json({ error: 'Request body must be a JSON object' });
+      }
+
+      const { kind } = req.body;
+      if (typeof kind !== 'string' || kind.trim() === '') {
+        return res.status(400).json({ error: 'Message kind is required' });
+      }
+
       // Build complete envelope
       const envelope = {
         protocol: 'mew/v0.3',
@@ -201,6 +210,60 @@ gateway
     const participantTokens = new Map(); // participantId -> token
     const participantCapabilities = new Map(); // participantId -> capabilities array
     const runtimeCapabilities = new Map(); // participantId -> Map(grantId -> capabilities)
+
+    function serializeCapability(capability) {
+      if (!capability || typeof capability !== 'object') {
+        return null;
+      }
+
+      const normalized = {};
+      for (const key of Object.keys(capability).sort()) {
+        normalized[key] = capability[key];
+      }
+
+      try {
+        return JSON.stringify(normalized);
+      } catch (error) {
+        if (options.logLevel === 'debug') {
+          console.log('Failed to serialize capability for dedupe', capability, error);
+        }
+        return null;
+      }
+    }
+
+    function ensureBaselineCapabilities(capabilities = []) {
+      const deduped = new Map();
+
+      for (const cap of capabilities) {
+        if (!cap || typeof cap !== 'object' || typeof cap.kind !== 'string') {
+          continue;
+        }
+
+        const key = serializeCapability(cap);
+        if (key) {
+          deduped.set(key, cap);
+        }
+      }
+
+      const ensure = (capability) => {
+        if (!capability || typeof capability.kind !== 'string') {
+          return;
+        }
+        const key = serializeCapability(capability);
+        if (key && !deduped.has(key)) {
+          deduped.set(key, capability);
+        }
+      };
+
+      ensure({ id: 'system-register', kind: 'system/register' });
+      ensure({ id: 'mcp-response', kind: 'mcp/response' });
+
+      return Array.from(deduped.values());
+    }
+
+    function mergeCapabilities(current = [], requested = []) {
+      return ensureBaselineCapabilities([...(current || []), ...(requested || [])]);
+    }
 
     // Track spawned processes
     const spawnedProcesses = new Map(); // participantId -> ChildProcess
@@ -369,7 +432,8 @@ gateway
         if (config.tokens && config.tokens.length > 0) {
           const token = config.tokens[0]; // Use first token
           participantTokens.set(participantId, token);
-          participantCapabilities.set(participantId, config.capabilities || []);
+          const capabilities = ensureBaselineCapabilities(config.capabilities || []);
+          participantCapabilities.set(participantId, capabilities);
           
           if (config.io === 'http') {
             console.log(`Registered HTTP participant: ${participantId}`);
@@ -540,7 +604,9 @@ gateway
 
             // Store token and resolve capabilities
             participantTokens.set(participantId, token);
-            const capabilities = await resolveCapabilities(token, participantId, null);
+            const capabilities = ensureBaselineCapabilities(
+              await resolveCapabilities(token, participantId, null),
+            );
             participantCapabilities.set(participantId, capabilities);
 
             // Send welcome message per MEW v0.2 spec
@@ -598,6 +664,63 @@ gateway
             }
 
             console.log(`${participantId} joined space ${spaceId} with token ${token || 'none'}`);
+            return;
+          }
+
+          if (message.kind === 'system/register') {
+            const requestedCapabilities = message.payload?.capabilities;
+            if (!Array.isArray(requestedCapabilities)) {
+              const errorMessage = {
+                protocol: 'mew/v0.3',
+                id: `error-${Date.now()}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                to: [participantId],
+                kind: 'system/error',
+                correlation_id: message.id ? [message.id] : undefined,
+                payload: {
+                  error: 'invalid_request',
+                  message: 'system/register payload must include capabilities array',
+                },
+              };
+              ws.send(JSON.stringify(errorMessage));
+              return;
+            }
+
+            const existingCapabilities = participantCapabilities.get(participantId) || [];
+            const mergedCapabilities = mergeCapabilities(existingCapabilities, requestedCapabilities);
+            participantCapabilities.set(participantId, mergedCapabilities);
+
+            if (options.logLevel === 'debug') {
+              console.log(
+                `Updated capabilities for ${participantId}: ${JSON.stringify(mergedCapabilities)}`,
+              );
+            }
+
+            const space = spaces.get(spaceId);
+            if (space) {
+              const presenceUpdate = {
+                protocol: 'mew/v0.3',
+                id: `presence-${Date.now()}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                kind: 'system/presence',
+                payload: {
+                  event: 'update',
+                  participant: {
+                    id: participantId,
+                    capabilities: mergedCapabilities,
+                  },
+                },
+              };
+
+              for (const [pid, pws] of space.participants.entries()) {
+                if (pid !== participantId && pws.readyState === WebSocket.OPEN) {
+                  pws.send(JSON.stringify(presenceUpdate));
+                }
+              }
+            }
+
             return;
           }
 

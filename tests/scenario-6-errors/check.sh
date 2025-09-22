@@ -27,14 +27,28 @@ TESTS_FAILED=0
 check_test() {
   local test_name="$1"
   local condition="$2"
-  
+
   if eval "$condition"; then
     echo -e "$test_name: ${GREEN}✓${NC}"
-    ((TESTS_PASSED++))
+    ((TESTS_PASSED++)) || true
   else
     echo -e "$test_name: ${RED}✗${NC}"
-    ((TESTS_FAILED++))
+    ((TESTS_FAILED++)) || true
   fi
+
+  return 0
+}
+
+send_http_message() {
+  local payload="$1"
+  local participant="${2:-test-client}"
+  local token="${3:-test-token}"
+
+  curl -s -o /tmp/scenario-6-last-response -w '%{http_code}' \
+    -X POST "http://localhost:$TEST_PORT/participants/${participant}/messages" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    --data "$payload"
 }
 
 # Basic connectivity tests
@@ -42,10 +56,10 @@ echo "Testing: Gateway is running ... \c"
 # Check if gateway is listening on the port
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  ((TESTS_PASSED++)) || true
 else
   echo -e "${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  ((TESTS_FAILED++)) || true
 fi
 
 echo "Testing: Output log exists ... \c"
@@ -53,49 +67,52 @@ check_test "" "[ -f '$OUTPUT_LOG' ]"
 
 # Test 1: Invalid JSON
 echo -e "\n${YELLOW}Test 1: Send invalid JSON${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+STATUS_INVALID=$(curl -s -o /tmp/scenario-6-invalid-response -w '%{http_code}' \
+  -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
-  -d 'This is not valid JSON' > /dev/null 2>&1 || true
-sleep 2
-
-# Check if error is logged (the gateway or client should handle it)
-if tail -20 "$OUTPUT_LOG" | grep -q '"kind":"system/error"' || tail -20 logs/*.log 2>/dev/null | grep -qi "invalid.*json\|json.*parse"; then
-  echo -e "Invalid JSON handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  -d 'This is not valid JSON' || true)
+if [[ "$STATUS_INVALID" == 4* ]]; then
+  echo -e "Invalid JSON rejected with HTTP $STATUS_INVALID: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
 else
-  echo -e "Invalid JSON handled: ${RED}✗${NC} (error not detected)"
-  ((TESTS_FAILED++))
+  echo -e "Invalid JSON rejected with HTTP $STATUS_INVALID: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
 fi
 
 # Test 2: Message without kind field
 echo -e "\n${YELLOW}Test 2: Message without 'kind' field${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+STATUS_MISSING=$(curl -s -o /tmp/scenario-6-missing-kind -w '%{http_code}' \
+  -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
-  -d '{"payload":{"text":"Missing kind field"}}' > /dev/null
-sleep 2
-
-if tail -20 "$OUTPUT_LOG" | grep -q '"kind":"system/error"' || tail -20 logs/*.log 2>/dev/null | grep -qi "missing.*kind\|kind.*required"; then
-  echo -e "Missing 'kind' field handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  -d '{"payload":{"text":"Missing kind field"}}' || true)
+if [[ "$STATUS_MISSING" == 4* ]]; then
+  echo -e "Missing 'kind' field rejected with HTTP $STATUS_MISSING: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
 else
-  echo -e "Missing 'kind' field handled: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  echo -e "Missing 'kind' field rejected with HTTP $STATUS_MISSING: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
 fi
 
 # Test 3: Message to non-existent participant
 echo -e "\n${YELLOW}Test 3: Message to non-existent participant${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
-sleep 2
-
-# This should be handled gracefully without errors
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Non-existent participant handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+STATUS_NON_EXISTENT=$(send_http_message '{"kind":"chat","payload":{"text":"hello from test"}}' 'ghost' 'test-token')
+if [[ "$STATUS_NON_EXISTENT" == 4* || "$STATUS_NON_EXISTENT" == 5* ]]; then
+  echo -e "Non-existent participant rejected with HTTP $STATUS_NON_EXISTENT: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
 else
-  echo -e "Non-existent participant handled: ${RED}✗${NC} (gateway crashed)"
-  ((TESTS_FAILED++))
+  echo -e "Non-existent participant rejected with HTTP $STATUS_NON_EXISTENT: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
+fi
+
+# Gateway should remain available
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
+  echo -e "Gateway availability after rejection: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
+else
+  echo -e "Gateway availability after rejection: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
 fi
 
 # Test 4: Very large message
@@ -103,70 +120,108 @@ echo -e "\n${YELLOW}Test 4: Very large message (10KB)${NC}"
 LARGE_MSG='{"kind":"chat","payload":{"text":"'
 LARGE_MSG+=$(printf 'A%.0s' {1..10000})
 LARGE_MSG+='"}}'
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
-sleep 2
-
-# Check if processes are still running
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Large message handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+STATUS_LARGE=$(send_http_message "$LARGE_MSG")
+if [[ "$STATUS_LARGE" == 2* ]]; then
+  echo -e "Large message accepted with HTTP $STATUS_LARGE: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
 else
-  echo -e "Large message handled: ${RED}✗${NC} (gateway crashed)"
-  ((TESTS_FAILED++))
+  echo -e "Large message accepted with HTTP $STATUS_LARGE: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
+fi
+
+if nc -z localhost ${TEST_PORT} 2>/dev/null; then
+  echo -e "Gateway alive after large message: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
+else
+  echo -e "Gateway alive after large message: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
 fi
 
 # Test 5: Rapid message sending
 echo -e "\n${YELLOW}Test 5: Rapid message sending (20 messages)${NC}"
+RAPID_SUCCESS=0
 for i in {1..20}; do
-  curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
+  STATUS_RAPID=$(send_http_message "{\"kind\":\"chat\",\"payload\":{\"text\":\"Message $i\"}}")
+  if [[ "$STATUS_RAPID" == 2* ]]; then
+    ((RAPID_SUCCESS++)) || true
+  fi
 done
-sleep 3
+
+if [[ $RAPID_SUCCESS -eq 20 ]]; then
+  echo -e "Rapid messages accepted (${RAPID_SUCCESS}/20): ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
+else
+  echo -e "Rapid messages accepted (${RAPID_SUCCESS}/20): ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
+fi
 
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Rapid messages handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  echo -e "Gateway alive after rapid messages: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
 else
-  echo -e "Rapid messages handled: ${RED}✗${NC} (gateway crashed)"
-  ((TESTS_FAILED++))
+  echo -e "Gateway alive after rapid messages: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
 fi
 
 # Test 6: Empty message
 echo -e "\n${YELLOW}Test 6: Empty message${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
-sleep 1
+STATUS_EMPTY=$(send_http_message '{}')
+if [[ "$STATUS_EMPTY" == 4* ]]; then
+  echo -e "Empty message rejected with HTTP $STATUS_EMPTY: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
+else
+  echo -e "Empty message rejected with HTTP $STATUS_EMPTY: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
+fi
 
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Empty message handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  echo -e "Gateway alive after empty message: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
 else
-  echo -e "Empty message handled: ${RED}✗${NC} (gateway crashed)"
-  ((TESTS_FAILED++))
+  echo -e "Gateway alive after empty message: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
 fi
 
 # Test 7: Malformed message (unclosed JSON)
 echo -e "\n${YELLOW}Test 7: Malformed JSON (unclosed)${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
-sleep 2
+STATUS_MALFORMED=$(curl -s -o /tmp/scenario-6-malformed -w '%{http_code}' \
+  -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  --data '{"kind":"chat"')
+if [[ "$STATUS_MALFORMED" == 4* ]]; then
+  echo -e "Malformed JSON rejected with HTTP $STATUS_MALFORMED: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
+else
+  echo -e "Malformed JSON rejected with HTTP $STATUS_MALFORMED: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
+fi
 
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Malformed JSON handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  echo -e "Gateway alive after malformed JSON: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
 else
-  echo -e "Malformed JSON handled: ${RED}✗${NC} (gateway crashed)"
-  ((TESTS_FAILED++))
+  echo -e "Gateway alive after malformed JSON: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
 fi
 
 # Test 8: Special characters in message
 echo -e "\n${YELLOW}Test 8: Special characters in message${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" -H "Authorization: Bearer test-token" -H "Content-Type: application/json" -d '{}' > /dev/null
-sleep 2
+STATUS_SPECIAL=$(send_http_message '{"kind":"chat","payload":{"text":"Symbols: © ™ 漢字 😊"}}')
+if [[ "$STATUS_SPECIAL" == 2* ]]; then
+  echo -e "Special characters accepted with HTTP $STATUS_SPECIAL: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
+else
+  echo -e "Special characters accepted with HTTP $STATUS_SPECIAL: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
+fi
 
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Special characters handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  echo -e "Gateway alive after special characters: ${GREEN}✓${NC}"
+  ((TESTS_PASSED++)) || true
 else
-  echo -e "Special characters handled: ${RED}✗${NC} (gateway crashed)"
-  ((TESTS_FAILED++))
+  echo -e "Gateway alive after special characters: ${RED}✗${NC}"
+  ((TESTS_FAILED++)) || true
 fi
 
 # Summary

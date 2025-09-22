@@ -60,6 +60,12 @@ run_test() {
 RESPONSE_FILE="$OUTPUT_LOG"
 FULFILLER_FILE="${FULFILLER_LOG:-$TEST_DIR/logs/fulfiller-output.log}"
 
+# Fall back to the standard participant log name if the configured output log
+# hasn't been generated (older spaces default to <participant>.log).
+if [ ! -f "$FULFILLER_FILE" ] && [ -f "$TEST_DIR/logs/fulfiller.log" ]; then
+  FULFILLER_FILE="$TEST_DIR/logs/fulfiller.log"
+fi
+
 # Test 1: Gateway health check
 run_test "Gateway is running" "curl -s http://localhost:$TEST_PORT/health | grep -q 'ok'"
 
