@@ -12,7 +12,18 @@
     "declarationMap": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "baseUrl": "./",
+    "paths": {
+      "@mew-protocol/types": ["../sdk/typescript-sdk/types/dist"],
+      "@mew-protocol/types/*": ["../sdk/typescript-sdk/types/dist/*"],
+      "@mew-protocol/client": ["../sdk/typescript-sdk/client/dist"],
+      "@mew-protocol/client/*": ["../sdk/typescript-sdk/client/dist/*"],
+      "@mew-protocol/participant": ["../sdk/typescript-sdk/participant/dist"],
+      "@mew-protocol/participant/*": ["../sdk/typescript-sdk/participant/dist/*"],
+      "@mew-protocol/capability-matcher": ["../sdk/typescript-sdk/capability-matcher/dist"],
+      "@mew-protocol/capability-matcher/*": ["../sdk/typescript-sdk/capability-matcher/dist/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test"]

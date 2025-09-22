@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import WebSocket from 'ws';
+import WebSocket, { RawData as WebSocketData } from 'ws';
 import { Envelope, Capability } from '@mew-protocol/types';
 
 const PROTOCOL_VERSION = 'mew/v0.3';
@@ -76,7 +76,7 @@ export class MEWClient extends EventEmitter {
           resolve();
         });
 
-        this.ws.on('message', (data: WebSocket.Data) => {
+        this.ws.on('message', (data: WebSocketData) => {
           const raw = typeof data === 'string' ? data : data.toString();
 
           if (raw.startsWith('#')) {

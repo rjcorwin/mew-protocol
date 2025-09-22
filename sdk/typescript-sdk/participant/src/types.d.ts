@@ -1,5 +1,5 @@
-import { ConnectionOptions, Envelope } from '@meup/client';
-import { Capability } from '@meup/types';
+import { ConnectionOptions, Envelope } from '@mew-protocol/client';
+import { Capability } from '@mew-protocol/types';
 export interface Tool {
     name: string;
     description: string;

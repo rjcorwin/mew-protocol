@@ -129,7 +129,7 @@ export interface SystemErrorPayload {
  * Presence event payload
  */
 export interface PresencePayload {
-  event: 'join' | 'leave' | 'heartbeat';
+  event: 'join' | 'leave' | 'heartbeat' | 'update';
   participant: Participant;
 }
 
