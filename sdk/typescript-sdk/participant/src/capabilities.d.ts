@@ -1,7 +1,7 @@
-import { Capability, Envelope } from '@meup/types';
+import { Capability, Envelope } from '@mew-protocol/types';
 /**
  * Check if a message matches a capability pattern
- * Supports wildcards (*) and nested object matching
+ * Supports wildcards (*), negative patterns (!pattern), and nested object matching
  */
 export declare function matchesCapability(capability: Capability, envelope: Partial<Envelope>): boolean;
 /**

@@ -13,7 +13,16 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "baseUrl": "./",
+    "paths": {
+      "@mew-protocol/client": ["../client/dist"],
+      "@mew-protocol/client/*": ["../client/dist/*"],
+      "@mew-protocol/participant": ["../participant/dist"],
+      "@mew-protocol/participant/*": ["../participant/dist/*"],
+      "@mew-protocol/types": ["../types/dist"],
+      "@mew-protocol/types/*": ["../types/dist/*"]
+    }
   },
   "include": [
     "src/**/*"

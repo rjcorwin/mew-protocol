@@ -16,6 +16,7 @@ program
   .option('--init-timeout <ms>', 'Initialization timeout in ms', '30000')
   .option('--reconnect <bool>', 'Auto-reconnect on disconnect', 'true')
   .option('--max-reconnects <n>', 'Maximum reconnect attempts', '3')
+  .option('--capabilities <json>', 'JSON encoded capabilities to advertise when joining')
   .parse(process.argv);
 
 const options = program.opts();
@@ -42,6 +43,16 @@ const mcpConfig = {
   cwd: options.mcpCwd,
 };
 
+let capabilities;
+if (options.capabilities) {
+  try {
+    capabilities = JSON.parse(options.capabilities);
+  } catch (error) {
+    console.error('Failed to parse --capabilities JSON:', error.message);
+    process.exit(1);
+  }
+}
+
 // Create bridge instance with MCP server config
 const bridge = new MCPBridge({
   gateway: options.gateway,
@@ -50,6 +61,7 @@ const bridge = new MCPBridge({
   token: options.token,
   initTimeout: parseInt(options.initTimeout),
   mcpServer: mcpConfig,
+  capabilities,
 });
 
 // Start the bridge

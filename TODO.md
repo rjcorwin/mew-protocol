@@ -1,5 +1,10 @@
 # TODO
 
+## Integration Phases
+- **Phase 1 – Spec Cohesion & SDK Telemetry**: Land protocol/SDK spec updates, finish participant control hooks, add status+stream coverage in unit tests.
+- **Phase 2 – CLI Experience Hardening**: Polish Ink UI (ack queue, pause banner, stream list), document commands, add regression tests and fixtures.
+- **Phase 3 – Template & Agent Validation**: Exercise coder template end-to-end with new participant controls, capture manual QA notes, expand automation around stream payloads.
+
 ## MVP
 - [x] [TD4] `mew init [space template]` command
     - [x] [TD4.1] `mew` by itself launches init if not init'ed, other wise it's up with interactive. if not init'ed, prompts user to pick template, then launches on choice. Space templates for common patterns (see demos/coder-agent for first template). Ok if just one template for now.

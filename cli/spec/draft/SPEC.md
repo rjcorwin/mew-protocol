@@ -1310,18 +1310,26 @@ The CLI provides two interactive modes for different use cases:
 The default interactive mode uses Ink (React for CLI) to provide a modern terminal interface that preserves native scrolling behavior while adding rich UI components for operation confirmations, status display, and comprehensive terminal input features.
 
 **Key Features:**
-- Native terminal scrolling for message history
-- Persistent bottom UI with input composer and status
-- MCP operation confirmation dialogs with risk assessment
-- Rich message formatting with syntax highlighting
-- Real-time participant status and typing indicators
-- Auto-approval rules for trusted operations
+- Native terminal scrolling for message history with verbose toggle
+- Side-board showing pending chat acknowledgements, latest participant/status telemetry, pause state, and active streams
+- MCP operation confirmation dialogs with capability grants and auto-approval rules
+- Chat acknowledgement and cancellation shortcuts (`/ack`, `/cancel`) to manage UI queues
+- Participant control shortcuts (`/status`, `/pause`, `/resume`, `/forget`, `/clear`, `/restart`, `/shutdown`)
+- Stream negotiation helpers (`/stream request`, `/stream close`, `/streams`) with live frame previews
+- Reasoning status card with `/reason-cancel` hint and automatic stream mirroring for thoughts
 
 **Architecture:**
 - Message history uses Ink's `Static` component for native scrolling
 - Persistent bottom panel stays fixed during scrolling
 - Content-aware truncation prevents UI overflow
 - Preserves terminal features (text selection, copy/paste)
+
+#### Signal Board Layout
+
+- **Pending Chat Acknowledgements**: Shows up to five unacknowledged chat envelopes with `/ack` and `/cancel` shortcuts
+- **Participant Status**: Displays most recent `participant/status` payloads (tokens, context occupancy, latency) per sender
+- **Pause State**: Highlights active pauses applied to the CLI participant with time remaining indicators
+- **Stream Monitor**: Lists current `stream/open` sessions and the latest raw frames decoded from `#streamId#` WebSocket traffic
 
 ### Debug Mode (--debug flag)
 
@@ -1472,11 +1480,11 @@ The terminal interface uses smart input detection with clear rules and escape ha
 ```bash
 > Hello everyone                    # Sends chat message
 > {"kind": "chat", "payload": {"text": "hi"}}  # Partial envelope - adds protocol fields
-> {"kind": "mcp/request", ...}      # Sends JSON envelope  
+> {"kind": "mcp/request", ...}      # Sends JSON envelope
 > /help                              # Executes help command
 > { invalid json                     # Sends as chat (not valid JSON)
-> /chat {"actual": "json"}          # Forces JSON to be sent as chat text
-> /json {"kind": "custom"}          # Forces input as protocol message
+> /ack 1 read                        # Acknowledge the first pending chat message as "read"
+> /stream request gateway upload log-stream  # Negotiate a raw stream for uploads
 ```
 
 ### Message Display Format
@@ -1508,23 +1516,23 @@ Verbose mode (`/verbose`) shows full JSON messages.
 
 #### Essential commands:
 ```
-/help              Show available commands
-/participants      List active participants
-/capabilities      Show your current capabilities  
-/verbose           Toggle verbose output (show full JSON)
-/json <msg>        Force input as JSON (escape hatch)
-/chat <text>       Force input as chat (escape hatch)
-/replay            Show last N messages
-/clear             Clear screen
-/exit              Disconnect and exit
-```
-
-#### Future commands (not in initial implementation):
-```
-/filter <kind>     Filter messages by kind
-/save <file>       Save session to file
-/load <file>       Replay messages from file
-/stats             Show message statistics
+/help                       Show available commands and shortcuts
+/verbose                    Toggle verbose output (show full JSON)
+/ui-clear                   Clear local UI buffers (history, status board)
+/exit                       Disconnect and exit
+/ack [selector] [status]    Acknowledge pending chat message(s)
+/cancel [selector] [reason] Cancel pending chat message(s)
+/reason-cancel [reason]     Cancel the active reasoning session
+/status <participant> [fields...]  Request participant/status telemetry
+/pause <participant> [timeout] [reason]  Issue participant/pause
+/resume <participant> [reason]    Issue participant/resume
+/forget <participant> [oldest|newest] [count]  Trim history for a participant
+/clear <participant> [reason]     Issue participant/clear
+/restart <participant> [mode] [reason]  Request participant restart
+/shutdown <participant> [reason]  Request participant shutdown
+/stream request <participant> <direction> [description] [size=bytes]
+/stream close <streamId> [reason]
+/streams                    List active stream sessions tracked by the UI
 ```
 
 ### Output Filtering

@@ -70,12 +70,26 @@ Field semantics:
   - `reasoning/start` - Begin reasoning sequence
   - `reasoning/thought` - Reasoning monologue (thinking out loud)
   - `reasoning/conclusion` - End reasoning sequence
+  - `reasoning/cancel` - Abort an in-progress reasoning sequence
   - `capability/grant` - Grant capabilities to participant
   - `capability/revoke` - Revoke capabilities from participant
   - `capability/grant-ack` - Acknowledge capability grant
   - `space/invite` - Invite participant to space
   - `space/kick` - Remove participant from space
+  - `participant/pause` - Pause outbound activity from a participant
+  - `participant/resume` - Resume a participant after a pause
+  - `participant/status` - Report usage status (e.g., tokens consumed vs. maximum) including current message counts per context
+  - `participant/request-status` - Ask a participant to emit its current status
+  - `participant/forget` - Instruct a participant to drop cached context (oldest or newest data)
+  - `participant/clear` - Wipe the participant's entire conversational context or scratchpad
+  - `participant/restart` - Restart a participant back to a known baseline state
+  - `participant/shutdown` - Request an orderly shutdown that ends activity without restarting
+  - `stream/request` - Ask the gateway to establish a new data stream
+  - `stream/open` - Gateway confirms stream creation with assigned identifier
+  - `stream/close` - Close a previously opened stream
   - `chat` - Chat messages
+  - `chat/acknowledge` - Confirm receipt of a chat message
+  - `chat/cancel` - Withdraw attention from a chat message that no longer needs action
   - `system/presence` - Join/leave events
   - `system/welcome` - Welcome message for new participants
   - `system/error` - System error messages
@@ -356,6 +370,57 @@ Chat messages are MEW Protocol-specific and do not pollute the MCP namespace:
 - `format` (optional): "plain" or "markdown", defaults to "plain"
 - Chat messages are typically broadcast (empty/omitted `to` array)
 
+#### 3.4.1 Chat Acknowledge (kind = "chat/acknowledge")
+
+Acknowledges receipt of a chat message without generating additional conversation content. Useful when participants need to
+signal that they observed a chat entry but have no substantive reply:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "chat-ack-1",
+  "from": "agent-1",
+  "kind": "chat/acknowledge",
+  "correlation_id": ["env-chat-1"],
+  "payload": {
+    "status": "received"
+  }
+}
+```
+
+- `correlation_id` MUST reference the chat envelope being acknowledged
+- `payload.status` conveys acknowledgement semantics (implementations MAY standardize values like `"received"` or
+  `"read"`)
+- Gateways MAY suppress broadcasting acknowledgements to reduce noise, but if delivered they provide an auditable confirmation
+  that the message was seen
+- User interfaces often surface a **queue of chat messages awaiting acknowledgement** so that humans and agents can close the
+  loop explicitly. Clearing that queue SHOULD emit acknowledgements for each entry to provide an auditable trail.
+
+#### 3.4.2 Chat Cancel (kind = "chat/cancel")
+
+Signals that an earlier chat message no longer requires attention. This helps UIs and agents clear acknowledgement queues and
+avoid stale follow-ups:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "chat-cancel-1",
+  "from": "user-alice",
+  "kind": "chat/cancel",
+  "to": ["agent-1"],
+  "correlation_id": ["env-chat-1"],
+  "payload": {
+    "reason": "handled elsewhere"
+  }
+}
+```
+
+- `correlation_id` MUST reference the chat message that is being cancelled
+- `payload.reason` SHOULD communicate why the message no longer needs attention (e.g., `"handled_elsewhere"`,
+  `"duplicate"`, `"timeout"`)
+- UIs MAY provide a shortcut to cancel **all** unacknowledged chat messages, emitting one cancellation per message to keep
+  participants in sync
+
 ### 3.5 Reasoning Transparency
 
 MEW Protocol supports transparent reasoning through dedicated message kinds and the context field. This allows agents to share their thinking process while maintaining clear boundaries between reasoning sequences and regular operations.
@@ -432,7 +497,32 @@ Concludes the reasoning sequence:
 }
 ```
 
-#### 3.5.5 Context Behavior
+#### 3.5.5 Reasoning Cancel (kind = "reasoning/cancel")
+
+Terminates an active reasoning sequence without providing a conclusion. Useful when the initiating trigger is withdrawn or the
+participant needs to abort due to higher-priority work:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "reason-cancel-1",
+  "from": "agent-1",
+  "kind": "reasoning/cancel",
+  "context": "reason-start-1",
+  "payload": {
+    "reason": "superseded"
+  }
+}
+```
+
+- `context` MUST reference the `reasoning/start` envelope establishing the sequence
+- `correlation_id` MAY reference the triggering request/proposal if the reasoning was in response to another message
+- `payload.reason` SHOULD use deployment-defined codes (e.g., `"timeout"`, `"superseded"`, `"error"`) to simplify monitoring
+- Upon cancellation, participants SHOULD stop sending additional `reasoning/thought` messages for that context
+- User-facing surfaces (CLIs, dashboards) SHOULD provide an explicit affordance to issue `reasoning/cancel` for any active
+  reasoning sequence so humans can interrupt long-running work without crafting raw envelopes
+
+#### 3.5.6 Context Behavior
 
 - Messages with a `context` field are part of a sub-context
 - Participants MAY filter out contexts when constructing prompts (e.g., excluding other agents' reasoning traces to reduce noise)
@@ -696,6 +786,273 @@ When a participant attempts an operation they lack capability for:
   }
 }
 ```
+
+---
+
+### 3.9 Participant Control Messages
+
+Participant control envelopes allow coordinators and the gateway to modulate how agents operate in a space. They provide a
+uniform mechanism for pausing work, requesting telemetry, and resetting state without overloading the MCP namespace.
+
+#### 3.9.1 Pause Participant (kind = "participant/pause")
+
+Requests that a participant temporarily stop emitting new work:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "pause-1",
+  "from": "orchestrator",
+  "to": ["agent-1"],
+  "kind": "participant/pause",
+  "payload": {
+    "reason": "rate_limit",
+    "timeout_seconds": 60
+  }
+}
+```
+
+- Target participant SHOULD stop sending envelopes other than acknowledgements or cancellations until resumed
+- `payload.timeout_seconds` MAY be provided so the participant can automatically resume if no explicit resume arrives
+- Gateways MAY enforce pauses by rejecting other outbound traffic while in effect
+
+#### 3.9.2 Resume Participant (kind = "participant/resume")
+
+Lifts a previously applied pause:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "resume-1",
+  "from": "orchestrator",
+  "to": ["agent-1"],
+  "kind": "participant/resume",
+  "correlation_id": ["pause-1"],
+  "payload": {}
+}
+```
+
+- `correlation_id` SHOULD reference the pause being cleared when known
+- Participants MAY resume autonomously when a pause timeout expires, but SHOULD still emit a `participant/resume` to document
+  the change in state
+
+#### 3.9.3 Request Status (kind = "participant/request-status")
+
+Asks a participant to emit its current utilization telemetry. Earlier drafts referenced this as `participant/requestStatus`; the
+hyphenated name is normative:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "status-request-1",
+  "from": "orchestrator",
+  "to": ["agent-1"],
+  "kind": "participant/request-status",
+  "payload": {
+    "fields": ["tokens", "latency"]
+  }
+}
+```
+
+- `payload.fields` MAY limit which metrics are requested
+- Participants SHOULD answer with `participant/status` promptly
+
+#### 3.9.4 Participant Status (kind = "participant/status")
+
+Reports runtime telemetry such as token consumption and context occupancy. This message is typically emitted in response to
+`participant/request-status` but MAY be sent proactively:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "status-1",
+  "from": "agent-1",
+  "kind": "participant/status",
+  "correlation_id": ["status-request-1"],
+  "payload": {
+    "tokens": 12345,
+    "max_tokens": 20000,
+    "messages_in_context": 128,
+    "latency_ms": 350
+  }
+}
+```
+
+- `tokens` and `max_tokens` provide the usage context requested in this draft update
+- `messages_in_context` MUST be included and counts envelopes currently retained for the active conversational context
+- Additional metrics are allowed and should use descriptive snake_case keys
+- Participants MAY broadcast status to improve observability, but gateways MAY limit dissemination to reduce noise
+- Participants MAY also emit `participant/status` proactively when approaching a resource limit (for example, when only 10%
+  of the context window remains) so orchestrators can intervene before prompts truncate unexpectedly
+
+#### 3.9.5 Participant Forget (kind = "participant/forget")
+
+Instructs a participant to drop cached context. The `payload.direction` field indicates whether to trim from the oldest or
+newest data, corresponding to the `(Oldest|Newest)` notation in the request:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "forget-1",
+  "from": "orchestrator",
+  "to": ["agent-1"],
+  "kind": "participant/forget",
+  "payload": {
+    "direction": "oldest",
+    "entries": 10
+  }
+}
+```
+
+- `direction` MUST be either `"oldest"` or `"newest"`
+- `entries` (optional) specifies how many records or messages to discard; implementations MAY interpret as tokens
+- Participants SHOULD emit a follow-up `participant/status` or `chat/acknowledge` once the context is dropped
+- Agents SHOULD monitor their context usage and automatically trigger a forget/compaction cycle before hitting hard limits.
+  When compacting autonomously, they MUST send a `participant/status` update indicating the compaction status and resulting
+  resource headroom so observers understand why history changed.
+
+#### 3.9.6 Participant Clear (kind = "participant/clear")
+
+Instructs a participant to wipe its entire retained conversational or working memory:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "clear-1",
+  "from": "orchestrator",
+  "to": ["agent-1"],
+  "kind": "participant/clear",
+  "payload": {
+    "reason": "privacy_reset"
+  }
+}
+```
+
+- `participant/clear` SHOULD be treated as stronger than `participant/forget` and MUST erase all cached context, scratchpads, and working memories
+- Participants SHOULD emit a follow-up `participant/status` confirming an empty context (e.g., `messages_in_context = 0`)
+
+#### 3.9.7 Participant Restart (kind = "participant/restart")
+
+Returns a participant to a known baseline configuration:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "restart-1",
+  "from": "orchestrator",
+  "to": ["agent-1"],
+  "kind": "participant/restart",
+  "payload": {
+    "mode": "factory"
+  }
+}
+```
+
+- Participants SHOULD terminate outstanding workflows and streams when restarting
+- Gateways MAY treat a restart as implicit acknowledgement that previous capability grants remain in effect unless explicitly
+  revoked
+
+#### 3.9.8 Participant Shutdown (kind = "participant/shutdown")
+
+Requests that a participant cease all activity without restarting, allowing the orchestrator to keep the slot idle or replace it later:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "shutdown-1",
+  "from": "orchestrator",
+  "to": ["agent-1"],
+  "kind": "participant/shutdown",
+  "payload": {
+    "reason": "maintenance"
+  }
+}
+```
+
+- Participants SHOULD acknowledge shutdown via `chat/acknowledge` or by emitting a terminal `system/presence` leave event
+- After shutdown, gateways SHOULD reject further outbound envelopes from the participant until it rejoins the space
+
+---
+
+### 3.10 Stream Lifecycle Messages
+
+Streaming envelopes coordinate high-volume or binary data transfer while keeping the core message bus lightweight.
+
+#### 3.10.1 Stream Request (kind = "stream/request")
+
+Sent by whichever entity initiates stream negotiation (typically a participant asking the gateway for bulk-transfer resources):
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "stream-req-1",
+  "from": "agent-1",
+  "to": ["gateway"],
+  "kind": "stream/request",
+  "payload": {
+    "direction": "upload",
+    "expected_size_bytes": 10485760,
+    "description": "Large dataset export"
+  }
+}
+```
+
+- `direction` clarifies whether the sender will upload or download data
+- `expected_size_bytes` is advisory and MAY be omitted
+- `correlation_id` (not shown) MAY reference the message that motivated the stream (e.g., a proposal or request)
+- The recipient SHOULD reply with `stream/open` once it has allocated resources
+- Agents that expose long-form reasoning SHOULD consider issuing a `stream/request` alongside `reasoning/start` so subscribers
+  can follow high-volume traces without bloating the shared envelope log.
+
+#### 3.10.2 Stream Open (kind = "stream/open")
+
+Confirms that a stream has been established and assigns the identifier used for raw frames:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "stream-open-1",
+  "from": "gateway",
+  "to": ["agent-1"],
+  "kind": "stream/open",
+  "correlation_id": ["stream-req-1"],
+  "payload": {
+    "stream_id": "stream-42",
+    "encoding": "binary"
+  }
+}
+```
+
+- `payload.stream_id` MUST be unique per active stream on the connection
+- Additional metadata such as `encoding` or `compression` MAY be provided for the receiver
+
+#### 3.10.3 Stream Data Frames (no envelope)
+
+Once a stream is open, binary or chunked data travels on the same WebSocket without the JSON envelope wrapper. Frames are
+prefixed using the pattern `#streamID#data`, matching the `#streamID#data` example provided with this update. Implementations
+MUST ensure framing preserves boundaries so receivers can demultiplex concurrent streams.
+
+#### 3.10.4 Stream Close (kind = "stream/close")
+
+Terminates a stream and releases associated resources:
+
+```json
+{
+  "protocol": "mew/v0.3",
+  "id": "stream-close-1",
+  "from": "gateway",
+  "to": ["agent-1"],
+  "kind": "stream/close",
+  "correlation_id": ["stream-open-1"],
+  "payload": {
+    "reason": "complete"
+  }
+}
+```
+
+- Either side MAY send `stream/close`
+- `payload.reason` SHOULD distinguish between normal completion and errors (e.g., `"complete"`, `"cancelled"`, `"timeout"`)
+- After closing, no additional `#streamID#...` frames MUST be sent
 
 ---
 

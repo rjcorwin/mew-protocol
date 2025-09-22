@@ -178,7 +178,7 @@ export class MEWGateway extends EventEmitter {
       });
 
       // Handle errors
-      ws.on('error', (error) => {
+      ws.on('error', (error: Error) => {
         this.log('error', `Client ${participantId} error: ${error.message}`);
         this.emit('error', error, client);
       });
@@ -194,6 +194,10 @@ export class MEWGateway extends EventEmitter {
    */
   private handleMessage(client: ConnectedClient, data: Buffer): void {
     try {
+      console.log(
+        `[${new Date().toISOString()}] [DEBUG] Raw message from ${client.participantId}: ${data.toString()}`,
+      );
+
       // Check message size
       if (data.length > this.config.maxMessageSize) {
         throw new Error(`Message too large (max ${this.config.maxMessageSize} bytes)`);
@@ -204,18 +208,26 @@ export class MEWGateway extends EventEmitter {
       
       // Validate envelope
       this.validateEnvelope(envelope, client);
-      
-      // Check capabilities
-      const capCheck = this.capabilityChecker.checkCapability(envelope, client.capabilities);
-      if (!capCheck.allowed) {
-        this.sendErrorToClient(client, capCheck.reason || 'Operation not allowed', envelope.kind);
-        this.emit('message:blocked', envelope, capCheck.reason || 'No capability');
-        return;
+
+      const isRegistration = envelope.kind === 'system/register';
+
+      console.log(
+        `[${new Date().toISOString()}] [INFO] Received envelope from ${client.participantId}: ${envelope.kind}`,
+      );
+
+      if (!isRegistration) {
+        // Check capabilities
+        const capCheck = this.capabilityChecker.checkCapability(envelope, client.capabilities);
+        if (!capCheck.allowed) {
+          this.sendErrorToClient(client, capCheck.reason || 'Operation not allowed', envelope.kind);
+          this.emit('message:blocked', envelope, capCheck.reason || 'No capability');
+          return;
+        }
       }
 
       // Update client activity
       client.lastActivity = new Date();
-      
+
       // Handle context operations
       if (envelope.context) {
         this.handleContextOperation(client, envelope);
@@ -225,6 +237,11 @@ export class MEWGateway extends EventEmitter {
       const space = this.spaceManager.getSpace(client.spaceId);
       if (!space) {
         throw new Error('Client not in a space');
+      }
+
+      if (envelope.kind === 'system/register') {
+        this.handleSystemRegister(client, envelope, space);
+        return;
       }
 
       // Route message
@@ -240,6 +257,57 @@ export class MEWGateway extends EventEmitter {
       this.log('error', `Message handling error: ${error.message}`);
       this.sendErrorToClient(client, error.message);
     }
+  }
+
+  private handleSystemRegister(
+    client: ConnectedClient,
+    envelope: Envelope,
+    space: Space
+  ): void {
+    const payload = envelope.payload as { capabilities?: Capability[] } | undefined;
+    if (!payload || !Array.isArray(payload.capabilities)) {
+      throw new Error('system/register payload must include capabilities array');
+    }
+
+    console.log(
+      `[${new Date().toISOString()}] [INFO] system/register from ${client.participantId}: ${JSON.stringify(payload.capabilities)}`,
+    );
+
+    const merged = this.mergeCapabilities(client.capabilities, payload.capabilities);
+    client.capabilities = merged;
+
+    console.log(
+      `[${new Date().toISOString()}] [INFO] Updated capabilities for ${client.participantId}: ${JSON.stringify(merged)}`,
+    );
+
+    this.spaceManager.broadcastPresenceUpdate(space, client);
+  }
+
+  private mergeCapabilities(
+    current: Capability[],
+    requested: Capability[]
+  ): Capability[] {
+    const deduped = new Map<string, Capability>();
+
+    for (const capability of [...current, ...requested]) {
+      if (!capability || typeof capability.kind !== 'string') {
+        continue;
+      }
+      const key = JSON.stringify(capability);
+      deduped.set(key, capability);
+    }
+
+    const ensure = (capability: Capability) => {
+      const key = JSON.stringify(capability);
+      if (!deduped.has(key)) {
+        deduped.set(key, capability);
+      }
+    };
+
+    ensure({ id: 'system-register', kind: 'system/register' });
+    ensure({ id: 'mcp-response', kind: 'mcp/response' });
+
+    return Array.from(deduped.values());
   }
 
   /**
@@ -266,7 +334,16 @@ export class MEWGateway extends EventEmitter {
   private handleContextOperation(client: ConnectedClient, envelope: Envelope): void {
     if (!envelope.context) return;
     
-    const { operation, correlation_id } = envelope.context;
+    const context = envelope.context;
+
+    if (typeof context === 'string') {
+      if (context) {
+        client.contextStack.push(context);
+      }
+      return;
+    }
+
+    const { operation, correlation_id } = context;
     
     switch (operation) {
       case 'push':

@@ -247,6 +247,7 @@ export class CapabilityChecker {
           { id: 'chat', kind: 'chat' },
           { id: 'propose', kind: 'mew/proposal' },
           { id: 'mcp-read', kind: 'mcp/request', payload: { method: 'resources/read' } },
+          { id: 'system-register', kind: 'system/register' },
         ];
     }
   }

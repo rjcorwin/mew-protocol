@@ -27,6 +27,7 @@ participants:
       - kind: chat
       - kind: system/*
     auto_start: true
+    output_log: "./logs/fulfiller-output.log"
     command: "node"
     args: ["../agents/fulfiller-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "fulfiller-token"]
     
