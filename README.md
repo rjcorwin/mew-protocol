@@ -97,4 +97,3 @@ That's it! MEW guides you through setting up your workspace with:
 ## 🐈 Why "MEW"?
 
 The name playfully evokes "herding cats" 🐈‍⬛🐈🐈‍⬛ - the quintessential challenge of coordinating multiple independent, autonomous agents. MEW Protocol provides the framework to bring order to this chaos, teaching the "cats" to work together effectively in a shared workspace. 🌠
-
