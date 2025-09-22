@@ -78,7 +78,7 @@ export class MEWAgent extends MEWParticipant {
   private reasoningContextId?: string;
   private reasoningCancelled = false;
   private reasoningCancelReason?: string;
-  private reasoningStreamInfo?: { description: string; requestId?: string; streamId?: string };
+  private reasoningStreamInfo?: { description: string; requestId?: string; streamId?: string; pending: string[] };
   private compacting = false;
 
   // Message queueing properties
@@ -615,6 +615,164 @@ Return a JSON object:
     return 'I exceeded the maximum number of reasoning iterations.';
   }
 
+  private async createStandardReasoning(messages: any[], tools: LLMTool[]): Promise<any> {
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized - this should never happen!');
+    }
+
+    const params: any = {
+      model: this.config.model!,
+      messages
+    };
+
+    if (tools.length > 0) {
+      params.tools = this.convertToOpenAITools(tools);
+      params.tool_choice = 'auto';
+    }
+
+    const response = await this.openai.chat.completions.create(params);
+    return response.choices[0].message;
+  }
+
+  private async createStreamingReasoning(messages: any[], tools: LLMTool[]): Promise<any> {
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized - this should never happen!');
+    }
+
+    const params: any = {
+      model: this.config.model!,
+      messages,
+      stream: true
+    };
+
+    if (tools.length > 0) {
+      params.tools = this.convertToOpenAITools(tools);
+      params.tool_choice = 'auto';
+    }
+
+    const stream = await this.openai.chat.completions.create(params);
+    const aggregated: any = { content: '' };
+    const toolCalls = new Map<number, { id?: string; type?: string; function: { name: string; arguments: string } }>();
+
+    for await (const part of stream as any) {
+      const choice = part?.choices?.[0];
+      if (!choice) {
+        continue;
+      }
+
+      const delta = (choice as any).delta || {};
+      const textDelta = this.extractTextFromDelta(delta);
+      if (textDelta) {
+        aggregated.content += textDelta;
+        this.pushReasoningStreamChunk({ type: 'token', value: textDelta });
+      }
+
+      if (Array.isArray(delta.tool_calls)) {
+        for (const call of delta.tool_calls) {
+          const index = typeof call.index === 'number' ? call.index : 0;
+          const existing = toolCalls.get(index) || {
+            id: call.id,
+            type: call.type,
+            function: { name: '', arguments: '' }
+          };
+
+          if (call.id) {
+            existing.id = call.id;
+          }
+          if (call.type) {
+            existing.type = call.type;
+          }
+          if (call.function?.name) {
+            existing.function.name += call.function.name;
+          }
+          if (call.function?.arguments) {
+            existing.function.arguments += call.function.arguments;
+          }
+
+          toolCalls.set(index, existing);
+        }
+      }
+    }
+
+    if (aggregated.content === '') {
+      aggregated.content = null;
+    }
+
+    if (toolCalls.size > 0) {
+      aggregated.tool_calls = Array.from(toolCalls.values()).map(call => ({
+        id: call.id,
+        type: call.type || 'function',
+        function: {
+          name: call.function.name,
+          arguments: call.function.arguments
+        }
+      }));
+    }
+
+    return aggregated;
+  }
+
+  private extractTextFromDelta(delta: any): string {
+    if (!delta) {
+      return '';
+    }
+
+    const content = delta.content ?? delta.text ?? delta.output_text ?? delta.reasoning;
+    if (!content) {
+      return '';
+    }
+
+    if (typeof content === 'string') {
+      return content;
+    }
+
+    if (Array.isArray(content)) {
+      return content.map((part: any) => {
+        if (typeof part === 'string') {
+          return part;
+        }
+        if (!part) {
+          return '';
+        }
+        if (typeof part === 'object') {
+          if (typeof part.text === 'string') {
+            return part.text;
+          }
+          if (typeof part.output_text === 'string') {
+            return part.output_text;
+          }
+          if (typeof part.reasoning === 'string') {
+            return part.reasoning;
+          }
+          if (typeof part.content === 'string') {
+            return part.content;
+          }
+          if (typeof part.value === 'string') {
+            return part.value;
+          }
+        }
+        return '';
+      }).join('');
+    }
+
+    if (typeof content === 'object') {
+      if (typeof content.text === 'string') {
+        return content.text;
+      }
+      if (typeof content.output_text === 'string') {
+        return content.output_text;
+      }
+      if (typeof content.reasoning === 'string') {
+        return content.reasoning;
+      }
+      if (typeof content.content === 'string') {
+        return content.content;
+      }
+    }
+
+    return '';
+  }
+
   /**
    * Reason phase (ReAct: Reason)
    */
@@ -691,17 +849,31 @@ Return a JSON object:
     }
 
     // Use function calling to let the model decide whether to use tools
-    const response = await this.openai.chat.completions.create({
-      model: this.config.model!,
-      messages,
-      tools: tools.length > 0 ? this.convertToOpenAITools(tools) : undefined,
-      tool_choice: tools.length > 0 ? 'auto' : undefined
-    });
+    let message: any;
+    let streamed = false;
+    try {
+      message = await this.createStreamingReasoning(messages, tools);
+      streamed = true;
+    } catch (error) {
+      this.log('warn', `Streaming reasoning failed: ${error instanceof Error ? error.message : error}`);
+      try {
+        message = await this.createStandardReasoning(messages, tools);
+      } catch (fallbackError) {
+        this.log('error', `Failed to generate reasoning response: ${fallbackError instanceof Error ? fallbackError.message : fallbackError}`);
+        throw fallbackError;
+      }
+    }
 
-    const message = response.choices[0].message;
-    
+    if (!streamed && message?.content) {
+      this.pushReasoningStreamChunk({ type: 'token', value: message.content, final: true });
+    }
+
+    if (!message) {
+      throw new Error('Model did not return a reasoning message.');
+    }
+
     // Check if the model wants to use a tool
-    if (message.tool_calls && message.tool_calls.length > 0) {
+    if (message?.tool_calls && message.tool_calls.length > 0) {
       const toolCall = message.tool_calls[0] as any;
       // Convert back from OpenAI format: replace underscore separator with slash
       // Note: Participant IDs must not contain underscores for this to work correctly
@@ -1045,7 +1217,16 @@ Return a JSON object:
     if (!this.reasoningStreamInfo) return;
     const correlationId = envelope.correlation_id?.[0];
     if (correlationId && correlationId === this.reasoningStreamInfo.requestId) {
-      this.reasoningStreamInfo.streamId = envelope.payload?.stream_id;
+      const streamId = envelope.payload?.stream_id;
+      if (streamId) {
+        this.reasoningStreamInfo.streamId = streamId;
+        if (this.reasoningStreamInfo.pending.length > 0) {
+          for (const chunk of this.reasoningStreamInfo.pending) {
+            this.sendStreamData(streamId, chunk);
+          }
+          this.reasoningStreamInfo.pending = [];
+        }
+      }
     }
   }
 
@@ -1063,6 +1244,11 @@ Return a JSON object:
     if (this.matchesReasoningContext(envelope.context)) {
       this.reasoningCancelled = true;
       this.reasoningCancelReason = envelope.payload?.reason || 'cancelled';
+      this.pushReasoningStreamChunk({
+        type: 'status',
+        event: 'cancelled',
+        reason: this.reasoningCancelReason
+      });
       this.closeReasoningStream('cancelled');
     }
   }
@@ -1154,6 +1340,28 @@ Return a JSON object:
     await super.onRestart(payload);
   }
 
+  private pushReasoningStreamChunk(payload: Record<string, any>): void {
+    if (!this.reasoningStreamInfo || !this.reasoningContextId) {
+      return;
+    }
+
+    const chunk = JSON.stringify({
+      context: this.reasoningContextId,
+      ...payload
+    });
+
+    if (this.reasoningStreamInfo.streamId) {
+      this.sendStreamData(this.reasoningStreamInfo.streamId, chunk);
+      return;
+    }
+
+    if (!Array.isArray(this.reasoningStreamInfo.pending)) {
+      this.reasoningStreamInfo.pending = [];
+    }
+
+    this.reasoningStreamInfo.pending.push(chunk);
+  }
+
   private closeReasoningStream(_reason: string): void {
     this.reasoningStreamInfo = undefined;
   }
@@ -1180,9 +1388,10 @@ Return a JSON object:
 
       if (this.canSend({ kind: 'stream/request', payload: { direction: 'upload' } })) {
         const description = `reasoning:${id}`;
-        this.reasoningStreamInfo = { description };
+        this.reasoningStreamInfo = { description, pending: [] };
         this.requestStream({ direction: 'upload', description });
       }
+      this.pushReasoningStreamChunk({ type: 'status', event: 'start', input: data?.input });
     } else if (this.reasoningContextId) {
       envelope.context = this.reasoningContextId;
     }
@@ -1193,11 +1402,17 @@ Return a JSON object:
 
     this.send(envelope);
 
-    if (event === 'reasoning/thought' && this.reasoningStreamInfo?.streamId) {
-      this.sendStreamData(this.reasoningStreamInfo.streamId, JSON.stringify(data));
+    if (event === 'reasoning/thought') {
+      this.pushReasoningStreamChunk({ type: 'thought', value: data });
     }
 
     if (event === 'reasoning/conclusion') {
+      this.pushReasoningStreamChunk({
+        type: 'status',
+        event: 'conclusion',
+        cancelled: !!data?.cancelled,
+        reason: data?.reason
+      });
       this.closeReasoningStream('complete');
       this.reasoningContextId = undefined;
     }

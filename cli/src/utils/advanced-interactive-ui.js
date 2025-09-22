@@ -30,6 +30,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [pauseState, setPauseState] = useState(null);
   const [activeStreams, setActiveStreams] = useState(new Map());
   const [streamFrames, setStreamFrames] = useState([]);
+  const reasoningStreamRequestsRef = useRef(new Map());
+  const reasoningStreamsRef = useRef(new Map());
   const contextUsageEntries = useMemo(() => buildContextUsageEntries(participantStatuses), [participantStatuses]);
   const { exit } = useApp();
 
@@ -91,10 +93,11 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   const handleStreamFrame = (streamId, payload) => {
+    const timestamp = new Date();
     const frame = {
       streamId,
       payload,
-      timestamp: new Date()
+      timestamp
     };
 
     setStreamFrames(prev => {
@@ -105,25 +108,80 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     setActiveStreams(prev => {
       const next = new Map(prev);
       const existing = next.get(streamId);
-      const now = new Date();
       if (existing) {
-        next.set(streamId, { ...existing, lastActivityAt: now });
+        next.set(streamId, { ...existing, lastActivityAt: timestamp });
       } else {
         next.set(streamId, {
           streamId,
           openedBy: 'unknown',
-          openedAt: now,
-          lastActivityAt: now,
+          openedAt: timestamp,
+          lastActivityAt: timestamp,
         });
       }
       return next;
     });
 
-    addMessage({
-      kind: 'stream/data',
-      from: streamId,
-      payload: { data: payload }
-    }, false);
+    let shouldAddMessage = true;
+    let parsed = null;
+    try {
+      parsed = JSON.parse(payload);
+    } catch (error) {
+      parsed = null;
+    }
+
+    let reasoningStream = reasoningStreamsRef.current.get(streamId);
+    if (!reasoningStream && parsed && parsed.context) {
+      reasoningStreamsRef.current.set(streamId, { contextId: parsed.context, from: parsed.from || 'unknown' });
+      reasoningStream = reasoningStreamsRef.current.get(streamId);
+    }
+
+    if (reasoningStream && parsed && parsed.context === reasoningStream.contextId) {
+      const chunkType = parsed.type || 'token';
+      if (chunkType === 'token' && typeof parsed.value === 'string') {
+        const chunkText = parsed.value;
+        shouldAddMessage = false;
+        setActiveReasoning(prev => {
+          if (!prev || prev.id !== parsed.context) {
+            return prev;
+          }
+          const combined = `${prev.streamText || ''}${chunkText}`;
+          const trimmed = combined.length > 4000 ? combined.slice(-4000) : combined;
+          return {
+            ...prev,
+            streamText: trimmed,
+            lastTokenUpdate: new Date()
+          };
+        });
+      } else if (chunkType === 'thought') {
+        shouldAddMessage = false;
+        const reasoningText = parsed.value?.reasoning || parsed.value?.message;
+        setActiveReasoning(prev => {
+          if (!prev || prev.id !== parsed.context) {
+            return prev;
+          }
+          const nextStreamText = reasoningText || prev.streamText;
+          return {
+            ...prev,
+            message: reasoningText || prev.message,
+            streamText: nextStreamText,
+            lastTokenUpdate: new Date()
+          };
+        });
+      } else if (chunkType === 'status') {
+        shouldAddMessage = false;
+        if (parsed.event === 'conclusion' || parsed.event === 'cancelled') {
+          reasoningStreamsRef.current.delete(streamId);
+        }
+      }
+    }
+
+    if (shouldAddMessage) {
+      addMessage({
+        kind: 'stream/data',
+        from: streamId,
+        payload: { data: payload }
+      }, false);
+    }
   };
 
   const handleIncomingMessage = (message) => {
@@ -283,10 +341,18 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     // Handle reasoning messages
     if (message.kind === 'reasoning/start') {
       const tokenMetrics = extractReasoningTokenMetrics(message.payload);
+      for (const [id, info] of reasoningStreamsRef.current.entries()) {
+        if (info.contextId === message.id) {
+          reasoningStreamsRef.current.delete(id);
+        }
+      }
       setActiveReasoning({
         id: message.id,
         from: message.from,
-        message: message.payload?.message || 'Thinking...',
+        message: '',
+        streamText: '',
+        streamId: null,
+        streamRequestId: null,
         startTime: new Date(),
         thoughtCount: 0,
         tokenMetrics,
@@ -294,27 +360,123 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       });
     } else if (message.kind === 'reasoning/thought') {
       setActiveReasoning(prev => {
-        if (!prev) return null;
+        if (!prev) return prev;
+        if (message.context && message.context !== prev.id) {
+          return prev;
+        }
         const tokenUpdate = extractReasoningTokenMetrics(message.payload);
         const { metrics, changed } = mergeReasoningTokenMetrics(prev.tokenMetrics, tokenUpdate);
+        const reasoningText = message.payload?.reasoning || message.payload?.message;
+        const nextStreamText = prev.streamText || reasoningText || '';
         return {
           ...prev,
-          message: message.payload?.message || prev.message,
+          message: reasoningText || prev.message,
+          streamText: nextStreamText,
           thoughtCount: prev.thoughtCount + 1,
           tokenMetrics: metrics,
           lastTokenUpdate: changed ? new Date() : prev.lastTokenUpdate
         };
       });
     } else if (message.kind === 'reasoning/conclusion') {
-      setActiveReasoning(null);
+      const contextId = message.context || message.id;
+      if (contextId) {
+        for (const [id, info] of reasoningStreamsRef.current.entries()) {
+          if (info.contextId === contextId) {
+            reasoningStreamsRef.current.delete(id);
+          }
+        }
+        for (const [requestId, info] of reasoningStreamRequestsRef.current.entries()) {
+          if (info?.contextId === contextId) {
+            reasoningStreamRequestsRef.current.delete(requestId);
+          }
+        }
+      }
+      setActiveReasoning(prev => {
+        if (!prev) return null;
+        if (contextId && prev.id !== contextId) {
+          return prev;
+        }
+        return null;
+      });
     } else if (message.kind === 'reasoning/cancel') {
-      setActiveReasoning(null);
+      const contextId = message.context || message.id;
+      if (contextId) {
+        for (const [id, info] of reasoningStreamsRef.current.entries()) {
+          if (info.contextId === contextId) {
+            reasoningStreamsRef.current.delete(id);
+          }
+        }
+        for (const [requestId, info] of reasoningStreamRequestsRef.current.entries()) {
+          if (info?.contextId === contextId) {
+            reasoningStreamRequestsRef.current.delete(requestId);
+          }
+        }
+      }
+      setActiveReasoning(prev => {
+        if (!prev) return prev;
+        if (contextId && prev.id !== contextId) {
+          return prev;
+        }
+        return null;
+      });
       if (message.payload?.reason) {
         addMessage({
           kind: 'system/info',
           from: 'system',
           payload: { text: `Reasoning cancelled (${message.payload.reason})` }
         }, false);
+      }
+    }
+
+    if (message.kind === 'stream/request') {
+      const description = message.payload?.description;
+      if (typeof description === 'string' && description.startsWith('reasoning:')) {
+        const contextId = description.slice('reasoning:'.length);
+        reasoningStreamRequestsRef.current.set(message.id, { contextId, from: message.from });
+        setActiveReasoning(prev => {
+          if (!prev || prev.id !== contextId) {
+            return prev;
+          }
+          return { ...prev, streamRequestId: message.id };
+        });
+      }
+    }
+
+    if (message.kind === 'stream/open') {
+      const streamId = message.payload?.stream_id;
+      let contextId = null;
+      const requestId = message.correlation_id?.[0];
+      if (requestId && reasoningStreamRequestsRef.current.has(requestId)) {
+        const info = reasoningStreamRequestsRef.current.get(requestId);
+        reasoningStreamRequestsRef.current.delete(requestId);
+        contextId = info?.contextId || null;
+      }
+      const description = message.payload?.description;
+      if (!contextId && typeof description === 'string' && description.startsWith('reasoning:')) {
+        contextId = description.slice('reasoning:'.length);
+      }
+      if (contextId && streamId) {
+        reasoningStreamsRef.current.set(streamId, { contextId, from: message.from });
+        setActiveReasoning(prev => {
+          if (!prev || prev.id !== contextId) {
+            return prev;
+          }
+          return { ...prev, streamId };
+        });
+      }
+    }
+
+    if (message.kind === 'stream/close') {
+      const streamId = message.payload?.stream_id;
+      const correlationId = message.correlation_id?.[0];
+      if (streamId && reasoningStreamsRef.current.has(streamId)) {
+        reasoningStreamsRef.current.delete(streamId);
+      }
+      if (correlationId) {
+        reasoningStreamRequestsRef.current.delete(correlationId);
+        if (reasoningStreamsRef.current.has(correlationId)) {
+          reasoningStreamsRef.current.delete(correlationId);
+        }
       }
     }
 
@@ -1373,6 +1535,15 @@ function ReasoningStatus({ reasoning }) {
   const elapsedTime = Math.floor((Date.now() - reasoning.startTime) / 1000);
   const tokenSummary = formatReasoningTokenSummary(reasoning.tokenMetrics);
   const tokenUpdatedAgo = reasoning.lastTokenUpdate ? formatRelativeTime(reasoning.lastTokenUpdate) : null;
+  const displayText = reasoning.streamText && reasoning.streamText.trim().length > 0
+    ? reasoning.streamText
+    : reasoning.message;
+  const textLimit = 400;
+  const textPreview = displayText
+    ? displayText.length > textLimit
+      ? `…${displayText.slice(displayText.length - textLimit)}`
+      : displayText
+    : null;
 
   return React.createElement(Box, {
     borderStyle: "round",
@@ -1391,9 +1562,9 @@ function ReasoningStatus({ reasoning }) {
         )
       )
     ),
-    reasoning.message && React.createElement(Box, { marginTop: 0 },
+    textPreview && React.createElement(Box, { marginTop: 0 },
       React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" },
-        `"${reasoning.message.slice(0, 300)}${reasoning.message.length > 300 ? '...' : ''}"`
+        textPreview
       )
     ),
     tokenSummary?.summary && React.createElement(Box, { marginTop: 1 },
