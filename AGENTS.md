@@ -1,8 +1,9 @@
 # 🤖 Agent Quick Reference - MEW Protocol
 
-## Critical Docs (READ FIRST)
-- **spec/v0.3/SPEC.md** - Current protocol specification
-- **spec/draft/SPEC.md** - Upcoming changes that are currently being implemented
+## Critical Docs (READ FIRST AND UPDATE AFTER COMPLETING WORK)
+- MEW Protocol: spec/draft/SPEC.md
+- SDK: sdk/spec/draft/SPEC.md
+- CLI: cli/spec/draft/SPEC.md
 
 ## Repository Structure
 ```
