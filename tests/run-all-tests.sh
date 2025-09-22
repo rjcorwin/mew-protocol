@@ -1,7 +1,9 @@
 #!/bin/bash
 # Run all MEW v0.2 test scenarios from test-spaces
 
-set -e
+# Don't use set -e because we want to run all tests even if some fail
+# But do use pipefail to catch errors in pipes
+set -o pipefail
 
 # Get the directory of this script (tests directory)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -86,20 +88,18 @@ run_test() {
     # Run the test with timeout directly
     if [ "$VERBOSE" = true ]; then
       # In verbose mode, show output directly
-      if timeout 60 ./test.sh 2>&1 | tee ./logs/test-output.log; then
-        TEST_SUCCESS=true
-      else
-        TEST_SUCCESS=false
-        EXIT_CODE=$?
-      fi
+      timeout 60 ./test.sh 2>&1 | tee ./logs/test-output.log
+      EXIT_CODE=${PIPESTATUS[0]}
     else
       # Normal mode - capture output to log file only
-      if timeout 60 ./test.sh > ./logs/test-output.log 2>&1; then
-        TEST_SUCCESS=true
-      else
-        TEST_SUCCESS=false
-        EXIT_CODE=$?
-      fi
+      timeout 60 ./test.sh > ./logs/test-output.log 2>&1
+      EXIT_CODE=$?
+    fi
+
+    if [ $EXIT_CODE -eq 0 ]; then
+      TEST_SUCCESS=true
+    else
+      TEST_SUCCESS=false
     fi
 
     if [ "$TEST_SUCCESS" = true ]; then
