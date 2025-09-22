@@ -26,7 +26,6 @@ jobs:
     - name: Make scripts executable
       run: |
         chmod +x ./tests/run-all-tests.sh
-        chmod +x ./update-deps.sh
         chmod +x ./tests/scenario-*/test.sh
         chmod +x ./tests/scenario-*/setup.sh
         chmod +x ./tests/scenario-*/teardown.sh
