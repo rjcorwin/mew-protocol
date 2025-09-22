@@ -1,0 +1,24 @@
+{
+  "recommendations": [
+    // TypeScript & JavaScript
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-typescript-next",
+
+    // Debugging
+    "ms-vscode.js-debug-nightly",
+
+    // Markdown
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+
+    // Git
+    "eamodio.gitlens",
+
+    // npm
+    "christian-kohler.npm-intellisense",
+
+    // YAML (for space.yaml files)
+    "redhat.vscode-yaml"
+  ]
+}
