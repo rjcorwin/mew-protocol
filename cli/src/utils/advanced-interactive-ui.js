@@ -25,6 +25,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [activeReasoning, setActiveReasoning] = useState(null); // Track active reasoning sessions
   const [grantedCapabilities, setGrantedCapabilities] = useState(new Map()); // Track granted capabilities by participant
   const [pendingAcknowledgements, setPendingAcknowledgements] = useState([]);
+  const [myPendingAcknowledgements, setMyPendingAcknowledgements] = useState([]);
   const [participantStatuses, setParticipantStatuses] = useState(new Map());
   const [pauseState, setPauseState] = useState(null);
   const [activeStreams, setActiveStreams] = useState(new Map());
@@ -156,6 +157,41 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       const target = message.correlation_id?.[0];
       if (target) {
         setPendingAcknowledgements(prev => prev.filter(entry => entry.id !== target));
+        setMyPendingAcknowledgements(prev => {
+          const index = prev.findIndex(entry => entry.id === target);
+          if (index === -1) {
+            return prev;
+          }
+
+          if (message.kind === 'chat/cancel') {
+            return prev.filter(entry => entry.id !== target);
+          }
+
+          const entry = prev[index];
+          const recipients = Array.isArray(entry.to) ? entry.to : [];
+
+          if (recipients.length === 0) {
+            return prev.filter(item => item.id !== target);
+          }
+
+          if (message.from && recipients.includes(message.from)) {
+            const acked = new Set(entry.acked || []);
+            acked.add(message.from);
+
+            if (acked.size >= recipients.length) {
+              return prev.filter(item => item.id !== target);
+            }
+
+            const updated = { ...entry, acked: Array.from(acked) };
+            return [
+              ...prev.slice(0, index),
+              updated,
+              ...prev.slice(index + 1)
+            ];
+          }
+
+          return prev;
+        });
       }
     }
 
@@ -412,6 +448,30 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       timestamp: new Date(),
     }]);
 
+    if (envelope.kind === 'chat') {
+      const recipients = Array.isArray(envelope.to)
+        ? envelope.to.filter(id => id && id !== participantId)
+        : [];
+
+      const timestamp = envelope.ts ? new Date(envelope.ts) : new Date();
+      const entry = {
+        id: envelope.id,
+        text: envelope.payload?.text || '',
+        timestamp,
+        to: recipients,
+        acked: [],
+      };
+
+      setMyPendingAcknowledgements(prev => [...prev.filter(item => item.id !== entry.id), entry]);
+    }
+
+    if (envelope.kind === 'chat/cancel') {
+      const target = envelope.correlation_id?.[0];
+      if (target) {
+        setMyPendingAcknowledgements(prev => prev.filter(entry => entry.id !== target));
+      }
+    }
+
     return envelope;
   };
 
@@ -539,6 +599,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       case '/ui-clear':
         setMessages([]);
         setPendingAcknowledgements([]);
+        setMyPendingAcknowledgements([]);
         setParticipantStatuses(new Map());
         setActiveStreams(new Map());
         setStreamFrames([]);
@@ -855,7 +916,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         )
       ),
       React.createElement(SidePanel, {
-        pendingAcknowledgements,
+        participantId,
+        myPendingAcknowledgements,
         participantStatuses,
         pauseState,
         activeStreams,
@@ -1012,7 +1074,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       pendingOperation: !!pendingOperation,
       spaceId: spaceId,
       participantId: participantId,
-      ackCount: pendingAcknowledgements.length,
+      awaitingAckCount: myPendingAcknowledgements.length,
       pauseState: pauseState,
       activeStreamCount: activeStreams.size,
       contextUsage: contextUsageEntries
@@ -1360,14 +1422,14 @@ function ReasoningStatus({ reasoning }) {
 /**
  * Status Bar Component
  */
-function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, ackCount = 0, pauseState, activeStreamCount = 0, contextUsage = [] }) {
+function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [] }) {
   const status = connected ? 'Connected' : 'Disconnected';
   const statusColor = connected ? 'green' : 'red';
 
   const extras = [];
   extras.push(`${messageCount} msgs`);
-  if (ackCount > 0) {
-    extras.push(`${ackCount} ack${ackCount === 1 ? '' : 's'}`);
+  if (awaitingAckCount > 0) {
+    extras.push(`${awaitingAckCount} awaiting`);
   }
   if (activeStreamCount > 0) {
     extras.push(`${activeStreamCount} stream${activeStreamCount === 1 ? '' : 's'}`);
@@ -1931,8 +1993,29 @@ function formatContextUsageForBar(entry) {
   return `${entry.id} ${pieces.join(' ')}`.trim();
 }
 
-function SidePanel({ pendingAcknowledgements, participantStatuses, pauseState, activeStreams, streamFrames }) {
-  const ackEntries = pendingAcknowledgements.slice(0, 5);
+function formatAckRecipients(recipients, participantId) {
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    return 'broadcast';
+  }
+
+  if (recipients.length === 1) {
+    return recipients[0] === participantId ? 'you' : recipients[0];
+  }
+
+  return recipients
+    .map(recipient => (recipient === participantId ? 'you' : recipient))
+    .join(', ');
+}
+
+function SidePanel({ participantId, myPendingAcknowledgements, participantStatuses, pauseState, activeStreams, streamFrames }) {
+  const ackEntries = myPendingAcknowledgements
+    .slice()
+    .sort((a, b) => {
+      const at = a.timestamp instanceof Date ? a.timestamp.getTime() : 0;
+      const bt = b.timestamp instanceof Date ? b.timestamp.getTime() : 0;
+      return at - bt;
+    })
+    .slice(0, 5);
   const statusEntries = Array.from(participantStatuses.entries())
     .sort(([, a], [, b]) => {
       const at = a.timestamp ? a.timestamp.getTime() : 0;
@@ -1954,12 +2037,15 @@ function SidePanel({ pendingAcknowledgements, participantStatuses, pauseState, a
     React.createElement(Text, { color: "cyan", bold: true }, "Signal Board"),
 
     React.createElement(Box, { marginTop: 1 }),
-    React.createElement(Text, { color: "yellow", bold: true }, `Pending Acks (${pendingAcknowledgements.length})`),
+    React.createElement(Text, { color: "yellow", bold: true }, `Awaiting Their Acks (${myPendingAcknowledgements.length})`),
     ackEntries.length > 0
-      ? ackEntries.map((entry, index) => React.createElement(Text, { key: entry.id, color: "yellow" },
-          `${index + 1}. ${entry.from || 'unknown'} – ${truncateText(entry.text, 28)} (${formatRelativeTime(entry.timestamp)})`
-        ))
-      : React.createElement(Text, { color: "gray" }, 'None'),
+      ? ackEntries.map((entry, index) => {
+          const recipients = formatAckRecipients(entry.to, participantId);
+          return React.createElement(Text, { key: entry.id, color: "yellow" },
+            `${index + 1}. you → ${recipients} – ${truncateText(entry.text, 28)} (${formatRelativeTime(entry.timestamp)})`
+          );
+        })
+      : React.createElement(Text, { color: "gray" }, 'All acknowledged'),
 
     React.createElement(Box, { marginTop: 1 }),
     React.createElement(Text, { color: "green", bold: true }, `Participant Status (${participantStatuses.size})`),
