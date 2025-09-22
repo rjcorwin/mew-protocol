@@ -35,8 +35,8 @@ jobs:
     - name: Install dependencies
       run: npm ci --ignore-scripts
 
-    - name: Build packages in order
-      run: npm run build:sdk
+    - name: Build packages
+      run: npm run build
 
     - name: Run tests (without LLM scenarios)
       run: ./tests/run-all-tests.sh --no-llm --verbose
