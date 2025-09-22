@@ -7,8 +7,15 @@ packages/*/node_modules/
 dist/
 build/
 *.tsbuildinfo
+.tsbuildinfo
 packages/*/dist/
 packages/*/build/
+sdk/typescript-sdk/*/.tsbuildinfo
+sdk/typescript-sdk/*/dist/
+bridge/.tsbuildinfo
+bridge/dist/
+build-temp/
+*/build-temp/
 
 # Logs
 logs/
@@ -49,7 +56,6 @@ tests/test-results.log
 spaces/*/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo

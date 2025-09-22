@@ -9,17 +9,17 @@ When developing MEW Protocol, you'll want to test with your local packages inste
 ### Quick Start with Local Dependencies
 
 1. **Ensure npm workspaces are set up (already configured in the repo):**
-   The root `package.json` includes all packages and test spaces in the workspace:
+   The root `package.json` includes all packages in the workspace:
    ```json
    {
      "workspaces": [
        "sdk/typescript-sdk/*",
        "bridge",
-       "cli",
-       "tests/*/.mew"
+       "cli"
      ]
    }
    ```
+   Note: Test spaces and development spaces use local packages automatically via npm workspaces but are not themselves workspace packages.
 
 2. **Create a test space in the tests directory:**
    ```bash
@@ -61,10 +61,11 @@ When developing MEW Protocol, you'll want to test with your local packages inste
 
 ### How It Works
 
-- Any space created in `tests/*/` automatically uses local packages via npm workspaces
-- The `.mew` directory inside each test space contains the actual MEW configuration and dependencies
+- Any space created in `tests/*/` or `spaces/*/` automatically uses local packages via npm workspaces
+- The `.mew` directory inside each test space contains the actual MEW configuration and runtime files
 - npm workspaces automatically symlinks all local packages, so changes to your code are immediately reflected
 - No need to manually update package.json files or use npm link
+- Development spaces go in `spaces/` directory, test scenarios in `tests/`
 
 ### Managing Test Spaces
 

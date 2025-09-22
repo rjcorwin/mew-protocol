@@ -13,8 +13,8 @@
     }
   },
   "scripts": {
-    "build": "node ../../../scripts/build-ts-package.mjs",
-    "dev": "tsc --watch --project tsconfig.json",
+    "build": "tsc",
+    "dev": "tsc --watch",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",

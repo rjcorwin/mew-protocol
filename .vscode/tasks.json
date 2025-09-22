@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build All",
+      "type": "npm",
+      "script": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$tsc",
+      "detail": "Build all packages with TypeScript project references"
+    },
+    {
+      "label": "Build Watch",
+      "type": "npm",
+      "script": "build:watch",
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch",
+      "detail": "Watch all packages for changes and rebuild"
+    },
+    {
+      "label": "Clean",
+      "type": "npm",
+      "script": "clean",
+      "detail": "Clean all build artifacts"
+    },
+    {
+      "label": "Test",
+      "type": "npm",
+      "script": "test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "detail": "Run all tests without LLM"
+    },
+    {
+      "label": "Lint",
+      "type": "npm",
+      "script": "lint",
+      "problemMatcher": "$eslint-stylish",
+      "detail": "Lint all workspace packages"
+    },
+    {
+      "label": "Format",
+      "type": "npm",
+      "script": "format",
+      "detail": "Format all workspace packages with Prettier"
+    }
+  ]
+}

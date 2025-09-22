@@ -1,0 +1,60 @@
+{
+    "editor.tokenColorCustomizations": {
+      "textMateRules": [
+        {
+          "scope": "markup.heading.1.markdown",
+          "settings": {
+            "foreground": "#e06c75",
+            "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": "markup.heading.2.markdown",
+          "settings": {
+            "foreground": "#61afef",
+            "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": "markup.heading.3.markdown",
+          "settings": {
+            "foreground": "#98c379",
+            "fontStyle": "bold"
+          }
+        }
+      ]
+    },
+
+    // TypeScript Configuration
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "typescript.preferences.includePackageJsonAutoImports": "on",
+
+    // TypeScript Project References
+    "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+    "typescript.preferences.importModuleSpecifier": "relative",
+
+    // Editor Settings for Monorepo
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+
+    // File Exclusions
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.tsbuildinfo": true,
+      "**/dist": false,
+      "**/build-temp": true
+    },
+
+    // Search Exclusions
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/.tsbuildinfo": true,
+      "**/build-temp": true,
+      "**/.mew": true,
+      "**/logs": true
+    }
+  }

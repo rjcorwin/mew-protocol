@@ -38,31 +38,29 @@ cd mew-protocol
 
 ### 2. Install Dependencies and Build
 
-The project uses npm workspaces, so a single install command handles all packages. However, due to the build dependencies between packages, you need to build them in a specific order on first setup:
+The project uses TypeScript project references for automatic dependency management and build ordering:
 
 ```bash
 # Install all dependencies
 npm install
 
-# Build TypeScript packages in dependency order
-npm run build:sdk
+# Build all TypeScript packages with automatic dependency ordering
+npm run build
 ```
 
-If `npm install` fails on first run (which can happen due to workspace interdependencies), run this setup script:
+The build system features:
+- **Automatic dependency ordering** - TypeScript determines the correct build order
+- **Incremental compilation** - Only changed packages are rebuilt
+- **Watch mode** - Use `npm run build:watch` for development
+
+If you need to clean and rebuild everything:
 
 ```bash
-# Alternative: Manual build sequence
-cd sdk/typescript-sdk/types && npm install && npm run build && cd ../../..
-cd sdk/typescript-sdk/capability-matcher && npm install && npm run build && cd ../../..
-cd sdk/typescript-sdk/client && npm install && npm run build && cd ../../..
-cd sdk/typescript-sdk/participant && npm install && npm run build && cd ../../..
-cd sdk/typescript-sdk/agent && npm install && npm run build && cd ../../..
-cd sdk/typescript-sdk/gateway && npm install && npm run build && cd ../../..
-cd bridge && npm install && npm run build && cd ..
-cd cli && npm install && cd ..
+# Clean all build artifacts
+npm run clean
 
-# Now run npm install from root to link everything
-npm install
+# Force rebuild all packages
+npm run build:force
 ```
 
 ### 3. Verify Installation
@@ -79,17 +77,24 @@ npm test
 
 ### Building Packages
 
-Most packages use either TypeScript compiler (`tsc`) or `tsup` for building:
+The project uses TypeScript project references for coordinated builds:
 
 ```bash
-# Build all packages
-npm run build --workspaces
+# Build all packages (automatic dependency ordering)
+npm run build
+
+# Watch mode for development (all packages)
+npm run build:watch
+
+# Clean and rebuild
+npm run clean
+npm run build
+
+# Force rebuild (ignores cache)
+npm run build:force
 
 # Build a specific package
 npm run build --workspace=@mew-protocol/participant
-
-# Watch mode for development (where available)
-npm run dev --workspace=@mew-protocol/gateway
 ```
 
 ### Running Tests
@@ -179,18 +184,13 @@ npx mew-bridge --gateway ws://localhost:8080 \
 
 ### Build Errors on Fresh Clone
 
-**Problem**: `npm install` fails with TypeScript compilation errors, particularly in the bridge package.
+**Problem**: TypeScript compilation errors on fresh clone.
 
-**Solution**: The packages need to be built in dependency order first:
+**Solution**: Use the project-wide build command which handles dependency ordering:
 ```bash
-# Build SDK packages first
-cd sdk/typescript-sdk/types && npm run build && cd ../../..
-cd sdk/typescript-sdk/capability-matcher && npm run build && cd ../../..
-cd sdk/typescript-sdk/client && npm run build && cd ../../..
-cd sdk/typescript-sdk/participant && npm run build && cd ../../..
-
-# Then run npm install from root
-npm install
+# Clean install and build
+npm ci
+npm run build
 ```
 
 ### React Peer Dependency Warnings
@@ -214,7 +214,12 @@ npm install
 
 **Solution**: Ensure all packages are built:
 ```bash
-npm run build --workspaces
+npm run build
+```
+
+Or use watch mode during development:
+```bash
+npm run build:watch
 ```
 
 ## Package-Specific Notes

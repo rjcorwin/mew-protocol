@@ -13,10 +13,10 @@
     }
   },
   "scripts": {
-    "build": "node ../../../scripts/build-ts-package.mjs",
-    "dev": "tsc --watch --project tsconfig.json",
+    "build": "tsc",
+    "dev": "tsc --watch",
     "lint": "tsc --noEmit",
-    "clean": "rm -rf dist build-temp"
+    "clean": "rm -rf dist"
   },
   "keywords": [
     "mew",
