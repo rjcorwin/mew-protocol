@@ -12,7 +12,7 @@ participants:
       args:
         - "-y"
         - "@modelcontextprotocol/server-filesystem"
-        - "/tmp/mcp-test-files"
+        - "/private/tmp/mcp-test-files"
     auto_start: true
     tokens: ["fs-token"]
     capabilities:

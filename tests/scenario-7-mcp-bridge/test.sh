@@ -104,7 +104,7 @@ REQUEST_1='{
 test_mcp_request \
   "List MCP tools" \
   "$REQUEST_1" \
-  "read_text_file"
+  "read_file"
 
 RESULT_1=$?
 
@@ -116,7 +116,7 @@ REQUEST_2='{
   "payload": {
     "method": "tools/call",
     "params": {
-      "name": "read_text_file",
+      "name": "read_file",
       "arguments": {
         "path": "/private/tmp/mcp-test-files/test.txt"
       }
