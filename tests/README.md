@@ -90,4 +90,4 @@ Tests use PM2 for process management and the MEW CLI to start spaces. Each test:
 3. Verifies expected outcomes
 4. Cleans up all processes and artifacts
 
-For protocol details, see the main MEUP documentation.
+For protocol details, see the main [MEW Protocol documentation](/spec/v0.3/SPEC.md).
