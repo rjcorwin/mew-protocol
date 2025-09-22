@@ -56,7 +56,6 @@ tests/test-results.log
 spaces/*/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
