@@ -72,9 +72,9 @@ async function start() {
     console.log(`Space: ${options.space}`);
     console.log(`MCP server: ${options.mcpCommand} ${mcpArgs.join(' ')}`);
 
-    // Connect to gateway
-    await bridge.connect();
-    console.log('Connected to gateway');
+    // Use the bridge's start() method for proper initialization
+    await bridge.start();
+    console.log('Bridge started successfully');
 
     // Keep the process alive
     process.on('SIGINT', async () => {

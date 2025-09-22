@@ -3,20 +3,31 @@
 
 set -e
 
+# Get the directory of this script (tests directory)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Get the repo root (parent of tests directory)
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+
 # Parse command line arguments
 NO_LLM=false
+VERBOSE=false
 for arg in "$@"; do
   case $arg in
     --no-llm)
       NO_LLM=true
       shift
       ;;
+    --verbose|-v)
+      VERBOSE=true
+      shift
+      ;;
     --help)
-      echo "Usage: $0 [--no-llm] [--help]"
+      echo "Usage: $0 [--no-llm] [--verbose|-v] [--help]"
       echo ""
       echo "Options:"
-      echo "  --no-llm    Skip scenarios that require OPENAI_API_KEY (8, 9, 10)"
-      echo "  --help      Show this help message"
+      echo "  --no-llm       Skip scenarios that require OPENAI_API_KEY (8, 9, 10)"
+      echo "  --verbose, -v  Show detailed test output (useful for CI debugging)"
+      echo "  --help         Show this help message"
       exit 0
       ;;
     *)
@@ -41,6 +52,10 @@ if [ "$NO_LLM" = true ]; then
   echo -e "${YELLOW}        LLM scenarios disabled (--no-llm)       ${NC}"
   echo -e "${BLUE}================================================${NC}"
 fi
+if [ "$VERBOSE" = true ]; then
+  echo -e "${YELLOW}        Verbose mode enabled                    ${NC}"
+  echo -e "${BLUE}================================================${NC}"
+fi
 echo ""
 
 # Track overall results
@@ -48,8 +63,8 @@ TOTAL_PASS=0
 TOTAL_FAIL=0
 FAILED_TESTS=""
 
-# Create test results log
-TEST_RESULTS_LOG="./test-results.log"
+# Create test results log in repo root
+TEST_RESULTS_LOG="$REPO_ROOT/test-results.log"
 echo "MEW v0.2 Test Suite Results - $(date)" > "$TEST_RESULTS_LOG"
 echo "================================================" >> "$TEST_RESULTS_LOG"
 
@@ -69,24 +84,49 @@ run_test() {
     mkdir -p logs
     
     # Run the test with timeout directly
-    if timeout 60 ./test.sh > ./logs/test-output.log 2>&1; then
-      echo -e "${GREEN}✅ $test_name PASSED${NC}"
-      echo "Status: PASSED" >> "../../$TEST_RESULTS_LOG"
-      ((TOTAL_PASS++))
+    if [ "$VERBOSE" = true ]; then
+      # In verbose mode, show output directly
+      if timeout 60 ./test.sh 2>&1 | tee ./logs/test-output.log; then
+        TEST_SUCCESS=true
+      else
+        TEST_SUCCESS=false
+        EXIT_CODE=$?
+      fi
     else
-      EXIT_CODE=$?
+      # Normal mode - capture output to log file only
+      if timeout 60 ./test.sh > ./logs/test-output.log 2>&1; then
+        TEST_SUCCESS=true
+      else
+        TEST_SUCCESS=false
+        EXIT_CODE=$?
+      fi
+    fi
+
+    if [ "$TEST_SUCCESS" = true ]; then
+      echo -e "${GREEN}✅ $test_name PASSED${NC}"
+      echo "Status: PASSED" >> "$TEST_RESULTS_LOG"
+      TOTAL_PASS=$((TOTAL_PASS + 1))
+    else
       if [ $EXIT_CODE -eq 124 ]; then
         echo -e "${RED}❌ $test_name TIMEOUT${NC}"
-        echo "Status: TIMEOUT" >> "../../$TEST_RESULTS_LOG"
+        echo "Status: TIMEOUT" >> "$TEST_RESULTS_LOG"
         # Cleanup any hanging processes
         pkill -f "mew.js|mew-bridge" 2>/dev/null || true
         pkill -f "node.*calculator-participant" 2>/dev/null || true
       else
         echo -e "${RED}❌ $test_name FAILED${NC}"
-        echo "Status: FAILED (exit code: $EXIT_CODE)" >> "../../$TEST_RESULTS_LOG"
+        echo "Status: FAILED (exit code: $EXIT_CODE)" >> "$TEST_RESULTS_LOG"
       fi
       echo "   See $test_dir/logs/test-output.log for details"
-      ((TOTAL_FAIL++))
+
+      # In verbose mode, also show the last 20 lines of the log
+      if [ "$VERBOSE" = true ] && [ -f "$test_dir/logs/test-output.log" ]; then
+        echo -e "${YELLOW}--- Last 20 lines of test output ---${NC}"
+        tail -20 "$test_dir/logs/test-output.log"
+        echo -e "${YELLOW}--- End of test output ---${NC}"
+      fi
+
+      TOTAL_FAIL=$((TOTAL_FAIL + 1))
       FAILED_TESTS="$FAILED_TESTS\n  - $test_name"
     fi
     
@@ -94,7 +134,7 @@ run_test() {
   else
     echo -e "${RED}❌ $test_name directory or script not found${NC}"
     echo "Status: NOT FOUND" >> "$TEST_RESULTS_LOG"
-    ((TOTAL_FAIL++))
+    TOTAL_FAIL=$((TOTAL_FAIL + 1))
     FAILED_TESTS="$FAILED_TESTS\n  - $test_name (not found)"
   fi
   
@@ -122,22 +162,22 @@ sleep 2
 echo -e "${BLUE}Running Test Scenarios...${NC}"
 echo ""
 
-run_test "Scenario 1: Basic Message Flow" "./scenario-1-basic"
-run_test "Scenario 2: MCP Tool Execution" "./scenario-2-mcp"
-run_test "Scenario 3: Proposals with Capability Blocking" "./scenario-3-proposals"
-run_test "Scenario 4: Dynamic Capability Granting" "./scenario-4-capabilities"
-run_test "Scenario 5: Reasoning with Context Field" "./scenario-5-reasoning"
-run_test "Scenario 6: Error Recovery and Edge Cases" "./scenario-6-errors"
-run_test "Scenario 7: MCP Bridge Integration" "./scenario-7-mcp-bridge"
-run_test "Scenario 11: Chat & Reasoning Controls" "./scenario-11-chat-controls"
-run_test "Scenario 12: Stream Lifecycle Controls" "./scenario-12-stream-controls"
-run_test "Scenario 13: Participant Lifecycle Controls" "./scenario-13-participant-controls"
+run_test "Scenario 1: Basic Message Flow" "$SCRIPT_DIR/scenario-1-basic"
+run_test "Scenario 2: MCP Tool Execution" "$SCRIPT_DIR/scenario-2-mcp"
+run_test "Scenario 3: Proposals with Capability Blocking" "$SCRIPT_DIR/scenario-3-proposals"
+run_test "Scenario 4: Dynamic Capability Granting" "$SCRIPT_DIR/scenario-4-capabilities"
+run_test "Scenario 5: Reasoning with Context Field" "$SCRIPT_DIR/scenario-5-reasoning"
+run_test "Scenario 6: Error Recovery and Edge Cases" "$SCRIPT_DIR/scenario-6-errors"
+run_test "Scenario 7: MCP Bridge Integration" "$SCRIPT_DIR/scenario-7-mcp-bridge"
+run_test "Scenario 11: Chat & Reasoning Controls" "$SCRIPT_DIR/scenario-11-chat-controls"
+run_test "Scenario 12: Stream Lifecycle Controls" "$SCRIPT_DIR/scenario-12-stream-controls"
+run_test "Scenario 13: Participant Lifecycle Controls" "$SCRIPT_DIR/scenario-13-participant-controls"
 
 # LLM-dependent scenarios (require OPENAI_API_KEY)
 if [ "$NO_LLM" = false ]; then
-  run_test "Scenario 8: TypeScript Agent" "./scenario-8-typescript-agent"
-  run_test "Scenario 9: TypeScript Proposals" "./scenario-9-typescript-proposals"
-  run_test "Scenario 10: Multi-Agent" "./scenario-10-multi-agent"
+  run_test "Scenario 8: TypeScript Agent" "$SCRIPT_DIR/scenario-8-typescript-agent"
+  run_test "Scenario 9: TypeScript Proposals" "$SCRIPT_DIR/scenario-9-typescript-proposals"
+  run_test "Scenario 10: Multi-Agent" "$SCRIPT_DIR/scenario-10-multi-agent"
 else
   echo -e "${YELLOW}Skipping Scenario 8 (TypeScript Agent) - requires OPENAI_API_KEY${NC}"
   echo -e "${YELLOW}Skipping Scenario 9 (TypeScript Proposals) - requires OPENAI_API_KEY${NC}"

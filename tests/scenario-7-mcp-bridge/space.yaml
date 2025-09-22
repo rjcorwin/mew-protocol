@@ -8,15 +8,14 @@ participants:
   filesystem:
     type: mcp-bridge
     mcp_server:
-      command: "node"
+      command: "npx"
       args:
-        - "../agents/mcp-filesystem-server.js"
+        - "-y"
+        - "@modelcontextprotocol/server-filesystem"
         - "/tmp/mcp-test-files"
     auto_start: true
     tokens: ["fs-token"]
     capabilities:
-      - kind: "system/register"
-      - kind: "system/heartbeat"
       - kind: "mcp/response"
       - kind: "chat"
     bridge_config:
