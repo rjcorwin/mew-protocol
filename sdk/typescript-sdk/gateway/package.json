@@ -13,8 +13,8 @@
     }
   },
   "scripts": {
-    "build": "node ../../../scripts/build-ts-package.mjs",
-    "dev": "tsc --watch --project tsconfig.json",
+    "build": "tsc",
+    "dev": "tsc --watch",
     "start": "node dist/index.js",
     "start:dev": "tsx src/server.ts",
     "test": "vitest",

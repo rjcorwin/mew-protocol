@@ -403,6 +403,28 @@ For CI/CD, cache these directories:
 ### Issue: Build order is wrong
 **Solution**: Check that `references` in tsconfig.json files match actual dependencies.
 
+## Recommended VS Code Settings
+
+For optimal development experience, create `.vscode/settings.json`:
+
+```json
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  }
+}
+```
+
+Recommended extensions:
+- `dbaeumer.vscode-eslint` - ESLint integration
+- `esbenp.prettier-vscode` - Prettier formatting
+- `ms-vscode.vscode-typescript-next` - Latest TypeScript features
+
 ## Future Improvements
 
 1. **Nx or Turborepo Integration**: For better caching and task orchestration
