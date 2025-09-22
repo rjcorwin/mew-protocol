@@ -1,34 +1,16 @@
 {
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020"],
+    "composite": true,
     "outDir": "./dist",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "allowJs": true,
-    "baseUrl": "./",
-    "paths": {
-      "@mew-protocol/client": ["../client/dist"],
-      "@mew-protocol/client/*": ["../client/dist/*"],
-      "@mew-protocol/participant": ["../participant/dist"],
-      "@mew-protocol/participant/*": ["../participant/dist/*"],
-      "@mew-protocol/types": ["../types/dist"],
-      "@mew-protocol/types/*": ["../types/dist/*"]
-    }
+    "rootDir": "./src",
+    "allowJs": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"],
+  "references": [
+    { "path": "../types" },
+    { "path": "../client" },
+    { "path": "../participant" }
   ]
 }

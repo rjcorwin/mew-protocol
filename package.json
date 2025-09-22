@@ -11,16 +11,17 @@
     "sdk/typescript-sdk/capability-matcher",
     "sdk/typescript-sdk/gateway",
     "bridge",
-    "cli",
-    "tests/*/.mew",
-    "spaces/*/.mew"
+    "cli"
   ],
   "scripts": {
     "test": "./tests/run-all-tests.sh --no-llm",
     "test:all": "./tests/run-all-tests.sh",
     "test:llm": "./tests/run-all-tests.sh",
-    "build": "npm run build:sdk",
-    "build:sdk": "npm run build:types && npm run build:matcher && npm run build:client && npm run build:participant && npm run build:agent && npm run build:gateway && npm run build:bridge",
+    "build": "tsc -b",
+    "build:force": "tsc -b --force",
+    "build:watch": "tsc -b --watch",
+    "clean": "tsc -b --clean",
+    "build:legacy": "npm run build:types && npm run build:matcher && npm run build:client && npm run build:participant && npm run build:agent && npm run build:gateway && npm run build:bridge",
     "build:types": "npm run build --workspace=@mew-protocol/types",
     "build:matcher": "npm run build --workspace=@mew-protocol/capability-matcher",
     "build:client": "npm run build --workspace=@mew-protocol/client",
@@ -28,7 +29,8 @@
     "build:agent": "npm run build --workspace=@mew-protocol/agent",
     "build:gateway": "npm run build --workspace=@mew-protocol/gateway",
     "build:bridge": "npm run build --workspace=@mew-protocol/bridge",
-    "lint": "echo 'Lint individual packages in their directories'"
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "npm run format --workspaces --if-present"
   },
   "keywords": [
     "mew",
