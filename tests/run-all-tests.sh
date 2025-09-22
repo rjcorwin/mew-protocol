@@ -129,6 +129,9 @@ run_test "Scenario 4: Dynamic Capability Granting" "./scenario-4-capabilities"
 run_test "Scenario 5: Reasoning with Context Field" "./scenario-5-reasoning"
 run_test "Scenario 6: Error Recovery and Edge Cases" "./scenario-6-errors"
 run_test "Scenario 7: MCP Bridge Integration" "./scenario-7-mcp-bridge"
+run_test "Scenario 11: Chat & Reasoning Controls" "./scenario-11-chat-controls"
+run_test "Scenario 12: Stream Lifecycle Controls" "./scenario-12-stream-controls"
+run_test "Scenario 13: Participant Lifecycle Controls" "./scenario-13-participant-controls"
 
 # LLM-dependent scenarios (require OPENAI_API_KEY)
 if [ "$NO_LLM" = false ]; then

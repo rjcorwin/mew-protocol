@@ -1,0 +1,37 @@
+space:
+  id: chat-control-space
+  name: "Scenario 11 - Chat & Reasoning Controls"
+  description: "Validate chat acknowledgements and reasoning cancellation envelopes"
+
+participants:
+  control-agent:
+    tokens: ["control-token"]
+    capabilities:
+      - kind: chat
+      - kind: chat/acknowledge
+      - kind: chat/cancel
+      - kind: reasoning/*
+      - kind: participant/status
+      - kind: system/*
+    auto_start: true
+    command: "node"
+    args:
+      - "../agents/control-agent.js"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "chat-control-space"
+      - "--token"
+      - "control-token"
+      - "--log"
+      - "./logs/control-agent.log"
+
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: chat
+      - kind: reasoning/*
+      - kind: participant/*
+      - kind: system/*
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true

@@ -134,6 +134,14 @@ class MEWClient extends EventEmitter {
 - `error`: Error occurred
 - `reconnecting`: Attempting to reconnect
 
+### Stream Support
+
+- Raw WebSocket frames prefixed with `#streamId#` are detected automatically
+- The client emits `stream/data` and `stream/data/<streamId>` events carrying `{ streamId, payload }`
+- `sendStreamData(streamId, payload)` writes framed chunks back to the gateway
+- Envelope-based stream negotiations (`stream/request`, `stream/open`, `stream/close`) continue to flow through the standard
+  `message` event pipeline
+
 ### Participant Join Flow and Tool Discovery
 
 When a participant joins a space, the following sequence occurs:
@@ -203,6 +211,10 @@ Provides protocol-aware participant functionality with MCP support, tool/resourc
 - **Smart Routing**: Route requests via direct send or proposals
 - **Request Tracking**: Track pending requests with timeouts
 - **Tool Invocation**: Send tools/call requests to other participants (if has capability)
+- **Chat Control**: Track pending acknowledgements and emit chat/acknowledge or chat/cancel
+- **Participant Controls**: Enforce pause/resume/forget/clear/restart/shutdown envelopes with local state
+- **Telemetry Reporting**: Maintain context usage counters and send participant/status updates
+- **Stream Negotiation**: Request, accept, and monitor stream sessions alongside raw frame routing
 
 ### Interface
 
@@ -424,16 +436,50 @@ class HumanInterface extends MEWParticipant {
   async onReady() {
     // Enable automatic discovery
     this.enableAutoDiscovery();
-    
+
     // Or manually discover
     await this.discoverTools('calculator-service');
-    
+
     // Get all available tools
     const tools = this.getAvailableTools();
     this.ui.showTools(tools);
   }
 }
 ```
+
+#### Chat Acknowledgement Helpers
+
+- `acknowledgeChat(messageId, target, status?)` wraps `chat/acknowledge` envelopes for UIs that track pending chat work
+- `cancelChat(messageId, target?, reason?)` emits `chat/cancel` to clear stale tasks (used by the CLI `/cancel` command)
+- Incoming `chat` messages automatically update context usage counters so telemetry stays accurate
+
+#### Participant Control Lifecycle
+
+- Pause envelopes update internal `pauseState`; non-exempt outbound traffic throws until resumed or timeout expires
+- Resume clears the pause and automatically publishes a `participant/status` update noting the transition
+- Forget, clear, restart, and shutdown envelopes call overridable hooks (`onForget`, `onClear`, `onRestart`, `onShutdown`)
+  so subclasses can drop scratchpads or reload models before the SDK reports completion
+- `requestParticipantStatus(target, fields?)` sends `participant/request-status`, while `reportStatus()` broadcasts current
+  telemetry (tokens, max tokens, `messages_in_context`, optional status string)
+
+#### Context Usage & Status Telemetry
+
+- `recordContextUsage({ tokens, messages })` updates running totals used for status reports and threshold monitoring
+- `buildStatusPayload(status?)` centralizes construction of compliant telemetry payloads (always including
+  `messages_in_context`)
+- When usage crosses the configured soft limit (90% by default) the SDK emits proactive `participant/status` messages so
+  orchestrators can intervene before truncation occurs
+- Autonomous compaction (triggered by forget/clear hooks) updates counters and publishes follow-up telemetry indicating how
+  much headroom was reclaimed
+
+#### Stream Lifecycle Helpers
+
+- `requestStream(payload, target?)` sends `stream/request` and tracks pending negotiations until `stream/open` arrives
+- Active streams are recorded with metadata (description, open envelope ID, last activity) to aid CLI visualizations
+- The participant listens for `stream/open`/`stream/close` to keep bookkeeping accurate and leverages the client’s
+  `sendStreamData`/`onStreamData` APIs for raw frame transfer
+- Reasoning workflows can call `requestStream` when emitting `reasoning/start` so observers can subscribe to high-volume
+  traces without polluting the envelope log
 
 ## Layer 3: MEWAgent
 
@@ -535,6 +581,27 @@ The `participant/tool` notation:
 - Easy to parse: `const [participantId, toolName] = toolCall.split('/')`
 
 **Important Restriction**: Participant IDs MUST NOT contain underscores (`_`) as the SDK converts slashes to underscores for OpenAI API compatibility. Use hyphens (`-`) instead (e.g., `weather-service`, not `weather_service`).
+
+#### Streaming Reasoning Transparency
+
+- When `reasoning/start` is emitted the agent automatically requests an upload stream (if permitted) so observers can subscribe
+  to high-volume traces without polluting the envelope log
+- `reasoning/thought` payloads are mirrored into the active stream when one is open
+- `stream/open`/`stream/close` messages update local bookkeeping so downstream UIs (CLI) know which stream IDs to display
+
+#### Reasoning Cancellation Awareness
+
+- Incoming `reasoning/cancel` envelopes matching the current context flip `reasoningCancelled` so additional thoughts stop
+- Stream channels are closed when cancellation arrives, ensuring consumers do not receive stale data
+- `/reason-cancel` commands from the CLI feed through `MEWParticipant.reasoning/cancel`, keeping SDK and UI semantics aligned
+
+#### Automatic Context Compaction
+
+- `ensureContextHeadroom()` monitors soft token limits and trims conversation history to maintain a 30% buffer before hard
+  limits are reached
+- Forget and clear directives reuse the participant-level hooks but also purge agent-specific caches like
+  `conversationHistory` and active reasoning IDs
+- Every compaction publishes `participant/status` updates so orchestrators understand why history changed
 
 #### ReAct Loop
 

@@ -1,7 +1,19 @@
 import micromatch from 'micromatch';
 import { JSONPath } from 'jsonpath-plus';
-import { isEqual, isPlainObject, isArray, isString, isRegExp } from 'lodash';
-import { CapabilityPattern, Message, PayloadPattern } from './types';
+import { CapabilityPattern, Message, PayloadPattern, PayloadValue } from './types';
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+const isRegExp = (value: unknown): value is RegExp => value instanceof RegExp;
 
 export class PatternMatcher {
   private cache = new Map<string, boolean>();
@@ -9,7 +21,7 @@ export class PatternMatcher {
   /**
    * Check if a value matches a pattern
    */
-  private matchesValue(pattern: any, value: any): boolean {
+  private matchesValue(pattern: PayloadValue | unknown, value: unknown): boolean {
     // Exact match
     if (pattern === value) {
       return true;
@@ -20,9 +32,13 @@ export class PatternMatcher {
       return pattern === value;
     }
 
+    if (isRegExp(pattern) && isString(value)) {
+      return pattern.test(value);
+    }
+
     // Array of options (OR)
-    if (isArray(pattern)) {
-      return pattern.some(p => this.matchesValue(p, value));
+    if (Array.isArray(pattern)) {
+      return pattern.some(candidate => this.matchesValue(candidate, value));
     }
 
     // String patterns
@@ -48,7 +64,10 @@ export class PatternMatcher {
 
     // Object patterns (recursive)
     if (isPlainObject(pattern) && isPlainObject(value)) {
-      return this.matchesPayload(pattern, value);
+      return this.matchesPayload(
+        pattern as PayloadPattern,
+        value as Record<string, unknown>
+      );
     }
 
     return false;
@@ -57,7 +76,7 @@ export class PatternMatcher {
   /**
    * Check if a payload matches a pattern
    */
-  private matchesPayload(pattern: PayloadPattern, payload: any): boolean {
+  private matchesPayload(pattern: PayloadPattern, payload: Record<string, unknown>): boolean {
     // If pattern is empty, it matches any payload
     if (Object.keys(pattern).length === 0) {
       return true;
@@ -72,7 +91,7 @@ export class PatternMatcher {
           return false;
         }
         // Check if any result matches the pattern
-        if (!results.some((result: any) => this.matchesValue(patternValue, result))) {
+        if (!results.some((result: unknown) => this.matchesValue(patternValue, result))) {
           return false;
         }
         continue;
@@ -110,11 +129,7 @@ export class PatternMatcher {
   /**
    * Find keys in object that match a pattern
    */
-  private findMatchingKeys(pattern: string, obj: any): string[] {
-    if (!isPlainObject(obj)) {
-      return [];
-    }
-
+  private findMatchingKeys(pattern: string, obj: Record<string, unknown>): string[] {
     const keys = Object.keys(obj);
     
     // Exact match
@@ -129,19 +144,19 @@ export class PatternMatcher {
   /**
    * Find if pattern exists deep in object
    */
-  private findDeepMatch(pattern: any, obj: any): boolean {
+  private findDeepMatch(pattern: PayloadValue | unknown, obj: unknown): boolean {
     if (this.matchesValue(pattern, obj)) {
       return true;
     }
 
     if (isPlainObject(obj)) {
-      return Object.values(obj).some(value => 
+      return Object.values(obj as Record<string, unknown>).some(value =>
         this.findDeepMatch(pattern, value)
       );
     }
 
-    if (isArray(obj)) {
-      return obj.some(item => this.findDeepMatch(pattern, item));
+    if (Array.isArray(obj)) {
+      return (obj as unknown[]).some(item => this.findDeepMatch(pattern, item));
     }
 
     return false;
@@ -173,7 +188,10 @@ export class PatternMatcher {
     }
 
     // Check payload pattern match
-    const payloadMatches = this.matchesPayload(capability.payload, message.payload || {});
+    const payloadSource: Record<string, unknown> = isPlainObject(message.payload)
+      ? (message.payload as Record<string, unknown>)
+      : {};
+    const payloadMatches = this.matchesPayload(capability.payload, payloadSource);
     
     this.cache.set(cacheKey, payloadMatches);
     return payloadMatches;

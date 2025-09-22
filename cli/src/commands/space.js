@@ -580,6 +580,10 @@ async function spaceUpAction(options) {
           }
         }
 
+        if (participant.capabilities && participant.capabilities.length > 0) {
+          bridgeArgs.push('--capabilities', JSON.stringify(participant.capabilities));
+        }
+
         try {
           // Find the bridge executable
           const bridgePath = path.resolve(

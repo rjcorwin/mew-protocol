@@ -29,21 +29,23 @@ check_test() {
   
   if eval "$condition"; then
     echo -e "$test_name: ${GREEN}✓${NC}"
-    ((TESTS_PASSED++))
+    ((TESTS_PASSED++)) || true
   else
     echo -e "$test_name: ${RED}✗${NC}"
-    ((TESTS_FAILED++))
+    ((TESTS_FAILED++)) || true
   fi
+
+  return 0
 }
 
 # Basic connectivity tests
 echo "Testing: Gateway is running ... \c"
 if nc -z localhost ${TEST_PORT} 2>/dev/null; then
   echo -e "${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  ((TESTS_PASSED++)) || true
 else
   echo -e "${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  ((TESTS_FAILED++)) || true
 fi
 
 echo "Testing: Output log exists ... \c"
@@ -120,53 +122,53 @@ echo -e "\n${YELLOW}Verifying reasoning flow results:${NC}"
 # Check that context field was preserved
 if grep -q '"context":"'$REASON_ID'"' /tmp/reasoning-response.txt; then
   echo -e "Context field preserved: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  ((TESTS_PASSED++)) || true
 else
   echo -e "Context field preserved: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  ((TESTS_FAILED++)) || true
 fi
 
 # Check reasoning messages
 if grep -q '"kind":"reasoning/start"' /tmp/reasoning-response.txt; then
   echo -e "Reasoning start message: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  ((TESTS_PASSED++)) || true
 else
   echo -e "Reasoning start message: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  ((TESTS_FAILED++)) || true
 fi
 
 if grep -q '"kind":"reasoning/thought"' /tmp/reasoning-response.txt; then
   echo -e "Reasoning thought messages: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  ((TESTS_PASSED++)) || true
 else
   echo -e "Reasoning thought messages: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  ((TESTS_FAILED++)) || true
 fi
 
 if grep -q '"kind":"reasoning/conclusion"' /tmp/reasoning-response.txt; then
   echo -e "Reasoning conclusion message: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  ((TESTS_PASSED++)) || true
 else
   echo -e "Reasoning conclusion message: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  ((TESTS_FAILED++)) || true
 fi
 
 # Check MCP responses (context is preserved in requests, not responses)
 if grep -q '"kind":"mcp/response"' /tmp/reasoning-response.txt && grep -q '"context":"'$REASON_ID'"' /tmp/reasoning-response.txt; then
   echo -e "MCP responses and context preserved: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  ((TESTS_PASSED++)) || true
 else
   echo -e "MCP responses and context preserved: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  ((TESTS_FAILED++)) || true
 fi
 
 # Check final calculation result
 if grep -q '64.80' /tmp/reasoning-response.txt || grep -q '64.8' /tmp/reasoning-response.txt; then
   echo -e "Correct calculation result: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+  ((TESTS_PASSED++)) || true
 else
   echo -e "Correct calculation result: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  ((TESTS_FAILED++)) || true
 fi
 
 # Summary

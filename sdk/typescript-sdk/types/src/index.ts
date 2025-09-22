@@ -34,10 +34,30 @@ export type {
   MewProposalRejectPayload,
   MewCapabilityGrantPayload,
   MewCapabilityRevokePayload,
-  
+
   // Chat
   ChatPayload,
-  
+  ChatAcknowledgePayload,
+  ChatCancelPayload,
+
+  // Participant control
+  ParticipantPausePayload,
+  ParticipantResumePayload,
+  ParticipantRequestStatusPayload,
+  ParticipantStatusPayload,
+  ParticipantForgetPayload,
+  ParticipantClearPayload,
+  ParticipantRestartPayload,
+  ParticipantShutdownPayload,
+
+  // Streams
+  StreamRequestPayload,
+  StreamOpenPayload,
+  StreamClosePayload,
+
+  // Reasoning
+  ReasoningCancelPayload,
+
 } from './protocol';
 
 // Re-export MCP types for convenience

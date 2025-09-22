@@ -222,13 +222,17 @@ export class SpaceManager {
     this.sendToClient(client, envelope);
   }
 
+  broadcastPresenceUpdate(space: Space, client: ConnectedClient): void {
+    this.broadcastPresence(space, client, 'update');
+  }
+
   /**
    * Broadcast presence event
    */
   private broadcastPresence(
-    space: Space, 
-    client: ConnectedClient, 
-    event: 'join' | 'leave'
+    space: Space,
+    client: ConnectedClient,
+    event: 'join' | 'leave' | 'update'
   ): void {
     const presencePayload: PresencePayload = {
       event,

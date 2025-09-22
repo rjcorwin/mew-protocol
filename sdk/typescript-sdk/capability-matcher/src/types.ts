@@ -3,7 +3,7 @@
 
 export interface Message {
   kind: string;
-  payload?: any;
+  payload?: unknown;
   // Additional MEUP v0.2 fields can be added as needed
   from?: string;
   to?: string | string[];
@@ -14,8 +14,16 @@ export interface CapabilityPattern {
   payload?: PayloadPattern;
 }
 
+export type PayloadPrimitive = string | number | boolean | null;
+
+export type PayloadValue =
+  | PayloadPrimitive
+  | RegExp
+  | PayloadPattern
+  | PayloadValue[];
+
 export interface PayloadPattern {
-  [key: string]: any;
+  [key: string]: PayloadValue;
 }
 
 export interface Participant {

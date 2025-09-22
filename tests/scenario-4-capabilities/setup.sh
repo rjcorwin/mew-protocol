@@ -37,6 +37,7 @@ echo "Starting space on port $TEST_PORT..."
 
 # Ensure logs directory exists
 mkdir -p ./logs
+touch ./logs/coordinator-output.log ./logs/limited-agent-output.log
 
 # Start the space using mew space up
 ../../cli/bin/mew.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1
