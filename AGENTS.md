@@ -2,7 +2,7 @@
 
 ## Critical Docs (READ FIRST)
 - **spec/v0.3/SPEC.md** - Current protocol specification
-- **spec/draft/SPEC.md** - Upcoming changes
+- **spec/draft/SPEC.md** - Upcoming changes that are currently being implemented
 
 ## Repository Structure
 ```
