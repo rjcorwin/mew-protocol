@@ -16,6 +16,7 @@ program
   .option('--cwd <dir>', 'Working directory for participant command')
   .option('--env <pairs...>', 'Environment variable overrides for participant command (KEY=VALUE)')
   .option('--log-file <path>', 'Write adapter logs to the specified file')
+  .allowUnknownOption(true)
   .parse(process.argv);
 
 const options = program.opts();
@@ -29,6 +30,9 @@ function log(...args) {
     console.log(line);
   }
 }
+
+log('Adapter parsed args', JSON.stringify(options.args || []));
+log('Adapter parsed token', options.token);
 
 function logError(...args) {
   const line = `[adapter:${options.participantId}] ${args.join(' ')}`;
@@ -85,6 +89,7 @@ function sendJoin() {
       token: options.token,
     },
   };
+  log('Join envelope token', options.token);
   sendToGateway(joinEnvelope);
   joined = true;
   log('Sent join handshake to gateway');
@@ -104,8 +109,9 @@ if (options.command) {
     spawnOptions.cwd = path.resolve(options.cwd);
   }
 
-  log(`Spawning participant process: ${options.command} ${(options.args || []).join(' ')}`);
-  participantProcess = spawn(options.command, options.args || [], spawnOptions);
+  const childArgs = options.args && options.args[0] === '--' ? options.args.slice(1) : options.args || [];
+  log(`Spawning participant process: ${options.command} ${(childArgs || []).join(' ')}`);
+  participantProcess = spawn(options.command, childArgs, spawnOptions);
   participantIn = participantProcess.stdin;
   participantOut = participantProcess.stdout;
   participantErr = participantProcess.stderr;

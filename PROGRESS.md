@@ -3,7 +3,7 @@
 _Last updated: 2025-09-19_
 
 ## Current Status
-The CLI, gateway, and regression suite now run entirely over the new STDIO transport. All scenarios (1–12) succeed under `tests/run-all-tests.sh`, the `mew` command boots a fresh space using `.mew/space.yaml` without PM2 or WebSockets, `mew space connect` launches an Ink-based interactive terminal (with `/simple` fallback), and spaces can optionally expose a WebSocket listener for remote participants via `space.transport` overrides.
+The CLI, gateway, and regression suite now run entirely over the new STDIO transport. All scenarios (1–12) succeed under `tests/run-all-tests.sh`, the `mew` command boots a fresh space using `.mew/space.yaml` without PM2 or WebSockets, `mew space connect` launches an Ink-based interactive terminal (with `/simple` fallback), spaces can optionally expose a WebSocket listener for remote participants via `space.transport` overrides, and the TypeScript SDK/agent now speak STDIO by default while retaining optional WebSocket support.
 
 ## Recent Highlights
 - **STDIO Gateway & CLI lifecycle**: Gateway core + FIFO transport landed, with adapters spawned by `mew space up`. State is persisted via `.mew/run/state.json`.
@@ -11,6 +11,7 @@ The CLI, gateway, and regression suite now run entirely over the new STDIO trans
 - **`mew` UX fixes**: `mew` auto-starts a stopped space, warns if already running, and now launches the interactive session automatically (or via `mew space connect`). Template package names are templated correctly, avoiding npm errors.
 - **Interactive CLI**: Human participants attach with `mew space connect`, defaulting to the Ink experience (history, proposals, commands) with a `/simple` readline fallback for debugging.
 - **Hybrid transports**: `space.yaml` now supports per-participant `transport` selection, spinning up STDIO adapters locally while offering optional WebSocket endpoints for remote processes with the same token model.
+- **SDK parity**: `@mew-protocol/client` exposes pluggable STDIO/WebSocket transports; `@mew-protocol/agent` defaults to STDIO so template agents run under the new adapter out of the box.
 
 ## Remaining Focus Areas
 1. **Interactive UX polish** – refine the Ink interface (history search, transcript export, richer capability dialogs) and keep `/simple` parity.

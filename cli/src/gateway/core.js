@@ -178,7 +178,14 @@ class GatewayCore extends EventEmitter {
       payload: {
         space: this.spaceId,
         participant: participantId,
-        participants: Array.from(this.connections.keys()),
+        you: {
+          id: participantId,
+          capabilities: connectionState.capabilities,
+        },
+        participants: Array.from(this.connections.keys()).map((id) => ({
+          id,
+          capabilities: this.connections.get(id)?.capabilities || this.participantConfigs.get(id)?.capabilities || [],
+        })),
       },
     });
 

@@ -9,7 +9,8 @@ import * as yaml from 'js-yaml';
 function parseArgs(): { options: any; configFile?: string } {
   const args = process.argv.slice(2);
   const options: any = {
-    gateway: process.env.MEW_GATEWAY || 'ws://localhost:8080',
+    transport: (process.env.MEW_TRANSPORT as string) || 'stdio',
+    gateway: process.env.MEW_GATEWAY,
     space: process.env.MEW_SPACE || 'playground',
     token: process.env.MEW_TOKEN || 'agent-token',
     participantId: process.env.MEW_PARTICIPANT_ID || 'typescript-agent',
@@ -25,6 +26,10 @@ function parseArgs(): { options: any; configFile?: string } {
       case '--gateway':
       case '-g':
         options.gateway = args[++i];
+        options.transport = 'websocket';
+        break;
+      case '--transport':
+        options.transport = args[++i];
         break;
       case '--space':
       case '-s':
@@ -75,7 +80,8 @@ MEW TypeScript Agent Example
 Usage: mew-agent [options]
 
 Options:
-  -g, --gateway <url>     Gateway WebSocket URL (default: ws://localhost:8080)
+  -g, --gateway <url>     Gateway WebSocket URL (implies --transport websocket)
+      --transport <mode>  Transport to use: stdio | websocket (default: stdio)
   -s, --space <name>      Space name to join (default: playground)
   -t, --token <token>     Authentication token (default: agent-token)
   -i, --id <id>          Participant ID (default: typescript-agent)
@@ -88,6 +94,7 @@ Options:
 
 Environment Variables:
   MEW_GATEWAY           Gateway URL
+  MEW_TRANSPORT         stdio | websocket
   MEW_SPACE            Space name
   MEW_TOKEN            Authentication token
   MEW_PARTICIPANT_ID   Participant ID
@@ -97,7 +104,8 @@ Environment Variables:
   MEW_AGENT_CONFIG     JSON configuration (overrides file config)
 
 Example:
-  mew-agent --gateway ws://localhost:8080 --space dev --id my-agent
+  mew-agent --space dev --id my-agent               # STDIO via parent process
+  mew-agent --gateway ws://localhost:8080 --transport websocket
   mew-agent --config agent-config.yaml
   mew-agent --model gpt-3.5-turbo --api-key sk-...
   mew-agent --openai-url http://localhost:11434/v1 --model llama2  # For Ollama
@@ -128,7 +136,16 @@ async function main(): Promise<void> {
   const { options, configFile } = parseArgs();
 
   // Build agent configuration
+  const transport = (options.transport as string | undefined)?.toLowerCase() === 'websocket'
+    ? 'websocket'
+    : 'stdio';
+
+  if (transport === 'websocket' && !options.gateway) {
+    options.gateway = 'ws://localhost:8080';
+  }
+
   let agentConfig: AgentConfig = {
+    transport,
     gateway: options.gateway,
     space: options.space,
     token: options.token,
@@ -165,7 +182,11 @@ async function main(): Promise<void> {
 
   // Create the agent
   console.log(`Starting MEW TypeScript Agent: ${agentConfig.participant_id}`);
-  console.log(`Connecting to ${agentConfig.gateway} (space: ${agentConfig.space})`);
+  if (agentConfig.transport === 'websocket') {
+    console.log(`Connecting via WebSocket ${agentConfig.gateway} (space: ${agentConfig.space})`);
+  } else {
+    console.log(`Connecting via STDIO (space: ${agentConfig.space})`);
+  }
 
   const agent = new MEWAgent(agentConfig);
 

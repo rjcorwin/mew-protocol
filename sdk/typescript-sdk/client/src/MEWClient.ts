@@ -1,31 +1,38 @@
-import { EventEmitter } from 'events';
-import WebSocket from 'ws';
+import { EventEmitter } from 'node:events';
 import { Envelope, Capability } from '@mew-protocol/types';
+import { Transport } from './transports/Transport';
+import { StdioTransport } from './transports/StdioTransport';
+import { WebSocketTransport } from './transports/WebSocketTransport';
 
 const PROTOCOL_VERSION = 'mew/v0.3';
 
+type ClientState = 'disconnected' | 'connecting' | 'connected' | 'joined' | 'ready';
+export type TransportKind = 'stdio' | 'websocket';
+
 export interface ClientOptions {
-  gateway: string;          // WebSocket URL
-  space: string;           // Space to join
-  token: string;           // Authentication token
-  participant_id?: string;  // Unique identifier
-  reconnect?: boolean;     // Auto-reconnect on disconnect
+  space: string;
+  token: string;
+  participant_id?: string;
+  reconnect?: boolean;
   heartbeatInterval?: number;
   maxReconnectAttempts?: number;
   reconnectDelay?: number;
-  capabilities?: Capability[];  // Initial capabilities
+  capabilities?: Capability[];
+  transport?: TransportKind;
+  gateway?: string; // Back-compat alias for websocketUrl
+  websocketUrl?: string;
+  forceJoin?: boolean;
 }
-
-type ClientState = 'disconnected' | 'connecting' | 'connected' | 'joined' | 'ready';
 
 export class MEWClient extends EventEmitter {
   protected options: ClientOptions;
-  protected ws?: WebSocket;
   protected state: ClientState = 'disconnected';
   protected reconnectAttempts = 0;
   protected heartbeatTimer?: NodeJS.Timeout;
   protected reconnectTimer?: NodeJS.Timeout;
   protected messageCounter = 0;
+  protected transport: Transport;
+  private readonly shouldSendJoin: boolean;
 
   constructor(options: ClientOptions) {
     super();
@@ -34,108 +41,81 @@ export class MEWClient extends EventEmitter {
       heartbeatInterval: 30000,
       maxReconnectAttempts: 5,
       reconnectDelay: 1000,
-      ...options
+      ...options,
     };
-    
-    // Generate participant_id if not provided
+
     if (!this.options.participant_id) {
-      this.options.participant_id = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      this.options.participant_id = `client-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    }
+
+    const transportKind = this.resolveTransportKind();
+    if (transportKind === 'websocket') {
+      const url = this.options.gateway ?? this.options.websocketUrl;
+      if (!url) {
+        throw new Error('WebSocket transport selected but no gateway URL provided');
+      }
+      this.transport = new WebSocketTransport({ url });
+    } else {
+      this.transport = new StdioTransport();
+    }
+
+    this.shouldSendJoin = this.options.forceJoin ?? this.transport.kind !== 'stdio';
+  }
+
+  protected resolveTransportKind(): TransportKind {
+    if (this.options.transport) return this.options.transport;
+    if (this.options.gateway || this.options.websocketUrl) return 'websocket';
+    return 'stdio';
+  }
+
+  async connect(): Promise<void> {
+    if (this.state !== 'disconnected') return;
+    this.state = 'connecting';
+
+    this.transport.onMessage((envelope) => this.handleMessage(envelope));
+    this.transport.onError((error) => this.emit('error', error));
+    this.transport.onClose(() => this.handleDisconnect());
+
+    try {
+      await this.transport.start();
+      this.state = 'connected';
+      this.reconnectAttempts = 0;
+      this.emit('connected');
+
+      await this.sendJoin();
+      if (this.transport.kind === 'websocket') {
+        this.startHeartbeat();
+      }
+    } catch (error) {
+      this.state = 'disconnected';
+      throw error;
     }
   }
 
-  /**
-   * Connect to the gateway
-   */
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.state !== 'disconnected') {
-        return resolve();
-      }
-
-      this.state = 'connecting';
-      
-      try {
-        this.ws = new WebSocket(this.options.gateway);
-        
-        this.ws.on('open', () => {
-          this.state = 'connected';
-          this.reconnectAttempts = 0;
-          this.emit('connected');
-          
-          // Send join message
-          this.sendJoin();
-          
-          // Start heartbeat
-          this.startHeartbeat();
-          
-          resolve();
-        });
-
-        this.ws.on('message', (data: WebSocket.Data) => {
-          try {
-            const message = JSON.parse(data.toString());
-            this.handleMessage(message);
-          } catch (error) {
-            console.error('Failed to parse message:', error);
-          }
-        });
-
-        this.ws.on('close', () => {
-          this.handleDisconnect();
-        });
-
-        this.ws.on('error', (error: Error) => {
-          this.emit('error', error);
-          if (this.state === 'connecting') {
-            reject(error);
-          }
-        });
-      } catch (error) {
-        this.state = 'disconnected';
-        reject(error);
-      }
-    });
-  }
-
-  /**
-   * Disconnect from the gateway
-   */
   disconnect(): void {
     this.stopHeartbeat();
     this.clearReconnectTimer();
     this.state = 'disconnected';
-    
-    if (this.ws) {
-      this.ws.close();
-      this.ws = undefined;
-    }
-    
+    this.transport.close().catch(() => {});
     this.emit('disconnected');
   }
 
-  /**
-   * Send an envelope
-   */
-  send(envelope: Envelope | Partial<Envelope>): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('Not connected to gateway');
+  async send(envelope: Envelope | Partial<Envelope>): Promise<void> {
+    if (this.state === 'disconnected' || this.state === 'connecting') {
+      throw new Error('Client is not connected');
     }
 
-    // Fill in missing fields
     const fullEnvelope: Envelope = {
       protocol: PROTOCOL_VERSION,
       id: `${this.options.participant_id}-${++this.messageCounter}`,
       ts: new Date().toISOString(),
       from: this.options.participant_id!,
-      ...envelope
+      ...envelope,
     } as Envelope;
 
-    this.ws.send(JSON.stringify(fullEnvelope));
+    await this.transport.send(fullEnvelope);
   }
 
-  /**
-   * Event handler helpers for subclasses
-   */
   onConnected(handler: () => void): void {
     this.on('connected', handler);
   }
@@ -148,7 +128,7 @@ export class MEWClient extends EventEmitter {
     this.on('message', handler);
   }
 
-  onWelcome(handler: (data: any) => void): void {
+  onWelcome(handler: (payload: any) => void): void {
     this.on('welcome', handler);
   }
 
@@ -156,92 +136,81 @@ export class MEWClient extends EventEmitter {
     this.on('error', handler);
   }
 
-  /**
-   * Send join message
-   */
-  private sendJoin(): void {
-    if (!this.ws) return;
+  protected async sendJoin(): Promise<void> {
+    if (!this.shouldSendJoin) {
+      this.state = 'joined';
+      return;
+    }
 
-    const joinMessage = {
-      type: 'join',
-      space: this.options.space,
-      token: this.options.token,
-      participantId: this.options.participant_id,
-      capabilities: this.options.capabilities || []
-    };
+    const joinEnvelope: Envelope = {
+      protocol: PROTOCOL_VERSION,
+      id: `join-${Date.now()}`,
+      ts: new Date().toISOString(),
+      from: this.options.participant_id!,
+      kind: 'system/join',
+      payload: {
+        space: this.options.space,
+        participantId: this.options.participant_id,
+        token: this.options.token,
+        capabilities: this.options.capabilities || [],
+      },
+    } as Envelope;
 
-    this.ws.send(JSON.stringify(joinMessage));
+    await this.transport.send(joinEnvelope);
     this.state = 'joined';
   }
 
-  /**
-   * Handle incoming messages
-   */
-  private handleMessage(message: any): void {
-    // Handle system welcome message
+  protected handleMessage(message: Envelope): void {
     if (message.kind === 'system/welcome') {
       this.state = 'ready';
       this.emit('welcome', message.payload);
       return;
     }
 
-    // Handle error messages
-    if (message.type === 'error' || message.kind === 'error') {
-      this.emit('error', new Error(message.message || message.payload?.message || 'Unknown error'));
+    if (message.kind === 'system/error') {
+      const err = new Error((message.payload as any)?.message || 'Unknown error');
+      this.emit('error', err);
       return;
     }
 
-    // Handle envelopes
-    if (message.protocol && message.kind) {
-      this.emit('message', message as Envelope);
-      
-      // Emit specific events for different kinds
-      if (message.kind) {
-        this.emit(message.kind, message);
-      }
+    this.emit('message', message);
+    if (message.kind) {
+      this.emit(message.kind, message);
     }
   }
 
-  /**
-   * Handle disconnection
-   */
-  private handleDisconnect(): void {
+  protected handleDisconnect(): void {
     this.stopHeartbeat();
-    const wasReady = this.state === 'ready';
+    const shouldReconnect =
+      this.options.reconnect &&
+      this.transport.kind === 'websocket' &&
+      this.reconnectAttempts < (this.options.maxReconnectAttempts ?? 5);
+
     this.state = 'disconnected';
-    this.ws = undefined;
-    
     this.emit('disconnected');
 
-    // Attempt reconnection if enabled
-    if (this.options.reconnect && wasReady && 
-        this.reconnectAttempts < this.options.maxReconnectAttempts!) {
+    if (shouldReconnect) {
       this.scheduleReconnect();
     }
   }
 
-  /**
-   * Schedule reconnection attempt
-   */
   private scheduleReconnect(): void {
-    const delay = this.options.reconnectDelay! * Math.pow(2, this.reconnectAttempts);
-    this.reconnectAttempts++;
-    
+    const baseDelay = this.options.reconnectDelay ?? 1000;
+    const delay = baseDelay * Math.pow(2, this.reconnectAttempts);
+    this.reconnectAttempts += 1;
+
     this.emit('reconnecting', { attempt: this.reconnectAttempts, delay });
-    
+
     this.reconnectTimer = setTimeout(() => {
-      this.connect().catch(error => {
-        console.error('Reconnection failed:', error);
-        if (this.reconnectAttempts < this.options.maxReconnectAttempts!) {
+      this.connect().catch((error) => {
+        this.emit('error', error);
+        if (this.reconnectAttempts < (this.options.maxReconnectAttempts ?? 5)) {
           this.scheduleReconnect();
         }
       });
     }, delay);
   }
 
-  /**
-   * Clear reconnection timer
-   */
   private clearReconnectTimer(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -249,40 +218,29 @@ export class MEWClient extends EventEmitter {
     }
   }
 
-  /**
-   * Start heartbeat
-   */
   private startHeartbeat(): void {
     this.stopHeartbeat();
-    
     this.heartbeatTimer = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.ping();
-      }
+      const heartbeat: Envelope = {
+        protocol: PROTOCOL_VERSION,
+        id: `heartbeat-${Date.now()}`,
+        ts: new Date().toISOString(),
+        from: this.options.participant_id!,
+        kind: 'system/heartbeat',
+        space: this.options.space,
+        payload: {},
+      } as Envelope;
+
+      this.transport.send(heartbeat).catch(() => {
+        // ignore heartbeat failures
+      });
     }, this.options.heartbeatInterval);
   }
 
-  /**
-   * Stop heartbeat
-   */
   private stopHeartbeat(): void {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = undefined;
     }
-  }
-
-  /**
-   * Get current state
-   */
-  getState(): ClientState {
-    return this.state;
-  }
-
-  /**
-   * Check if connected and ready
-   */
-  isReady(): boolean {
-    return this.state === 'ready';
   }
 }

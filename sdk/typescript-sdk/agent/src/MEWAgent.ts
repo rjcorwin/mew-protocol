@@ -1,4 +1,5 @@
 import { MEWParticipant, ParticipantOptions, Tool, Resource } from '@mew-protocol/participant';
+import { TransportKind } from '@mew-protocol/client';
 import { Envelope } from '@mew-protocol/types';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
@@ -17,6 +18,7 @@ export interface AgentConfig extends ParticipantOptions {
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
   reasoningFormat?: 'native' | 'scratchpad';  // How to format previous thoughts for LLM (default: 'native')
   conversationHistoryLength?: number;  // Number of previous messages to include in context (default: 0 = only current)
+  transport?: TransportKind;
   
   // Chat response configuration
   chatResponse?: {

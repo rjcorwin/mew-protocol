@@ -5,7 +5,8 @@
  */
 
 // Main MEW client export
-export { MEWClient, ClientOptions } from './MEWClient';
+export { MEWClient, ClientOptions, TransportKind } from './MEWClient';
+export * from './transports';
 
 // Type exports
 export * from './types';

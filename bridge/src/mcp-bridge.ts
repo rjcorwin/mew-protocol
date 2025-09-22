@@ -1,16 +1,18 @@
 import Debug from 'debug';
 import { MEWParticipant } from '@mew-protocol/participant';
+import { TransportKind } from '@mew-protocol/client';
 import { MCPClient, MCPServerConfig } from './mcp-client';
 
 const debug = Debug('mew:bridge');
 
 export interface MCPBridgeOptions {
-  gateway: string;
+  gateway?: string;
   space: string;
   participantId?: string;
   token: string;
   mcpServer: MCPServerConfig;
   initTimeout?: number;
+  transport?: TransportKind;
 }
 
 /**
@@ -28,10 +30,11 @@ export class MCPBridge extends MEWParticipant {
   constructor(options: MCPBridgeOptions) {
     // Initialize parent with connection options
     super({
-      gateway: options.gateway,
       space: options.space,
       participant_id: options.participantId || 'mcp-bridge',
       token: options.token,
+      transport: options.transport,
+      gateway: options.transport === 'websocket' ? options.gateway : undefined,
     });
 
     this.initTimeout = options.initTimeout || 30000;

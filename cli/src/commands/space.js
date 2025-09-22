@@ -675,6 +675,15 @@ async function spaceUpAction(options) {
   const tokens = new Map();
   const participantTransports = new Map();
 
+  const substituteValue = (value, { token, space, port }) => {
+    if (typeof value !== 'string') return value;
+    return value
+      .replace(/\$\{TOKEN\}/g, token || '')
+      .replace(/\$\{SPACE\}/g, space || '')
+      .replace(/\$\{SPACE_NAME\}/g, space || '')
+      .replace(/\$\{PORT\}/g, port || '');
+  };
+
   for (const [participantId, participantConfig] of participantEntries) {
     const resolvedTransport =
       participantConfig.transport || transportOverrides[participantId] || defaultTransport;
@@ -756,20 +765,37 @@ async function spaceUpAction(options) {
       '--log-file',
       adapterLog,
     ];
+    console.log(`Launching adapter ${participantId} with token ${tokens.get(participantId)}`);
 
     if (participantConfig.command) {
       args.push('--command', participantConfig.command);
     }
     if (participantConfig.args && participantConfig.args.length) {
-      args.push('--args', ...participantConfig.args);
+      const substituted = participantConfig.args.map((value) =>
+        substituteValue(value, {
+          token: tokens.get(participantId),
+          space: spaceId,
+          port: options.port || '0',
+        }),
+      );
+      args.push('--args', '--', ...substituted);
     }
     if (participantConfig.cwd) {
-      args.push('--cwd', participantConfig.cwd);
+      args.push('--cwd', substituteValue(participantConfig.cwd, {
+        token: tokens.get(participantId),
+        space: spaceId,
+        port: options.port || '0',
+      }));
     }
     if (participantConfig.env) {
-      const envPairs = Object.entries(participantConfig.env).map(
-        ([key, value]) => `${key}=${value}`,
-      );
+      const envPairs = Object.entries(participantConfig.env).map(([key, value]) => {
+        const resolved = substituteValue(value, {
+          token: tokens.get(participantId),
+          space: spaceId,
+          port: options.port || '0',
+        });
+        return `${key}=${resolved}`;
+      });
       if (envPairs.length) {
         args.push('--env', ...envPairs);
       }
