@@ -20,7 +20,7 @@ The CLI specification is being developed at [`spec/draft/SPEC.md`](spec/draft/SP
 
 ## Development
 
-This package is not yet implemented. Once the specification is approved, implementation will begin following the tasks in [TODO.md](../TODO.md).
+This package is not yet implemented. Once the specification is approved, implementation will begin following the tasks in [TODO.md](../docs/progress/TODO.md).
 
 ## Contributing
 
