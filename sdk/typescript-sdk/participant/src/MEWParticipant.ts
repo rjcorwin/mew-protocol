@@ -110,18 +110,21 @@ export class MEWParticipant extends MEWClient {
 
   constructor(options: ParticipantOptions) {
     super(options);
-    this.options = { requestTimeout: 30000, ...options };
+    this.options = {
+      ...this.options,
+      requestTimeout: options.requestTimeout ?? 30000,
+    } as ParticipantOptions;
     this.setupLifecycle();
   }
 
-  send(envelope: Envelope | Partial<Envelope>): void {
+  async send(envelope: Envelope | Partial<Envelope>): Promise<void> {
     const kind = (envelope as Envelope).kind || (envelope as any).kind;
     if (kind && this.isPauseActive() && !this.isAllowedDuringPause(kind)) {
       const reason = this.pauseState?.reason ? ` (${this.pauseState?.reason})` : '';
       throw new Error(`Participant is paused${reason}`);
     }
 
-    super.send(envelope);
+    await super.send(envelope);
   }
 
   /**
