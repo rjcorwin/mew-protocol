@@ -18,15 +18,16 @@ cd "$TEST_DIR"
 # Clean up any previous runs
 ./teardown.sh 2>/dev/null || true
 
-# Setup test files
-mkdir -p /tmp/mcp-test-files
-echo "Test content" > /tmp/mcp-test-files/test.txt
-echo "Hello MCP" > /tmp/mcp-test-files/hello.txt
-mkdir -p /tmp/mcp-test-files/subdir
-echo "Nested file" > /tmp/mcp-test-files/subdir/nested.txt
+# Setup test files in local test directory
+TEST_FILES_DIR="$TEST_DIR/test-files"
+mkdir -p "$TEST_FILES_DIR"
+echo "Test content" > "$TEST_FILES_DIR/test.txt"
+echo "Hello MCP" > "$TEST_FILES_DIR/hello.txt"
+mkdir -p "$TEST_FILES_DIR/subdir"
+echo "Nested file" > "$TEST_FILES_DIR/subdir/nested.txt"
 
-echo "Test files created in /tmp/mcp-test-files"
-ls -la /tmp/mcp-test-files
+echo "Test files created in $TEST_FILES_DIR"
+ls -la "$TEST_FILES_DIR"
 
 # Generate random port
 export TEST_PORT=$((9700 + RANDOM % 100))
@@ -109,7 +110,8 @@ test_mcp_request \
 RESULT_1=$?
 
 # Test 2: Read a file via MCP
-REQUEST_2='{
+REQUEST_2=$(cat <<EOF
+{
   "kind": "mcp/request",
   "id": "test-2",
   "to": ["filesystem"],
@@ -118,11 +120,13 @@ REQUEST_2='{
     "params": {
       "name": "read_file",
       "arguments": {
-        "path": "/private/tmp/mcp-test-files/test.txt"
+        "path": "$TEST_FILES_DIR/test.txt"
       }
     }
   }
-}'
+}
+EOF
+)
 
 test_mcp_request \
   "Read file via MCP" \
@@ -132,7 +136,8 @@ test_mcp_request \
 RESULT_2=$?
 
 # Test 3: List directory via MCP
-REQUEST_3='{
+REQUEST_3=$(cat <<EOF
+{
   "kind": "mcp/request",
   "id": "test-3",
   "to": ["filesystem"],
@@ -141,11 +146,13 @@ REQUEST_3='{
     "params": {
       "name": "list_directory",
       "arguments": {
-        "path": "/private/tmp/mcp-test-files"
+        "path": "$TEST_FILES_DIR"
       }
     }
   }
-}'
+}
+EOF
+)
 
 test_mcp_request \
   "List directory via MCP" \
@@ -166,6 +173,6 @@ fi
 # Cleanup
 echo -e "\nCleaning up..."
 ./teardown.sh
-rm -rf /tmp/mcp-test-files
+# Test files will be cleaned up by teardown.sh
 
 exit $TOTAL_RESULT
