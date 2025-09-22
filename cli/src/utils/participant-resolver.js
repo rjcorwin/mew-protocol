@@ -149,12 +149,6 @@ function getInteractiveOverrides(participantConfig) {
   delete config.output_log;
   delete config.auto_connect;
 
-  // Ensure we have tokens
-  if (!config.tokens || config.tokens.length === 0) {
-    // Generate a default token if none provided
-    config.tokens = [`${config.id}-token-${Date.now()}`];
-  }
-
   return config;
 }
 

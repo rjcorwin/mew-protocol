@@ -141,7 +141,11 @@ export class MEWParticipant extends MEWClient {
         // Debug: Sending MCP request
 
         // Send the request
-        this.send(envelope);
+        this.send(envelope).catch((error) => {
+          if (timer) clearTimeout(timer);
+          this.pendingRequests.delete(id);
+          reject(error);
+        });
         return;
       }
 
@@ -174,8 +178,8 @@ export class MEWParticipant extends MEWClient {
               reason: 'timeout'
             }
           };
-          this.send(withdrawEnvelope);
-          
+          this.send(withdrawEnvelope).catch(() => {});
+
           reject(new Error(`Proposal ${id} not fulfilled after ${timeout}ms`));
         }, timeout);
 
@@ -189,7 +193,11 @@ export class MEWParticipant extends MEWClient {
         // Debug: Sending MCP proposal
 
         // Send the proposal
-        this.send(envelope);
+        this.send(envelope).catch((error) => {
+          if (timer) clearTimeout(timer);
+          this.pendingRequests.delete(id);
+          reject(error);
+        });
         return;
       }
 
@@ -220,7 +228,7 @@ export class MEWParticipant extends MEWClient {
       correlation_id: [proposalId],
       payload: { reason }
     };
-    this.send(withdrawEnvelope);
+    this.send(withdrawEnvelope).catch(() => {});
     
     // Reject the promise
     pending.reject(new Error(`Proposal withdrawn: ${reason}`));
@@ -243,7 +251,7 @@ export class MEWParticipant extends MEWClient {
       envelope.to = Array.isArray(to) ? to : [to];
     }
 
-    this.send(envelope);
+    this.send(envelope).catch((error) => this.emit('error', error));
   }
 
   /**
@@ -731,7 +739,7 @@ export class MEWParticipant extends MEWClient {
     };
 
     // Debug: Sending MCP response
-    this.send(response);
+    this.send(response).catch((error) => this.emit('error', error));
   }
 
   /**

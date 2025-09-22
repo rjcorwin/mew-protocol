@@ -4,6 +4,14 @@ space:
   name: "{{SPACE_NAME}}"
   description: "Coding assistant that requires human approval for file modifications"
   default_participant: human
+  # transport:
+  #   default: stdio
+  #   overrides:
+  #     remote-tester: websocket
+
+gateway:
+  # websocket:
+  #   listen: 0.0.0.0:4700
 
 participants:
   # Human participant with full capabilities (can approve proposals)
@@ -15,9 +23,14 @@ participants:
   # Coder agent with limited capabilities - creates proposals for file modifications
   mew:
     type: local
-    command: "npx"
-    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
+    command: "node"
+    args: ["../../sdk/typescript-sdk/agent/dist/index.js"]
     auto_start: true
+    env:
+      MEW_TRANSPORT: "stdio"
+      MEW_SPACE: "{{SPACE_NAME}}"
+      MEW_TOKEN: "${TOKEN}"
+      MEW_PARTICIPANT_ID: "mew"
     # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
       - kind: "chat"
@@ -86,49 +99,33 @@ participants:
           method: "tools/call"
           params:
             name: "get_file_info"
-    env:
-      # API configuration - these read from environment at runtime
-      OPENAI_API_KEY: "${OPENAI_API_KEY}"
-      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
-      OPENAI_MODEL: "{{AGENT_MODEL}}"
-      # Configure the agent with 100 max iterations for complex multi-step tasks
-      # and 1 hour timeout for proposals to allow human review time
-      # and 50 message conversation history for context across interactions
-      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 3600000, "conversationHistoryLength": 50, "reasoningEnabled": true, "systemPrompt": "{{AGENT_PROMPT}}"}'
 
-  # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:
     type: local
-    command: "npx"
-    args: ["--yes", "@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./", "--mcp-cwd", "./"]
+    command: "node"
+    args:
+      [
+        "../../bridge/dist/mcp-bridge.js",
+        "--transport",
+        "stdio",
+        "--space",
+        "{{SPACE_NAME}}",
+        "--token",
+        "${TOKEN}",
+        "--participant-id",
+        "mcp-fs-bridge",
+        "--mcp-command",
+        "node",
+        "--mcp-args",
+        ".mew/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js,./",
+        "--mcp-cwd",
+        "./"
+      ]
     auto_start: true
-    # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
       - kind: "mcp/request"
       - kind: "mcp/response"
       - kind: "mcp/notification"
-
-  # Auto-fulfiller for proposals (disabled by default for manual testing)
-  auto-fulfiller:
-    type: local
-    command: "node"
-    args: ["./.mew/agents/auto-fulfiller.js"]
-    auto_start: false  # Disabled for manual testing
-    # No tokens field - generated at runtime in .mew/tokens/
-    capabilities:
-      - kind: "mcp/proposal"  # Can see proposals
-      - kind: "mcp/request"   # Can execute approved operations
-      - kind: "mcp/response"  # Can respond to requests
-      - kind: "chat"
-    env:
-      NODE_PATH: "./.mew/node_modules"
-      MEW_GATEWAY: "ws://localhost:${PORT}"
-      MEW_SPACE: "{{SPACE_NAME}}"
-      MEW_TOKEN: "${TOKEN}"  # Token will be loaded from .mew/tokens/auto-fulfiller.token
-      MEW_PARTICIPANT_ID: "auto-fulfiller"
-      AUTO_APPROVE: "false"  # Set to "true" to enable auto-approval
-      APPROVAL_DELAY: "2000"  # 2 second delay before auto-approval
-      TARGET_PARTICIPANTS: "mcp-fs-bridge"
 
 defaults:
   capabilities:

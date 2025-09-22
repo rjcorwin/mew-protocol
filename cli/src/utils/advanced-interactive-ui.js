@@ -947,17 +947,30 @@ function getPayloadPreview(payload, kind) {
  * Starts the advanced interactive UI
  */
 function startAdvancedInteractiveUI(ws, participantId, spaceId) {
-  const { rerender, unmount } = render(
+  const instance = render(
     React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId })
   );
 
-  // Handle cleanup
-  process.on('SIGINT', () => {
-    unmount();
+  const handleSigint = () => {
+    instance.unmount();
     process.exit(0);
+  };
+
+  process.on('SIGINT', handleSigint);
+
+  const exitPromise = instance.waitUntilExit();
+  exitPromise.finally(() => {
+    process.off('SIGINT', handleSigint);
   });
 
-  return { rerender, unmount };
+  return {
+    rerender: instance.rerender,
+    unmount: () => {
+      process.off('SIGINT', handleSigint);
+      instance.unmount();
+    },
+    waitUntilExit: () => exitPromise,
+  };
 }
 
 module.exports = {

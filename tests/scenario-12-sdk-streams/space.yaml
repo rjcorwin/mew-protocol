@@ -1,0 +1,29 @@
+space:
+  id: scenario-12
+  name: "Scenario 12 - STDIO Batch Streaming"
+  description: "Batch agent emits multiple data chunks to driver"
+
+participants:
+  batch-agent:
+    auto_start: true
+    command: "node"
+    args: ["../agents/batch-agent.js"]
+    env:
+      MEW_PARTICIPANT_ID: "batch-agent"
+      BATCH_AGENT_LOG: "./logs/batch-agent.log"
+      DRIVER_ID: "batch-driver"
+    capabilities:
+      - kind: chat
+      - kind: system/*
+
+  batch-driver:
+    auto_start: true
+    command: "node"
+    args: ["../agents/batch-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "batch-driver"
+      BATCH_DRIVER_LOG: "./logs/batch-driver.log"
+      AGENT_ID: "batch-agent"
+    capabilities:
+      - kind: chat
+      - kind: system/*

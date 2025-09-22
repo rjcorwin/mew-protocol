@@ -5,7 +5,7 @@ const { program } = require('commander');
 
 program
   .description('MEW-MCP Bridge - Connect MCP servers to MEW spaces')
-  .requiredOption('--gateway <url>', 'Gateway WebSocket URL')
+  .option('--gateway <url>', 'Gateway WebSocket URL (required for websocket transport)')
   .requiredOption('--space <id>', 'Space ID to join')
   .requiredOption('--participant-id <id>', 'Participant ID for this bridge')
   .requiredOption('--token <token>', 'Authentication token')
@@ -16,9 +16,21 @@ program
   .option('--init-timeout <ms>', 'Initialization timeout in ms', '30000')
   .option('--reconnect <bool>', 'Auto-reconnect on disconnect', 'true')
   .option('--max-reconnects <n>', 'Maximum reconnect attempts', '3')
+  .option('--transport <mode>', 'Transport to use: stdio | websocket', 'stdio')
   .parse(process.argv);
 
 const options = program.opts();
+
+const transport = (options.transport || 'stdio').toLowerCase();
+if (transport !== 'stdio' && transport !== 'websocket') {
+  console.error(`Unsupported transport: ${options.transport}`);
+  process.exit(1);
+}
+
+if (transport === 'websocket' && !options.gateway) {
+  console.error('Gateway URL is required when transport is websocket');
+  process.exit(1);
+}
 
 // Parse MCP args
 const mcpArgs = options.mcpArgs ? options.mcpArgs.split(',') : [];
@@ -50,13 +62,18 @@ const bridge = new MCPBridge({
   token: options.token,
   initTimeout: parseInt(options.initTimeout),
   mcpServer: mcpConfig,
+  transport: transport,
 });
 
 // Start the bridge
 async function start() {
   try {
     console.log(`Starting MCP bridge for ${options.participantId}...`);
-    console.log(`Connecting to gateway: ${options.gateway}`);
+    if (transport === 'websocket') {
+      console.log(`Connecting to gateway: ${options.gateway}`);
+    } else {
+      console.log('Connecting via STDIO transport');
+    }
     console.log(`Space: ${options.space}`);
     console.log(`MCP server: ${options.mcpCommand} ${mcpArgs.join(' ')}`);
 
@@ -97,4 +114,3 @@ async function start() {
 
 // Start the bridge
 start();
-

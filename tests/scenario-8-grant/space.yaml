@@ -1,0 +1,51 @@
+space:
+  id: scenario-8
+  name: "Scenario 8 - STDIO Capability Grant"
+  description: "Exercise capability grants enabling direct MCP calls"
+
+participants:
+  file-server:
+    auto_start: true
+    command: "node"
+    args: ["../agents/filesystem-server.js"]
+    env:
+      MEW_PARTICIPANT_ID: "file-server"
+      FS_ROOT: "./"
+      FS_LOG: "./logs/file-server.log"
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: system/*
+
+  grant-coordinator:
+    auto_start: true
+    command: "node"
+    args: ["../agents/grant-coordinator.js"]
+    env:
+      MEW_PARTICIPANT_ID: "grant-coordinator"
+      GRANT_LOG: "./logs/grant-coordinator.log"
+      FILE_SERVER_ID: "file-server"
+      AGENT_ID: "grant-agent"
+    capabilities:
+      - kind: mcp/proposal
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: capability/*
+      - kind: system/*
+
+  grant-agent:
+    auto_start: true
+    command: "node"
+    args: ["../agents/grant-agent.js"]
+    env:
+      MEW_PARTICIPANT_ID: "grant-agent"
+      DRIVER_LOG: "./logs/grant-agent.log"
+      FILE_SERVER_ID: "file-server"
+      COORDINATOR_ID: "grant-coordinator"
+    capabilities:
+      - kind: mcp/proposal
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: capability/*
+      - kind: chat
+      - kind: system/*

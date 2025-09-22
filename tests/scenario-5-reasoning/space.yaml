@@ -1,26 +1,30 @@
 space:
-  id: test-space
-  name: "Scenario 5 - Reasoning with Context Field"
-  description: "Test reasoning messages with context field"
+  id: scenario-5
+  name: "Scenario 5 - STDIO Reasoning Flow"
+  description: "Exercises reasoning messages with context preservation"
 
 participants:
   calculator-agent:
-    tokens: ["calculator-token"]
-    capabilities:
-      - kind: mcp/response
-      - kind: system/*
     auto_start: true
     command: "node"
-    args: ["../agents/calculator-participant.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "calculator-token"]
-    
+    args: ["../agents/calculator-participant.js"]
+    env:
+      MEW_PARTICIPANT_ID: "calculator-agent"
+      CALCULATOR_LOG: "./logs/calculator.log"
+    capabilities:
+      - kind: mcp/request
+      - kind: mcp/response
+      - kind: system/*
+
   research-agent:
-    tokens: ["research-token"]
+    auto_start: true
+    command: "node"
+    args: ["../agents/reasoning-driver.js"]
+    env:
+      MEW_PARTICIPANT_ID: "research-agent"
+      DRIVER_LOG: "./logs/reasoning-driver.log"
     capabilities:
       - kind: reasoning/*
       - kind: mcp/request
-        payload:
-          method: tools/*
       - kind: chat
       - kind: system/*
-    output_log: "./logs/research-agent-output.log"
-    auto_connect: true

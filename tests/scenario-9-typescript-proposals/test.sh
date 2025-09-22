@@ -1,60 +1,35 @@
 #!/bin/bash
-# Automated test script - Combines setup, check, and teardown
-#
-# This is the entry point for automated testing (e.g., from run-all-tests.sh)
-# For manual/debugging, use setup.sh, check.sh, and teardown.sh separately
-
 set -e
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Get test directory
 export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Use random port to avoid conflicts
-export TEST_PORT=$((8000 + RANDOM % 1000))
-
-echo -e "${YELLOW}=== Scenario 9: TypeScript Agent Proposals & Chat Response Test ===${NC}"
-echo -e "${BLUE}Testing TypeScript agent with proposal-only permissions and chat response behavior${NC}"
-echo ""
-
-# Cleanup function (no trap, will call explicitly)
 cleanup() {
-  echo ""
-  echo "Cleaning up..."
   ./teardown.sh
 }
+trap cleanup EXIT
 
-# Step 1: Setup the space
-echo -e "${YELLOW}Step 1: Setting up space...${NC}"
-# Run setup in subprocess but capture the environment it sets
-./setup.sh </dev/null
+echo -e "${YELLOW}=== Scenario 9: STDIO TypeScript Proposals ===${NC}"
 
-# Export the paths that check.sh needs
-export FIFO_IN="$TEST_DIR/fifos/test-client-in"
-export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
+echo -e "${BLUE}Step 1: Setup${NC}"
+./setup.sh
 
-# Step 2: Run checks
-echo ""
-echo -e "${YELLOW}Step 2: Running test checks...${NC}"
-./check.sh
-TEST_RESULT=$?
+echo -e "${BLUE}Waiting for proposal flow to complete...${NC}"
+sleep 2
 
-# Step 3: Report results
-echo ""
-if [ $TEST_RESULT -eq 0 ]; then
+export TS_PROPOSAL_LOG="$TEST_DIR/logs/typescript-proposal-agent.log"
+export TS_DRIVER_LOG="$TEST_DIR/logs/ts-proposal-driver.log"
+
+echo -e "${BLUE}Step 2: Checks${NC}"
+if ./check.sh; then
   echo -e "${GREEN}✓ Scenario 9 PASSED${NC}"
+  exit 0
 else
   echo -e "${RED}✗ Scenario 9 FAILED${NC}"
+  exit 1
 fi
-
-# Always cleanup before exiting
-cleanup
-
-# Exit with the test result
-exit $TEST_RESULT
