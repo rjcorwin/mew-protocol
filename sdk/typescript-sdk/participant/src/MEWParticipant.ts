@@ -286,14 +286,21 @@ export class MEWParticipant extends MEWClient {
     this.recordContextUsage({ tokens: this.estimateTokens(text), messages: 1 });
   }
 
-  acknowledgeChat(messageId: string, target: string | string[], status: string = 'received'): void {
-    const to = Array.isArray(target) ? target : [target];
-    this.send({
+  acknowledgeChat(messageId: string, target: string | string[] | null = null, status: string = 'received'): void {
+    const envelope: Partial<Envelope> = {
       kind: 'chat/acknowledge',
-      to,
       correlation_id: [messageId],
       payload: status ? { status } : {}
-    });
+    };
+
+    // Only add 'to' field if target is explicitly provided
+    if (target) {
+      envelope.to = Array.isArray(target) ? target : [target];
+    }
+
+    console.log(`[MEWParticipant] Sending chat acknowledgment for message ${messageId} with status ${status} to ${target || 'broadcast'}`);
+    this.send(envelope);
+    console.log(`[MEWParticipant] Chat acknowledgment sent`);
   }
 
   cancelChat(messageId: string, target?: string | string[], reason: string = 'cancelled'): void {
@@ -331,6 +338,20 @@ export class MEWParticipant extends MEWClient {
       to,
       payload
     });
+  }
+
+  /**
+   * Send data over a stream using the #streamID#data frame format
+   */
+  sendStreamData(streamId: string, data: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.log('warn', `Cannot send stream data: WebSocket not connected`);
+      return;
+    }
+
+    // Send as raw frame with stream ID prefix per spec
+    const frame = `#${streamId}#${data}`;
+    this.ws.send(frame);
   }
 
   /**

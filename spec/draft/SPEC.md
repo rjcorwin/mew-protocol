@@ -1000,7 +1000,8 @@ Sent by whichever entity initiates stream negotiation (typically a participant a
 - `direction` clarifies whether the sender will upload or download data
 - `expected_size_bytes` is advisory and MAY be omitted
 - `correlation_id` (not shown) MAY reference the message that motivated the stream (e.g., a proposal or request)
-- The recipient SHOULD reply with `stream/open` once it has allocated resources
+- The gateway MUST intercept all `stream/request` messages and reply with `stream/open` containing a unique `stream_id`
+- The gateway is responsible for stream ID allocation and management, regardless of the request's `to` field
 - Agents that expose long-form reasoning SHOULD consider issuing a `stream/request` alongside `reasoning/start` so subscribers
   can follow high-volume traces without bloating the shared envelope log.
 

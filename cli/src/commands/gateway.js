@@ -204,7 +204,7 @@ gateway
     const wss = new WebSocket.Server({ server });
 
     // Track spaces and participants
-    const spaces = new Map(); // spaceId -> { participants: Map(participantId -> ws) }
+    const spaces = new Map(); // spaceId -> { participants: Map(participantId -> ws), streamCounter: number, activeStreams: Map }
 
     // Track participant info
     const participantTokens = new Map(); // participantId -> token
@@ -563,7 +563,34 @@ gateway
 
       ws.on('message', async (data) => {
         try {
-          const message = JSON.parse(data.toString());
+          const dataStr = data.toString();
+
+          // Check if this is a stream data frame (format: #streamID#data)
+          if (dataStr.startsWith('#') && dataStr.indexOf('#', 1) > 0) {
+            const secondHash = dataStr.indexOf('#', 1);
+            const streamId = dataStr.substring(1, secondHash);
+
+            // Forward stream data to all participants in the space
+            if (spaceId && spaces.has(spaceId)) {
+              const space = spaces.get(spaceId);
+
+              // Verify stream exists and belongs to this participant
+              const streamInfo = space.activeStreams.get(streamId);
+              if (streamInfo && streamInfo.participantId === participantId) {
+                // Forward to all participants
+                for (const [pid, pws] of space.participants.entries()) {
+                  if (pws.readyState === WebSocket.OPEN) {
+                    pws.send(data); // Send raw data frame
+                  }
+                }
+              } else {
+                console.log(`[GATEWAY WARNING] Invalid stream ID ${streamId} from ${participantId}`);
+              }
+            }
+            return; // Don't process as JSON message
+          }
+
+          const message = JSON.parse(dataStr);
 
           // Validate message
           const validationError = validateMessage(message);
@@ -593,7 +620,11 @@ gateway
 
             // Create space if it doesn't exist
             if (!spaces.has(spaceId)) {
-              spaces.set(spaceId, { participants: new Map() });
+              spaces.set(spaceId, {
+                participants: new Map(),
+                streamCounter: 0,
+                activeStreams: new Map()
+              });
             }
 
             // Add participant to space
@@ -940,6 +971,65 @@ gateway
           // Ensure correlation_id is always an array if present
           if (envelope.correlation_id && !Array.isArray(envelope.correlation_id)) {
             envelope.correlation_id = [envelope.correlation_id];
+          }
+
+          // Handle stream/request - gateway must respond with stream/open
+          if (envelope.kind === 'stream/request' && spaceId && spaces.has(spaceId)) {
+            const space = spaces.get(spaceId);
+
+            // Generate unique stream ID
+            space.streamCounter++;
+            const streamId = `stream-${space.streamCounter}`;
+
+            // Track the stream
+            space.activeStreams.set(streamId, {
+              requestId: envelope.id,
+              participantId: participantId,
+              direction: envelope.payload?.direction || 'unknown',
+              created: new Date().toISOString()
+            });
+
+            // Send stream/open response
+            const streamOpenResponse = {
+              protocol: 'mew/v0.3',
+              id: `stream-open-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              ts: new Date().toISOString(),
+              from: 'gateway',
+              to: [participantId],
+              kind: 'stream/open',
+              correlation_id: [envelope.id],
+              payload: {
+                stream_id: streamId,
+                encoding: 'text'
+              }
+            };
+
+            // Send stream/open to ALL participants (MEW Protocol visibility)
+            for (const [pid, pws] of space.participants.entries()) {
+              if (pws.readyState === WebSocket.OPEN) {
+                pws.send(JSON.stringify(streamOpenResponse));
+              }
+            }
+
+            if (options.logLevel === 'debug') {
+              console.log(`[GATEWAY DEBUG] Assigned stream ID ${streamId} for request from ${participantId}`);
+            }
+          }
+
+          // Handle stream/close - clean up active streams
+          if (envelope.kind === 'stream/close' && spaceId && spaces.has(spaceId)) {
+            const space = spaces.get(spaceId);
+
+            // Find and remove the stream (may be referenced by correlation_id)
+            if (envelope.payload?.stream_id) {
+              const streamId = envelope.payload.stream_id;
+              if (space.activeStreams.has(streamId)) {
+                space.activeStreams.delete(streamId);
+                if (options.logLevel === 'debug') {
+                  console.log(`[GATEWAY DEBUG] Closed stream ${streamId}`);
+                }
+              }
+            }
           }
 
           // ALWAYS broadcast to ALL participants - MEW Protocol requires all messages visible to all
