@@ -184,13 +184,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       }
     }
 
-    if (shouldAddMessage) {
-      addMessage({
-        kind: 'stream/data',
-        from: streamId,
-        payload: { data: payload }
-      }, false);
-    }
+    // Don't add stream/data messages to the message list
+    // They're already displayed in the Signal Board's stream monitor
   };
 
   const handleStreamData = (streamId, data) => {
@@ -664,7 +659,11 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       }
     }
 
-    addMessage(message, false);
+    // Don't add stream/data messages to the message list - they're handled separately
+    // and displayed in the Signal Board's stream monitor
+    if (message.kind !== 'stream/data') {
+      addMessage(message, false);
+    }
   };
 
   const sendMessage = (message) => {
