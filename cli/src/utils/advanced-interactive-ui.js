@@ -444,10 +444,12 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         const { metrics, changed } = mergeReasoningTokenMetrics(prev.tokenMetrics, tokenUpdate);
         const reasoningText = message.payload?.reasoning || message.payload?.message;
         const nextStreamText = prev.streamText || reasoningText || '';
+        const action = message.payload?.action;
         return {
           ...prev,
           message: reasoningText || prev.message,
           streamText: nextStreamText,
+          action: action || prev.action,
           thoughtCount: prev.thoughtCount + 1,
           tokenMetrics: metrics,
           lastTokenUpdate: changed ? new Date() : prev.lastTokenUpdate
@@ -1633,36 +1635,38 @@ function ReasoningStatus({ reasoning }) {
     paddingX: 1,
     marginBottom: 1
   },
-    React.createElement(Box, { justifyContent: "space-between", width: "100%" },
-      React.createElement(Box, null,
+    React.createElement(Box, { flexDirection: "column" },
+      React.createElement(Box, { width: "100%" },
         React.createElement(Text, { color: "cyan", bold: true }, spinnerChars[spinnerIndex] + " "),
-        React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`)
-      ),
-      React.createElement(Box, null,
-        React.createElement(Text, { color: "gray" },
-          `${elapsedTime}s | ${reasoning.tokenCount ? `${reasoning.tokenCount} tokens` : `${reasoning.thoughtCount} thoughts`}`
+        React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`),
+        React.createElement(Text, { color: "gray", marginLeft: 4 }, `${elapsedTime}s`),
+        React.createElement(Text, { color: "gray", marginLeft: 2 },
+          reasoning.tokenCount ? `${reasoning.tokenCount} tokens` : `${reasoning.thoughtCount} thoughts`
         )
-      )
-    ),
-    textPreview && React.createElement(Box, { marginTop: 0 },
+      ),
+      reasoning.action && React.createElement(Box, { marginTop: 0 },
+        React.createElement(Text, { color: "gray" }, reasoning.action)
+      ),
+      textPreview && React.createElement(Box, { marginTop: 0 },
       React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" },
         textPreview
       )
     ),
-    tokenSummary?.summary && React.createElement(Box, { marginTop: 1 },
-      React.createElement(Text, { color: "cyan" }, `Tokens: ${tokenSummary.summary}`)
-    ),
-    tokenSummary?.deltas && React.createElement(Box, { marginTop: 0 },
-      React.createElement(Text, { color: "cyan" }, `Δ ${tokenSummary.deltas}`)
-    ),
-    tokenSummary?.details && React.createElement(Box, { marginTop: 0 },
-      React.createElement(Text, { color: "gray" }, tokenSummary.details)
-    ),
-    tokenSummary && tokenUpdatedAgo && React.createElement(Box, { marginTop: 0 },
-      React.createElement(Text, { color: "gray" }, `Updated ${tokenUpdatedAgo}`)
-    ),
-    React.createElement(Box, { marginTop: 1 },
-      React.createElement(Text, { color: "gray" }, 'Use /reason-cancel to interrupt reasoning.')
+      tokenSummary?.summary && React.createElement(Box, { marginTop: 1 },
+        React.createElement(Text, { color: "cyan" }, `Tokens: ${tokenSummary.summary}`)
+      ),
+      tokenSummary?.deltas && React.createElement(Box, { marginTop: 0 },
+        React.createElement(Text, { color: "cyan" }, `Δ ${tokenSummary.deltas}`)
+      ),
+      tokenSummary?.details && React.createElement(Box, { marginTop: 0 },
+        React.createElement(Text, { color: "gray" }, tokenSummary.details)
+      ),
+      tokenSummary && tokenUpdatedAgo && React.createElement(Box, { marginTop: 0 },
+        React.createElement(Text, { color: "gray" }, `Updated ${tokenUpdatedAgo}`)
+      ),
+      React.createElement(Box, { marginTop: 1 },
+        React.createElement(Text, { color: "gray" }, 'Use /reason-cancel to interrupt reasoning.')
+      )
     )
   );
 }
