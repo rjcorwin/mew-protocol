@@ -21,7 +21,12 @@ participants:
     # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
       - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
       - kind: "reasoning/*"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
       - kind: "mcp/proposal"
       - kind: "mcp/response"
       - kind: "mcp/request"

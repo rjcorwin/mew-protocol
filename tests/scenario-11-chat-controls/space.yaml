@@ -30,6 +30,8 @@ participants:
     tokens: ["test-token"]
     capabilities:
       - kind: chat
+      - kind: chat/acknowledge
+      - kind: chat/cancel
       - kind: reasoning/*
       - kind: participant/*
       - kind: system/*

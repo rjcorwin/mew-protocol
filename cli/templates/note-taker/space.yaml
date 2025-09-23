@@ -29,3 +29,5 @@ participants:
     capabilities:
       - kind: "mcp/request"
       - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
