@@ -681,8 +681,9 @@ Return a JSON object:
     for await (const part of stream as any) {
       // Check if reasoning was cancelled
       if (this.reasoningCancelled) {
-        this.log('info', '🛑 Reasoning cancelled - aborting stream');
-        // Clean up and throw to exit early
+        this.log('info', '🛑 Reasoning cancelled - exiting stream loop');
+        // We can't actually abort the underlying HTTP request with OpenAI SDK
+        // but we can stop processing and exit early
         throw new Error(`Reasoning cancelled: ${this.reasoningCancelReason || 'cancelled by user'}`);
       }
 
@@ -1296,6 +1297,10 @@ Return a JSON object:
     if (this.matchesReasoningContext(envelope.context)) {
       this.reasoningCancelled = true;
       this.reasoningCancelReason = envelope.payload?.reason || 'cancelled';
+
+      // Note: We can't actually abort the OpenAI HTTP stream
+      // The loop will check this flag and exit on next iteration
+
       this.pushReasoningStreamChunk({
         type: 'status',
         event: 'cancelled',
