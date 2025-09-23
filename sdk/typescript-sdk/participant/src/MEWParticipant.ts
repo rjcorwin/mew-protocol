@@ -331,13 +331,16 @@ export class MEWParticipant extends MEWClient {
     });
   }
 
-  requestStream(payload: StreamRequestPayload, target: string | string[] = 'gateway'): void {
+  requestStream(payload: StreamRequestPayload, target: string | string[] = 'gateway'): string {
     const to = Array.isArray(target) ? target : [target];
+    const id = `stream-req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     this.send({
+      id,
       kind: 'stream/request',
       to,
       payload
     });
+    return id;
   }
 
   /**

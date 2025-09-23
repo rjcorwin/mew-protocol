@@ -22,6 +22,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [pendingOperation, setPendingOperation] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [verbose, setVerbose] = useState(false);
+  const [showStreams, setShowStreams] = useState(false);
   const [activeReasoning, setActiveReasoning] = useState(null); // Track active reasoning sessions
   const [grantedCapabilities, setGrantedCapabilities] = useState(new Map()); // Track granted capabilities by participant
   const [pendingAcknowledgements, setPendingAcknowledgements] = useState([]);
@@ -47,10 +48,18 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     const handleMessage = (data) => {
       const raw = typeof data === 'string' ? data : data.toString();
 
+      // Check if this is a stream data frame (format: #streamID#data)
       if (raw.startsWith('#')) {
         const match = raw.match(/^#([^#]+)#([\s\S]*)$/);
         if (match) {
-          handleStreamFrame(match[1], match[2]);
+          const streamId = match[1];
+          const streamData = match[2];
+
+          // Store frame for display
+          handleStreamFrame(streamId, streamData);
+
+          // Process stream data for reasoning
+          handleStreamData(streamId, streamData);
           return;
         }
       }
@@ -184,6 +193,66 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     }
   };
 
+  const handleStreamData = (streamId, data) => {
+    // Show stream data if streams mode is enabled
+    if (showStreams) {
+      addSystemMessage(`[STREAM ${streamId}] ${data.substring(0, 200)}${data.length > 200 ? '...' : ''}`, 'stream');
+    }
+
+    try {
+      const parsed = JSON.parse(data);
+
+      // Check if this is reasoning stream data
+      const streamInfo = reasoningStreamsRef.current.get(streamId);
+      if (streamInfo) {
+        const { contextId } = streamInfo;
+
+        if (parsed.type === 'progress' && parsed.tokenCount) {
+          // Update token count to show progress in the active reasoning bar
+          setActiveReasoning(prev => {
+            if (prev && prev.id === contextId) {
+              return {
+                ...prev,
+                tokenCount: parsed.tokenCount,
+                updateCount: (prev.updateCount || 0) + 1
+              };
+            }
+            return prev;
+          });
+        } else if (parsed.type === 'token' && parsed.value) {
+          // Update reasoning session with actual token content (if any)
+          setActiveReasoning(prev => {
+            if (prev && prev.id === contextId) {
+              return {
+                ...prev,
+                message: (prev.message || '') + parsed.value,
+                updateCount: (prev.updateCount || 0) + 1
+              };
+            }
+            return prev;
+          });
+        } else if (parsed.type === 'thought' && parsed.value) {
+          // Handle complete thoughts
+          const thoughtText = parsed.value.reasoning || parsed.value.message || parsed.value;
+          setActiveReasoning(prev => {
+            if (prev && prev.id === contextId) {
+              return {
+                ...prev,
+                message: thoughtText,
+                thoughtCount: (prev.thoughtCount || 0) + 1,
+                updateCount: (prev.updateCount || 0) + 1
+              };
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (err) {
+      // Not JSON, might be raw text stream data
+      console.error('[Stream] Raw data on stream', streamId, ':', data);
+    }
+  };
+
   const handleIncomingMessage = (message) => {
     // Filter out echo messages - don't show messages from ourselves coming back
     // EXCEPT for errors and grant acknowledgments which we want to see
@@ -228,10 +297,16 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
           const entry = prev[index];
           const recipients = Array.isArray(entry.to) ? entry.to : [];
 
+          // For broadcast messages (no recipients), any acknowledgment removes it
           if (recipients.length === 0) {
-            return prev.filter(item => item.id !== target);
+            if (message.from) {
+              // Someone acknowledged our broadcast message
+              return prev.filter(item => item.id !== target);
+            }
+            return prev;
           }
 
+          // For targeted messages, track individual acknowledgments
           if (message.from && recipients.includes(message.from)) {
             const acked = new Set(entry.acked || []);
             acked.add(message.from);
@@ -296,6 +371,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
           return next;
         });
       }
+      // Continue processing for reasoning-specific logic below
     }
 
     if (message.kind === 'stream/close') {
@@ -442,6 +518,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       }
     }
 
+    // Handle reasoning-specific stream logic (this is a second handler for the same event)
     if (message.kind === 'stream/open') {
       const streamId = message.payload?.stream_id;
       let contextId = null;
@@ -644,10 +721,10 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     });
   };
 
-  const addSystemMessage = (text) => {
+  const addSystemMessage = (text, type = 'info') => {
     setMessages(prev => [...prev, {
       id: uuidv4(),
-      message: { kind: 'system/info', payload: { text } },
+      message: { kind: `system/${type}`, payload: { text } },
       sent: false,
       timestamp: new Date(),
     }]);
@@ -757,6 +834,10 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       case '/verbose':
         setVerbose(prev => !prev);
         addSystemMessage(`Verbose mode ${!verbose ? 'enabled' : 'disabled'}.`);
+        break;
+      case '/streams':
+        setShowStreams(prev => !prev);
+        addSystemMessage(`Stream data display ${!showStreams ? 'enabled' : 'disabled'}.`);
         break;
       case '/ui-clear':
         setMessages([]);
@@ -1482,6 +1563,7 @@ function HelpModal({ onClose }) {
       React.createElement(Text, { color: "blue", bold: true }, "Available Commands"),
       React.createElement(Text, null, "/help                       Show this help"),
       React.createElement(Text, null, "/verbose                    Toggle verbose output"),
+      React.createElement(Text, null, "/streams                    Toggle stream data display"),
       React.createElement(Text, null, "/ui-clear                   Clear local UI buffers"),
       React.createElement(Text, null, "/exit                       Exit application"),
 
@@ -1558,7 +1640,7 @@ function ReasoningStatus({ reasoning }) {
       ),
       React.createElement(Box, null,
         React.createElement(Text, { color: "gray" },
-          `${elapsedTime}s | ${reasoning.thoughtCount} thoughts`
+          `${elapsedTime}s | ${reasoning.tokenCount ? `${reasoning.tokenCount} tokens` : `${reasoning.thoughtCount} thoughts`}`
         )
       )
     ),

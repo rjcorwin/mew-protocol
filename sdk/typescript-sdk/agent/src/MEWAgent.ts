@@ -347,6 +347,20 @@ export class MEWAgent extends MEWParticipant {
       return;
     }
 
+    // Send acknowledgment that we're handling this message
+    this.log('info', `About to acknowledge message ${envelope.id} from ${envelope.from}`);
+    if (envelope.id) {
+      try {
+        // Send acknowledgment TO the sender (like the CLI does)
+        this.acknowledgeChat(envelope.id, envelope.from, 'processing');
+        this.log('info', `Successfully sent acknowledgment for chat message ${envelope.id} from ${envelope.from}`);
+      } catch (error) {
+        this.log('error', `Failed to acknowledge chat message ${envelope.id}: ${error}`);
+      }
+    } else {
+      this.log('warn', `Cannot acknowledge message - no ID present`);
+    }
+
     // Mark as processing
     this.isProcessing = true;
     if (this.config.messageQueue?.notifyQueueing) {
@@ -642,7 +656,8 @@ Return a JSON object:
     const params: any = {
       model: this.config.model!,
       messages,
-      stream: true
+      stream: true,
+      stream_options: { include_usage: true }  // Request token usage in stream
     };
 
     if (tools.length > 0) {
@@ -653,9 +668,15 @@ Return a JSON object:
     const stream = await this.openai.chat.completions.create(params);
     const aggregated: any = { content: '' };
     const toolCalls = new Map<number, { id?: string; type?: string; function: { name: string; arguments: string } }>();
+    let tokenCount = 0;
 
     for await (const part of stream as any) {
       const choice = part?.choices?.[0];
+
+      // Track progress even when no content is streaming
+      tokenCount++;
+      this.pushReasoningStreamChunk({ type: 'progress', tokenCount });
+
       if (!choice) {
         continue;
       }
@@ -1388,8 +1409,8 @@ Return a JSON object:
 
       if (this.canSend({ kind: 'stream/request', payload: { direction: 'upload' } })) {
         const description = `reasoning:${id}`;
-        this.reasoningStreamInfo = { description, pending: [] };
-        this.requestStream({ direction: 'upload', description });
+        const requestId = this.requestStream({ direction: 'upload', description });
+        this.reasoningStreamInfo = { description, requestId, pending: [] };
       }
       this.pushReasoningStreamChunk({ type: 'status', event: 'start', input: data?.input });
     } else if (this.reasoningContextId) {
