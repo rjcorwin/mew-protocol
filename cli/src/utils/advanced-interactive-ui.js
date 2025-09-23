@@ -9,7 +9,7 @@
 
 const React = require('react');
 const { render, Box, Text, Static, useInput, useApp, useFocus } = require('ink');
-const { useState, useEffect, useRef, useMemo } = React;
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
 const { v4: uuidv4 } = require('uuid');
 const EnhancedInput = require('../ui/components/EnhancedInput');
 
@@ -33,13 +33,43 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [streamFrames, setStreamFrames] = useState([]);
   const reasoningStreamRequestsRef = useRef(new Map());
   const reasoningStreamsRef = useRef(new Map());
+  const reasoningUpdateTimerRef = useRef(null);
+  const pendingReasoningUpdateRef = useRef(null);
   const contextUsageEntries = useMemo(() => buildContextUsageEntries(participantStatuses), [participantStatuses]);
   const { exit } = useApp();
+
+  // Throttled reasoning update to prevent performance issues during streaming
+  const updateReasoningThrottled = useCallback((updateFn) => {
+    // Store the latest update function
+    pendingReasoningUpdateRef.current = updateFn;
+
+    // If no timer is running, start one
+    if (!reasoningUpdateTimerRef.current) {
+      reasoningUpdateTimerRef.current = setTimeout(() => {
+        // Apply the latest pending update
+        if (pendingReasoningUpdateRef.current) {
+          setActiveReasoning(pendingReasoningUpdateRef.current);
+          pendingReasoningUpdateRef.current = null;
+        }
+        reasoningUpdateTimerRef.current = null;
+      }, 100); // Update at most every 100ms
+    }
+  }, []);
 
   // Environment configuration
   const showHeartbeat = process.env.MEW_INTERACTIVE_SHOW_HEARTBEAT === 'true';
   const showSystem = process.env.MEW_INTERACTIVE_SHOW_SYSTEM !== 'false';
   const useColor = process.env.MEW_INTERACTIVE_COLOR !== 'false';
+
+  // Cleanup throttle timer on unmount
+  useEffect(() => {
+    return () => {
+      if (reasoningUpdateTimerRef.current) {
+        clearTimeout(reasoningUpdateTimerRef.current);
+        reasoningUpdateTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Setup WebSocket handlers
   useEffect(() => {
@@ -203,8 +233,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         const { contextId } = streamInfo;
 
         if (parsed.type === 'progress' && parsed.tokenCount) {
-          // Update token count to show progress in the active reasoning bar
-          setActiveReasoning(prev => {
+          // Update token count to show progress in the active reasoning bar (throttled)
+          updateReasoningThrottled(prev => {
             if (prev && prev.id === contextId) {
               return {
                 ...prev,
