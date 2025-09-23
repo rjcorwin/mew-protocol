@@ -40,6 +40,41 @@ npm test            # Run tests
 ./cli/bin/mew.js space up
 ```
 
+## Quick Testing Guide
+```bash
+# Create test space (from repo root)
+cd tests && mkdir test-feature && cd test-feature
+../../cli/bin/mew.js space init --template coder-agent .
+cd ../.. && npm install  # Link local packages
+
+# Start space
+cd tests/test-feature
+../../cli/bin/mew.js space up  # Default port 8080
+
+# Send messages via HTTP API (replace test-feature with your folder name)
+curl -X POST 'http://localhost:8080/participants/human/messages?space=test-feature' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer human-token' \
+  -d '{"type": "chat", "content": "Hello"}'
+
+# View logs (non-blocking for coding agents)
+pm2 logs --nostream --lines 50     # Last 50 lines, exits immediately
+pm2 logs gateway --nostream         # Gateway logs only, no streaming
+pm2 logs coder --nostream --err     # Agent errors only
+tail -n 100 ~/.pm2/logs/gateway-out.log  # Direct file access
+
+# Check responses in curl (add -v for verbose)
+curl -v -X POST ...  # Shows request/response headers
+
+# Interactive mode (better for development)
+../../cli/bin/mew.js space connect
+# Paste JSON directly to send protocol messages
+# Type normally for chat messages
+
+# Clean up
+../../cli/bin/mew.js space down
+```
+
 ## Development Workflow
 1. Read existing patterns before implementing
 2. Update types first, then implementations
@@ -58,6 +93,7 @@ npm test            # Run tests
 - DO follow TypeScript strict mode
 - DO run relevant tests after changes
 - DO update specs if changing protocol
+- DO send stream/close when done with a stream (agents must clean up)
 
 ## Making Changes
 1. **Protocol changes**: Update spec/draft → types → implementations → tests
