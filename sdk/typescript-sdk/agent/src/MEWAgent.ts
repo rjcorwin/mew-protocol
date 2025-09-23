@@ -571,10 +571,18 @@ Return a JSON object:
       this.ensureContextHeadroom();
 
       // Act phase
+      if (thought.action === 'cancelled') {
+        // Reasoning was cancelled during stream
+        this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: thought.actionInput?.reason || 'cancelled by user' });
+        this.reasoningCancelled = false;
+        this.reasoningCancelReason = undefined;
+        return `Reasoning cancelled: ${thought.actionInput?.reason || 'cancelled by user'}`;
+      }
+
       if (thought.action === 'respond') {
         return thought.actionInput;
       }
-      
+
       // Track tool call in conversation history
       if (thought.action === 'tool') {
         this.conversationHistory.push({
@@ -671,6 +679,13 @@ Return a JSON object:
     let tokenCount = 0;
 
     for await (const part of stream as any) {
+      // Check if reasoning was cancelled
+      if (this.reasoningCancelled) {
+        this.log('info', '🛑 Reasoning cancelled - aborting stream');
+        // Clean up and throw to exit early
+        throw new Error(`Reasoning cancelled: ${this.reasoningCancelReason || 'cancelled by user'}`);
+      }
+
       const choice = part?.choices?.[0];
 
       // Track progress even when no content is streaming
@@ -876,6 +891,17 @@ Return a JSON object:
       message = await this.createStreamingReasoning(messages, tools);
       streamed = true;
     } catch (error) {
+      // Check if this was a cancellation
+      if (this.reasoningCancelled) {
+        this.log('info', `Reasoning cancelled: ${this.reasoningCancelReason || 'cancelled by user'}`);
+        // Return a special thought indicating cancellation
+        return {
+          reasoning: 'Reasoning cancelled by user request',
+          action: 'cancelled',
+          actionInput: { reason: this.reasoningCancelReason || 'cancelled by user' }
+        };
+      }
+
       this.log('warn', `Streaming reasoning failed: ${error instanceof Error ? error.message : error}`);
       try {
         message = await this.createStandardReasoning(messages, tools);
@@ -1021,9 +1047,14 @@ Return a JSON object:
    * Act phase (ReAct: Act)
    */
   protected async act(action: string, input: any): Promise<string> {
+    if (action === 'cancelled') {
+      // Handle cancellation - no further action needed
+      return `Cancelled: ${input.reason || 'cancelled by user'}`;
+    }
+
     if (action === 'tool') {
       const result = await this.executeLLMToolCall(input.tool, input.arguments);
-      
+
       // Format the result as a string response
       if (typeof result === 'object' && result.content) {
         // MCP response format
@@ -1037,7 +1068,7 @@ Return a JSON object:
         return JSON.stringify(result);
       }
     }
-    
+
     return 'Action completed';
   }
 
@@ -1271,6 +1302,16 @@ Return a JSON object:
         reason: this.reasoningCancelReason
       });
       this.closeReasoningStream('cancelled');
+
+      // Immediately send reasoning/conclusion to confirm cancellation
+      this.emitReasoning('reasoning/conclusion', {
+        cancelled: true,
+        reason: this.reasoningCancelReason,
+        message: `Reasoning cancelled: ${this.reasoningCancelReason}`
+      });
+
+      // Clear reasoning context
+      this.reasoningContextId = undefined;
     }
   }
 
