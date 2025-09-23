@@ -1316,7 +1316,8 @@ The default interactive mode uses Ink (React for CLI) to provide a modern termin
 - Chat acknowledgement and cancellation shortcuts (`/ack`, `/cancel`) to manage UI queues
 - Participant control shortcuts (`/status`, `/pause`, `/resume`, `/forget`, `/clear`, `/restart`, `/shutdown`)
 - Stream negotiation helpers (`/stream request`, `/stream close`, `/streams`) with live frame previews
-- Reasoning status card with `/reason-cancel` hint and automatic stream mirroring for thoughts
+- Reasoning bar with token streaming, action display, and `/reason-cancel` control
+- Fixed-height UI components to prevent jitter during real-time updates
 
 **Architecture:**
 - Message history uses Ink's `Static` component for native scrolling
@@ -1330,6 +1331,89 @@ The default interactive mode uses Ink (React for CLI) to provide a modern termin
 - **Participant Status**: Displays most recent `participant/status` payloads (tokens, context occupancy, latency) per sender
 - **Pause State**: Highlights active pauses applied to the CLI participant with time remaining indicators
 - **Stream Monitor**: Lists current `stream/open` sessions and the latest raw frames decoded from `#streamId#` WebSocket traffic
+
+#### Reasoning Bar Display
+
+The advanced interactive mode includes a dedicated reasoning bar that appears when agents engage in reasoning sessions. This component provides real-time feedback about the agent's thought process, even when the underlying model doesn't stream the actual reasoning content.
+
+**Visual Design:**
+- Cyan rounded border distinguishes it from regular messages
+- Fixed height (8 lines) to prevent UI jitter during streaming
+- Animated spinner indicates active processing
+- Horizontal layout spreads information across the width
+
+**Information Display:**
+```
+╭─────────────────────────────────────────────────────────────╮
+│ ⠋ mew is thinking     90s   32 tokens                      │
+│ Using tool mcp-fs-bridge /read_text_file                    │
+│ ...preview of reasoning text (max 3 lines)...               │
+│                                                              │
+│ Use /reason-cancel to interrupt reasoning.                  │
+╰─────────────────────────────────────────────────────────────╯
+```
+
+**Content Elements:**
+1. **Status Line**:
+   - Animated spinner (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏) for visual activity
+   - Participant name ("mew is thinking")
+   - Elapsed time in seconds
+   - Token count or thought count depending on available data
+
+2. **Action Line** (when available):
+   - Shows current tool or action being executed
+   - Extracted from `reasoning/thought` payload's `action` field
+   - Example: "Using tool mcp-fs-bridge /read_text_file"
+
+3. **Text Preview**:
+   - Limited to 3 lines and 400 characters to prevent height changes
+   - Shows latest reasoning text or message
+   - Italicized gray text for visual distinction
+   - Ellipsis prefix when truncated
+
+4. **Control Hint**:
+   - Always displayed at bottom: "Use /reason-cancel to interrupt reasoning."
+   - Provides user with clear action to stop long-running reasoning
+
+**Streaming and Token Counting:**
+
+The reasoning bar handles two types of progress indication:
+
+1. **Token Streaming** (OpenAI-style models):
+   - Receives token count updates via `stream/data` frames
+   - Displays running total as "X tokens"
+   - Updates in real-time as tokens are generated
+   - No actual reasoning content streamed (model limitation)
+
+2. **Thought Counting** (legacy/fallback):
+   - Counts number of `reasoning/thought` messages
+   - Displays as "X thoughts"
+   - Used when token information not available
+
+**Implementation Details:**
+
+- **Fixed Layout**: All elements use fixed heights to prevent layout shifts:
+  - Main container: `height: 8`
+  - Action line: `height: 1`
+  - Text preview: `height: 3` (matches `maxLines`)
+  - Always renders elements with space character fallback to avoid Ink rendering errors
+
+- **State Management**:
+  - Tracks `activeReasoning` in UI state
+  - Updates on `reasoning/start` messages
+  - Clears on `reasoning/conclusion` or `/reason-cancel`
+  - Merges token metrics from multiple sources (thoughts and streams)
+
+- **Stream Integration**:
+  - Automatically subscribes to reasoning streams via `stream/request`
+  - Processes `stream/open` responses to track stream IDs
+  - Parses `#streamId#data` frames for token updates
+  - Handles `stream/close` for cleanup
+
+**User Interactions:**
+- `/reason-cancel [reason]` - Sends cancellation request to stop reasoning
+- Escape key can be used in some contexts to cancel
+- Visual feedback shows cancellation was sent
 
 ### Debug Mode (--debug flag)
 

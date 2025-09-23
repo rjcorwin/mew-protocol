@@ -1623,48 +1623,59 @@ function ReasoningStatus({ reasoning }) {
     ? reasoning.streamText
     : reasoning.message;
   const textLimit = 400;
-  const textPreview = displayText
-    ? displayText.length > textLimit
+  const maxLines = 3; // Limit to 3 lines to prevent height changes
+  let textPreview = null;
+  if (displayText) {
+    // First apply character limit
+    let preview = displayText.length > textLimit
       ? `…${displayText.slice(displayText.length - textLimit)}`
-      : displayText
-    : null;
+      : displayText;
+    // Then limit line count
+    const lines = preview.split('\n');
+    if (lines.length > maxLines) {
+      preview = '…' + lines.slice(-maxLines).join('\n');
+    }
+    textPreview = preview;
+  }
 
   return React.createElement(Box, {
     borderStyle: "round",
     borderColor: "cyan",
     paddingX: 1,
-    marginBottom: 1
+    marginBottom: 1,
+    height: 8  // Fixed height to completely prevent jitter
   },
-    React.createElement(Box, { flexDirection: "column" },
+    React.createElement(Box, { flexDirection: "column", height: "100%" },
       React.createElement(Box, { width: "100%" },
         React.createElement(Text, { color: "cyan", bold: true }, spinnerChars[spinnerIndex] + " "),
         React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`),
-        React.createElement(Text, { color: "gray", marginLeft: 4 }, `${elapsedTime}s`),
-        React.createElement(Text, { color: "gray", marginLeft: 2 },
+        React.createElement(Text, { color: "gray", marginLeft: 4 }, `  ${elapsedTime}s  `),
+        reasoning.tokenCount || reasoning.thoughtCount > 0 ? React.createElement(Text, { color: "gray", marginLeft: 3 },
           reasoning.tokenCount ? `${reasoning.tokenCount} tokens` : `${reasoning.thoughtCount} thoughts`
+        ) : null
+      ),
+      React.createElement(Box, { height: 1 },  // Fixed height for action line
+        React.createElement(Text, { color: "gray" }, reasoning.action || ' ')  // Use space instead of empty string
+      ),
+      React.createElement(Box, { marginTop: 0, height: maxLines },  // Fixed height for text preview - always rendered
+        React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" },
+          textPreview || ' '  // Use space to avoid empty string error
         )
       ),
-      reasoning.action && React.createElement(Box, { marginTop: 0 },
-        React.createElement(Text, { color: "gray" }, reasoning.action)
-      ),
-      textPreview && React.createElement(Box, { marginTop: 0 },
-      React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" },
-        textPreview
-      )
-    ),
-      tokenSummary?.summary && React.createElement(Box, { marginTop: 1 },
+      tokenSummary?.summary ? React.createElement(Box, { marginTop: 0 },
         React.createElement(Text, { color: "cyan" }, `Tokens: ${tokenSummary.summary}`)
-      ),
-      tokenSummary?.deltas && React.createElement(Box, { marginTop: 0 },
+      ) : null,
+      tokenSummary?.deltas ? React.createElement(Box, { marginTop: 0 },
         React.createElement(Text, { color: "cyan" }, `Δ ${tokenSummary.deltas}`)
-      ),
-      tokenSummary?.details && React.createElement(Box, { marginTop: 0 },
+      ) : null,
+      tokenSummary?.details ? React.createElement(Box, { marginTop: 0 },
         React.createElement(Text, { color: "gray" }, tokenSummary.details)
-      ),
-      tokenSummary && tokenUpdatedAgo && React.createElement(Box, { marginTop: 0 },
+      ) : null,
+      tokenSummary && tokenUpdatedAgo ? React.createElement(Box, { marginTop: 0 },
         React.createElement(Text, { color: "gray" }, `Updated ${tokenUpdatedAgo}`)
-      ),
-      React.createElement(Box, { marginTop: 1 },
+      ) : null,
+      React.createElement(Box, { marginTop: 0, flexGrow: 1 }),  // Spacer to push cancel hint to bottom
+      React.createElement(Box, null,
         React.createElement(Text, { color: "gray" }, 'Use /reason-cancel to interrupt reasoning.')
       )
     )
