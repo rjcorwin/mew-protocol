@@ -864,6 +864,20 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         break;
       }
       case '/cancel': {
+        // First check for active reasoning session
+        if (activeReasoning) {
+          const reason = args.length > 0 ? args.join(' ') : undefined;
+          sendMessage({
+            kind: 'reasoning/cancel',
+            context: activeReasoning.id,
+            payload: reason ? { reason } : {}
+          });
+          setActiveReasoning(null);
+          addSystemMessage(`Sent reasoning cancel${reason ? ` (${reason})` : ''}.`);
+          break;
+        }
+
+        // Otherwise handle chat acknowledgement cancellation
         const { entries, rest } = pickAcknowledgementEntries(args);
         if (entries.length === 0) {
           addSystemMessage('No chat messages matched for cancellation.');
@@ -872,21 +886,6 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         const reason = rest.length > 0 ? rest.join(' ') : 'cleared';
         cancelEntries(entries, reason);
         addSystemMessage(`Cancelled ${entries.length} chat message${entries.length === 1 ? '' : 's'}${reason ? ` (${reason})` : ''}.`);
-        break;
-      }
-      case '/reason-cancel': {
-        if (!activeReasoning) {
-          addSystemMessage('No active reasoning session to cancel.');
-          break;
-        }
-        const reason = args.length > 0 ? args.join(' ') : undefined;
-        sendMessage({
-          kind: 'reasoning/cancel',
-          context: activeReasoning.id,
-          payload: reason ? { reason } : {}
-        });
-        setActiveReasoning(null);
-        addSystemMessage(`Sent reasoning cancel${reason ? ` (${reason})` : ''}.`);
         break;
       }
       case '/status': {
@@ -1571,11 +1570,7 @@ function HelpModal({ onClose }) {
       React.createElement(Box, { marginTop: 1 }),
       React.createElement(Text, { color: "yellow", bold: true }, "Chat Queue"),
       React.createElement(Text, null, "/ack [selector] [status]     Acknowledge chat messages"),
-      React.createElement(Text, null, "/cancel [selector] [reason]  Cancel pending chat entries"),
-
-      React.createElement(Box, { marginTop: 1 }),
-      React.createElement(Text, { color: "magenta", bold: true }, "Reasoning"),
-      React.createElement(Text, null, "/reason-cancel [reason]      Cancel active reasoning"),
+      React.createElement(Text, null, "/cancel [selector] [reason]  Cancel reasoning or pending chats"),
 
       React.createElement(Box, { marginTop: 1 }),
       React.createElement(Text, { color: "green", bold: true }, "Participant Controls"),
@@ -1675,7 +1670,7 @@ function ReasoningStatus({ reasoning }) {
       ) : null,
       React.createElement(Box, { marginTop: 0, flexGrow: 1 }),  // Spacer to push cancel hint to bottom
       React.createElement(Box, null,
-        React.createElement(Text, { color: "gray" }, 'Use /reason-cancel to interrupt reasoning.')
+        React.createElement(Text, { color: "gray" }, 'Use /cancel to interrupt reasoning.')
       )
     )
   );
