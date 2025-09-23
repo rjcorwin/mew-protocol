@@ -1429,7 +1429,17 @@ Return a JSON object:
     this.reasoningStreamInfo.pending.push(chunk);
   }
 
-  private closeReasoningStream(_reason: string): void {
+  private closeReasoningStream(reason: string): void {
+    if (this.reasoningStreamInfo?.streamId) {
+      // Send stream/close message to properly clean up the stream
+      this.send({
+        kind: 'stream/close',
+        payload: {
+          stream_id: this.reasoningStreamInfo.streamId,
+          reason
+        }
+      });
+    }
     this.reasoningStreamInfo = undefined;
   }
 
