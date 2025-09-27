@@ -312,7 +312,7 @@ Any participant with the capability can reject proposals. Rejections provide ear
 
 #### 3.3.3 Standardized Reason Codes
 
-Lifecycle operations use standardized reason codes:
+Lifecycle operations may use the following suggested reason codes (optional and non-normative):
 
 - `"disagree"` - Don't agree with the proposed action
 - `"inappropriate"` - Not suitable for the current context
@@ -326,6 +326,8 @@ Lifecycle operations use standardized reason codes:
 - `"resource_limit"` - Would exceed resource constraints
 - `"no_longer_needed"` - Proposer no longer needs the operation
 - `"other"` - Reason not covered above
+
+These reason codes are suggestions only; participants MAY use other reason strings and MUST handle unknown codes gracefully.
 
 Detailed explanations can be provided via follow-up chat messages using `correlation_id`:
 
@@ -921,14 +923,12 @@ Instructs a participant to wipe its entire retained conversational or working me
   "id": "clear-1",
   "from": "orchestrator",
   "to": ["agent-1"],
-  "kind": "participant/clear",
-  "payload": {
-    "reason": "privacy_reset"
-  }
+  "kind": "participant/clear"
 }
 ```
 
 - `participant/clear` SHOULD be treated as stronger than `participant/forget` and MUST erase all cached context, scratchpads, and working memories
+- No additional payload fields are required; implementations MAY omit the `payload` property or include an empty object if their transport requires it
 - Participants SHOULD emit a follow-up `participant/status` confirming an empty context (e.g., `messages_in_context = 0`)
 
 #### 3.9.7 Participant Restart (kind = "participant/restart")
@@ -941,13 +941,11 @@ Returns a participant to a known baseline configuration:
   "id": "restart-1",
   "from": "orchestrator",
   "to": ["agent-1"],
-  "kind": "participant/restart",
-  "payload": {
-    "mode": "factory"
-  }
+  "kind": "participant/restart"
 }
 ```
 
+- No standard payload fields are required; implementations MAY include vendor-specific restart hints if all participants support them
 - Participants SHOULD terminate outstanding workflows and streams when restarting
 - Gateways MAY treat a restart as implicit acknowledgement that previous capability grants remain in effect unless explicitly
   revoked
@@ -962,13 +960,11 @@ Requests that a participant cease all activity without restarting, allowing the 
   "id": "shutdown-1",
   "from": "orchestrator",
   "to": ["agent-1"],
-  "kind": "participant/shutdown",
-  "payload": {
-    "reason": "maintenance"
-  }
+  "kind": "participant/shutdown"
 }
 ```
 
+- No standard payload fields are required; orchestrators MAY include optional context if their counterpart supports it
 - Participants SHOULD acknowledge shutdown via `chat/acknowledge` or by emitting a terminal `system/presence` leave event
 - After shutdown, gateways SHOULD reject further outbound envelopes from the participant until it rejoins the space
 
@@ -1029,9 +1025,7 @@ Confirms that a stream has been established and assigns the identifier used for 
 
 #### 3.10.3 Stream Data Frames (no envelope)
 
-Once a stream is open, binary or chunked data travels on the same WebSocket without the JSON envelope wrapper. Frames are
-prefixed using the pattern `#streamID#data`, matching the `#streamID#data` example provided with this update. Implementations
-MUST ensure framing preserves boundaries so receivers can demultiplex concurrent streams.
+Once a stream is open, binary or chunked data travels on the same WebSocket without the JSON envelope wrapper. Frames are prefixed using the pattern `#streamID#data`, matching the `#streamID#data` example provided with this update. Implementations MUST ensure framing preserves boundaries so receivers can demultiplex concurrent streams.
 
 #### 3.10.4 Stream Close (kind = "stream/close")
 
