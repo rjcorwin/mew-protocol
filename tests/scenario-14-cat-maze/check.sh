@@ -29,6 +29,14 @@ if [[ -z "${SOLVER_LOG:-}" ]]; then
   exit 1
 fi
 
+printf "%b\n" "${BLUE}Verifying CLI template discovery...${NC}"
+if node "${REPO_ROOT}/cli/bin/mew.js" init --list-templates | grep -q "cat-maze"; then
+  printf "%b\n" "${GREEN}✓ cat-maze template advertised by mew init${NC}"
+else
+  printf "%b\n" "${RED}✗ cat-maze template missing from mew init --list-templates${NC}"
+  exit 1
+fi
+
 : > "${SOLVER_LOG}"
 
 if node "${SCENARIO_DIR}/solver.js" --server "${SERVER_PATH}" --log "${SOLVER_LOG}"; then
