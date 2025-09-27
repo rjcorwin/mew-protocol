@@ -20,6 +20,79 @@ const { getSlashCommandSuggestions } = require('../utils/slashCommands');
 const fs = require('fs');
 const path = require('path');
 
+function tokensFromCommand(commandText) {
+  if (!commandText) return [];
+  return commandText.trim().split(/\s+/);
+}
+
+function tokenMatchesSuggestion(inputToken, expectedToken) {
+  if (!inputToken || !expectedToken) return false;
+  const actual = inputToken.toLowerCase();
+  const expected = expectedToken.toLowerCase();
+  return expected.startsWith(actual) || actual.startsWith(expected);
+}
+
+function findSlashCommandArgsIndex(input, commandText) {
+  const tokens = tokensFromCommand(commandText);
+  if (!input) return 0;
+  if (tokens.length === 0) return input.length;
+
+  let idx = 0;
+  let tokenIdx = 0;
+  let tokenStart = null;
+
+  const consumeMatchedToken = () => {
+    tokenIdx += 1;
+    if (tokenIdx === tokens.length) {
+      while (idx < input.length && /\s/.test(input[idx])) {
+        idx += 1;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  while (idx < input.length) {
+    const char = input[idx];
+    const isWhitespace = /\s/.test(char);
+
+    if (isWhitespace) {
+      if (tokenStart !== null) {
+        const tokenText = input.slice(tokenStart, idx);
+        if (tokenIdx < tokens.length && tokenMatchesSuggestion(tokenText, tokens[tokenIdx])) {
+          tokenStart = null;
+          idx += 1;
+          if (consumeMatchedToken()) {
+            return idx;
+          }
+          continue;
+        }
+        return tokenStart;
+      }
+      idx += 1;
+      continue;
+    }
+
+    if (tokenStart === null) {
+      tokenStart = idx;
+    }
+    idx += 1;
+  }
+
+  if (tokenStart !== null) {
+    const tokenText = input.slice(tokenStart, idx);
+    if (tokenIdx < tokens.length && tokenMatchesSuggestion(tokenText, tokens[tokenIdx])) {
+      tokenIdx += 1;
+      if (tokenIdx >= tokens.length) {
+        return idx;
+      }
+      return tokenStart;
+    }
+    return tokenStart;
+  }
+
+  return idx;
+}
 // Helper function for debug logging
 const debugLog = (message) => {
   const logFile = path.join(process.cwd(), '.mew', 'debug.log');
@@ -94,6 +167,62 @@ function EnhancedInput({
   const update = useCallback(() => {
     setUpdateCounter(c => c + 1);
   }, []);
+
+  // Handle autocomplete (defined early so other hooks can depend on it)
+  const handleAutocompleteAccept = useCallback(() => {
+    if (suggestions.length === 0) return;
+
+    const suggestion = suggestions[selectedSuggestion];
+    const template = suggestion.usage || suggestion.command;
+
+    const currentText = buffer.getText();
+    const leadingWhitespaceMatch = currentText.match(/^\s*/);
+    const leadingWhitespace = leadingWhitespaceMatch ? leadingWhitespaceMatch[0] : '';
+    const trimmedInput = currentText.slice(leadingWhitespace.length);
+
+    const commandBase = template.endsWith(' ')
+      ? template
+      : `${template} `;
+
+    let newText;
+
+    if (trimmedInput.startsWith('/')) {
+      const argsIndex = findSlashCommandArgsIndex(trimmedInput, suggestion.command);
+
+      let argsStartIndex = argsIndex;
+      if (argsStartIndex === 0) {
+        const firstWhitespaceMatch = trimmedInput.match(/\s+/);
+        if (firstWhitespaceMatch) {
+          const tentativeIndex = firstWhitespaceMatch.index + firstWhitespaceMatch[0].length;
+          if (tentativeIndex < trimmedInput.length) {
+            argsStartIndex = tentativeIndex;
+          } else {
+            argsStartIndex = -1;
+          }
+        } else {
+          argsStartIndex = -1;
+        }
+      }
+
+      const remainder = argsStartIndex >= 0 && argsStartIndex < trimmedInput.length
+        ? trimmedInput.slice(argsStartIndex).replace(/^\s*/, '')
+        : '';
+
+      newText = remainder
+        ? `${leadingWhitespace}${commandBase}${remainder}`
+        : `${leadingWhitespace}${commandBase}`;
+    } else {
+      newText = `${leadingWhitespace}${commandBase}`;
+    }
+
+    suppressSuggestionsRef.current = true;
+    buffer.setText(newText);
+    buffer.move('bufferEnd');
+    setIsAutocompleting(false);
+    setSuggestions([]);
+    setSelectedSuggestion(0);
+    update();
+  }, [suggestions, selectedSuggestion, buffer, update]);
 
   // Handle input submission (defined before handleCommand which uses it)
   const handleSubmit = useCallback(() => {
@@ -373,7 +502,7 @@ function EnhancedInput({
         // Unknown command
         break;
     }
-  }, [disabled, buffer, multiline, update, handleSubmit, suggestions, history, historyIndex, tempInput, setHistoryIndex, setTempInput]);
+  }, [disabled, buffer, multiline, update, handleSubmit, suggestions, history, historyIndex, tempInput, setHistoryIndex, setTempInput, handleAutocompleteAccept]);
 
   // Handle history navigation
   const handleHistoryPrev = useCallback(() => {
@@ -411,23 +540,6 @@ function EnhancedInput({
   }, [history, historyIndex, tempInput, buffer, update]);
 
   // Handle autocomplete
-  const handleAutocompleteAccept = useCallback(() => {
-    if (suggestions.length === 0) return;
-
-    const suggestion = suggestions[selectedSuggestion];
-    const template = suggestion.usage || suggestion.command;
-    const text = template.endsWith(' ')
-      ? template
-      : `${template} `;
-    suppressSuggestionsRef.current = true;
-    buffer.setText(text);
-    buffer.move('bufferEnd');
-    setIsAutocompleting(false);
-    setSuggestions([]);
-    setSelectedSuggestion(0);
-    update();
-  }, [suggestions, selectedSuggestion, buffer, update]);
-
   // Keyboard input handler
   useKeypress((key) => {
 
@@ -471,11 +583,15 @@ function EnhancedInput({
     // Get command from key binding first
     let command = getCommand(key, keyBindings);
 
-    // Special case: empty key object might be forward delete on Mac
-    // Note: On Mac, the "delete" key often acts like backspace
+    // Special case: empty key object might be forward delete on Mac or Tab without a name
     if (!key.input && !key.name && !command) {
-      debugLog(`Detected empty key - treating as DELETE_BACKWARD (Mac delete key)\n`);
-      command = 'DELETE_BACKWARD';  // Changed to backward for Mac compatibility
+      if (key.tab) {
+        debugLog(`Detected nameless key with tab flag - treating as AUTOCOMPLETE\n`);
+        command = 'AUTOCOMPLETE';
+      } else {
+        debugLog(`Detected empty key - treating as DELETE_BACKWARD (Mac delete key)\n`);
+        command = 'DELETE_BACKWARD';  // Changed to backward for Mac compatibility
+      }
     }
 
     debugLog(`Command matched: ${command || 'NONE'}\n`);
