@@ -481,13 +481,26 @@ gateway
       // Get or create space - use the configured space ID
       const spaceId = spaceConfig.space.id || 'default';
       if (!spaces.has(spaceId)) {
-        spaces.set(spaceId, { participants: new Map() });
+        spaces.set(spaceId, {
+          participants: new Map(),
+          streamCounter: 0,
+          activeStreams: new Map(),
+        });
       }
-      
+
       // Register this virtual connection in the space
       const space = spaces.get(spaceId);
+
+      // Backfill missing stream tracking fields for pre-existing spaces
+      if (typeof space.streamCounter !== 'number') {
+        space.streamCounter = 0;
+      }
+      if (!space.activeStreams) {
+        space.activeStreams = new Map();
+      }
+
       space.participants.set(participantId, virtualWs);
-      
+
       console.log(`${participantId} auto-connected with output to ${config.output_log}`);
     }
 
