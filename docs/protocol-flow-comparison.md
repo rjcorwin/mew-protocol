@@ -208,7 +208,7 @@ Agent      →   {kind: "chat", to: ["human"],                           → All
 ```json
 // Human → All (via gateway)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-1",
   "from": "human",
   "kind": "chat",
@@ -217,7 +217,7 @@ Agent      →   {kind: "chat", to: ["human"],                           → All
 
 // Agent → MCP Server (via gateway)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-2",
   "from": "agent",
   "to": ["mcp-server"],
@@ -235,7 +235,7 @@ Agent      →   {kind: "chat", to: ["human"],                           → All
 
 // MCP Server → Agent (via gateway)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-3",
   "from": "mcp-server",
   "to": ["agent"],
@@ -329,7 +329,7 @@ Agent      →   {kind: "chat", to: ["human"],                           → All
 ```json
 // Agent → All (PROPOSAL, not request)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-2",
   "from": "agent",
   "to": ["human"],
@@ -345,7 +345,7 @@ Agent      →   {kind: "chat", to: ["human"],                           → All
 
 // Human → MCP Server (FULFILLING the proposal)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-3",
   "from": "human",
   "to": ["mcp-server"],

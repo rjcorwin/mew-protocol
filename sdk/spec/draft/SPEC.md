@@ -654,7 +654,7 @@ When a chat message or MCP request arrives:
 ```typescript
 // Incoming MEW Protocol envelope
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-123",
   "from": "user",
   "to": ["agent"],
@@ -672,7 +672,7 @@ If `reasoningEnabled: true`, emit reasoning start:
 ```typescript
 // Agent sends reasoning/start message
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "reason-001",
   "from": "agent",
   "kind": "reasoning/start",
@@ -727,7 +727,7 @@ Return a JSON object with:
 ```typescript
 // Agent emits reasoning/thought
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "thought-001",
   "from": "agent",
   "kind": "reasoning/thought",
@@ -743,7 +743,7 @@ Return a JSON object with:
 ```typescript
 // Agent sends MCP request (or proposal if lacking capability)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "req-001",
   "from": "agent",
   "to": ["weather-service"],
@@ -762,7 +762,7 @@ Return a JSON object with:
 
 // Tool responds
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "resp-001",
   "from": "weather-service",
   "to": ["agent"],
@@ -820,7 +820,7 @@ Return a JSON object with:
 ```typescript
 // Another reasoning/thought
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "thought-002",
   "from": "agent",
   "kind": "reasoning/thought",
@@ -861,7 +861,7 @@ For your tip calculation: 15% of $85 is $12.75, making your total $97.75."
 ```typescript
 // Agent sends reasoning/conclusion
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "reason-end-001",
   "from": "agent",
   "kind": "reasoning/conclusion",
@@ -877,7 +877,7 @@ For your tip calculation: 15% of $85 is $12.75, making your total $97.75."
 ```typescript
 // Agent sends final response
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "response-001",
   "from": "agent",
   "to": ["user"],
@@ -1130,7 +1130,7 @@ maxIterations: 10
 - TypeScript 5.0+ (for TypeScript SDK)
 
 ### Protocol Dependencies
-- MEW Protocol v0.3
+- MEW Protocol v0.4
 - MCP (Model Context Protocol)
 
 ### Package Dependencies
@@ -1321,7 +1321,7 @@ Add state persistence:
 
 ## References
 
-- [MEW Protocol Specification v0.3](../spec/v0.3/SPEC.md)
+- [MEW Protocol Specification v0.4](../spec/v0.4/SPEC.md)
 - [MCP Specification](https://modelcontextprotocol.org)
 ### Chat Message Response Strategy
 

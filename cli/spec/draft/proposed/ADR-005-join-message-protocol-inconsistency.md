@@ -5,7 +5,7 @@ Proposed
 
 ## Context
 
-The current implementation has a significant inconsistency in how participants join spaces. The MEW Protocol v0.3 specification does not define a join mechanism, leaving it as an implementation detail. However, the CLI implementation uses **two different join message formats** inconsistently across different components.
+The current implementation has a significant inconsistency in how participants join spaces. The MEW Protocol v0.4 specification does not define a join mechanism, leaving it as an implementation detail. However, the CLI implementation uses **two different join message formats** inconsistently across different components.
 
 ### Current Implementation Issues:
 
@@ -13,7 +13,7 @@ The current implementation has a significant inconsistency in how participants j
 ```javascript
 // Used in client.js and agent.js
 {
-  type: 'join',                    // NOT MEW v0.3 compliant
+  type: 'join',                    // NOT MEW v0.4 compliant
   participantId: 'participant-id',
   space: 'space-name',
   token: 'auth-token'
@@ -24,7 +24,7 @@ The current implementation has a significant inconsistency in how participants j
 ```javascript
 // Used in space.js for interactive connections
 {
-  protocol: 'mew/v0.3',           // MEW v0.3 compliant envelope
+  protocol: 'mew/v0.4',           // MEW v0.4 compliant envelope
   id: 'join-12345',
   ts: '2025-01-10T12:00:00Z',
   kind: 'system/join',
@@ -49,12 +49,12 @@ This creates confusion, maintenance burden, and protocol compliance issues.
 
 ## Decision
 
-We will **standardize on the MEW v0.3 compliant `system/join` envelope format** and deprecate the legacy `type: 'join'` format.
+We will **standardize on the MEW v0.4 compliant `system/join` envelope format** and deprecate the legacy `type: 'join'` format.
 
 ### Standard Join Message Format:
 ```javascript
 {
-  protocol: 'mew/v0.3',
+  protocol: 'mew/v0.4',
   id: `join-${uuidv4()}`,
   ts: new Date().toISOString(),
   from: participantId,              // NEW: sender identification
@@ -69,7 +69,7 @@ We will **standardize on the MEW v0.3 compliant `system/join` envelope format** 
 ```
 
 ### Rationale for MEW Compliance:
-1. **Protocol Consistency**: All messages follow MEW v0.3 envelope format
+1. **Protocol Consistency**: All messages follow MEW v0.4 envelope format
 2. **Future Compatibility**: Aligns with protocol evolution
 3. **Tooling Compatibility**: Works with MEW protocol analyzers
 4. **Audit Trail**: Standard envelope provides tracking fields (`id`, `ts`, `from`)
@@ -80,7 +80,7 @@ We will **standardize on the MEW v0.3 compliant `system/join` envelope format** 
 ```javascript
 // Gateway continues accepting both formats during transition
 if (message.kind === 'system/join') {
-  // Standard MEW v0.3 format (preferred)
+  // Standard MEW v0.4 format (preferred)
   handleMEWJoin(message);
 } else if (message.type === 'join') {
   // Legacy format (deprecated, with warning)
@@ -105,9 +105,9 @@ ws.send(JSON.stringify({
   token: options.token,
 }));
 
-// AFTER (MEW v0.3 compliant)  
+// AFTER (MEW v0.4 compliant)  
 const joinMessage = {
-  protocol: 'mew/v0.3',
+  protocol: 'mew/v0.4',
   id: `join-${Date.now()}`,
   ts: new Date().toISOString(),
   from: participantId,
@@ -129,7 +129,7 @@ ws.send(JSON.stringify(joinMessage));
 ### Phase 3: Gateway Cleanup
 Remove legacy format support after transition period:
 ```javascript
-// Only accept MEW v0.3 compliant format
+// Only accept MEW v0.4 compliant format
 if (message.kind === 'system/join') {
   handleJoin(message);
 } else {
@@ -139,7 +139,7 @@ if (message.kind === 'system/join') {
 
 ## Protocol Extension Consideration
 
-Since MEW Protocol v0.3 does not define join semantics, this is effectively a **protocol extension** that should be documented.
+Since MEW Protocol v0.4 does not define join semantics, this is effectively a **protocol extension** that should be documented.
 
 ### Proposed MEW Protocol Extension:
 ```
@@ -206,9 +206,9 @@ Month 7+: Remove legacy format support
 ### Format Validation Tests:
 ```javascript
 describe('Join Message Handling', () => {
-  test('accepts MEW v0.3 compliant join', () => {
+  test('accepts MEW v0.4 compliant join', () => {
     const message = {
-      protocol: 'mew/v0.3',
+      protocol: 'mew/v0.4',
       id: 'join-123',
       ts: new Date().toISOString(),
       from: 'test-participant',
@@ -247,7 +247,7 @@ Send a join message to connect:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "join-unique-id",
   "ts": "2025-01-10T12:00:00Z", 
   "from": "your-participant-id",
@@ -275,7 +275,7 @@ Gateway responds with `system/welcome` containing your capabilities.
 **New Format (Required):**
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "kind": "system/join", 
   "payload": { "space": "...", "participant": "...", "token": "..." }
 }
@@ -302,7 +302,7 @@ Gateway responds with `system/welcome` containing your capabilities.
 ## Consequences
 
 ### Positive:
-- **Protocol Consistency**: All messages follow MEW v0.3 envelope
+- **Protocol Consistency**: All messages follow MEW v0.4 envelope
 - **Future Compatibility**: Aligned with protocol evolution
 - **Maintainability**: Single format to test and support
 - **Tooling**: Standard MEW analyzers can parse join messages

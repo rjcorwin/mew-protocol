@@ -293,29 +293,29 @@ Mark old versions as deprecated but keep for reference
 
 2. **Update Draft Spec**
    - Keep SPEC.md as starting point for next version
-   - Update version header to indicate next target (e.g., "draft for v0.3")
+   - Update version header to indicate next target (e.g., "draft for v0.4")
    - Remove completed work that won't carry forward
 
 3. **Add README Clarifications**
    ```bash
    # Add README to each decision folder explaining state
-   echo "# Proposed ADRs for v0.3" > spec/draft/decisions/proposed/README.md
-   echo "# No accepted ADRs for v0.3 yet" > spec/draft/decisions/accepted/README.md
-   echo "# No rejected ADRs for v0.3 yet" > spec/draft/decisions/rejected/README.md
+   echo "# Proposed ADRs for v0.4" > spec/draft/decisions/proposed/README.md
+   echo "# No accepted ADRs for v0.4 yet" > spec/draft/decisions/accepted/README.md
+   echo "# No rejected ADRs for v0.4 yet" > spec/draft/decisions/rejected/README.md
    ```
 
 ### Example Release Flow
 
 ```bash
-# 1. Release v0.2 from draft
-cp -r spec/draft spec/v0.2
-rmdir spec/v0.2/decisions/proposed
-# Edit spec/v0.2/SPEC.md to update version
+# 1. Release v0.4 from draft
+cp -r spec/draft spec/v0.4
+rmdir spec/v0.4/decisions/proposed
+# Edit spec/v0.4/SPEC.md to update version
 
-# 2. Prepare draft for v0.3
+# 2. Prepare draft for v0.5
 rm -rf spec/draft/decisions/accepted/*.md
 rm -rf spec/draft/decisions/rejected/*.md
-# Edit spec/draft/SPEC.md to indicate "draft for v0.3"
+# Edit spec/draft/SPEC.md to indicate "draft for v0.5"
 
 # 3. Continue development
 # New ADRs go in spec/draft/decisions/proposed/

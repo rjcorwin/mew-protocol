@@ -152,7 +152,7 @@ Discover what tools the fileserver provides:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-1",
   "from": "human",
   "to": ["filesystem-server"],
@@ -170,7 +170,7 @@ Check what resources are exposed:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-2",
   "from": "human",
   "to": ["filesystem-server"],
@@ -188,7 +188,7 @@ List files in the current directory:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-3",
   "from": "human",
   "to": ["filesystem-server"],
@@ -212,7 +212,7 @@ Read contents of a specific file:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-4",
   "from": "human",
   "to": ["filesystem-server"],
@@ -236,7 +236,7 @@ Create or update a file:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-5",
   "from": "human",
   "to": ["filesystem-server"],
@@ -261,7 +261,7 @@ Get metadata about a file:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-6",
   "from": "human",
   "to": ["filesystem-server"],
@@ -285,7 +285,7 @@ Create a new directory:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-7",
   "from": "human",
   "to": ["filesystem-server"],
@@ -309,7 +309,7 @@ Move or rename a file:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-8",
   "from": "human",
   "to": ["filesystem-server"],
@@ -334,7 +334,7 @@ Delete a file:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "test-9",
   "from": "human",
   "to": ["filesystem-server"],
@@ -359,7 +359,7 @@ Successful responses should look like:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "resp-X",
   "from": "mcp-fs-bridge",
   "to": ["human"],
@@ -379,7 +379,7 @@ Error responses will have an `error` field instead of `result`:
 
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "resp-X",
   "from": "mcp-fs-bridge",
   "to": ["human"],

@@ -205,7 +205,7 @@ client.on('reconnected', () => {});
 
 ## Protocol Version
 
-This SDK implements MEW v0.2 (moving to v0.3). See the specification for protocol details.
+This SDK implements MEW v0.4. See the specification for protocol details.
 
 ## License
 

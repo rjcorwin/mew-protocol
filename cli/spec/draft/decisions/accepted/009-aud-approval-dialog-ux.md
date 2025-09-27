@@ -182,7 +182,7 @@ This ensures users always know:
 When user selects "Yes, allow all X during this session", the CLI sends a capability grant message:
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "from": "human",
   "to": ["coder-agent"],
   "kind": "capability/grant",
@@ -452,7 +452,7 @@ function ProposalDialog({ proposal, onApprove, onDeny, sessionPermissions }) {
       case 2:
         // Grant capability for all similar operations
         const grant = {
-          protocol: "mew/v0.3",
+          protocol: "mew/v0.4",
           from: participantId,
           to: [proposal.from],
           kind: "capability/grant",

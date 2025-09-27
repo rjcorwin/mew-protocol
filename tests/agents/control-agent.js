@@ -82,7 +82,7 @@ let activeStreamId = null;
 
 function sendEnvelope(envelope) {
   const fullEnvelope = {
-    protocol: 'mew/v0.3',
+    protocol: 'mew/v0.4',
     id: envelope.id || generateId('env'),
     ts: new Date().toISOString(),
     from: participantId,

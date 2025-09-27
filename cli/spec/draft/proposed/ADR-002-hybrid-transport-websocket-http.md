@@ -47,7 +47,7 @@ Content-Type: application/json
 ```
 
 The gateway adds protocol envelope fields:
-- `protocol: "mew/v0.3"`
+- `protocol: "mew/v0.4"`
 - `id: "http-${timestamp}-${random}"`
 - `ts: "${iso8601_timestamp}"`
 - `from: "${participantId}"`
@@ -89,7 +89,7 @@ app.post('/participants/:participantId/messages', (req, res) => {
   
   // Build complete envelope
   const envelope = {
-    protocol: 'mew/v0.3',
+    protocol: 'mew/v0.4',
     id: `http-${Date.now()}-${randomId()}`,
     ts: new Date().toISOString(),
     from: participantId,

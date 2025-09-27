@@ -66,7 +66,7 @@ ws.on('message', (data) => {
 
         // Send success response
         const response = {
-          protocol: 'mew/v0.3',
+          protocol: 'mew/v0.4',
           id: `response-${messageId++}`,
           ts: new Date().toISOString(),
           from: PARTICIPANT_ID,
@@ -91,7 +91,7 @@ ws.on('message', (data) => {
 
         // Send error response
         const errorResponse = {
-          protocol: 'mew/v0.3',
+          protocol: 'mew/v0.4',
           id: `error-response-${messageId++}`,
           ts: new Date().toISOString(),
           from: PARTICIPANT_ID,

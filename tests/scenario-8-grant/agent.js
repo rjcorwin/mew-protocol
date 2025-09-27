@@ -70,7 +70,7 @@ ws.on('message', (data) => {
 
     // Send acknowledgment
     const ack = {
-      protocol: 'mew/v0.3',
+      protocol: 'mew/v0.4',
       id: `ack-${messageId++}`,
       ts: new Date().toISOString(),
       from: PARTICIPANT_ID,
@@ -114,7 +114,7 @@ ws.on('close', () => {
 function sendProposal(filename, content) {
   log(`Sending PROPOSAL to write "${content}" to ${filename}`);
   const proposal = {
-    protocol: 'mew/v0.3',
+    protocol: 'mew/v0.4',
     id: `proposal-${messageId++}`,
     ts: new Date().toISOString(),
     from: PARTICIPANT_ID,
@@ -138,7 +138,7 @@ function sendProposal(filename, content) {
 function sendDirectRequest(filename, content) {
   log(`Sending DIRECT REQUEST to write "${content}" to ${filename}`);
   const request = {
-    protocol: 'mew/v0.3',
+    protocol: 'mew/v0.4',
     id: `request-${messageId++}`,
     ts: new Date().toISOString(),
     from: PARTICIPANT_ID,
