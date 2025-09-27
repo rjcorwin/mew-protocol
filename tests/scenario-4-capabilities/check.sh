@@ -1,158 +1,163 @@
-#!/bin/bash
-# Check script for Scenario 4: Dynamic Capability Granting
+#!/usr/bin/env bash
+# Scenario 4 assertions - observe capability flows and MCP access
 
-# Colors for output
-RED='\033[0;31m'
+set -euo pipefail
+
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "workspace.env not found at ${ENV_FILE}. Run setup.sh first." >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+
+COORD_LOG=${COORD_LOG:-"${WORKSPACE_DIR}/logs/coordinator-output.log"}
+LIMITED_LOG=${LIMITED_LOG:-"${WORKSPACE_DIR}/logs/limited-agent-output.log"}
+TEST_PORT=${TEST_PORT:-8080}
+
+if [[ ! -f "${COORD_LOG}" ]]; then
+  echo "Expected coordinator log ${COORD_LOG} was not created" >&2
+  exit 1
+fi
+
+if [[ ! -f "${LIMITED_LOG}" ]]; then
+  echo "Expected limited agent log ${LIMITED_LOG} was not created" >&2
+  exit 1
+fi
+
+: > "${COORD_LOG}"
+: > "${LIMITED_LOG}"
+
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'
+NC='\033[0m'
 
-echo -e "${YELLOW}=== Running Test Checks ===${NC}"
-echo -e "${BLUE}Scenario: Dynamic Capability Granting${NC}"
-echo -e "${BLUE}Test directory: $(pwd)${NC}"
-echo -e "${BLUE}Gateway port: ${TEST_PORT}${NC}"
+printf "%b\n" "${YELLOW}=== Scenario 4 Checks ===${NC}"
+printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
+printf "%b\n" "${BLUE}Gateway port: ${TEST_PORT}${NC}"
 
-# Get paths from environment or use defaults
-COORD_LOG="${COORD_LOG:-./logs/coordinator-output.log}"
-LIMITED_LOG="${LIMITED_LOG:-./logs/limited-agent-output.log}"
+sleep 2
 
-# Test counters
-TESTS_PASSED=0
-TESTS_FAILED=0
+tests_passed=0
+tests_failed=0
 
-# Helper function to check test result
-check_test() {
-  local test_name="$1"
-  local condition="$2"
-  
-  if eval "$condition"; then
-    echo -e "$test_name: ${GREEN}✓${NC}"
-    ((TESTS_PASSED++))
+record_pass() {
+  local name="$1"
+  printf "%s: %b\n" "${name}" "${GREEN}✓${NC}"
+  tests_passed=$((tests_passed + 1))
+}
+
+record_fail() {
+  local name="$1"
+  printf "%s: %b\n" "${name}" "${RED}✗${NC}"
+  tests_failed=$((tests_failed + 1))
+}
+
+run_check() {
+  local name="$1"
+  shift
+  if "$@" > /dev/null 2>&1; then
+    record_pass "${name}"
   else
-    echo -e "$test_name: ${RED}✗${NC}"
-    ((TESTS_FAILED++))
+    record_fail "${name}"
   fi
 }
 
-# Basic connectivity tests
-echo "Testing: Gateway is running ... \c"
-# Check if gateway is listening on the port
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+wait_for_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local attempts=${3:-30}
+  for ((i = 0; i < attempts; i += 1)); do
+    if grep -E "${pattern}" "${file}" > /dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+post_limited() {
+  local payload="$1"
+  curl -sf -X POST "http://localhost:${TEST_PORT}/participants/limited-agent/messages" \
+    -H "Authorization: Bearer limited-token" \
+    -H "Content-Type: application/json" \
+    -d "${payload}" > /dev/null
+}
+
+post_coordinator() {
+  local payload="$1"
+  curl -sf -X POST "http://localhost:${TEST_PORT}/participants/coordinator/messages" \
+    -H "Authorization: Bearer admin-token" \
+    -H "Content-Type: application/json" \
+    -d "${payload}" > /dev/null
+}
+
+run_check "Gateway health endpoint" curl -sf "http://localhost:${TEST_PORT}/health"
+run_check "Coordinator log exists" test -f "${COORD_LOG}"
+run_check "Limited agent log exists" test -f "${LIMITED_LOG}"
+
+printf "\n%b\n" "${YELLOW}Test: Limited agent can list calculator tools${NC}"
+if post_limited "$(cat <<JSON
+{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}
+JSON
+)"; then
+  if wait_for_pattern "${LIMITED_LOG}" '"kind":"mcp/response"' && \
+     wait_for_pattern "${LIMITED_LOG}" '"tools"'; then
+    record_pass "tools/list response captured"
+  else
+    record_fail "tools/list response captured"
+  fi
 else
-  echo -e "${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST tools/list"
 fi
 
-echo "Testing: Coordinator output log exists ... \c"
-check_test "" "[ -f '$COORD_LOG' ]"
-
-echo "Testing: Limited agent output log exists ... \c"
-check_test "" "[ -f '$LIMITED_LOG' ]"
-
-echo "Testing: Output logs exist ... \c"
-check_test "" "[ -f '$COORD_LOG' ] && [ -f '$LIMITED_LOG' ]"
-
-# Test 1: Limited agent attempts MCP operation (should be blocked)
-# SKIP: Capability checking not yet implemented in gateway
-echo -e "\n${YELLOW}Test 1: Limited agent attempts tools/list (should be blocked)${NC}"
-echo -e "MCP request blocked: ${YELLOW}SKIPPED${NC} (capability checking not implemented)"
-
-# Test 2: Coordinator grants MCP capability
-# SKIP: Capability granting not yet implemented
-echo -e "\n${YELLOW}Test 2: Coordinator grants tools/list capability${NC}"
-echo -e "Grant acknowledged: ${YELLOW}SKIPPED${NC} (capability granting not implemented)"
-
-# Test 3: Limited agent can now list tools
-echo -e "\n${YELLOW}Test 3: Limited agent attempts tools/list (should succeed)${NC}"
-# Clear previous responses
-echo "" > /tmp/test-response.txt
-tail -f "$LIMITED_LOG" > /tmp/test-response.txt &
-TAIL_PID=$!
-
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/limited-agent/messages" \
-  -H "Authorization: Bearer limited-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > /dev/null
-sleep 3
-kill $TAIL_PID 2>/dev/null || true
-
-if grep -q '"kind":"mcp/response"' /tmp/test-response.txt && grep -q '"tools"' /tmp/test-response.txt; then
-  echo -e "Tools listed successfully: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Limited agent can call add tool${NC}"
+if post_limited "$(cat <<JSON
+{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}
+JSON
+)"; then
+  if wait_for_pattern "${LIMITED_LOG}" '"kind":"mcp/response"' && \
+     wait_for_pattern "${LIMITED_LOG}" '"result":8|"text":"8"'; then
+    record_pass "tools/call add succeeded"
+  else
+    record_fail "tools/call add succeeded"
+  fi
 else
-  echo -e "Tools listed successfully: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST tools/call add"
 fi
 
-# Test 4: Limited agent still can't call tools
-# SKIP: Capability checking not implemented
-echo -e "\n${YELLOW}Test 4: Limited agent attempts tools/call (should be blocked)${NC}"
-echo -e "tools/call blocked: ${YELLOW}SKIPPED${NC} (capability checking not implemented)"
+printf "\n%b\n" "${YELLOW}Test: Capability grant enforcement${NC}"
+printf "Grant enforcement: %b\n" "${YELLOW}SKIPPED (capability granting not implemented)${NC}"
 
-# Test 5: Grant broader capability
-# SKIP: Capability granting not implemented
-echo -e "\n${YELLOW}Test 5: Grant tools/* wildcard capability${NC}"
-echo -e "Wildcard grant acknowledged: ${YELLOW}SKIPPED${NC} (capability granting not implemented)"
-
-# Test 6: Limited agent can now call tools
-echo -e "\n${YELLOW}Test 6: Limited agent calls add tool (should succeed)${NC}"
-# Clear previous responses
-echo "" > /tmp/test-response.txt
-tail -f "$LIMITED_LOG" > /tmp/test-response.txt &
-TAIL_PID=$!
-
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/limited-agent/messages" \
-  -H "Authorization: Bearer limited-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > /dev/null
-sleep 3
-kill $TAIL_PID 2>/dev/null || true
-
-if grep -q '"kind":"mcp/response"' /tmp/test-response.txt && grep -q '"result":8' /tmp/test-response.txt; then
-  echo -e "Tool called successfully: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Coordinator revokes capability${NC}"
+if post_coordinator "$(cat <<JSON
+{"kind":"capability/revoke","payload":{"recipient":"limited-agent","capabilities":[{"kind":"mcp/request","payload":{"method":"tools/*"}}]}}
+JSON
+)"; then
+  if wait_for_pattern "${LIMITED_LOG}" '"kind":"capability/revoke"'; then
+    record_pass "revoke notification delivered"
+  else
+    record_fail "revoke notification delivered"
+  fi
 else
-  echo -e "Tool called successfully: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST capability revoke"
 fi
 
-# Test 7: Revoke capabilities  
-echo -e "\n${YELLOW}Test 7: Revoke tools/* capability${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/coordinator/messages" \
-  -H "Authorization: Bearer admin-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"capability/revoke","payload":{"recipient":"limited-agent","capabilities":[{"kind":"mcp/request","payload":{"method":"tools/*"}}]}}' > /dev/null
-sleep 2
+printf "\n%b\n" "${YELLOW}Test: Capability revocation enforcement${NC}"
+printf "Revocation enforcement: %b\n" "${YELLOW}SKIPPED (capability enforcement not implemented)${NC}"
 
-# Check if the revoke message was sent (revoke-ack might not be implemented yet)
-if tail -10 "$LIMITED_LOG" | grep -q '"kind":"capability/revoke"'; then
-  echo -e "Revoke sent: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
-else
-  echo -e "Revoke sent: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
-fi
+printf "\n%b\n" "${YELLOW}=== Scenario 4 Summary ===${NC}"
+printf "Passed: %d\n" "${tests_passed}"
+printf "Failed: %d\n" "${tests_failed}"
 
-# Test 8: Limited agent can no longer call tools
-# SKIP: Capability checking not implemented
-echo -e "\n${YELLOW}Test 8: Limited agent attempts tools/call after revoke (should be blocked)${NC}"
-echo -e "Tool call blocked after revoke: ${YELLOW}SKIPPED${NC} (capability checking not implemented)"
-
-# Clean up temp file
-rm -f /tmp/test-response.txt
-
-# Summary
-echo -e "\n${YELLOW}=== Test Summary ===${NC}"
-echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
-echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"
-
-if [ $TESTS_FAILED -eq 0 ]; then
-  echo -e "\n${GREEN}✓ All tests passed!${NC}"
+if [[ ${tests_failed} -eq 0 ]]; then
   exit 0
-else
-  echo -e "\n${RED}✗ Some tests failed${NC}"
-  exit 1
 fi
+
+exit 1

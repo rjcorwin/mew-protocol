@@ -1,0 +1,8 @@
+{
+  "name": "scenario-6-errors",
+  "description": "Gateway error handling and validation edge cases",
+  "version": "0.1.0",
+  "variables": [
+    { "name": "SPACE_NAME", "description": "Space identifier", "default": "scenario-6-errors" }
+  ]
+}

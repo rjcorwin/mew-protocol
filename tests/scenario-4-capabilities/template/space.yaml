@@ -1,0 +1,42 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 4 - Dynamic Capabilities"
+  description: "Exercise capability grant and revoke flows"
+
+participants:
+  calculator-agent:
+    type: local
+    tokens: ["calculator-token"]
+    auto_start: true
+    command: "node"
+    args:
+      - "./.mew/agents/calculator-agent.js"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "calculator-token"
+    capabilities:
+      - kind: "mcp/response"
+      - kind: "system/*"
+
+  coordinator:
+    tokens: ["admin-token"]
+    auto_connect: true
+    output_log: "./logs/coordinator-output.log"
+    capabilities:
+      - kind: "capability/grant"
+      - kind: "capability/revoke"
+      - kind: "system/*"
+
+  limited-agent:
+    tokens: ["limited-token"]
+    auto_connect: true
+    output_log: "./logs/limited-agent-output.log"
+    capabilities:
+      - kind: "system/*"
+
+defaults:
+  capabilities:
+    - kind: "system/*"

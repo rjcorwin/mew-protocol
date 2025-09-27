@@ -1,0 +1,9 @@
+{
+  "name": "scenario-6-errors-{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scenario 6 template for MEW integration tests (error handling)",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

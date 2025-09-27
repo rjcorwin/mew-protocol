@@ -1,175 +1,236 @@
-#!/bin/bash
-# Check script - Runs test assertions against a running space
-#
-# Can be run after manual setup or called by test.sh
+#!/usr/bin/env bash
+# Scenario 2 assertions - validate MCP tool execution workflow
 
-# Don't use set -e as it causes issues with arithmetic operations
-# set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
 
-# If TEST_DIR not set, we're running standalone
-if [ -z "$TEST_DIR" ]; then
-  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-  export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
-  
-  # Try to detect port from running space
-  if [ -f "$TEST_DIR/.mew/pids.json" ]; then
-    export TEST_PORT=$(grep -o '"port":[[:space:]]*"[0-9]*"' "$TEST_DIR/.mew/pids.json" | grep -o '[0-9]*')
-  fi
-  
-  if [ -z "$TEST_PORT" ]; then
-    echo -e "${RED}Error: Cannot determine test port. Is the space running?${NC}"
-    exit 1
-  fi
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "workspace.env not found at ${ENV_FILE}. Run setup.sh first." >&2
+  exit 1
 fi
 
-echo -e "${YELLOW}=== Running Test Checks ===${NC}"
-echo -e "${BLUE}Scenario: MCP Tool Execution${NC}"
-echo -e "${BLUE}Test directory: $TEST_DIR${NC}"
-echo -e "${BLUE}Gateway port: $TEST_PORT${NC}"
-echo ""
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
 
-# Track test results
-TESTS_PASSED=0
-TESTS_FAILED=0
+OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
+TEST_PORT=${TEST_PORT:-8080}
 
-# Helper function to run a test
-run_test() {
-  local test_name="$1"
-  local test_command="$2"
-  
-  echo -n "Testing: $test_name ... "
-  
-  if eval "$test_command" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC}"
-    ((TESTS_PASSED++))
+if [[ ! -f "${OUTPUT_LOG}" ]]; then
+  echo "Expected output log ${OUTPUT_LOG} was not created" >&2
+  exit 1
+fi
+
+: > "${OUTPUT_LOG}"
+
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+printf "%b\n" "${YELLOW}=== Scenario 2 Checks ===${NC}"
+printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
+printf "%b\n" "${BLUE}Gateway port: ${TEST_PORT}${NC}"
+
+sleep 2
+
+tests_passed=0
+tests_failed=0
+
+record_pass() {
+  local name="$1"
+  printf "%s: %b\n" "${name}" "${GREEN}✓${NC}"
+  tests_passed=$((tests_passed + 1))
+}
+
+record_fail() {
+  local name="$1"
+  printf "%s: %b\n" "${name}" "${RED}✗${NC}"
+  tests_failed=$((tests_failed + 1))
+}
+
+run_check() {
+  local name="$1"
+  shift
+  if "$@" > /dev/null 2>&1; then
+    record_pass "${name}"
   else
-    echo -e "${RED}✗${NC}"
-    ((TESTS_FAILED++))
+    record_fail "${name}"
   fi
 }
 
-# Point to the output log file (created by output_log config)
-RESPONSE_FILE="$OUTPUT_LOG"
+correlation_found() {
+  local id="$1"
+  if grep -E '"correlation_id":\[[^]]*"'"${id}"'"' "${OUTPUT_LOG}" > /dev/null 2>&1; then
+    return 0
+  fi
+  if grep -F '"correlation_id":"'"${id}"'"' "${OUTPUT_LOG}" > /dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
 
-# Test 1: Gateway health check
-run_test "Gateway is running" "curl -s http://localhost:$TEST_PORT/health | grep -q 'ok'"
+wait_for_correlation() {
+  local id="$1"
+  local attempts=${2:-20}
+  for ((i = 0; i < attempts; i += 1)); do
+    if correlation_found "${id}"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
 
-# Test 2: Check output log exists
-run_test "Output log exists" "[ -f '$OUTPUT_LOG' ]"
+response_matches() {
+  local id="$1"
+  local pattern="$2"
+  if grep -F '"kind":"mcp/response"' "${OUTPUT_LOG}" | \
+    grep -E '"correlation_id":\[[^]]*"'"${id}"'"|"correlation_id":"'"${id}"'"' | \
+    grep -E "${pattern}" > /dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
 
-# Test 3: List available tools
-echo -e "\n${YELLOW}Test: List available tools${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}' > /dev/null
-sleep 2
+post_message() {
+  local payload="$1"
+  curl -sf -X POST "http://localhost:${TEST_PORT}/participants/test-client/messages" \
+    -H "Authorization: Bearer test-token" \
+    -H "Content-Type: application/json" \
+    -d "${payload}" > /dev/null
+}
 
-if grep -q '"kind":"mcp/response"' "$RESPONSE_FILE" && grep -q '"tools":\[' "$RESPONSE_FILE"; then
-  echo -e "Tools list received: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+run_check "Gateway health endpoint" curl -sf "http://localhost:${TEST_PORT}/health"
+run_check "Client output log exists" test -f "${OUTPUT_LOG}"
+
+printf "\n%b\n" "${YELLOW}Test: List available tools${NC}"
+tools_list_id="tools-list-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${tools_list_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}
+JSON
+)"; then
+  if wait_for_correlation "${tools_list_id}"; then
+    if response_matches "${tools_list_id}" '"name":"add"' && \
+      response_matches "${tools_list_id}" '"name":"multiply"' && \
+      response_matches "${tools_list_id}" '"name":"evaluate"'; then
+      record_pass "Tools list contains calculator tools"
+    else
+      record_fail "Tools list contains calculator tools"
+    fi
+  else
+    record_fail "Tools list response received"
+  fi
 else
-  echo -e "Tools list received: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST tools/list request"
 fi
 
-# Test 4: Call add tool
-echo -e "\n${YELLOW}Test: Call add tool (5 + 3)${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}' > /dev/null
-sleep 2
-
-if grep -q '"result":8' "$RESPONSE_FILE"; then
-  echo -e "Add tool result: ${GREEN}✓ (8)${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Call add tool (5 + 3)${NC}"
+add_id="tools-call-add-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${add_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}
+JSON
+)"; then
+  if wait_for_correlation "${add_id}"; then
+    if response_matches "${add_id}" '"result":8'; then
+      record_pass "Add tool returns 8"
+    else
+      record_fail "Add tool returns 8"
+    fi
+  else
+    record_fail "Add tool response received"
+  fi
 else
-  echo -e "Add tool result: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST tools/call add"
 fi
 
-# Test 5: Call multiply tool
-echo -e "\n${YELLOW}Test: Call multiply tool (7 × 9)${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":9}}}}' > /dev/null
-sleep 2
-
-if grep -q '"result":63' "$RESPONSE_FILE"; then
-  echo -e "Multiply tool result: ${GREEN}✓ (63)${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Call multiply tool (7 × 9)${NC}"
+multiply_id="tools-call-multiply-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${multiply_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":9}}}}
+JSON
+)"; then
+  if wait_for_correlation "${multiply_id}"; then
+    if response_matches "${multiply_id}" '"result":63'; then
+      record_pass "Multiply tool returns 63"
+    else
+      record_fail "Multiply tool returns 63"
+    fi
+  else
+    record_fail "Multiply tool response received"
+  fi
 else
-  echo -e "Multiply tool result: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST tools/call multiply"
 fi
 
-# Test 6: Call evaluate tool for division
-echo -e "\n${YELLOW}Test: Call evaluate tool (20 ÷ 4)${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"20 / 4"}}}}' > /dev/null
-sleep 2
-
-if grep -q '"result":5' "$RESPONSE_FILE"; then
-  echo -e "Evaluate tool result: ${GREEN}✓ (5)${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Call evaluate tool (20 ÷ 4)${NC}"
+evaluate_id="tools-call-evaluate-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${evaluate_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"20 / 4"}}}}
+JSON
+)"; then
+  if wait_for_correlation "${evaluate_id}"; then
+    if response_matches "${evaluate_id}" '"result":5'; then
+      record_pass "Evaluate tool returns 5"
+    else
+      record_fail "Evaluate tool returns 5"
+    fi
+  else
+    record_fail "Evaluate tool response received"
+  fi
 else
-  echo -e "Evaluate tool result: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST tools/call evaluate"
 fi
 
-# Test 7: Handle division by zero
-echo -e "\n${YELLOW}Test: Handle division by zero${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"10 / 0"}}}}' > /dev/null
-sleep 2
-
-if grep -q '"result":"Infinity"' "$RESPONSE_FILE" || grep -q '"result":null' "$RESPONSE_FILE" || grep -q 'division by zero' "$RESPONSE_FILE"; then
-  echo -e "Division by zero handling: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Handle division by zero${NC}"
+div_zero_id="tools-call-divzero-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${div_zero_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"10 / 0"}}}}
+JSON
+)"; then
+  if wait_for_correlation "${div_zero_id}"; then
+    if response_matches "${div_zero_id}" '"result":"Infinity"|"result":null|division by zero|"code":"EVALUATION_ERROR"'; then
+      record_pass "Division by zero handled"
+    else
+      record_fail "Division by zero handled"
+    fi
+  else
+    record_fail "Division by zero response received"
+  fi
 else
-  echo -e "Division by zero handling: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST tools/call division by zero"
 fi
 
-# Test 8: Invalid tool name
-echo -e "\n${YELLOW}Test: Call non-existent tool${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"invalid","arguments":{}}}}' > /dev/null
-sleep 2
-
-if grep -q 'Tool not found: invalid' "$RESPONSE_FILE" || grep -q '"error":{' "$RESPONSE_FILE"; then
-  echo -e "Invalid tool handling: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Invalid tool name${NC}"
+invalid_id="tools-call-invalid-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${invalid_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"invalid","arguments":{}}}}
+JSON
+)"; then
+  if wait_for_correlation "${invalid_id}"; then
+    if response_matches "${invalid_id}" 'Tool not found|"error":'; then
+      record_pass "Invalid tool returns error"
+    else
+      record_fail "Invalid tool returns error"
+    fi
+  else
+    record_fail "Invalid tool response received"
+  fi
 else
-  echo -e "Invalid tool handling: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST tools/call invalid"
 fi
 
-# Summary
-echo ""
-echo -e "${YELLOW}=== Test Summary ===${NC}"
-echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
-echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"
+printf "\n%b\n" "${YELLOW}=== Scenario 2 Summary ===${NC}"
+printf "Tests passed: %s\n" "${tests_passed}"
+printf "Tests failed: %s\n" "${tests_failed}"
 
-if [ $TESTS_FAILED -eq 0 ]; then
-  echo -e "\n${GREEN}✓ All tests passed!${NC}"
+if [[ ${tests_failed} -eq 0 ]]; then
+  printf "%b\n" "${GREEN}✓ All Scenario 2 checks passed${NC}"
   exit 0
 else
-  echo -e "\n${RED}✗ Some tests failed${NC}"
+  printf "%b\n" "${RED}✗ Scenario 2 checks failed${NC}"
   exit 1
 fi

@@ -1,0 +1,8 @@
+{
+  "name": "scenario-7-mcp-bridge",
+  "description": "MCP bridge integration with filesystem server",
+  "version": "0.1.0",
+  "variables": [
+    { "name": "SPACE_NAME", "description": "Space identifier", "default": "scenario-7-mcp-bridge" }
+  ]
+}

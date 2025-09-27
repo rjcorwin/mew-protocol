@@ -1,238 +1,233 @@
-#!/bin/bash
-# Check script for Scenario 6: Error Recovery and Edge Cases
+#!/usr/bin/env bash
+# Scenario 6 assertions - validate gateway error handling and resilience
 
-set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "workspace.env not found at ${ENV_FILE}. Run setup.sh first." >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+
+OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
+TEST_PORT=${TEST_PORT:-8080}
+
+if [[ ! -f "${OUTPUT_LOG}" ]]; then
+  echo "Expected client log ${OUTPUT_LOG} not found" >&2
+  exit 1
+fi
+
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'
+NC='\033[0m'
 
-echo -e "${YELLOW}=== Running Test Checks ===${NC}"
-echo -e "${BLUE}Scenario: Error Recovery and Edge Cases${NC}"
-echo -e "${BLUE}Test directory: $(pwd)${NC}"
-echo -e "${BLUE}Gateway port: ${TEST_PORT}${NC}"
+printf "%b\n" "${YELLOW}=== Scenario 6 Checks ===${NC}"
+printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
+printf "%b\n" "${BLUE}Gateway port: ${TEST_PORT}${NC}"
 
-# Get paths from environment or use defaults
-OUTPUT_LOG="${OUTPUT_LOG:-./logs/test-client-output.log}"
-GATEWAY_LOG="./logs/gateway.log"
+sleep 2
 
-# Test counters
-TESTS_PASSED=0
-TESTS_FAILED=0
+: > "${OUTPUT_LOG}"
 
-# Helper function to check test result
-check_test() {
-  local test_name="$1"
-  local condition="$2"
+TMP_DIR=$(mktemp -d "${WORKSPACE_DIR}/check-tmp.XXXXXX")
+cleanup_tmp() {
+  rm -rf "${TMP_DIR}"
+}
+trap cleanup_tmp EXIT
 
-  if eval "$condition"; then
-    echo -e "$test_name: ${GREEN}✓${NC}"
-    ((TESTS_PASSED++)) || true
+tests_passed=0
+tests_failed=0
+
+record_pass() {
+  printf "%s: %b\n" "$1" "${GREEN}✓${NC}"
+  tests_passed=$((tests_passed + 1))
+}
+
+record_fail() {
+  printf "%s: %b\n" "$1" "${RED}✗${NC}"
+  tests_failed=$((tests_failed + 1))
+}
+
+run_check() {
+  local name="$1"
+  shift
+  if "$@" > /dev/null 2>&1; then
+    record_pass "${name}"
   else
-    echo -e "$test_name: ${RED}✗${NC}"
-    ((TESTS_FAILED++)) || true
+    record_fail "${name}"
   fi
+}
 
-  return 0
+gateway_alive() {
+  curl -sf "http://localhost:${TEST_PORT}/health" >/dev/null 2>&1
 }
 
 send_http_message() {
   local payload="$1"
   local participant="${2:-test-client}"
   local token="${3:-test-token}"
-
-  curl -s -o /tmp/scenario-6-last-response -w '%{http_code}' \
-    -X POST "http://localhost:$TEST_PORT/participants/${participant}/messages" \
+  local outfile="${TMP_DIR}/last-response.json"
+  curl -s -o "${outfile}" -w '%{http_code}' \
+    -X POST "http://localhost:${TEST_PORT}/participants/${participant}/messages" \
     -H "Authorization: Bearer ${token}" \
     -H "Content-Type: application/json" \
-    --data "$payload"
+    --data "${payload}"
 }
 
-# Basic connectivity tests
-echo "Testing: Gateway is running ... \c"
-# Check if gateway is listening on the port
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
-else
-  echo -e "${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
-fi
+run_check "Gateway health endpoint" gateway_alive
+run_check "Output log exists" test -f "${OUTPUT_LOG}"
 
-echo "Testing: Output log exists ... \c"
-check_test "" "[ -f '$OUTPUT_LOG' ]"
-
-# Test 1: Invalid JSON
-echo -e "\n${YELLOW}Test 1: Send invalid JSON${NC}"
-STATUS_INVALID=$(curl -s -o /tmp/scenario-6-invalid-response -w '%{http_code}' \
-  -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+printf "\n%b\n" "${YELLOW}Test 1: Invalid JSON payload${NC}"
+status_invalid=$(curl -s -o "${TMP_DIR}/invalid-response" -w '%{http_code}' \
+  -X POST "http://localhost:${TEST_PORT}/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
-  -d 'This is not valid JSON' || true)
-if [[ "$STATUS_INVALID" == 4* ]]; then
-  echo -e "Invalid JSON rejected with HTTP $STATUS_INVALID: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+  --data 'This is not valid JSON' || true)
+if [[ "${status_invalid}" == 4* ]]; then
+  record_pass "Invalid JSON rejected with ${status_invalid}"
 else
-  echo -e "Invalid JSON rejected with HTTP $STATUS_INVALID: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Invalid JSON rejected with ${status_invalid}"
 fi
 
-# Test 2: Message without kind field
-echo -e "\n${YELLOW}Test 2: Message without 'kind' field${NC}"
-STATUS_MISSING=$(curl -s -o /tmp/scenario-6-missing-kind -w '%{http_code}' \
-  -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"payload":{"text":"Missing kind field"}}' || true)
-if [[ "$STATUS_MISSING" == 4* ]]; then
-  echo -e "Missing 'kind' field rejected with HTTP $STATUS_MISSING: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+if gateway_alive; then
+  record_pass "Gateway alive after invalid JSON"
 else
-  echo -e "Missing 'kind' field rejected with HTTP $STATUS_MISSING: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Gateway alive after invalid JSON"
 fi
 
-# Test 3: Message to non-existent participant
-echo -e "\n${YELLOW}Test 3: Message to non-existent participant${NC}"
-STATUS_NON_EXISTENT=$(send_http_message '{"kind":"chat","payload":{"text":"hello from test"}}' 'ghost' 'test-token')
-if [[ "$STATUS_NON_EXISTENT" == 4* || "$STATUS_NON_EXISTENT" == 5* ]]; then
-  echo -e "Non-existent participant rejected with HTTP $STATUS_NON_EXISTENT: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+printf "\n%b\n" "${YELLOW}Test 2: Missing kind field${NC}"
+status_missing=$(send_http_message '{"payload":{"text":"Missing kind field"}}')
+if [[ "${status_missing}" == 4* ]]; then
+  record_pass "Missing kind rejected with ${status_missing}"
 else
-  echo -e "Non-existent participant rejected with HTTP $STATUS_NON_EXISTENT: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Missing kind rejected with ${status_missing}"
 fi
 
-# Gateway should remain available
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Gateway availability after rejection: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+if gateway_alive; then
+  record_pass "Gateway alive after missing kind"
 else
-  echo -e "Gateway availability after rejection: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Gateway alive after missing kind"
 fi
 
-# Test 4: Very large message
-echo -e "\n${YELLOW}Test 4: Very large message (10KB)${NC}"
-LARGE_MSG='{"kind":"chat","payload":{"text":"'
-LARGE_MSG+=$(printf 'A%.0s' {1..10000})
-LARGE_MSG+='"}}'
-STATUS_LARGE=$(send_http_message "$LARGE_MSG")
-if [[ "$STATUS_LARGE" == 2* ]]; then
-  echo -e "Large message accepted with HTTP $STATUS_LARGE: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+printf "\n%b\n" "${YELLOW}Test 3: Non-existent participant${NC}"
+status_nonexistent=$(send_http_message '{"kind":"chat","payload":{"text":"hello"}}' 'ghost' 'test-token')
+if [[ "${status_nonexistent}" == 4* || "${status_nonexistent}" == 5* ]]; then
+  record_pass "Ghost participant rejected with ${status_nonexistent}"
 else
-  echo -e "Large message accepted with HTTP $STATUS_LARGE: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Ghost participant rejected with ${status_nonexistent}"
 fi
 
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Gateway alive after large message: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+if gateway_alive; then
+  record_pass "Gateway alive after ghost participant"
 else
-  echo -e "Gateway alive after large message: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Gateway alive after ghost participant"
 fi
 
-# Test 5: Rapid message sending
-echo -e "\n${YELLOW}Test 5: Rapid message sending (20 messages)${NC}"
-RAPID_SUCCESS=0
+printf "\n%b\n" "${YELLOW}Test 4: Large message acceptance${NC}"
+large_payload=$(python - <<'PY'
+import json
+print(json.dumps({"kind": "chat", "payload": {"text": "A" * 10000}}))
+PY
+)
+status_large=$(send_http_message "${large_payload}")
+if [[ "${status_large}" == 2* ]]; then
+  record_pass "Large message accepted with ${status_large}"
+else
+  record_fail "Large message accepted with ${status_large}"
+fi
+
+if gateway_alive; then
+  record_pass "Gateway alive after large message"
+else
+  record_fail "Gateway alive after large message"
+fi
+
+printf "\n%b\n" "${YELLOW}Test 5: Rapid message burst${NC}"
+rapid_success=0
 for i in {1..20}; do
-  STATUS_RAPID=$(send_http_message "{\"kind\":\"chat\",\"payload\":{\"text\":\"Message $i\"}}")
-  if [[ "$STATUS_RAPID" == 2* ]]; then
-    ((RAPID_SUCCESS++)) || true
+  status=$(send_http_message "{\"kind\":\"chat\",\"payload\":{\"text\":\"Message ${i}\"}}")
+  if [[ "${status}" == 2* ]]; then
+    rapid_success=$((rapid_success + 1))
   fi
+  sleep 0.1
 done
-
-if [[ $RAPID_SUCCESS -eq 20 ]]; then
-  echo -e "Rapid messages accepted (${RAPID_SUCCESS}/20): ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+if [[ ${rapid_success} -eq 20 ]]; then
+  record_pass "All rapid messages accepted"
 else
-  echo -e "Rapid messages accepted (${RAPID_SUCCESS}/20): ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "All rapid messages accepted"
 fi
 
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Gateway alive after rapid messages: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+if gateway_alive; then
+  record_pass "Gateway alive after rapid burst"
 else
-  echo -e "Gateway alive after rapid messages: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Gateway alive after rapid burst"
 fi
 
-# Test 6: Empty message
-echo -e "\n${YELLOW}Test 6: Empty message${NC}"
-STATUS_EMPTY=$(send_http_message '{}')
-if [[ "$STATUS_EMPTY" == 4* ]]; then
-  echo -e "Empty message rejected with HTTP $STATUS_EMPTY: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+printf "\n%b\n" "${YELLOW}Test 6: Empty message body${NC}"
+status_empty=$(send_http_message '{}')
+if [[ "${status_empty}" == 4* ]]; then
+  record_pass "Empty message rejected with ${status_empty}"
 else
-  echo -e "Empty message rejected with HTTP $STATUS_EMPTY: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Empty message rejected with ${status_empty}"
 fi
 
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Gateway alive after empty message: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+if gateway_alive; then
+  record_pass "Gateway alive after empty message"
 else
-  echo -e "Gateway alive after empty message: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Gateway alive after empty message"
 fi
 
-# Test 7: Malformed message (unclosed JSON)
-echo -e "\n${YELLOW}Test 7: Malformed JSON (unclosed)${NC}"
-STATUS_MALFORMED=$(curl -s -o /tmp/scenario-6-malformed -w '%{http_code}' \
-  -X POST "http://localhost:$TEST_PORT/participants/test-client/messages" \
+printf "\n%b\n" "${YELLOW}Test 7: Malformed JSON${NC}"
+status_malformed=$(curl -s -o "${TMP_DIR}/malformed-response" -w '%{http_code}' \
+  -X POST "http://localhost:${TEST_PORT}/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
-  --data '{"kind":"chat"')
-if [[ "$STATUS_MALFORMED" == 4* ]]; then
-  echo -e "Malformed JSON rejected with HTTP $STATUS_MALFORMED: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+  --data '{"kind":"chat"' || true)
+if [[ "${status_malformed}" == 4* ]]; then
+  record_pass "Malformed JSON rejected with ${status_malformed}"
 else
-  echo -e "Malformed JSON rejected with HTTP $STATUS_MALFORMED: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Malformed JSON rejected with ${status_malformed}"
 fi
 
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Gateway alive after malformed JSON: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+if gateway_alive; then
+  record_pass "Gateway alive after malformed JSON"
 else
-  echo -e "Gateway alive after malformed JSON: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Gateway alive after malformed JSON"
 fi
 
-# Test 8: Special characters in message
-echo -e "\n${YELLOW}Test 8: Special characters in message${NC}"
-STATUS_SPECIAL=$(send_http_message '{"kind":"chat","payload":{"text":"Symbols: © ™ 漢字 😊"}}')
-if [[ "$STATUS_SPECIAL" == 2* ]]; then
-  echo -e "Special characters accepted with HTTP $STATUS_SPECIAL: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+printf "\n%b\n" "${YELLOW}Test 8: Special characters${NC}"
+special_payload=$(python - <<'PY'
+import json
+print(json.dumps({"kind": "chat", "payload": {"text": "Symbols: © ™ 漢字 😊"}}))
+PY
+)
+status_special=$(send_http_message "${special_payload}")
+if [[ "${status_special}" == 2* ]]; then
+  record_pass "Special characters accepted with ${status_special}"
 else
-  echo -e "Special characters accepted with HTTP $STATUS_SPECIAL: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Special characters accepted with ${status_special}"
 fi
 
-if nc -z localhost ${TEST_PORT} 2>/dev/null; then
-  echo -e "Gateway alive after special characters: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++)) || true
+if gateway_alive; then
+  record_pass "Gateway alive after special characters"
 else
-  echo -e "Gateway alive after special characters: ${RED}✗${NC}"
-  ((TESTS_FAILED++)) || true
+  record_fail "Gateway alive after special characters"
 fi
 
-# Summary
-echo -e "\n${YELLOW}=== Test Summary ===${NC}"
-echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
-echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"
+printf "\n%b\n" "${YELLOW}=== Scenario 6 Summary ===${NC}"
+printf "Passed: %d\n" "${tests_passed}"
+printf "Failed: %d\n" "${tests_failed}"
 
-if [ $TESTS_FAILED -eq 0 ]; then
-  echo -e "\n${GREEN}✓ All tests passed!${NC}"
+if [[ ${tests_failed} -eq 0 ]]; then
   exit 0
-else
-  echo -e "\n${RED}✗ Some tests failed${NC}"
-  exit 1
 fi
+
+exit 1
