@@ -4,13 +4,13 @@ This folder contains rejected Architecture Decision Records kept for historical 
 
 ## Current Status
 
-The following draft ADRs were rejected while preparing MEW Protocol v0.4:
+The following ADRs were rejected prior to the v0.4 release:
 - ADR-REN — Rename Participant to Entity
 - ADR-WCM — Where to Put MCP Request/Proposal Auto-Conversion Logic
-- ADR-DSA — Data Stream Announcements (superseded by incorporated stream guidance)
+- ADR-DSA — Data Stream Announcements (streams documented directly in the spec)
 - ADR-002 — Join Protocol Extension for Space Participation
 - ADR-CTX — Simplify Context Terminology
-- ADR-009 — Gateway I/O Options for Participant Communication (scope-limited to WebSocket for v0.4)
+- ADR-009 — Gateway I/O Options for Participant Communication (non-WebSocket I/O remains optional guidance)
 
 ## Format
 

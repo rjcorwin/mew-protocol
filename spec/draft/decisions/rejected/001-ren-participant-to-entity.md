@@ -1,9 +1,11 @@
 # ADR-REN: Rename Participant to Entity
 
-**Status:** Proposed
-**Date:** 2025-01-10
+**Status:** Rejected  
+**Date:** 2025-01-10  
 **Context:** MEW Protocol v0.3
-**Incorporation:** Not Incorporated
+**Incorporation:** Not Incorporated  
+**Rejection Date:** 2025-09-26  
+**Rejection Rationale:** Retaining "participant" terminology for v0.4 maintains compatibility with existing implementations; the rename needs additional planning beyond this release.
 
 ## Context
 

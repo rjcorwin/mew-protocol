@@ -1,9 +1,11 @@
 # ADR-DSA: Data Stream Announcements
 
-**Status:** Proposed
-**Date:** 2025-01-10
+**Status:** Rejected  
+**Date:** 2025-01-10  
 **Context:** MEW Protocol v0.3
-**Incorporation:** Not Incorporated
+**Incorporation:** Not Incorporated  
+**Rejection Date:** 2025-09-26  
+**Rejection Rationale:** Streaming primitives remain out of scope for the v0.4 protocol release; the team will revisit once core request/proposal flows stabilize.
 
 ## Context
 

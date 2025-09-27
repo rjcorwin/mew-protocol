@@ -10,6 +10,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **v1.0+**: Will follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Breaking changes are expected in v0.x releases as the protocol evolves
 
+## [v0.4] - 2025-09-26
+
+### Added
+- Participant runtime management messages: `participant/request-status`, `participant/status`, `participant/forget`, `participant/clear`, `participant/restart`, `participant/shutdown`
+- Stream lifecycle guidance including `stream/request`, `stream/open`, `stream/close`, and associated binary framing semantics
+- Optional HTTP message injection endpoints for gateways that need polling workflows
+
+### Changed
+- Protocol identifier bumped to `mew/v0.4`; clients and gateways must agree on the new version identifier
+
 ## [v0.1] - 2025-08-27
 
 ### Breaking Changes from v0.0

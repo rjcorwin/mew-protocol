@@ -1,7 +1,8 @@
-# MEW Protocol Draft Specification
+# MEW Protocol v0.4 Specification
 
-Status: draft  
-Date: 2025-01-09
+Version: v0.4  
+Status: Released  
+Release Date: 2025-09-26  
 Intended Status: Experimental  
 Editors: RJ Corwin (https://github.com/rjcorwin)
 
@@ -43,7 +44,7 @@ All data flowing over a space MUST be a single top-level JSON envelope:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "2f6b6e70-7b36-4b8b-9ad8-7c4f7d0e2d0b",
   "ts": "2025-08-26T14:00:00Z",
   "from": "robot-alpha",
@@ -56,7 +57,7 @@ All data flowing over a space MUST be a single top-level JSON envelope:
 ```
 
 Field semantics:
-- `protocol`: MUST be `"mew/v0.x"` for this version
+- `protocol`: MUST be `"mew/v0.4"` for this version
 - `id`: globally unique message id (e.g., UUIDv4)
 - `ts`: RFC3339 timestamp
 - `from`: stable participant id within the space
@@ -127,7 +128,7 @@ Example tool call request:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-call-1",
   "from": "trusted-agent",
   "to": ["target-agent"],
@@ -152,7 +153,7 @@ Response to the above tool call:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-resp-1",
   "from": "target-agent",
   "to": ["trusted-agent"],
@@ -179,7 +180,7 @@ Participants with restricted capabilities MUST use proposals instead of direct M
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-req-1",
   "from": "untrusted-agent",
   "to": ["target-agent"],
@@ -208,7 +209,7 @@ Example fulfillment:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-fulfill-1",
   "from": "human-user",
   "to": ["target-agent"],
@@ -230,7 +231,7 @@ The response goes only to the fulfiller who made the request. The response's `co
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-fulfill-resp-1",
   "from": "target-agent",
   "to": ["human-user"],
@@ -265,7 +266,7 @@ Proposers can withdraw their own proposals that are no longer needed:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "withdraw-456",
   "from": "untrusted-agent",
   "correlation_id": ["env-req-1"],
@@ -286,7 +287,7 @@ Any participant with the capability can reject proposals. Rejections provide ear
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "reject-789",
   "from": "filesystem-agent",
   "to": ["untrusted-agent"],
@@ -333,7 +334,7 @@ Detailed explanations can be provided via follow-up chat messages using `correla
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "chat-790",
   "from": "filesystem-agent",
   "to": ["untrusted-agent"],
@@ -357,7 +358,7 @@ Chat messages are MEW Protocol-specific and do not pollute the MCP namespace:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-chat-1",
   "from": "user-alice",
   "kind": "chat",
@@ -379,7 +380,7 @@ signal that they observed a chat entry but have no substantive reply:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "chat-ack-1",
   "from": "agent-1",
   "kind": "chat/acknowledge",
@@ -405,7 +406,7 @@ avoid stale follow-ups:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "chat-cancel-1",
   "from": "user-alice",
   "kind": "chat/cancel",
@@ -454,7 +455,7 @@ Signals the beginning of a reasoning sequence:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "reason-start-1",
   "from": "agent-1",
   "kind": "reasoning/start",
@@ -471,7 +472,7 @@ Shares internal reasoning steps (monologue, no reply expected):
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "thought-1",
   "from": "agent-1",
   "kind": "reasoning/thought",
@@ -488,7 +489,7 @@ Concludes the reasoning sequence:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "reason-end-1",
   "from": "agent-1",
   "kind": "reasoning/conclusion",
@@ -506,7 +507,7 @@ participant needs to abort due to higher-priority work:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "reason-cancel-1",
   "from": "agent-1",
   "kind": "reasoning/cancel",
@@ -549,7 +550,7 @@ Allows participants with appropriate capabilities to grant capabilities to other
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "grant-789",
   "from": "trusted-orchestrator",
   "to": ["untrusted-agent"],
@@ -583,7 +584,7 @@ Revokes previously granted capabilities:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "revoke-123",
   "from": "orchestrator",
   "kind": "capability/revoke",
@@ -599,7 +600,7 @@ Alternatively, revoke by capability pattern (removes ALL matching capabilities):
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "revoke-456",
   "from": "orchestrator",
   "kind": "capability/revoke",
@@ -624,7 +625,7 @@ Recipients acknowledge capability grants:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "ack-001",
   "from": "agent",
   "correlation_id": ["grant-789"],
@@ -641,7 +642,7 @@ Invites new participants to the space:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "invite-123",
   "from": "admin",
   "kind": "space/invite",
@@ -671,7 +672,7 @@ Removes participants from the space:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "kick-456",
   "from": "admin",
   "kind": "space/kick",
@@ -696,7 +697,7 @@ Presence messages are broadcast to notify all participants about join/leave even
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-presence-1",
   "from": "system:gateway",
   "kind": "system/presence",
@@ -728,7 +729,7 @@ When a participant connects, the gateway MUST send a welcome message addressed s
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-welcome-1",
   "from": "system:gateway",
   "to": ["new-participant"],
@@ -772,7 +773,7 @@ When a participant attempts an operation they lack capability for:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "env-violation-1",
   "from": "system:gateway",
   "to": ["violator"],
@@ -802,7 +803,7 @@ Requests that a participant temporarily stop emitting new work:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "pause-1",
   "from": "orchestrator",
   "to": ["agent-1"],
@@ -824,7 +825,7 @@ Lifts a previously applied pause:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "resume-1",
   "from": "orchestrator",
   "to": ["agent-1"],
@@ -845,7 +846,7 @@ hyphenated name is normative:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "status-request-1",
   "from": "orchestrator",
   "to": ["agent-1"],
@@ -866,7 +867,7 @@ Reports runtime telemetry such as token consumption and context occupancy. This 
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "status-1",
   "from": "agent-1",
   "kind": "participant/status",
@@ -880,7 +881,7 @@ Reports runtime telemetry such as token consumption and context occupancy. This 
 }
 ```
 
-- `tokens` and `max_tokens` provide the usage context requested in this draft update
+- `tokens` and `max_tokens` provide the usage context introduced in this release
 - `messages_in_context` MUST be included and counts envelopes currently retained for the active conversational context
 - Additional metrics are allowed and should use descriptive snake_case keys
 - Participants MAY broadcast status to improve observability, but gateways MAY limit dissemination to reduce noise
@@ -894,7 +895,7 @@ newest data, corresponding to the `(Oldest|Newest)` notation in the request:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "forget-1",
   "from": "orchestrator",
   "to": ["agent-1"],
@@ -919,7 +920,7 @@ Instructs a participant to wipe its entire retained conversational or working me
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "clear-1",
   "from": "orchestrator",
   "to": ["agent-1"],
@@ -937,7 +938,7 @@ Returns a participant to a known baseline configuration:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "restart-1",
   "from": "orchestrator",
   "to": ["agent-1"],
@@ -956,7 +957,7 @@ Requests that a participant cease all activity without restarting, allowing the 
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "shutdown-1",
   "from": "orchestrator",
   "to": ["agent-1"],
@@ -980,7 +981,7 @@ Sent by whichever entity initiates stream negotiation (typically a participant a
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "stream-req-1",
   "from": "agent-1",
   "to": ["gateway"],
@@ -1007,7 +1008,7 @@ Confirms that a stream has been established and assigns the identifier used for 
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "stream-open-1",
   "from": "gateway",
   "to": ["agent-1"],
@@ -1033,7 +1034,7 @@ Terminates a stream and releases associated resources:
 
 ```json
 {
-  "protocol": "mew/v0.x",
+  "protocol": "mew/v0.4",
   "id": "stream-close-1",
   "from": "gateway",
   "to": ["agent-1"],
@@ -1194,12 +1195,9 @@ The gateway:
 
 The capabilities in the welcome message constitute the authoritative list of what operations the participant can perform. Participants SHOULD use this list to understand their allowed operations.
 
-### 5.3 Alternative I/O Mechanisms
+### 5.3 HTTP Message Injection (Optional)
 
-In addition to WebSocket connections, gateways MAY support alternative I/O mechanisms for participant communication:
-
-#### 5.3.1 HTTP REST API
-Gateways MAY expose HTTP endpoints for message injection:
+Gateways MAY expose HTTP endpoints that let trusted callers inject MEW envelopes without maintaining a WebSocket connection. These endpoints mirror the WebSocket semantics and MUST enforce the same capability rules as live connections.
 
 ```
 POST /participants/{participant_id}/messages
@@ -1214,7 +1212,7 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
+**Typical response**
 ```json
 {
   "id": "msg-123",
@@ -1223,44 +1221,18 @@ Content-Type: application/json
 }
 ```
 
-**Message Retrieval (optional):**
+Gateways MAY also expose a retrieval endpoint for polling scenarios:
+
 ```
 GET /participants/{participant_id}/messages?since={timestamp}
 Authorization: Bearer {token}
 ```
 
-Returns array of messages addressed to this participant since the given timestamp.
-
-#### 5.3.2 Standard I/O (stdio)
-Gateways MAY spawn participant processes and communicate via standard input/output:
-
-- Messages TO participant: Written to process stdin as JSON lines
-- Messages FROM participant: Read from process stdout as JSON lines
-- Process stderr: Used for logging/debugging (not protocol messages)
-
-**Configuration example:**
-```yaml
-participants:
-  my-agent:
-    command: "./my-agent"
-    args: ["--mode", "stdio"]
-    io: stdio  # Uses stdin/stdout instead of WebSocket
-```
-
-#### 5.3.3 I/O Mechanism Selection
-The I/O mechanism for a participant is determined by:
-1. Explicit configuration in space definition (`io` field)
-2. Connection method (WebSocket connection vs HTTP POST)
-3. Gateway spawning the process (stdio)
-
-All I/O mechanisms MUST:
-- Deliver complete MEW Protocol envelopes
-- Enforce the same capability model
-- Provide the same message ordering guarantees (best-effort)
+Responses MUST contain complete envelopes and respect the caller's capabilities; messages the caller lacks permission to view MUST be omitted.
 
 ### 5.4 Message Filtering
 
-For each incoming message from a participant (regardless of I/O mechanism):
+For each incoming message from a participant:
 
 ```python
 if not matches_any_capability(message, participant.capabilities):
@@ -1277,28 +1249,36 @@ send_to_space(message)
 ### 6.1 Breaking Changes
 
 This is a v0.x release. Breaking changes are expected between minor versions until v1.0:
-- v0.x is NOT backward compatible with v0.2
+- v0.4 is NOT backward compatible with v0.3
 - Clients and gateways MUST use matching protocol versions
 - No compatibility guarantees until v1.0 release
 
-### 6.2 Migration from v0.2
+### 6.2 Migration from v0.3
 
-Key breaking changes from v0.2:
+Key updates in v0.4:
+- Protocol identifier changed from `mew/v0.3` to `mew/v0.4`
+- Added participant control messages for runtime management: `participant/request-status`, `participant/status`, `participant/forget`, `participant/clear`, `participant/restart`, and `participant/shutdown`
+- Introduced stream lifecycle support (`stream/request`, `stream/open`, `stream/close`) plus binary frame guidance for high-volume data
+- Documented optional HTTP message injection endpoints alongside the WebSocket channel
+
+### 6.3 Migration from v0.2
+
+Key breaking changes from v0.2 (cumulative):
 - Protocol name changed from MEUP to MEW Protocol
-- Protocol identifier changed from `meup/v0.2` to `mew/v0.x`
+- Protocol identifier changed from `meup/v0.2` to `mew/v0.4`
 - Full name is now "Multi-Entity Workspace Protocol"
 
-### 6.3 Migration from v0.0
+### 6.4 Migration from v0.0
 
-Key breaking changes from v0.0:
-- Protocol identifier changed from `mcp-x/v0` to `mew/v0.x`
+Key breaking changes from v0.0 (cumulative):
+- Protocol identifier changed from `mcp-x/v0` to `mew/v0.4`
 - Message kinds now use slash notation (e.g., `mcp/request` instead of `mcp/request:tools/call`)
 - Method information moved to payload
 - Capabilities use JSON pattern matching instead of string wildcards
 - `correlation_id` is now always an array
 - Chat remains as dedicated `chat` kind
 
-### 6.4 Future Compatibility
+### 6.5 Future Compatibility
 
 - v0.x series is experimental and subject to breaking changes
 - v1.0 will establish stable protocol with compatibility guarantees

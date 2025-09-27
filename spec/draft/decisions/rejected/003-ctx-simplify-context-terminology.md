@@ -1,9 +1,11 @@
 # ADR-CTX: Simplify Context Terminology
 
-**Status:** Proposed
-**Date:** 2025-01-10
+**Status:** Rejected  
+**Date:** 2025-01-10  
 **Context:** MEW Protocol v0.3
-**Incorporation:** Not Incorporated
+**Incorporation:** Not Incorporated  
+**Rejection Date:** 2025-09-26  
+**Rejection Rationale:** Terminology cleanup will ride a future comprehensive documentation pass; v0.4 keeps existing wording to avoid churn during release prep.
 
 ## Context
 

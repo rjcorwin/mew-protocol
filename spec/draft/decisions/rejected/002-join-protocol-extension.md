@@ -1,9 +1,11 @@
 # ADR-002: Join Protocol Extension for Space Participation
 
-**Status:** Proposed
-**Date:** 2025-01-15
+**Status:** Rejected  
+**Date:** 2025-01-15  
 **Context:** MEW Protocol Draft (post v0.3)
-**Incorporation:** Not Incorporated
+**Incorporation:** Not Incorporated  
+**Rejection Date:** 2025-09-26  
+**Rejection Rationale:** Connection and join flows stay implementation-defined for v0.4; standardization needs deeper security review before inclusion.
 
 ## Context
 

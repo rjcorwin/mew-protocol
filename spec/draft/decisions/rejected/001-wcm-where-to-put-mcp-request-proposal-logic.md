@@ -1,8 +1,10 @@
 # ADR-WCM: Where to Put MCP Request/Proposal Auto-Conversion Logic
 
-**Status:** Proposed  
+**Status:** Rejected  
 **Date:** 2025-01-10  
-**Incorporation:** Not Incorporated
+**Incorporation:** Not Incorporated  
+**Rejection Date:** 2025-09-26  
+**Rejection Rationale:** v0.4 scope keeps current MEWParticipant auto-conversion behavior; larger refactor will be reconsidered alongside future SDK updates.
 
 ## Context
 

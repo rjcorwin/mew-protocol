@@ -1,7 +1,10 @@
 # ADR-009: Gateway I/O Options for Participant Communication
 
 ## Status
-Proposed
+Rejected
+
+**Rejection Date:** 2025-09-26  
+**Rejection Rationale:** Gateway I/O expansion is deferred; v0.4 only documents existing WebSocket interface while we validate desired operational requirements.
 
 ## Context
 Currently, the MEW Protocol gateway only accepts WebSocket connections for participants. This creates limitations:
