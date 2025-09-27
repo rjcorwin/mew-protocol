@@ -82,6 +82,8 @@ Field semantics:
   - `participant/status` - Report usage status (e.g., tokens consumed vs. maximum) including current message counts per context
   - `participant/request-status` - Ask a participant to emit its current status
   - `participant/forget` - Instruct a participant to drop cached context (oldest or newest data)
+  - `participant/compact` - Request that a participant compact its working memory to free headroom
+  - `participant/compact-done` - Participant acknowledgement that compaction is complete
   - `participant/clear` - Wipe the participant's entire conversational context or scratchpad
   - `participant/restart` - Restart a participant back to a known baseline state
   - `participant/shutdown` - Request an orderly shutdown that ends activity without restarting
@@ -914,7 +916,58 @@ newest data, corresponding to the `(Oldest|Newest)` notation in the request:
   When compacting autonomously, they MUST send a `participant/status` update indicating the compaction status and resulting
   resource headroom so observers understand why history changed.
 
-#### 3.9.6 Participant Clear (kind = "participant/clear")
+#### 3.9.6 Participant Compact (kind = "participant/compact")
+
+Requests that a participant run its compaction routine to free headroom in its working memory or conversational history:
+
+```json
+{
+  "protocol": "mew/v0.4",
+  "id": "compact-1",
+  "from": "orchestrator",
+  "to": ["agent-1"],
+  "kind": "participant/compact",
+  "payload": {
+    "reason": "token_pressure",
+    "target_tokens": 16000
+  }
+}
+```
+
+- `payload.reason` (optional) provides operator context the participant MAY log or surface in status updates
+- `payload.target_tokens` (optional) indicates a desired ceiling after compaction; participants MAY ignore if unsupported
+- Participants that maintain working memory SHOULD attempt compaction promptly and emit interim `participant/status` updates
+  such as `compacting` / `compacted`
+- Participants with no compactable state MAY ignore the request entirely or MAY reply with `participant/compact-done` including
+  `"skipped": true` to document that nothing changed
+
+#### 3.9.7 Participant Compaction Complete (kind = "participant/compact-done")
+
+Acknowledges the completion (or intentional skip) of a requested compaction:
+
+```json
+{
+  "protocol": "mew/v0.4",
+  "id": "compact-done-1",
+  "from": "agent-1",
+  "to": ["orchestrator"],
+  "kind": "participant/compact-done",
+  "correlation_id": ["compact-1"],
+  "payload": {
+    "freed_tokens": 2048,
+    "freed_messages": 12,
+    "status": "compacted"
+  }
+}
+```
+
+- `correlation_id` MUST reference the originating `participant/compact` request when one exists
+- `freed_tokens` / `freed_messages` (optional) report how much context was reclaimed
+- When compaction is skipped, participants SHOULD include `"skipped": true` and MAY add a human-readable `"reason"`
+- Participants MUST send `participant/compact-done` after completing work triggered by `participant/compact`, even if no context
+  was removed, so orchestrators can clear pending actions
+
+#### 3.9.8 Participant Clear (kind = "participant/clear")
 
 Instructs a participant to wipe its entire retained conversational or working memory:
 
@@ -932,7 +985,7 @@ Instructs a participant to wipe its entire retained conversational or working me
 - No additional payload fields are required; implementations MAY omit the `payload` property or include an empty object if their transport requires it
 - Participants SHOULD emit a follow-up `participant/status` confirming an empty context (e.g., `messages_in_context = 0`)
 
-#### 3.9.7 Participant Restart (kind = "participant/restart")
+#### 3.9.9 Participant Restart (kind = "participant/restart")
 
 Returns a participant to a known baseline configuration:
 
@@ -951,7 +1004,7 @@ Returns a participant to a known baseline configuration:
 - Gateways MAY treat a restart as implicit acknowledgement that previous capability grants remain in effect unless explicitly
   revoked
 
-#### 3.9.8 Participant Shutdown (kind = "participant/shutdown")
+#### 3.9.10 Participant Shutdown (kind = "participant/shutdown")
 
 Requests that a participant cease all activity without restarting, allowing the orchestrator to keep the slot idle or replace it later:
 

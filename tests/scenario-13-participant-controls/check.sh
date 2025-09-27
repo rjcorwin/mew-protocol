@@ -98,6 +98,24 @@ record_result "participant restart status" "\"status\":\"restarted\""
 record_result "participant restart correlation" "\"correlation_id\":[\"$RESTART_ID\"]"
 
 
+echo -e "${YELLOW}-- Participant compact --${NC}"
+COMPACT_ID="compact-$(date +%s)"
+post_message "{\"id\":\"$COMPACT_ID\",\"kind\":\"participant/compact\",\"to\":[\"control-agent\"],\"payload\":{\"reason\":\"test_compact\",\"target_tokens\":5120}}"
+record_result "participant compact status start" "\"status\":\"compacting\""
+record_result "participant compact done" "\"kind\":\"participant/compact-done\""
+record_result "participant compact status end" "\"status\":\"compacted\""
+record_result "participant compact correlation" "\"correlation_id\":[\"$COMPACT_ID\"]"
+
+
+echo -e "${YELLOW}-- Participant pause / resume --${NC}"
+PAUSE_ID="pause-$(date +%s)"
+post_message "{\"id\":\"$PAUSE_ID\",\"kind\":\"participant/pause\",\"to\":[\"control-agent\"],\"payload\":{\"reason\":\"test_pause\",\"timeout_seconds\":2}}"
+record_result "participant pause status" "\"status\":\"paused:test_pause\""
+record_result "participant resume emitted" "\"kind\":\"participant/resume\""
+record_result "participant resume status" "\"status\":\"active\""
+record_result "participant pause correlation" "\"correlation_id\":[\"$PAUSE_ID\"]"
+
+
 echo -e "${YELLOW}-- Participant shutdown --${NC}"
 SHUTDOWN_ID="shutdown-$(date +%s)"
 post_message "{\"id\":\"$SHUTDOWN_ID\",\"kind\":\"participant/shutdown\",\"to\":[\"control-agent\"],\"payload\":{\"reason\":\"test_shutdown\"}}"

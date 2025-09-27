@@ -253,6 +253,18 @@ else
   record_fail "File server handled write requests"
 fi
 
+if wait_for_pattern "${AGENT_LOG}" '"message":"Sent envelope","extra":{"kind":"capability/grant-ack"' 40; then
+  record_pass "Grant acknowledgment originates from recipient"
+else
+  record_fail "Grant acknowledgment originates from recipient"
+fi
+
+if grep -F '"kind":"capability/grant-ack","from":"system:gateway"' "${OUTPUT_LOG}" >/dev/null 2>&1; then
+  record_fail "Gateway did not forge grant acknowledgment"
+else
+  record_pass "Gateway did not forge grant acknowledgment"
+fi
+
 printf "\n%b\n" "${YELLOW}=== Scenario 8 Summary ===${NC}"
 printf "Passed: %d\n" "${tests_passed}"
 printf "Failed: %d\n" "${tests_failed}"

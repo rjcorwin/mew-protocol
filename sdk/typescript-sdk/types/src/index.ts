@@ -21,6 +21,9 @@ export type {
   Participant,
   Capability,
   CapabilityGrant,
+  CapabilityGrantPayload,
+  CapabilityRevokePayload,
+  CapabilityGrantAckPayload,
   Proposal,
   
   // System payloads
@@ -34,6 +37,8 @@ export type {
   MewProposalRejectPayload,
   MewCapabilityGrantPayload,
   MewCapabilityRevokePayload,
+  SpaceInvitePayload,
+  SpaceKickPayload,
 
   // Chat
   ChatPayload,
@@ -46,6 +51,8 @@ export type {
   ParticipantRequestStatusPayload,
   ParticipantStatusPayload,
   ParticipantForgetPayload,
+  ParticipantCompactPayload,
+  ParticipantCompactDonePayload,
   ParticipantClearPayload,
   ParticipantRestartPayload,
   ParticipantShutdownPayload,

@@ -102,6 +102,35 @@ run_check "Gateway health endpoint" curl -sf "http://localhost:${TEST_PORT}/heal
 run_check "Coordinator log exists" test -f "${COORD_LOG}"
 run_check "Limited agent log exists" test -f "${LIMITED_LOG}"
 
+printf "\n%b\n" "${YELLOW}Test: Gateway rejects participant system/register${NC}"
+SYSREG_ID="sysreg-$(date +%s)"
+SYSREG_RESPONSE=$(mktemp)
+HTTP_STATUS=$(curl -s -o "${SYSREG_RESPONSE}" -w '%{http_code}' \
+  -X POST "http://localhost:${TEST_PORT}/participants/limited-agent/messages" \
+  -H "Authorization: Bearer limited-token" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"${SYSREG_ID}\",\"kind\":\"system/register\",\"payload\":{\"capabilities\":[]}}" || true)
+
+if [[ "${HTTP_STATUS}" == "400" ]] && grep -Fq 'system/register is reserved for the gateway' "${SYSREG_RESPONSE}"; then
+  record_pass "HTTP rejection of system/register"
+else
+  record_fail "HTTP rejection of system/register"
+fi
+
+rm -f "${SYSREG_RESPONSE}"
+
+if wait_for_pattern "${LIMITED_LOG}" '"kind":"system/error"' 20; then
+  record_pass "system/register triggers system/error"
+else
+  record_fail "system/register triggers system/error"
+fi
+
+if wait_for_pattern "${LIMITED_LOG}" 'system/register is reserved for the gateway' 20; then
+  record_pass "system/register rejection message"
+else
+  record_fail "system/register rejection message"
+fi
+
 printf "\n%b\n" "${YELLOW}Test: Limited agent can list calculator tools${NC}"
 if post_limited "$(cat <<JSON
 {"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}

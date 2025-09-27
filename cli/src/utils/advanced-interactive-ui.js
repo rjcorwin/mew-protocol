@@ -589,6 +589,30 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       });
     }
 
+    if (message.kind === 'participant/compact-done') {
+      const freedTokens = message.payload?.freed_tokens;
+      const freedMessages = message.payload?.freed_messages;
+      const status = message.payload?.status || (message.payload?.skipped ? 'skipped' : 'compacted');
+      const details = [];
+      if (typeof freedTokens === 'number') {
+        details.push(`tokens=${freedTokens}`);
+      }
+      if (typeof freedMessages === 'number') {
+        details.push(`messages=${freedMessages}`);
+      }
+      if (message.payload?.reason) {
+        details.push(`reason=${message.payload.reason}`);
+      }
+
+      addMessage({
+        kind: 'system/info',
+        from: 'system',
+        payload: {
+          text: `participant ${message.from} compact complete (${status}${details.length ? '; ' + details.join(', ') : ''})`
+        }
+      }, false);
+    }
+
     if (message.kind === 'mcp/response') {
       const tools = message.payload?.result?.tools;
       if (Array.isArray(tools) && message.from) {
@@ -1391,6 +1415,45 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
           payload
         });
         addSystemMessage(`Forget requested for ${target} (${direction}${entriesCount !== undefined ? `, ${entriesCount}` : ''}).`);
+        break;
+      }
+      case '/compact': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /compact <participant> [targetTokens] [reason]');
+          break;
+        }
+        const target = args[0];
+        let targetTokens;
+        let reasonParts = [];
+        if (args.length > 1) {
+          const maybeTokens = Number.parseInt(args[1], 10);
+          if (!Number.isNaN(maybeTokens)) {
+            targetTokens = maybeTokens;
+            reasonParts = args.slice(2);
+          } else {
+            reasonParts = args.slice(1);
+          }
+        }
+        const payload = {};
+        if (typeof targetTokens === 'number') {
+          payload.target_tokens = targetTokens;
+        }
+        if (reasonParts.length > 0) {
+          payload.reason = reasonParts.join(' ');
+        }
+        sendMessage({
+          kind: 'participant/compact',
+          to: [target],
+          payload
+        });
+        const detailParts = [];
+        if (typeof targetTokens === 'number') {
+          detailParts.push(`target ${targetTokens}`);
+        }
+        if (reasonParts.length > 0) {
+          detailParts.push(`reason ${payload.reason}`);
+        }
+        addSystemMessage(`Compact requested for ${target}${detailParts.length ? ` (${detailParts.join(', ')})` : ''}.`);
         break;
       }
       case '/clear': {

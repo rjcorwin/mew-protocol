@@ -15,7 +15,7 @@ export interface Envelope {
     from: string;
     to?: string[];
     kind: string;
-    correlation_id?: string | string[];
+    correlation_id?: string[];
     context?: ContextField;
     payload: any;
 }
@@ -25,7 +25,7 @@ export interface Envelope {
 export interface PartialEnvelope {
     to?: string[];
     kind: string;
-    correlation_id?: string | string[];
+    correlation_id?: string[];
     context?: ContextField;
     payload: any;
 }
@@ -51,15 +51,17 @@ export type ContextField = string | ContextOperation;
 export interface Participant {
     id: string;
     capabilities: Capability[];
+    [key: string]: unknown;
 }
 /**
  * Capability definition with JSON pattern matching
  */
 export interface Capability {
-    id: string;
+    id?: string;
     kind: string;
-    to?: string | string[];
+    to?: string[];
     payload?: any;
+    [key: string]: unknown;
 }
 /**
  * Capability grant from one participant to another
@@ -97,8 +99,9 @@ export interface SystemErrorPayload {
  * Presence event payload
  */
 export interface PresencePayload {
-    event: 'join' | 'leave' | 'heartbeat';
+    event: 'join' | 'leave';
     participant: Participant;
+    [key: string]: unknown;
 }
 export type SystemPayload = SystemWelcomePayload | SystemErrorPayload | PresencePayload;
 export interface MewProposalPayload {
