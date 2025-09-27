@@ -1,0 +1,8 @@
+{
+  "name": "scenario-2-mcp",
+  "description": "MCP tool execution harness used by automated integration tests",
+  "version": "0.1.0",
+  "variables": [
+    { "name": "SPACE_NAME", "description": "Space identifier", "default": "scenario-2-mcp" }
+  ]
+}
