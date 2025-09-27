@@ -41,6 +41,47 @@ class TextBuffer {
   }
 
   /**
+   * Get the absolute cursor index within the buffer text
+   */
+  getCursorIndex() {
+    let index = 0;
+    for (let lineIndex = 0; lineIndex < this.cursorLine; lineIndex++) {
+      index += this.lines[lineIndex].length;
+      index += 1; // Account for newline separator
+    }
+    return index + this.cursorColumn;
+  }
+
+  /**
+   * Set cursor position from an absolute text index
+   * @param {number} index
+   */
+  setCursorIndex(index) {
+    if (typeof index !== 'number' || Number.isNaN(index)) {
+      return;
+    }
+
+    let remaining = Math.max(0, index);
+
+    for (let lineIndex = 0; lineIndex < this.lines.length; lineIndex++) {
+      const lineLength = this.lines[lineIndex].length;
+
+      if (remaining <= lineLength) {
+        this.cursorLine = lineIndex;
+        this.cursorColumn = remaining;
+        return;
+      }
+
+      // Skip newline separator
+      remaining -= lineLength + 1;
+    }
+
+    // Clamp to end of buffer if index exceeds length
+    this.cursorLine = this.lines.length - 1;
+    this.cursorColumn = this.lines[this.cursorLine].length;
+  }
+
+  /**
    * Clear the buffer
    */
   clear() {

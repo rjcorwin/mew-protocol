@@ -57,6 +57,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [pauseState, setPauseState] = useState(null);
   const [activeStreams, setActiveStreams] = useState(new Map());
   const [streamFrames, setStreamFrames] = useState([]);
+  const [knownParticipants, setKnownParticipants] = useState(() => []);
+  const [toolCatalog, setToolCatalog] = useState(() => new Map());
   const reasoningStreamRequestsRef = useRef(new Map());
   const reasoningStreamsRef = useRef(new Map());
   const reasoningUpdateTimerRef = useRef(null);
@@ -92,6 +94,106 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       stdout.off('resize', handleResize);
     };
   }, [stdout]);
+
+  const registerParticipants = useCallback((ids) => {
+    if (!ids) {
+      return;
+    }
+
+    const list = Array.isArray(ids) ? ids : [ids];
+
+    setKnownParticipants(prev => {
+      const nextSet = new Set(prev);
+      let changed = false;
+
+      for (const id of list) {
+        if (!id || typeof id !== 'string') {
+          continue;
+        }
+
+        if (!nextSet.has(id)) {
+          nextSet.add(id);
+          changed = true;
+        }
+      }
+
+      if (!changed) {
+        return prev;
+      }
+
+      return Array.from(nextSet).sort((a, b) => a.localeCompare(b));
+    });
+  }, []);
+
+  const registerTools = useCallback((participant, tools) => {
+    if (!participant || !Array.isArray(tools)) {
+      return;
+    }
+
+    const normalized = tools
+      .map(tool => {
+        if (!tool) {
+          return null;
+        }
+
+        if (typeof tool === 'string') {
+          return { name: tool, description: null, displayName: null, inputSchema: null };
+        }
+
+        if (typeof tool === 'object') {
+          const name = tool.name || tool.id || tool.value;
+          if (!name) {
+            return null;
+          }
+
+          const description = typeof tool.description === 'string' ? tool.description : null;
+          const displayName = tool.display_name || tool.displayName || null;
+          const inputSchema = tool.inputSchema || tool.input_schema || tool.schema || tool.parameters || null;
+
+          return {
+            name,
+            description,
+            displayName,
+            inputSchema: inputSchema || null
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    setToolCatalog(prev => {
+      const existing = prev.get(participant);
+
+      if (existing && existing.length === normalized.length) {
+        let identical = true;
+        for (let index = 0; index < normalized.length; index += 1) {
+          const current = existing[index];
+          const next = normalized[index];
+          if (!current || !next ||
+              current.name !== next.name ||
+              current.description !== next.description ||
+              current.displayName !== next.displayName ||
+              JSON.stringify(current.inputSchema) !== JSON.stringify(next.inputSchema)) {
+            identical = false;
+            break;
+          }
+        }
+
+        if (identical) {
+          return prev;
+        }
+      }
+
+      const nextCatalog = new Map(prev);
+      nextCatalog.set(participant, normalized);
+      return nextCatalog;
+    });
+  }, []);
+
+  useEffect(() => {
+    registerParticipants([participantId]);
+  }, [participantId, registerParticipants]);
 
   const meaningfulMessageCount = useMemo(() => {
     return messages.reduce((count, entry) => {
@@ -195,6 +297,16 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
 
       try {
         const message = JSON.parse(raw);
+        const participantsToRegister = [];
+        if (message.from) {
+          participantsToRegister.push(message.from);
+        }
+        if (Array.isArray(message.to)) {
+          participantsToRegister.push(...message.to);
+        }
+        if (participantsToRegister.length > 0) {
+          registerParticipants(participantsToRegister);
+        }
         handleIncomingMessage(message);
       } catch (err) {
         console.error('Failed to parse message:', err);
@@ -475,6 +587,14 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         });
         return next;
       });
+    }
+
+    if (message.kind === 'mcp/response') {
+      const tools = message.payload?.result?.tools;
+      if (Array.isArray(tools) && message.from) {
+        registerParticipants([message.from]);
+        registerTools(message.from, tools);
+      }
     }
 
     if (message.kind === 'stream/open') {
@@ -809,7 +929,22 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     }
 
     ws.send(JSON.stringify(envelope));
-    
+
+    const participantsToRegister = new Set();
+    if (envelope.from) {
+      participantsToRegister.add(envelope.from);
+    }
+    if (Array.isArray(envelope.to)) {
+      envelope.to.forEach(id => {
+        if (id) {
+          participantsToRegister.add(id);
+        }
+      });
+    }
+    if (participantsToRegister.size > 0) {
+      registerParticipants(Array.from(participantsToRegister));
+    }
+
     setMessages(prev => [...prev, {
       id: envelope.id,
       message: envelope,
@@ -984,6 +1119,52 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     }
   };
 
+  const slashContext = useMemo(() => {
+    const participantSet = new Set(knownParticipants);
+    if (participantId) {
+      participantSet.add(participantId);
+    }
+
+    for (const [id] of participantStatuses.entries()) {
+      if (id) {
+        participantSet.add(id);
+      }
+    }
+
+    for (const [id] of toolCatalog.entries()) {
+      if (id) {
+        participantSet.add(id);
+      }
+    }
+
+    const participants = Array.from(participantSet)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+
+    const participantDetails = {};
+    for (const [id, info] of participantStatuses.entries()) {
+      if (!id) {
+        continue;
+      }
+      participantDetails[id] = {
+        summary: typeof info?.payload?.summary === 'string' ? info.payload.summary : null,
+        status: typeof info?.payload?.status === 'string' ? info.payload.status : null,
+        description: typeof info?.payload?.description === 'string' ? info.payload.description : null
+      };
+    }
+
+    const toolsByParticipant = {};
+    for (const [id, tools] of toolCatalog.entries()) {
+      toolsByParticipant[id] = tools.map(tool => ({ ...tool }));
+    }
+
+    return {
+      participants,
+      participantDetails,
+      toolsByParticipant
+    };
+  }, [knownParticipants, participantId, participantStatuses, toolCatalog]);
+
   const handleCommand = (command) => {
     const parts = command.trim().split(/\s+/);
     const cmd = parts[0];
@@ -997,6 +1178,70 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         setVerbose(prev => !prev);
         addSystemMessage(`Verbose mode ${!verbose ? 'enabled' : 'disabled'}.`);
         break;
+      case '/envelope': {
+        if (args.length < 4) {
+          addSystemMessage('Usage: /envelope mcp/request tool/call <participant> <tool> [jsonArguments]');
+          break;
+        }
+
+        const [kind, method, target, toolName, ...restArgs] = args;
+
+        if (kind !== 'mcp/request') {
+          addSystemMessage(`Unsupported envelope kind: ${kind}. Only mcp/request is supported.`);
+          break;
+        }
+
+        if (method !== 'tool/call') {
+          addSystemMessage(`Unsupported MCP method: ${method}. Only tool/call is supported.`);
+          break;
+        }
+
+        if (!target) {
+          addSystemMessage('Specify a participant to target.');
+          break;
+        }
+
+        if (!toolName) {
+          addSystemMessage('Specify a tool name to call.');
+          break;
+        }
+
+        let toolArguments;
+        if (restArgs.length > 0) {
+          const raw = restArgs.join(' ').trim();
+          if (raw.length > 0) {
+            try {
+              toolArguments = JSON.parse(raw);
+            } catch (err) {
+              const reason = err && err.message ? err.message : 'Invalid JSON';
+              addSystemMessage(`Invalid JSON for tool arguments: ${reason}`);
+              break;
+            }
+          }
+        }
+
+        const params = { name: toolName };
+        if (toolArguments !== undefined) {
+          params.arguments = toolArguments;
+        } else {
+          params.arguments = {};
+        }
+
+        const envelope = {
+          kind: 'mcp/request',
+          to: [target],
+          payload: {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/call',
+            params
+          }
+        };
+
+        sendMessage(envelope);
+        addSystemMessage(`Requested ${toolName} from ${target} via MCP tool call.`);
+        break;
+      }
       case '/streams':
         setShowStreams(prev => !prev);
         addSystemMessage(`Stream data display ${!showStreams ? 'enabled' : 'disabled'}.`);
@@ -1529,7 +1774,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       history: commandHistory,
       onHistoryChange: setCommandHistory,
       prompt: '> ',
-      showCursor: true
+      showCursor: true,
+      slashContext
     }),
     
     // Status Bar
