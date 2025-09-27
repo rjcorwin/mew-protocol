@@ -1331,6 +1331,7 @@ The default interactive mode uses Ink (React for CLI) to provide a modern termin
 - **Participant Status**: Displays most recent `participant/status` payloads (tokens, context occupancy, latency) per sender
 - **Pause State**: Highlights active pauses applied to the CLI participant with time remaining indicators
 - **Stream Monitor**: Lists current `stream/open` sessions and the latest raw frames decoded from `#streamId#` WebSocket traffic
+- **Collapsed Summary**: When the board is hidden, the status bar surfaces a compact `acks`, `status`, and `paused` summary so operators can monitor high-level state without losing transcript space. The board remains collapsed unless toggled with `/ui board open`; `/ui board close` re-collapses it and `/ui board auto` re-enables auto-collapse when no activity is present.
 
 #### Reasoning Bar Display
 
@@ -1603,6 +1604,7 @@ Verbose mode (`/verbose`) shows full JSON messages.
 /help                       Show available commands and shortcuts
 /verbose                    Toggle verbose output (show full JSON)
 /ui-clear                   Clear local UI buffers (history, status board)
+/ui board [open|close|auto] Control Signal Board docking behaviour
 /exit                       Disconnect and exit
 /ack [selector] [status]    Acknowledge pending chat message(s)
 /cancel [selector] [reason] Cancel pending chat message(s)
