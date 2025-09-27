@@ -1,0 +1,12 @@
+{
+  "name": "scenario-8-grant",
+  "description": "Capability grant workflow with proposal fulfillment and direct requests",
+  "version": "0.1.0",
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Space identifier used for the scenario",
+      "default": "scenario-8-grant"
+    }
+  ]
+}

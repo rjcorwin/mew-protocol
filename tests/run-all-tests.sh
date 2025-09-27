@@ -85,7 +85,10 @@ format_display_name() {
   fi
 }
 
-mapfile -t SCENARIO_DIRS < <(find "${SCRIPT_DIR}" -maxdepth 1 -mindepth 1 -type d -name 'scenario-*' | sort)
+SCENARIO_DIRS=()
+while IFS= read -r scenario_dir; do
+  SCENARIO_DIRS+=("${scenario_dir}")
+done < <(find "${SCRIPT_DIR}" -maxdepth 1 -mindepth 1 -type d -name 'scenario-*' | sort)
 
 if [[ ${#SCENARIO_DIRS[@]} -eq 0 ]]; then
   echo "No scenarios found under ${SCRIPT_DIR}" >&2

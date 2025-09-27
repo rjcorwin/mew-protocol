@@ -1,0 +1,43 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 8 - TypeScript Agent"
+  description: "Test TypeScript agent MCP tools and chat behaviour"
+
+participants:
+  typescript-agent:
+    type: local
+    tokens: ["ts-agent-token"]
+    auto_start: true
+    command: "npx"
+    args:
+      - "--yes"
+      - "@mew-protocol/agent"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "ts-agent-token"
+      - "--id"
+      - "typescript-agent"
+    capabilities:
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "chat"
+      - kind: "reasoning/*"
+
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "chat"
+      - kind: "system/*"
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true
+
+defaults:
+  capabilities:
+    - kind: "chat"

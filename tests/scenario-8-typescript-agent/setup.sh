@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Scenario 8 (TypeScript agent) setup - prepares disposable workspace
+
+set -euo pipefail
+
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-8-typescript-agent"}
+SPACE_NAME=${SPACE_NAME:-"scenario-8-typescript-agent"}
+TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+AGENT_DIST="${REPO_ROOT}/sdk/typescript-sdk/agent/dist/index.js"
+
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+printf "%b\n" "${YELLOW}=== Scenario 8 (TypeScript Agent) Setup ===${NC}"
+printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
+printf "%b\n" "${BLUE}Using port ${TEST_PORT}${NC}"
+
+if [[ ! -f "${AGENT_DIST}" ]]; then
+  printf "%b\n" "${YELLOW}Building @mew-protocol/agent (tsc)${NC}"
+  if ! (cd "${REPO_ROOT}" && npm run build > "${SCENARIO_DIR}/agent-build.log" 2>&1); then
+    printf "%b\n" "${YELLOW}Agent build failed, printing log:${NC}"
+    cat "${SCENARIO_DIR}/agent-build.log"
+    exit 1
+  fi
+fi
+
+rm -rf "${WORKSPACE_DIR}"
+mkdir -p "${WORKSPACE_DIR}/templates"
+
+cp -R "${SCENARIO_DIR}/template" "${WORKSPACE_DIR}/templates/${TEMPLATE_NAME}"
+
+pushd "${WORKSPACE_DIR}" >/dev/null
+
+node "${CLI_BIN}" init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 8 - TypeScript Agent" > init.log 2>&1
+
+mkdir -p logs
+: > logs/test-client-output.log
+
+MEW_REPO_ROOT="${REPO_ROOT}" node "${CLI_BIN}" space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
+  printf "%b\n" "${YELLOW}space up failed, printing log:${NC}"
+  cat logs/space-up.log
+  exit 1
+}
+
+health_url="http://localhost:${TEST_PORT}/health"
+for attempt in {1..20}; do
+  if curl -sf "${health_url}" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+  if [[ ${attempt} -eq 20 ]]; then
+    printf "%b\n" "${YELLOW}Gateway failed to start within timeout${NC}"
+    cat logs/gateway.log 2>/dev/null || true
+    exit 1
+  fi
+done
+
+sleep 3
+printf "%b\n" "${GREEN}✓ Gateway is ready on port ${TEST_PORT}${NC}"
+
+cat > "${ENV_FILE}" <<ENV
+SCENARIO_DIR=${SCENARIO_DIR}
+REPO_ROOT=${REPO_ROOT}
+WORKSPACE_DIR=${WORKSPACE_DIR}
+TEMPLATE_NAME=${TEMPLATE_NAME}
+SPACE_NAME=${SPACE_NAME}
+TEST_PORT=${TEST_PORT}
+OUTPUT_LOG=${WORKSPACE_DIR}/logs/test-client-output.log
+ENV
+
+printf "%b\n" "${GREEN}✓ Setup complete${NC}"
+printf "Workspace log directory: %s\n" "${WORKSPACE_DIR}/logs"
+printf "Gateway health: %s\n" "${health_url}"
+
+popd >/dev/null

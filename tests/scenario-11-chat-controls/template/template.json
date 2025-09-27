@@ -1,0 +1,12 @@
+{
+  "name": "scenario-11-chat-controls",
+  "description": "Exercise chat acknowledgement and reasoning control envelopes",
+  "version": "0.1.0",
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Space identifier used for scenario 11",
+      "default": "scenario-11-chat-controls"
+    }
+  ]
+}

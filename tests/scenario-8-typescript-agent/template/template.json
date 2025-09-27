@@ -1,0 +1,12 @@
+{
+  "name": "scenario-8-typescript-agent",
+  "description": "TypeScript agent exercising MCP tools and chat interactions",
+  "version": "0.1.0",
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Space identifier used for scenario 8",
+      "default": "scenario-8-typescript-agent"
+    }
+  ]
+}
