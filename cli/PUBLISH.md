@@ -88,6 +88,5 @@ If you encounter publish errors:
 
 ## Notes
 
-- Some lint errors exist in legacy files (gateway-enhanced.js, etc.) but don't affect the new features
 - The package includes templates directory which is essential for `mew init` functionality
 - Package size is reasonable at ~45.7KB compressed
