@@ -1,0 +1,12 @@
+{
+  "name": "scenario-1-basic-{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scenario 1 template for MEW integration tests (basic message flow)",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

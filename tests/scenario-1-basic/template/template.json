@@ -1,0 +1,8 @@
+{
+  "name": "scenario-1-basic",
+  "description": "Basic echo message flow used by automated integration tests",
+  "version": "0.1.0",
+  "variables": [
+    { "name": "SPACE_NAME", "description": "Space identifier", "default": "scenario-1-basic" }
+  ]
+}
