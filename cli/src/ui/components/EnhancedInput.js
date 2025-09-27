@@ -118,7 +118,6 @@ function EnhancedInput({
 
     const newText = `${currentText.slice(0, start)}${insertText}${currentText.slice(end)}`;
 
-    suppressSuggestionsRef.current = true;
     buffer.setText(newText);
     if (typeof buffer.setCursorIndex === 'function') {
       buffer.setCursorIndex(nextCursorIndex);
