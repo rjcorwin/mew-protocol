@@ -137,7 +137,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         }
 
         if (typeof tool === 'string') {
-          return { name: tool, description: null, displayName: null };
+          return { name: tool, description: null, displayName: null, inputSchema: null };
         }
 
         if (typeof tool === 'object') {
@@ -146,10 +146,15 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
             return null;
           }
 
+          const description = typeof tool.description === 'string' ? tool.description : null;
+          const displayName = tool.display_name || tool.displayName || null;
+          const inputSchema = tool.inputSchema || tool.input_schema || tool.schema || tool.parameters || null;
+
           return {
             name,
-            description: typeof tool.description === 'string' ? tool.description : null,
-            displayName: tool.display_name || tool.displayName || null
+            description,
+            displayName,
+            inputSchema: inputSchema || null
           };
         }
 
@@ -168,7 +173,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
           if (!current || !next ||
               current.name !== next.name ||
               current.description !== next.description ||
-              current.displayName !== next.displayName) {
+              current.displayName !== next.displayName ||
+              JSON.stringify(current.inputSchema) !== JSON.stringify(next.inputSchema)) {
             identical = false;
             break;
           }

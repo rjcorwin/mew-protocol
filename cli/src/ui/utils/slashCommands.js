@@ -11,6 +11,225 @@ const NODE_TYPES = {
   PARAMETER: 'parameter'
 };
 
+const DEFAULT_ARGUMENT_TEMPLATE_OPTIONS = [
+  {
+    value: '{}',
+    insertValue: '{}',
+    displayValue: '{}',
+    description: 'Empty object arguments'
+  },
+  {
+    value: '{"property": ""}',
+    insertValue: '{"property": ""}',
+    displayValue: '{"property": ""}',
+    description: 'Single string argument template'
+  }
+];
+
+const MAX_SCHEMA_TEMPLATE_DEPTH = 3;
+const MAX_SCHEMA_TEMPLATE_KEYS = 5;
+
+function normalizeSchemaCandidate(schema) {
+  if (!schema) {
+    return null;
+  }
+
+  if (Array.isArray(schema)) {
+    for (const entry of schema) {
+      const normalized = normalizeSchemaCandidate(entry);
+      if (normalized) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  if (typeof schema !== 'object') {
+    return null;
+  }
+
+  if (schema.anyOf) {
+    return normalizeSchemaCandidate(schema.anyOf);
+  }
+
+  if (schema.oneOf) {
+    return normalizeSchemaCandidate(schema.oneOf);
+  }
+
+  if (schema.allOf) {
+    return normalizeSchemaCandidate(schema.allOf);
+  }
+
+  return schema;
+}
+
+function buildObjectTemplateFromSchema(schema, depth = 0) {
+  if (!schema || depth >= MAX_SCHEMA_TEMPLATE_DEPTH) {
+    return {};
+  }
+
+  const normalized = normalizeSchemaCandidate(schema);
+  if (!normalized || typeof normalized !== 'object') {
+    return {};
+  }
+
+  const properties = normalized.properties && typeof normalized.properties === 'object'
+    ? normalized.properties
+    : {};
+  const required = Array.isArray(normalized.required)
+    ? normalized.required.filter(key => properties[key])
+    : [];
+
+  let keys = required;
+  if (!keys || keys.length === 0) {
+    keys = Object.keys(properties);
+  }
+
+  if (!keys || keys.length === 0) {
+    return {};
+  }
+
+  const limitedKeys = keys.slice(0, MAX_SCHEMA_TEMPLATE_KEYS);
+  const template = {};
+
+  for (const key of limitedKeys) {
+    template[key] = inferEmptyValueFromSchema(properties[key], depth + 1);
+  }
+
+  return template;
+}
+
+function inferEmptyValueFromSchema(schema, depth = 0) {
+  const normalized = normalizeSchemaCandidate(schema);
+  if (!normalized) {
+    return '';
+  }
+
+  let type = normalized.type;
+  if (Array.isArray(type)) {
+    type = type[0];
+  }
+
+  if (!type) {
+    if (Array.isArray(normalized.enum) && normalized.enum.length > 0) {
+      return normalized.enum[0];
+    }
+    if (normalized.const !== undefined) {
+      return normalized.const;
+    }
+    if (normalized.default !== undefined) {
+      return normalized.default;
+    }
+    if (normalized.properties) {
+      return buildObjectTemplateFromSchema(normalized, depth + 1);
+    }
+    return '';
+  }
+
+  switch (type) {
+    case 'string':
+      if (normalized.enum && Array.isArray(normalized.enum) && normalized.enum.length > 0) {
+        return normalized.enum[0];
+      }
+      return normalized.default !== undefined ? normalized.default : '';
+    case 'number':
+    case 'integer':
+      if (normalized.default !== undefined) {
+        return normalized.default;
+      }
+      if (typeof normalized.minimum === 'number') {
+        return normalized.minimum;
+      }
+      return 0;
+    case 'boolean':
+      if (normalized.default !== undefined) {
+        return Boolean(normalized.default);
+      }
+      return false;
+    case 'array': {
+      if (depth >= MAX_SCHEMA_TEMPLATE_DEPTH) {
+        return [];
+      }
+      const itemTemplate = inferEmptyValueFromSchema(normalized.items, depth + 1);
+      if (itemTemplate === '' || itemTemplate === undefined) {
+        return [];
+      }
+      return [itemTemplate];
+    }
+    case 'object':
+      return buildObjectTemplateFromSchema(normalized, depth + 1);
+    default:
+      return '';
+  }
+}
+
+function buildTemplatesFromSchema(schema) {
+  const normalized = normalizeSchemaCandidate(schema);
+  if (!normalized || (normalized.type && normalized.type !== 'object' && normalized.type !== 'array' && normalized.type !== 'any')) {
+    if (normalized && !normalized.type && normalized.properties) {
+      // Treat as object schema without explicit type
+      const template = buildObjectTemplateFromSchema(normalized);
+      if (template && Object.keys(template).length > 0) {
+        return [JSON.stringify(template)];
+      }
+    }
+    return [];
+  }
+
+  const template = normalized.type === 'array'
+    ? inferEmptyValueFromSchema(normalized)
+    : buildObjectTemplateFromSchema(normalized);
+
+  if (!template || typeof template !== 'object' || Array.isArray(template)) {
+    return [];
+  }
+
+  if (Object.keys(template).length === 0) {
+    return [];
+  }
+
+  return [JSON.stringify(template)];
+}
+
+function findToolDefinition(state, participantId, toolName) {
+  if (!state || !toolName) {
+    return null;
+  }
+
+  const toolsByParticipant = state.toolsByParticipant || {};
+  const normalizedName = toolName.toLowerCase();
+
+  const candidateLists = [];
+
+  if (participantId && Array.isArray(toolsByParticipant[participantId])) {
+    candidateLists.push(toolsByParticipant[participantId]);
+  }
+
+  for (const value of Object.values(toolsByParticipant)) {
+    if (Array.isArray(value)) {
+      candidateLists.push(value);
+    }
+  }
+
+  for (const list of candidateLists) {
+    const match = list.find(tool => tool && typeof tool.name === 'string' && tool.name.toLowerCase() === normalizedName);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function createTemplateOption(value, description) {
+  return {
+    value,
+    displayValue: value,
+    insertValue: value,
+    description: description || null
+  };
+}
+
 function literal(value, meta = {}) {
   return {
     type: NODE_TYPES.LITERAL,
@@ -153,6 +372,49 @@ const resolverRegistry = {
         seen.add(key);
         return true;
       });
+  },
+
+  argumentTemplatesForTool(context = {}) {
+    const parameters = context.parameters || {};
+    const state = context.state || {};
+
+    const participantId = parameters.targetParticipant || parameters.participant || parameters.to || null;
+    const toolName = parameters.toolName || parameters.tool || parameters.name || null;
+
+    const tool = findToolDefinition(state, participantId, toolName);
+    const options = [];
+
+    if (tool) {
+      const schema = tool.inputSchema || tool.schema || tool.parameters || null;
+      const schemaTemplates = buildTemplatesFromSchema(schema);
+
+      schemaTemplates.forEach(template => {
+        options.push(createTemplateOption(
+          template,
+          tool.name ? `Template from ${tool.name} schema` : 'Template from tool schema'
+        ));
+      });
+    }
+
+    DEFAULT_ARGUMENT_TEMPLATE_OPTIONS.forEach(defaultOption => {
+      options.push({ ...defaultOption });
+    });
+
+    const seen = new Set();
+    return options.filter(option => {
+      if (!option || typeof option.value !== 'string') {
+        return false;
+      }
+      const trimmed = option.value.trim();
+      if (!trimmed) {
+        return false;
+      }
+      if (seen.has(trimmed)) {
+        return false;
+      }
+      seen.add(trimmed);
+      return true;
+    });
   }
 };
 
@@ -446,7 +708,7 @@ const commandDefinitions = [
         description: 'JSON arguments payload',
         placeholder: '{"key":"value"}',
         appendSpace: false,
-        options: ['{}']
+        resolverKey: 'argumentTemplatesForTool'
       })
     ]
   })
