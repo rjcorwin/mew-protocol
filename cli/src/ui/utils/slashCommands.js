@@ -59,6 +59,103 @@ function parameter(name, options = {}) {
   };
 }
 
+const resolverRegistry = {
+  participants(context = {}) {
+    const state = context.state || {};
+    const participants = Array.isArray(state.participants) ? state.participants : [];
+    const details = state.participantDetails || {};
+
+    return participants
+      .filter(id => typeof id === 'string' && id.length > 0)
+      .map(id => {
+        const info = details[id] || {};
+        const descriptionCandidate = [info.summary, info.status, info.description]
+          .find(value => typeof value === 'string' && value.trim().length > 0) || null;
+
+        return {
+          value: id,
+          displayValue: id,
+          insertValue: id,
+          description: descriptionCandidate
+        };
+      });
+  },
+
+  toolsForParticipant(context = {}) {
+    const state = context.state || {};
+    const parameters = context.parameters || {};
+    const toolsByParticipant = state.toolsByParticipant || {};
+    const targetParticipant = parameters.targetParticipant || parameters.participant || parameters.to || null;
+
+    let toolEntries = [];
+
+    if (targetParticipant && Array.isArray(toolsByParticipant[targetParticipant])) {
+      toolEntries = toolsByParticipant[targetParticipant];
+    } else {
+      for (const key of Object.keys(toolsByParticipant)) {
+        const list = toolsByParticipant[key];
+        if (Array.isArray(list)) {
+          toolEntries = toolEntries.concat(list);
+        }
+      }
+    }
+
+    if (!Array.isArray(toolEntries) || toolEntries.length === 0) {
+      return [];
+    }
+
+    const seen = new Set();
+
+    return toolEntries
+      .map(tool => {
+        if (!tool) {
+          return null;
+        }
+
+        if (typeof tool === 'string') {
+          return {
+            value: tool,
+            displayValue: tool,
+            insertValue: tool,
+            description: null
+          };
+        }
+
+        if (typeof tool === 'object') {
+          const name = tool.name || tool.value || tool.id;
+          if (!name) {
+            return null;
+          }
+
+          const display = tool.displayName || tool.display_name || null;
+          const description = typeof tool.description === 'string' ? tool.description : null;
+
+          return {
+            value: name,
+            displayValue: display || name,
+            insertValue: name,
+            description
+          };
+        }
+
+        return null;
+      })
+      .filter(option => {
+        if (!option || !option.value) {
+          return false;
+        }
+
+        const key = option.value.toLowerCase();
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+  }
+};
+
 function normalizeOption(option, index) {
   if (typeof option === 'string') {
     return {
@@ -322,6 +419,36 @@ const commandDefinitions = [
       parameter('streamId', { description: 'Stream identifier', placeholder: 'streamId' }),
       parameter('reason', { optional: true, description: 'Reason', placeholder: 'reason', variadic: true })
     ]
+  }),
+  createCommand({
+    id: 'envelope-mcp-tool-call',
+    description: 'Send an MCP tool call request envelope',
+    category: 'Envelopes',
+    usage: '/envelope mcp/request tool/call <participant> <tool> [jsonArguments]',
+    sequence: [
+      literal('/envelope'),
+      literal('mcp/request'),
+      literal('tool/call'),
+      parameter('participant', {
+        description: 'Participant to target',
+        placeholder: 'participant',
+        resolverKey: 'participants',
+        collectAs: 'targetParticipant'
+      }),
+      parameter('tool', {
+        description: 'Tool name to call',
+        placeholder: 'tool',
+        resolverKey: 'toolsForParticipant',
+        collectAs: 'toolName'
+      }),
+      parameter('arguments', {
+        optional: true,
+        description: 'JSON arguments payload',
+        placeholder: '{"key":"value"}',
+        appendSpace: false,
+        options: ['{}']
+      })
+    ]
   })
 ];
 
@@ -518,6 +645,17 @@ function resolveNodeOptions(node, context) {
       return node.options;
     }
 
+    if (node.resolverKey && resolverRegistry[node.resolverKey]) {
+      try {
+        const result = resolverRegistry[node.resolverKey](context) || [];
+        if (Array.isArray(result)) {
+          return result.map((option, index) => normalizeOption(option, index));
+        }
+      } catch (err) {
+        // Ignore resolver errors to keep suggestions responsive.
+      }
+    }
+
     if (typeof node.resolver === 'function') {
       try {
         const result = node.resolver(context) || [];
@@ -533,7 +671,7 @@ function resolveNodeOptions(node, context) {
   return [];
 }
 
-function getNextNodeWithSuggestions(command, match, context) {
+function getNextNodeWithSuggestions(command, match, context, requestContext) {
   let nodeIndex = match.nextIndex;
 
   while (nodeIndex < command.sequence.length) {
@@ -543,7 +681,8 @@ function getNextNodeWithSuggestions(command, match, context) {
       match,
       text: context.text,
       cursorIndex: context.cursorIndex,
-      parameters: match.parameters
+      parameters: match.parameters,
+      state: requestContext
     });
 
     const suggestions = buildSuggestionsForNode(command, node, nodeIndex, match, context, options);
@@ -738,6 +877,7 @@ function getSlashCommandSuggestions(input, limitOverride) {
   }
 
   const context = buildInputContext(text, request.cursorIndex);
+  const requestContext = request.context || {};
   const suggestions = [];
 
   for (const command of commandRegistry) {
@@ -746,7 +886,7 @@ function getSlashCommandSuggestions(input, limitOverride) {
       continue;
     }
 
-    const commandSuggestions = getNextNodeWithSuggestions(command, match, context);
+    const commandSuggestions = getNextNodeWithSuggestions(command, match, context, requestContext);
     suggestions.push(...commandSuggestions);
   }
 

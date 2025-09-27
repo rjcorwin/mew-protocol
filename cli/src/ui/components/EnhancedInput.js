@@ -52,7 +52,8 @@ function EnhancedInput({
   onHistoryChange = () => {},
   keyBindings = defaultKeyBindings,
   showCursor = true,
-  prompt = '> '
+  prompt = '> ',
+  slashContext = null
 }) {
   // Text buffer for managing input
   const bufferRef = useRef(new TextBuffer());
@@ -81,7 +82,11 @@ function EnhancedInput({
       const cursorIndex = typeof buffer.getCursorIndex === 'function'
         ? buffer.getCursorIndex()
         : text.length;
-      const matches = getSlashCommandSuggestions({ text, cursorIndex });
+      const matches = getSlashCommandSuggestions({
+        text,
+        cursorIndex,
+        context: slashContext || undefined
+      });
       setSuggestions(matches);
       setIsAutocompleting(matches.length > 0);
       setSelectedSuggestion(0);
@@ -90,7 +95,7 @@ function EnhancedInput({
       setSuggestions([]);
       setSelectedSuggestion(0);
     }
-  }, [buffer, updateCounter]);
+  }, [buffer, updateCounter, slashContext]);
 
   // Force re-render when buffer changes
   const update = useCallback(() => {
