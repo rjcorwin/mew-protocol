@@ -1,6 +1,6 @@
 # MEW CLI Architecture Decision Records (ADRs)
 
-This directory contains Architecture Decision Records (ADRs) that document key architectural and design decisions made during the implementation of the MEW CLI, particularly where the implementation diverges from or extends the MEW Protocol v0.3 specification.
+This directory contains Architecture Decision Records (ADRs) that document key architectural and design decisions made during the implementation of the MEW CLI, particularly where the implementation diverges from or extends the MEW Protocol v0.4 specification.
 
 ## Status: Proposed
 All ADRs in this directory are currently **proposed** and under review. They document the current state of the CLI implementation and the rationale behind key architectural choices.
@@ -60,12 +60,12 @@ All ADRs in this directory are currently **proposed** and under review. They doc
 ---
 
 ### [ADR-005: Join Message Protocol Inconsistency](./ADR-005-join-message-protocol-inconsistency.md)
-**Decision**: Standardize on MEW v0.3 compliant `system/join` envelope format and deprecate legacy `type: 'join'` format.
+**Decision**: Standardize on MEW v0.4 compliant `system/join` envelope format and deprecate legacy `type: 'join'` format.
 
 **Context**: The implementation currently uses two different join message formats inconsistently across components, creating protocol compliance and maintenance issues.
 
 **Impact**:
-- ✅ Protocol consistency with MEW v0.3 envelope format
+- ✅ Protocol consistency with MEW v0.4 envelope format
 - ✅ Future compatibility and tooling support
 - ⚠️ Breaking change requiring client migration
 - ⚠️ Temporary dual-format complexity during transition
@@ -97,7 +97,7 @@ The ADRs collectively document a **layered architecture** that separates protoco
 ## Key Design Principles
 
 ### 1. **Protocol Compliance with Operational Extensions**
-- Core message exchange follows MEW Protocol v0.3
+- Core message exchange follows MEW Protocol v0.4
 - Operational features (process management, configuration) are implementation extensions
 - Clear separation between protocol semantics and deployment concerns
 
@@ -164,7 +164,7 @@ To propose changes or add new ADRs:
 
 ## Links
 
-- [MEW Protocol v0.3 Specification](../../../spec/v0.3/SPEC.md)
+- [MEW Protocol v0.4 Specification](../../../spec/v0.4/SPEC.md)
 - [CLI Draft Specification](../SPEC.md) 
 - [Implementation Source Code](../../../src/)
 - [Test Scenarios](../../../tests/)

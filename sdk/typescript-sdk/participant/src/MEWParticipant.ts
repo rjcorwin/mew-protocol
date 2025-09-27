@@ -14,7 +14,7 @@ import {
 import { PatternMatcher } from '@mew-protocol/capability-matcher';
 import { v4 as uuidv4 } from 'uuid';
 
-const PROTOCOL_VERSION = 'mew/v0.3';
+const PROTOCOL_VERSION = 'mew/v0.4';
 
 export interface ParticipantOptions extends ClientOptions {
   requestTimeout?: number;  // Default timeout for MCP requests

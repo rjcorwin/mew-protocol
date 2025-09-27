@@ -74,7 +74,7 @@ gateway
             // Send welcome message
             ws.send(
               JSON.stringify({
-                protocol: 'mew/v0.3',
+                protocol: 'mew/v0.4',
                 kind: 'system/welcome',
                 payload: {
                   participantId,
@@ -92,7 +92,7 @@ gateway
           if (spaceId && spaces.has(spaceId)) {
             const space = spaces.get(spaceId);
             const envelope = {
-              protocol: 'mew/v0.3',
+              protocol: 'mew/v0.4',
               id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               ts: new Date().toISOString(),
               from: participantId,
@@ -114,7 +114,7 @@ gateway
           console.error('Error handling message:', error);
           ws.send(
             JSON.stringify({
-              protocol: 'mew/v0.3',
+              protocol: 'mew/v0.4',
               kind: 'system/error',
               payload: {
                 error: error.message,

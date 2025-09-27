@@ -33,7 +33,7 @@ ws.on('open', () => {
 
   // Send join message
   const joinMessage = {
-    protocol: 'mew/v0.3',
+    protocol: 'mew/v0.4',
     id: `msg-${Date.now()}`,
     ts: new Date().toISOString(),
     from: participantId,
@@ -58,7 +58,7 @@ ws.on('message', (data) => {
     if (message.kind === 'chat' && message.from !== participantId) {
       setTimeout(() => {
         const response = {
-          protocol: 'mew/v0.3',
+          protocol: 'mew/v0.4',
           id: `msg-${Date.now()}`,
           ts: new Date().toISOString(),
           from: participantId,

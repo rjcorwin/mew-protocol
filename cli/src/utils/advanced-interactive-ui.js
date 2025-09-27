@@ -4,7 +4,7 @@
  * Provides a modern terminal interface with native scrolling, MCP confirmations,
  * and rich formatting for MEW protocol interactions.
  * 
- * Based on Gemini CLI patterns and MEW Protocol v0.3 specification.
+ * Based on Gemini CLI patterns and MEW Protocol v0.4 specification.
  */
 
 const React = require('react');
@@ -722,7 +722,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     }
 
     // Check if this is an MCP proposal requiring confirmation
-    // In MEW v0.3, mcp/proposal contains operation details that need approval
+    // In MEW v0.4, mcp/proposal contains operation details that need approval
     if (message.kind === 'mcp/proposal') {
       // Check if we've already granted this capability
       const proposerGrants = grantedCapabilities.get(message.from) || [];
@@ -1338,7 +1338,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
 
   const wrapEnvelope = (message) => {
     return {
-      protocol: 'mew/v0.3',
+      protocol: 'mew/v0.4',
       id: `msg-${uuidv4()}`,
       ts: new Date().toISOString(),
       from: participantId,
@@ -1349,7 +1349,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   const isValidEnvelope = (obj) => {
-    return obj && obj.protocol === 'mew/v0.3' && obj.id && obj.ts && obj.kind;
+    return obj && obj.protocol === 'mew/v0.4' && obj.id && obj.ts && obj.kind;
   };
 
   const isDockedLayout = layoutMode === 'docked';

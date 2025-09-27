@@ -11,7 +11,7 @@
 
 ### Changed
 - Updated all references from MEUP to MEW protocol
-- Updated protocol version from v0.2 to v0.3
+- Updated protocol version from v0.2 to v0.4
 - Enhanced participant resolution with multiple fallback strategies
 
 ### Features

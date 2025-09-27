@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import WebSocket, { RawData as WebSocketData } from 'ws';
 import { Envelope, Capability } from '@mew-protocol/types';
 
-const PROTOCOL_VERSION = 'mew/v0.3';
+const PROTOCOL_VERSION = 'mew/v0.4';
 
 export interface StreamFrame {
   streamId: string;

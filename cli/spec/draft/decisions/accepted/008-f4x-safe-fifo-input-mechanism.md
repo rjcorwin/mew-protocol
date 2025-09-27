@@ -431,4 +431,4 @@ For backward compatibility, FIFO mode is still supported but not recommended for
 - [Express.js Documentation](https://expressjs.com/)
 - [Unix Domain Sockets](https://man7.org/linux/man-pages/man7/unix.7.html)
 - [MEW CLI Specification](../SPEC.md)
-- [MEW Protocol v0.3 Specification](../../../../spec/v0.3/SPEC.md)
+- [MEW Protocol v0.4 Specification](../../../../spec/v0.4/SPEC.md)

@@ -427,7 +427,7 @@ class InteractiveUI {
    * @returns {boolean}
    */
   isValidEnvelope(obj) {
-    return obj && obj.protocol === 'mew/v0.3' && obj.id && obj.ts && obj.kind;
+    return obj && obj.protocol === 'mew/v0.4' && obj.id && obj.ts && obj.kind;
   }
 
   /**
@@ -437,7 +437,7 @@ class InteractiveUI {
    */
   wrapEnvelope(message) {
     return {
-      protocol: 'mew/v0.3',
+      protocol: 'mew/v0.4',
       id: `msg-${uuidv4()}`,
       ts: new Date().toISOString(),
       from: this.participantId,

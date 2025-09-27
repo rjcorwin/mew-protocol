@@ -4,7 +4,7 @@ exports.MEWParticipant = exports.DiscoveryState = void 0;
 const client_1 = require("@mew-protocol/client");
 const capability_matcher_1 = require("@mew-protocol/capability-matcher");
 const uuid_1 = require("uuid");
-const PROTOCOL_VERSION = 'mew/v0.3';
+const PROTOCOL_VERSION = 'mew/v0.4';
 // Discovery state for each participant
 var DiscoveryState;
 (function (DiscoveryState) {

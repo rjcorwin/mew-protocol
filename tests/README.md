@@ -1,6 +1,6 @@
 # MEW Protocol Tests
 
-This directory contains the test suite for the MEW (Multi-Entity Workspace) Protocol v0.3 implementation.
+This directory contains the test suite for the MEW (Multi-Entity Workspace) Protocol v0.4 implementation.
 
 ## Running Tests
 
@@ -90,4 +90,4 @@ Tests use PM2 for process management and the MEW CLI to start spaces. Each test:
 3. Verifies expected outcomes
 4. Cleans up all processes and artifacts
 
-For protocol details, see the main [MEW Protocol documentation](/spec/v0.3/SPEC.md).
+For protocol details, see the main [MEW Protocol documentation](/spec/v0.4/SPEC.md).

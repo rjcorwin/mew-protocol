@@ -101,7 +101,7 @@ gateway
       }
 
       // Protocol version check
-      if (message.protocol && message.protocol !== 'mew/v0.3') {
+      if (message.protocol && message.protocol !== 'mew/v0.4') {
         return `Invalid protocol version: ${message.protocol}`;
       }
 
@@ -135,7 +135,7 @@ gateway
           if (validationError) {
             ws.send(
               JSON.stringify({
-                protocol: 'mew/v0.3',
+                protocol: 'mew/v0.4',
                 kind: 'system/error',
                 payload: {
                   error: validationError,
@@ -176,7 +176,7 @@ gateway
             // Send welcome message with capabilities
             ws.send(
               JSON.stringify({
-                protocol: 'mew/v0.3',
+                protocol: 'mew/v0.4',
                 kind: 'system/welcome',
                 payload: {
                   participantId,
@@ -195,7 +195,7 @@ gateway
           if (requiredCapability && !hasCapability(participantId, requiredCapability)) {
             ws.send(
               JSON.stringify({
-                protocol: 'mew/v0.3',
+                protocol: 'mew/v0.4',
                 kind: 'system/error',
                 payload: {
                   error: `Insufficient capability: ${requiredCapability} required`,
@@ -239,7 +239,7 @@ gateway
                 : message.correlation_id;
 
             const envelope = {
-              protocol: 'mew/v0.3',
+              protocol: 'mew/v0.4',
               id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               ts: new Date().toISOString(),
               from: participantId,
@@ -268,7 +268,7 @@ gateway
           console.error('Error handling message:', error);
           ws.send(
             JSON.stringify({
-              protocol: 'mew/v0.3',
+              protocol: 'mew/v0.4',
               kind: 'system/error',
               payload: {
                 error: error.message,
@@ -312,7 +312,7 @@ function handleCapabilityGrant(message, ws, fromParticipant, spaces, capabilitie
   if (!hasCapability(fromParticipant, 'capability/admin')) {
     ws.send(
       JSON.stringify({
-        protocol: 'mew/v0.3',
+        protocol: 'mew/v0.4',
         kind: 'system/error',
         payload: {
           error: 'Not authorized to grant capabilities',
@@ -339,7 +339,7 @@ function handleCapabilityGrant(message, ws, fromParticipant, spaces, capabilitie
     if (targetWs && targetWs.readyState === WebSocket.OPEN) {
       targetWs.send(
         JSON.stringify({
-          protocol: 'mew/v0.3',
+          protocol: 'mew/v0.4',
           kind: 'capability/granted',
           from: fromParticipant,
           payload: {
@@ -362,7 +362,7 @@ function handleCapabilityRevoke(message, ws, fromParticipant, spaces, capabiliti
   if (!hasCapability(fromParticipant, 'capability/admin')) {
     ws.send(
       JSON.stringify({
-        protocol: 'mew/v0.3',
+        protocol: 'mew/v0.4',
         kind: 'system/error',
         payload: {
           error: 'Not authorized to revoke capabilities',
@@ -390,7 +390,7 @@ function handleCapabilityRevoke(message, ws, fromParticipant, spaces, capabiliti
     if (targetWs && targetWs.readyState === WebSocket.OPEN) {
       targetWs.send(
         JSON.stringify({
-          protocol: 'mew/v0.3',
+          protocol: 'mew/v0.4',
           kind: 'capability/revoked',
           from: fromParticipant,
           payload: {
@@ -423,7 +423,7 @@ function handleContextPush(message, ws, participantId, contextStacks, spaces, op
   if (ws.spaceId && spaces.has(ws.spaceId)) {
     const space = spaces.get(ws.spaceId);
     const envelope = {
-      protocol: 'mew/v0.3',
+      protocol: 'mew/v0.4',
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ts: new Date().toISOString(),
       from: participantId,
@@ -451,7 +451,7 @@ function handleContextPop(message, ws, participantId, contextStacks, spaces, opt
   if (stack.length === 0) {
     ws.send(
       JSON.stringify({
-        protocol: 'mew/v0.3',
+        protocol: 'mew/v0.4',
         kind: 'system/error',
         payload: {
           error: 'No context to pop',
@@ -468,7 +468,7 @@ function handleContextPop(message, ws, participantId, contextStacks, spaces, opt
   if (ws.spaceId && spaces.has(ws.spaceId)) {
     const space = spaces.get(ws.spaceId);
     const envelope = {
-      protocol: 'mew/v0.3',
+      protocol: 'mew/v0.4',
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ts: new Date().toISOString(),
       from: participantId,

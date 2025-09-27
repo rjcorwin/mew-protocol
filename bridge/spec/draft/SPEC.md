@@ -35,7 +35,7 @@ Out of scope:
 MEW Space
     │
     ├── Gateway (WebSocket)
-    │      ↕ MEW Protocol v0.3
+    │      ↕ MEW Protocol v0.4
     │
     ├── MCP Bridge Process (@mew-protocol/bridge)
     │   ├── MEWParticipant (SDK base class)
@@ -145,7 +145,7 @@ Identifies this participant as an MCP bridge (required for gateway to use bridge
 ```javascript
 // MEW Request (incoming)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "req-123",
   "from": "client",
   "to": ["filesystem"],
@@ -164,7 +164,7 @@ Identifies this participant as an MCP bridge (required for gateway to use bridge
 ```javascript
 // MEW Request (incoming)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "req-456",
   "from": "client",
   "to": ["filesystem"],
@@ -200,7 +200,7 @@ Identifies this participant as an MCP bridge (required for gateway to use bridge
 
 // MEW Response (automatic from MEWParticipant)
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "resp-789",
   "from": "filesystem",
   "to": ["client"],
@@ -437,7 +437,7 @@ Log categories:
 
 ## References
 
-- [MEW Protocol Specification v0.3](../../spec/v0.3/SPEC.md)
+- [MEW Protocol Specification v0.4](../../spec/v0.4/SPEC.md)
 - [MCP Specification](https://modelcontextprotocol.org)
 - [MEW SDK Documentation](../../sdk/spec/draft/SPEC.md)
 - [Test Scenarios](../../tests/scenario-7-mcp-bridge/)

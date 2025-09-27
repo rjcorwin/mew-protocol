@@ -3,7 +3,7 @@ import { Envelope, ParticipantRestartPayload } from '@mew-protocol/types';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
-const PROTOCOL_VERSION = 'mew/v0.3';
+const PROTOCOL_VERSION = 'mew/v0.4';
 
 export interface AgentConfig extends ParticipantOptions {
   name?: string;

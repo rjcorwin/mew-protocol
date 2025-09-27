@@ -17,7 +17,7 @@ sdk/typescript-sdk/    # Core packages
 bridge/             # MCP-MEW bridge
 cli/               # Command-line tool
 tests/             # Integration tests (scenario-*)
-spec/              # Protocol specs (v0.3=current, draft=next)
+spec/              # Protocol specs (v0.4=current, draft=next)
 docs/              # Guides in architecture/, guides/, bugs/, progress/
 ```
 

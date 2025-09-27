@@ -71,7 +71,7 @@ class FulfillerAgent extends MEWParticipant {
     console.log(`Saw proposal from ${envelope.from}, auto-fulfilling...`);
     console.log(`Proposal details: ${JSON.stringify(envelope)}`);
 
-    // In MEW v0.3, the proposal payload IS the MCP request payload
+    // In MEW v0.4, the proposal payload IS the MCP request payload
     const proposal = envelope.payload;
     if (!proposal || !proposal.method) {
       console.log('No valid MCP proposal data found in message');

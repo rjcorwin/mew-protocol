@@ -2,14 +2,14 @@
 /**
  * Core MEW Protocol Types
  *
- * These types define the Multi-Entity Workspace Protocol v0.3
+ * These types define the Multi-Entity Workspace Protocol v0.4
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessageKinds = exports.MCP_VERSION = exports.PROTOCOL_VERSION = void 0;
 // ============================================================================
 // Protocol Constants
 // ============================================================================
-exports.PROTOCOL_VERSION = 'mew/v0.3';
+exports.PROTOCOL_VERSION = 'mew/v0.4';
 exports.MCP_VERSION = '2025-06-18';
 // ============================================================================
 // Message Kind Constants

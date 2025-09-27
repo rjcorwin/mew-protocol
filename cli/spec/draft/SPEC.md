@@ -760,7 +760,7 @@ ls -la .mew/tokens/
 
 ## FIFO Message Format
 
-Messages sent to/from FIFOs use MEW v0.3 protocol format.
+Messages sent to/from FIFOs use MEW v0.4 protocol format.
 
 **Input (to fifo-in):**
 Simplified format - CLI adds protocol envelope fields:
@@ -774,10 +774,10 @@ Simplified format - CLI adds protocol envelope fields:
 ```
 
 **Output (from fifo-out):**
-Full MEW v0.3 envelope:
+Full MEW v0.4 envelope:
 ```json
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-123",
   "ts": "2025-01-05T12:00:00Z",
   "from": "other-agent",
@@ -897,7 +897,7 @@ defaults:
 
 #### Capability Patterns
 
-Capabilities use JSON pattern matching as defined in MEW v0.3:
+Capabilities use JSON pattern matching as defined in MEW v0.4:
 
 **Simple patterns:**
 ```yaml

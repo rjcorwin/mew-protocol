@@ -259,7 +259,7 @@ Bridges MCP servers to MEW Protocol. Requires the participant package to be buil
 
 ## Additional Resources
 
-- [MEW Protocol Specification](spec/v0.3/SPEC.md)
+- [MEW Protocol Specification](spec/v0.4/SPEC.md)
 - [TypeScript SDK Documentation](sdk/typescript-sdk/README.md)
 - [Test Scenarios](tests/README.md)
 - [Architecture Decision Records](decisions/)

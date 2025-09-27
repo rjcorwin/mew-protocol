@@ -82,7 +82,7 @@ function generateBanner(options = {}) {
             ${bold}██║ ╚═╝ ██║███████╗╚███╔███╔╝${reset}
             ${bold}╚═╝     ╚═╝╚══════╝ ╚══╝╚══╝${reset}
 
-    ${green}Multi-Entity Workspace Protocol v0.3${reset}
+    ${green}Multi-Entity Workspace Protocol v0.4${reset}
     ${cyan}"${tagline}"${reset}
 `;
 

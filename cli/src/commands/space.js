@@ -800,7 +800,7 @@ async function spaceUpAction(options) {
         ws.on('open', () => {
           // Send join message
           const joinMessage = {
-            protocol: 'mew/v0.3',
+            protocol: 'mew/v0.4',
             id: `join-${Date.now()}`,
             ts: new Date().toISOString(),
             kind: 'system/join',
@@ -1459,7 +1459,7 @@ space
       ws.on('open', () => {
         // Send join message
         const joinMessage = {
-          protocol: 'mew/v0.3',
+          protocol: 'mew/v0.4',
           id: `join-${Date.now()}`,
           ts: new Date().toISOString(),
           kind: 'system/join',

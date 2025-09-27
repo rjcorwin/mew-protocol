@@ -27,9 +27,9 @@ This debug mode should be:
 
 Show only JSON messages, require full JSON input:
 ```
-< {"protocol":"mew/v0.3","kind":"system/welcome",...}
-> {"protocol":"mew/v0.3","kind":"chat","payload":{"text":"hello"}}
-< {"protocol":"mew/v0.3","kind":"chat","from":"echo",...}
+< {"protocol":"mew/v0.4","kind":"system/welcome",...}
+> {"protocol":"mew/v0.4","kind":"chat","payload":{"text":"hello"}}
+< {"protocol":"mew/v0.4","kind":"chat","from":"echo",...}
 ```
 
 **Pros:**
@@ -174,7 +174,7 @@ Verbose mode (`/verbose` command) shows full JSON:
 ```
 [10:23:45] → you chat
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-123",
   "kind": "chat",
   "payload": {"text": "Hello"}
@@ -335,7 +335,7 @@ Active participants:
 > {"kind": "invalid"}
 [10:25:00] → you invalid
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "id": "msg-456",
   "ts": "2025-01-10T10:25:00Z",
   "from": "human",
@@ -344,7 +344,7 @@ Active participants:
 
 [10:25:01] ← system system/error
 {
-  "protocol": "mew/v0.3",
+  "protocol": "mew/v0.4",
   "kind": "system/error",
   "payload": {
     "error": "Unknown message kind: invalid",

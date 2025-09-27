@@ -1,14 +1,14 @@
 /**
  * Core MEW Protocol Types
  * 
- * These types define the Multi-Entity Workspace Protocol v0.3
+ * These types define the Multi-Entity Workspace Protocol v0.4
  */
 
 // ============================================================================
 // Protocol Constants
 // ============================================================================
 
-export const PROTOCOL_VERSION = 'mew/v0.3';
+export const PROTOCOL_VERSION = 'mew/v0.4';
 export const MCP_VERSION = '2025-06-18';
 
 // ============================================================================
@@ -19,7 +19,7 @@ export const MCP_VERSION = '2025-06-18';
  * MEW envelope - the top-level wrapper for all messages
  */
 export interface Envelope {
-  protocol: 'mew/v0.3';
+  protocol: 'mew/v0.4';
   id: string;
   ts: string;
   from: string;
