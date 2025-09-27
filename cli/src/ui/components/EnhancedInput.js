@@ -211,6 +211,7 @@ function EnhancedInput({
               }
               const newIndex = Math.min(historyIndex + 1, history.length - 1);
               setHistoryIndex(newIndex);
+              suppressSuggestionsRef.current = true;
               buffer.setText(history[history.length - 1 - newIndex]);
               buffer.move('bufferEnd');
               update();
@@ -227,6 +228,7 @@ function EnhancedInput({
             }
             const newIndex = Math.min(historyIndex + 1, history.length - 1);
             setHistoryIndex(newIndex);
+            suppressSuggestionsRef.current = true;
             buffer.setText(history[history.length - 1 - newIndex]);
             buffer.move('bufferEnd');
             update();
@@ -247,6 +249,7 @@ function EnhancedInput({
             if (historyIndex !== -1) {
               const newIndex = historyIndex - 1;
               setHistoryIndex(newIndex);
+              suppressSuggestionsRef.current = true;
               if (newIndex === -1) {
                 buffer.setText(tempInput);
               } else {
@@ -264,6 +267,7 @@ function EnhancedInput({
           if (historyIndex !== -1) {
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
+            suppressSuggestionsRef.current = true;
             if (newIndex === -1) {
               buffer.setText(tempInput);
             } else {
@@ -315,6 +319,7 @@ function EnhancedInput({
           }
           const newIndex = Math.min(historyIndex + 1, history.length - 1);
           setHistoryIndex(newIndex);
+          suppressSuggestionsRef.current = true;
           buffer.setText(history[history.length - 1 - newIndex]);
           buffer.move('bufferEnd');
           update();
@@ -326,6 +331,7 @@ function EnhancedInput({
         if (historyIndex !== -1) {
           const newIndex = historyIndex - 1;
           setHistoryIndex(newIndex);
+          suppressSuggestionsRef.current = true;
           if (newIndex === -1) {
             buffer.setText(tempInput);
           } else {
@@ -380,6 +386,7 @@ function EnhancedInput({
 
     const newIndex = Math.min(historyIndex + 1, history.length - 1);
     setHistoryIndex(newIndex);
+    suppressSuggestionsRef.current = true;
     buffer.setText(history[history.length - 1 - newIndex]);
     buffer.move('bufferEnd');
     update();
@@ -391,6 +398,7 @@ function EnhancedInput({
     const newIndex = historyIndex - 1;
     setHistoryIndex(newIndex);
 
+    suppressSuggestionsRef.current = true;
     if (newIndex === -1) {
       // Restore temp input
       buffer.setText(tempInput);
