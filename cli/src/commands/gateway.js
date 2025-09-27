@@ -16,6 +16,7 @@ gateway
   .option('-p, --port <port>', 'Port to listen on', '8080')
   .option('-l, --log-level <level>', 'Log level (debug|info|warn|error)', 'info')
   .option('-s, --space-config <path>', 'Path to space.yaml configuration', './space.yaml')
+  .option('--no-auto-start', 'Disable auto-starting participants defined in the space configuration')
   .action(async (options) => {
     const port = parseInt(options.port);
 
@@ -265,6 +266,20 @@ gateway
       return ensureBaselineCapabilities([...(current || []), ...(requested || [])]);
     }
 
+    function resolveEnvVariables(envObj = {}) {
+      const resolved = {};
+      for (const [key, value] of Object.entries(envObj || {})) {
+        if (typeof value === 'string') {
+          resolved[key] = value.replace(/\$\{([^}]+)\}/g, (match, varName) =>
+            process.env[varName] || match,
+          );
+        } else {
+          resolved[key] = value;
+        }
+      }
+      return resolved;
+    }
+
     // Track spawned processes
     const spawnedProcesses = new Map(); // participantId -> ChildProcess
 
@@ -512,13 +527,26 @@ gateway
         if (config.auto_start && config.command) {
           console.log(`Auto-starting agent: ${participantId}`);
 
-          // Substitute ${PORT} in args
-          const args = (config.args || []).map(arg => 
-            arg.replace('${PORT}', port.toString())
+          const resolvedSpaceId = spaceConfig?.space?.id || 'default';
+          const token = tokenMap.get(participantId) || '';
+          const args = (config.args || []).map((arg) =>
+            typeof arg === 'string'
+              ? arg
+                  .replace('${PORT}', port.toString())
+                  .replace('${SPACE}', resolvedSpaceId)
+                  .replace('${TOKEN}', token)
+              : arg,
           );
 
           const child = spawn(config.command, args, {
-            env: { ...process.env, PORT: port.toString(), ...config.env },
+            env: {
+              ...process.env,
+              PORT: port.toString(),
+              SPACE: resolvedSpaceId,
+              TOKEN: token,
+              [`MEW_TOKEN_${participantId.toUpperCase().replace(/-/g, '_')}`]: token,
+              ...resolveEnvVariables(config.env || {}),
+            },
             stdio: 'inherit',
           });
 
@@ -1124,6 +1152,8 @@ gateway
       });
     });
 
+    const autoStartEnabled = options.autoStart !== false;
+
     // Start server
     server.listen(port, () => {
       console.log(`Gateway listening on port ${port}`);
@@ -1136,7 +1166,12 @@ gateway
 
       // Register HTTP participants and auto-start agents
       registerHttpParticipants();
-      autoStartAgents();
+      if (autoStartEnabled) {
+        console.log('Auto-starting participants defined in space configuration');
+        autoStartAgents();
+      } else {
+        console.log('Auto-start of participants disabled via --no-auto-start');
+      }
     });
 
     // Graceful shutdown

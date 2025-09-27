@@ -491,6 +491,7 @@ async function spaceUpAction(options) {
           options.logLevel,
           '--space-config',
           configPath,
+          '--no-auto-start',
         ],
         cwd: spaceDir,
         autorestart: false,
