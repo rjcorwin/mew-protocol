@@ -43,7 +43,7 @@ tests/
 ├── templates/                          # shared base templates (optional)
 └── scenario-*/
     ├── template/                       # scenario-specific template
-    │   └── .mew/space.yaml             # primary configuration (plus extras)
+    │   └── (files mirroring cli/templates/* structure)
     ├── setup.sh                        # initialises disposable workspace
     ├── check.sh / test.sh              # scenario assertions
     └── teardown.sh                     # shuts down & deletes workspace dir
@@ -57,9 +57,9 @@ CI once the migration completes.
 ## 4. Scenario Lifecycle
 
 1. **Setup (`setup.sh`)**
-   - Creates a scratch directory (default: `.workspace/`).
-   - Runs `mew space init --template <template-path> --space-dir .workspace`.
-   - Starts the space via `mew space up --space-dir .workspace [--port N]`.
+   - Creates a scratch directory (default: `.workspace/`) and `cd`s into it.
+   - Runs `../../cli/bin/mew.js space init --template ../template --space-dir .` so the local template is treated exactly like the built-in CLI templates.
+   - Starts the space via `../../cli/bin/mew.js space up --space-dir . [--port N]`.
    - Exports environment variables needed by the scenario scripts (e.g. port,
      log paths).
 
@@ -86,8 +86,10 @@ CI once the migration completes.
 
 ## 6. Templates
 
-- Scenario templates follow the same variable substitution rules as built-in CLI
-  templates (`{{SPACE_NAME}}`, etc.).
+- Scenario templates mimic the layout of `cli/templates/*` (e.g. `package.json`,
+  `.mew/space.yaml`, supporting files). This allows `mew space init --template`
+  to operate without special handling.
+- Templates follow the usual substitution tokens (`{{SPACE_NAME}}`, etc.).
 - Shared assets (common agents, scripts) may live under `tests/templates/` and be
   referenced via template inheritance or duplication, depending on needs.
 - Each template is versioned alongside its scenario scripts to keep historical
@@ -141,4 +143,3 @@ CI once the migration completes.
 
 - 2025-09-27: Initial draft capturing planned final state of disposable
   workspaces for tests.
-
