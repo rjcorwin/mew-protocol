@@ -72,6 +72,9 @@ class InitCommand {
       await this.processTemplateFiles(variables);
       console.log('✓ Processed template files with configuration');
 
+      // Prefer local workspace packages when running inside the monorepo
+      await this.useLocalWorkspacePackagesIfAvailable();
+
       // NOW install dependencies after package.json has been processed
       console.log('\nInstalling dependencies...');
       const depsInstalled = await this.installDependencies();
@@ -710,6 +713,96 @@ class InitCommand {
       // Package.json might not exist or have variables
       console.warn('Could not process package.json:', error.message);
     }
+  }
+
+  /**
+   * If we're running inside the MEW monorepo, rewrite MEW package deps to link to local workspaces
+   */
+  async useLocalWorkspacePackagesIfAvailable() {
+    const mewDir = path.join(process.cwd(), '.mew');
+    const packagePath = path.join(mewDir, 'package.json');
+
+    let packageJson;
+    try {
+      const content = await fs.readFile(packagePath, 'utf8');
+      packageJson = JSON.parse(content);
+    } catch {
+      return; // No package.json or invalid JSON
+    }
+
+    const repoRoot = await this.findMonorepoRoot();
+    if (!repoRoot) {
+      return; // Not inside the monorepo, keep npm versions
+    }
+
+    const localTargets = {
+      '@mew-protocol/agent': path.join(repoRoot, 'sdk/typescript-sdk/agent'),
+      '@mew-protocol/bridge': path.join(repoRoot, 'bridge'),
+      '@mew-protocol/client': path.join(repoRoot, 'sdk/typescript-sdk/client'),
+      '@mew-protocol/participant': path.join(repoRoot, 'sdk/typescript-sdk/participant'),
+      '@mew-protocol/types': path.join(repoRoot, 'sdk/typescript-sdk/types')
+    };
+
+    let changed = false;
+    for (const [dep, targetPath] of Object.entries(localTargets)) {
+      if (!packageJson.dependencies || !packageJson.dependencies[dep]) {
+        continue;
+      }
+
+      try {
+        await fs.access(targetPath);
+      } catch {
+        continue; // Local package not present
+      }
+
+      const relativePath = path.relative(mewDir, targetPath) || '.';
+      const normalized = relativePath.split(path.sep).join('/');
+      const linkSpec = `link:${normalized.startsWith('.') ? normalized : `./${normalized}`}`;
+
+      if (packageJson.dependencies[dep] !== linkSpec) {
+        packageJson.dependencies[dep] = linkSpec;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await fs.writeFile(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
+      console.log('  Using local MEW workspace packages');
+    }
+  }
+
+  /**
+   * Find the monorepo root (package.json named "mew-protocol" with MEW workspaces)
+   */
+  async findMonorepoRoot() {
+    let dir = process.cwd();
+    const root = path.parse(dir).root;
+
+    while (dir && dir !== root) {
+      const pkgPath = path.join(dir, 'package.json');
+      try {
+        const content = await fs.readFile(pkgPath, 'utf8');
+        const pkg = JSON.parse(content);
+
+        if (
+          pkg?.name === 'mew-protocol' &&
+          Array.isArray(pkg.workspaces) &&
+          pkg.workspaces.some((entry) => String(entry).includes('sdk/typescript-sdk/agent'))
+        ) {
+          return dir;
+        }
+      } catch {
+        // ignore
+      }
+
+      const parent = path.dirname(dir);
+      if (parent === dir) {
+        break;
+      }
+      dir = parent;
+    }
+
+    return null;
   }
 
   /**
