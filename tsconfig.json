@@ -6,7 +6,6 @@
     { "path": "./sdk/typescript-sdk/client" },
     { "path": "./sdk/typescript-sdk/participant" },
     { "path": "./sdk/typescript-sdk/agent" },
-    { "path": "./sdk/typescript-sdk/gateway" },
     { "path": "./bridge" }
   ]
 }

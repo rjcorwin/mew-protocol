@@ -9,7 +9,6 @@
     "sdk/typescript-sdk/participant",
     "sdk/typescript-sdk/types",
     "sdk/typescript-sdk/capability-matcher",
-    "sdk/typescript-sdk/gateway",
     "bridge",
     "cli"
   ],
