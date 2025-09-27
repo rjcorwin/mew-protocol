@@ -1,0 +1,12 @@
+{
+  "name": "scenario-12-stream-controls",
+  "description": "Validate stream request, open, and close envelopes",
+  "version": "0.1.0",
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Space identifier used for scenario 12",
+      "default": "scenario-12-stream-controls"
+    }
+  ]
+}

@@ -1,142 +1,176 @@
-#!/bin/bash
-# Check script - Runs test assertions against a running space
-#
-# Can be run after manual setup or called by test.sh
+#!/usr/bin/env bash
+# Scenario 3 assertions - validate proposal flow and fulfilment
 
-# Don't use set -e as it causes issues with arithmetic operations
-# set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
 
-# If TEST_DIR not set, we're running standalone
-if [ -z "$TEST_DIR" ]; then
-  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-  export OUTPUT_LOG="$TEST_DIR/logs/proposer-output.log"
-  export FULFILLER_LOG="$TEST_DIR/logs/fulfiller-output.log"
-  
-  # Try to detect port from running space
-  if [ -f "$TEST_DIR/.mew/pids.json" ]; then
-    export TEST_PORT=$(grep -o '"port":[[:space:]]*"[0-9]*"' "$TEST_DIR/.mew/pids.json" | grep -o '[0-9]*')
-  fi
-  
-  if [ -z "$TEST_PORT" ]; then
-    echo -e "${RED}Error: Cannot determine test port. Is the space running?${NC}"
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "workspace.env not found at ${ENV_FILE}. Run setup.sh first." >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+
+PROPOSER_LOG=${PROPOSER_LOG:-"${WORKSPACE_DIR}/logs/proposer-output.log"}
+FULFILLER_LOG=${FULFILLER_LOG:-"${WORKSPACE_DIR}/logs/fulfiller.log"}
+TEST_PORT=${TEST_PORT:-8080}
+
+if [[ ! -f "${PROPOSER_LOG}" ]]; then
+  echo "Expected proposer log ${PROPOSER_LOG} was not created" >&2
+  exit 1
+fi
+
+if [[ ! -f "${FULFILLER_LOG}" ]]; then
+  fallback_log="${WORKSPACE_DIR}/logs/fulfiller.log"
+  if [[ -f "${fallback_log}" ]]; then
+    FULFILLER_LOG="${fallback_log}"
+  else
+    echo "Expected fulfiller log ${FULFILLER_LOG} was not created" >&2
     exit 1
   fi
 fi
 
-echo -e "${YELLOW}=== Running Test Checks ===${NC}"
-echo -e "${BLUE}Scenario: Proposals with Capability Blocking${NC}"
-echo -e "${BLUE}Test directory: $TEST_DIR${NC}"
-echo -e "${BLUE}Gateway port: $TEST_PORT${NC}"
-echo ""
+if [[ ! -s "${FULFILLER_LOG}" ]]; then
+  fallback_log="${WORKSPACE_DIR}/logs/fulfiller.log"
+  if [[ "${FULFILLER_LOG}" != "${fallback_log}" && -f "${fallback_log}" ]]; then
+    FULFILLER_LOG="${fallback_log}"
+  fi
+fi
 
-# Track test results
-TESTS_PASSED=0
-TESTS_FAILED=0
+: > "${PROPOSER_LOG}"
+: > "${FULFILLER_LOG}"
 
-# Helper function to run a test
-run_test() {
-  local test_name="$1"
-  local test_command="$2"
-  
-  echo -n "Testing: $test_name ... "
-  
-  if eval "$test_command" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC}"
-    ((TESTS_PASSED++))
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+printf "%b\n" "${YELLOW}=== Scenario 3 Checks ===${NC}"
+printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
+printf "%b\n" "${BLUE}Gateway port: ${TEST_PORT}${NC}"
+
+sleep 2
+
+tests_passed=0
+tests_failed=0
+
+record_pass() {
+  local name="$1"
+  printf "%s: %b\n" "${name}" "${GREEN}✓${NC}"
+  tests_passed=$((tests_passed + 1))
+}
+
+record_fail() {
+  local name="$1"
+  printf "%s: %b\n" "${name}" "${RED}✗${NC}"
+  tests_failed=$((tests_failed + 1))
+}
+
+run_check() {
+  local name="$1"
+  shift
+  if "$@" > /dev/null 2>&1; then
+    record_pass "${name}"
   else
-    echo -e "${RED}✗${NC}"
-    ((TESTS_FAILED++))
+    record_fail "${name}"
   fi
 }
 
-# Point to the output log files (created by output_log config)
-RESPONSE_FILE="$OUTPUT_LOG"
-FULFILLER_FILE="${FULFILLER_LOG:-$TEST_DIR/logs/fulfiller-output.log}"
+wait_for_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local attempts=${3:-30}
+  for ((i = 0; i < attempts; i += 1)); do
+    if grep -E "${pattern}" "${file}" > /dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
 
-# Fall back to the standard participant log name if the configured output log
-# hasn't been generated (older spaces default to <participant>.log).
-if [ ! -f "$FULFILLER_FILE" ] && [ -f "$TEST_DIR/logs/fulfiller.log" ]; then
-  FULFILLER_FILE="$TEST_DIR/logs/fulfiller.log"
-fi
+post_message() {
+  local payload="$1"
+  curl -sf -X POST "http://localhost:${TEST_PORT}/participants/proposer/messages" \
+    -H "Authorization: Bearer proposer-token" \
+    -H "Content-Type: application/json" \
+    -d "${payload}" > /dev/null
+}
 
-# Test 1: Gateway health check
-run_test "Gateway is running" "curl -s http://localhost:$TEST_PORT/health | grep -q 'ok'"
+run_check "Gateway health endpoint" curl -sf "http://localhost:${TEST_PORT}/health"
+run_check "Proposer log exists" test -f "${PROPOSER_LOG}"
+run_check "Fulfiller log exists" test -f "${FULFILLER_LOG}"
 
-# Test 2: Check output log exists
-run_test "Output log exists" "[ -f '$OUTPUT_LOG' ]"
-
-# Test 3: Proposer cannot directly call MCP tools (blocked by capabilities)
-# SKIP: Capability checking not yet implemented in gateway HTTP endpoint
-echo -e "\n${YELLOW}Test: Proposer attempts direct MCP call${NC}"
-echo -e "Direct MCP call blocked: ${YELLOW}SKIPPED${NC} (capability checking not implemented)"
-# Not counting as pass or fail since it's not implemented
-
-# Test 4: Proposer sends proposal for calculation
-echo -e "\n${YELLOW}Test: Send proposal for calculation${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/proposer/messages" \
-  -H "Authorization: Bearer proposer-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":10,"b":5}}}}' > /dev/null
-sleep 3
-
-# Check if fulfiller received and processed the proposal
-if tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q '"text":"15"' || tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q '"result":15' || tail -50 logs/*.log 2>/dev/null | grep -q '15'; then
-  echo -e "Proposal fulfilled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Fulfil simple proposal (10 + 5)${NC}"
+proposal_simple_id="proposal-simple-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${proposal_simple_id}","kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":10,"b":5}}}}
+JSON
+)"; then
+  if wait_for_pattern "${FULFILLER_LOG}" "Fulfilling proposal ${proposal_simple_id}"; then
+    if wait_for_pattern "${PROPOSER_LOG}" '"kind":"chat"' && \
+       wait_for_pattern "${PROPOSER_LOG}" '"text":"15"'; then
+      record_pass "Proposal 1 fulfilled with result 15"
+    else
+      record_fail "Proposal 1 fulfilled with result 15"
+    fi
+  else
+    record_fail "Fulfiller saw proposal ${proposal_simple_id}"
+  fi
 else
-  echo -e "Proposal fulfilled: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST proposal 1"
 fi
 
-# Test 5: Proposer sends proposal for complex calculation
-echo -e "\n${YELLOW}Test: Complex calculation proposal${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/proposer/messages" \
-  -H "Authorization: Bearer proposer-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":8}}}}' > /dev/null
-sleep 3
-
-if tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q '"text":"56"' || tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q '"result":56' || tail -50 logs/*.log 2>/dev/null | grep -q '56'; then
-  echo -e "Complex proposal fulfilled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Fulfil multiply proposal (7 × 8)${NC}"
+proposal_multiply_id="proposal-multiply-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${proposal_multiply_id}","kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":8}}}}
+JSON
+)"; then
+  if wait_for_pattern "${FULFILLER_LOG}" "Fulfilling proposal ${proposal_multiply_id}"; then
+    if wait_for_pattern "${PROPOSER_LOG}" '"kind":"chat"' && \
+       wait_for_pattern "${PROPOSER_LOG}" '"text":"56"'; then
+      record_pass "Proposal 2 fulfilled with result 56"
+    else
+      record_fail "Proposal 2 fulfilled with result 56"
+    fi
+  else
+    record_fail "Fulfiller saw proposal ${proposal_multiply_id}"
+  fi
 else
-  echo -e "Complex proposal fulfilled: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST proposal 2"
 fi
 
-# Test 6: Invalid proposal
-echo -e "\n${YELLOW}Test: Invalid proposal handling${NC}"
-curl -sf -X POST "http://localhost:$TEST_PORT/participants/proposer/messages" \
-  -H "Authorization: Bearer proposer-token" \
-  -H "Content-Type: application/json" \
-  -d '{"kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"invalid_tool","arguments":{}}}}' > /dev/null
-sleep 2
-
-if tail -50 "$FULFILLER_FILE" 2>/dev/null | grep -q 'Tool not found' || tail -50 logs/*.log 2>/dev/null | grep -qi 'tool not found\|invalid.*tool\|error'; then
-  echo -e "Invalid proposal handled: ${GREEN}✓${NC}"
-  ((TESTS_PASSED++))
+printf "\n%b\n" "${YELLOW}Test: Handle invalid tool proposal${NC}"
+proposal_invalid_id="proposal-invalid-$RANDOM-$RANDOM"
+if post_message "$(cat <<JSON
+{"id":"${proposal_invalid_id}","kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"not-a-tool","arguments":{}}}}
+JSON
+)"; then
+if wait_for_pattern "${FULFILLER_LOG}" "Calculator returned error for proposal ${proposal_invalid_id}"; then
+    if wait_for_pattern "${PROPOSER_LOG}" 'Error fulfilling proposal'; then
+      record_pass "Invalid proposal error surfaced"
+    else
+      record_fail "Invalid proposal error surfaced"
+    fi
+  else
+    record_fail "Fulfiller logged failure for ${proposal_invalid_id}"
+  fi
 else
-  echo -e "Invalid proposal handled: ${RED}✗${NC}"
-  ((TESTS_FAILED++))
+  record_fail "POST invalid proposal"
 fi
 
-# Summary
-echo ""
-echo -e "${YELLOW}=== Test Summary ===${NC}"
-echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
-echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"
+printf "\n%b\n" "${YELLOW}=== Scenario 3 Summary ===${NC}"
+printf "Passed: %d\n" "${tests_passed}"
+printf "Failed: %d\n" "${tests_failed}"
 
-if [ $TESTS_FAILED -eq 0 ]; then
-  echo -e "\n${GREEN}✓ All tests passed!${NC}"
+if [[ ${tests_failed} -eq 0 ]]; then
   exit 0
-else
-  echo -e "\n${RED}✗ Some tests failed${NC}"
-  exit 1
 fi
+
+exit 1

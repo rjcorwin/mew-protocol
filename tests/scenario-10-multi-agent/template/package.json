@@ -1,0 +1,13 @@
+{
+  "name": "scenario-10-multi-agent-{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scenario 10 template for MEW integration tests (multi-agent coordination)",
+  "dependencies": {
+    "@mew-protocol/participant": "^0.2.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

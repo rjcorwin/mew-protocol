@@ -1,0 +1,79 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 10 - Multi-Agent Coordination"
+  description: "Coordinator delegates calculator operations to worker agent"
+
+participants:
+  coordinator-agent:
+    type: local
+    tokens: ["coordinator-token"]
+    auto_start: true
+    command: "node"
+    args:
+      - "./.mew/agents/coordinator-agent.js"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "coordinator-token"
+      - "--log"
+      - "./logs/coordinator.log"
+    capabilities:
+      - kind: "chat"
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "system/*"
+
+  worker-agent:
+    type: local
+    tokens: ["worker-token"]
+    auto_start: true
+    command: "node"
+    args:
+      - "./.mew/agents/worker-agent.js"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "worker-token"
+      - "--log"
+      - "./logs/worker.log"
+    capabilities:
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "system/*"
+
+  calculator-agent:
+    type: local
+    tokens: ["calculator-token"]
+    auto_start: true
+    command: "node"
+    args:
+      - "./.mew/agents/calculator-participant.js"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "calculator-token"
+    capabilities:
+      - kind: "mcp/response"
+      - kind: "system/*"
+
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "system/*"
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true
+
+defaults:
+  capabilities:
+    - kind: "chat"

@@ -1,60 +1,32 @@
-#!/bin/bash
-# Teardown script - Cleans up the test space
-#
-# Can be run after manual testing or called by test.sh
+#!/usr/bin/env bash
+# Scenario 4 teardown - stop space and clean workspace
 
-set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+GREEN='\033[0;32m'
+NC='\033[0m'
 
-# If TEST_DIR not set, we're running standalone
-if [ -z "$TEST_DIR" ]; then
-  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-fi
+printf "%b\n" "${YELLOW}=== Scenario 4 Teardown ===${NC}"
 
-echo -e "${YELLOW}=== Cleaning up Test Space ===${NC}"
-echo -e "${BLUE}Directory: $TEST_DIR${NC}"
-echo ""
+if [[ -d "${WORKSPACE_DIR}" ]]; then
+  if [[ -f "${ENV_FILE}" ]]; then
+    # shellcheck disable=SC1090
+    source "${ENV_FILE}"
+  fi
 
-cd "$TEST_DIR"
+  if [[ -f "${CLI_BIN}" ]]; then
+    node "${CLI_BIN}" space down --space-dir "${WORKSPACE_DIR}" >/dev/null 2>&1 || true
+  fi
 
-# Stop the space using mew space down
-echo "Stopping space..."
-../../cli/bin/mew.js space down 2>/dev/null || true
-
-# Additional cleanup for any orphaned processes
-if [ -f ".mew/pids.json" ]; then
-  # Extract PIDs and kill them if still running
-  PIDS=$(grep -o '"pid":[0-9]*' .mew/pids.json 2>/dev/null | cut -d: -f2 || true)
-  for pid in $PIDS; do
-    if kill -0 $pid 2>/dev/null; then
-      echo "Killing orphaned process $pid"
-      kill -TERM $pid 2>/dev/null || true
-    fi
-  done
-fi
-
-# Clean up test artifacts using mew space clean
-if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
-  echo "Cleaning test artifacts..."
-  
-  # Use the new mew space clean command
-  ../../cli/bin/mew.js space clean --all --force 2>/dev/null || {
-    # Fallback to manual cleanup if clean command fails
-    echo "Clean command failed, using manual cleanup..."
-    rm -rf logs fifos .mew 2>/dev/null || true
-  }
-  
-  echo -e "${GREEN}✓ Test artifacts removed${NC}"
+  rm -rf "${WORKSPACE_DIR}"
+  printf "%b\n" "${GREEN}✓ Workspace removed${NC}"
 else
-  echo -e "${YELLOW}Preserving logs (PRESERVE_LOGS=true)${NC}"
-  # Clean only fifos and .mew, preserve logs
-  ../../cli/bin/mew.js space clean --fifos --force 2>/dev/null || true
+  printf "No workspace directory found at %s\n" "${WORKSPACE_DIR}"
 fi
-
-echo -e "${GREEN}✓ Cleanup complete${NC}"

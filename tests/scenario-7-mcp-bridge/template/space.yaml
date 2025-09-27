@@ -1,0 +1,37 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 7 - MCP Bridge"
+  description: "Test MCP bridge integration with a filesystem server"
+
+participants:
+  filesystem:
+    type: mcp-bridge
+    tokens: ["fs-token"]
+    auto_start: true
+    capabilities:
+      - kind: "mcp/response"
+      - kind: "chat"
+    mcp_server:
+      command: "node"
+      args:
+        - "./.mew/agents/filesystem-mcp.js"
+        - "./test-files"
+    bridge_config:
+      init_timeout: 30000
+      reconnect: true
+      max_reconnects: 3
+
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "system/*"
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true
+
+defaults:
+  capabilities:
+    - kind: "chat"

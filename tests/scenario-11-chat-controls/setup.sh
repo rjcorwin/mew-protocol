@@ -1,53 +1,74 @@
-#!/bin/bash
-# Setup script - Initializes the chat & reasoning control test space
+#!/usr/bin/env bash
+# Scenario 11 setup - prepares workspace for chat control tests
 
-set -e
+set -euo pipefail
 
-RED='\033[0;31m'
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-11-chat-controls"}
+SPACE_NAME=${SPACE_NAME:-"scenario-11-chat-controls"}
+TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m'
 
-if [ -z "$TEST_DIR" ]; then
-  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-fi
+printf "%b\n" "${YELLOW}=== Scenario 11 Setup ===${NC}"
+printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
+printf "%b\n" "${BLUE}Using port ${TEST_PORT}${NC}"
 
-cd "$TEST_DIR"
+rm -rf "${WORKSPACE_DIR}"
+mkdir -p "${WORKSPACE_DIR}/templates"
 
-echo -e "${YELLOW}=== Setting up Scenario 11: Chat & Reasoning Controls ===${NC}"
-echo -e "${BLUE}Directory: $TEST_DIR${NC}"
+cp -R "${SCENARIO_DIR}/template" "${WORKSPACE_DIR}/templates/${TEMPLATE_NAME}"
 
-echo "Cleaning up previous runs..."
-../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
+pushd "${WORKSPACE_DIR}" >/dev/null
 
-if [ -z "$TEST_PORT" ]; then
-  export TEST_PORT=$((8600 + RANDOM % 100))
-fi
+node "${CLI_BIN}" init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 11 - Chat Controls" > init.log 2>&1
 
-echo "Using gateway port $TEST_PORT"
+mkdir -p logs
+: > logs/test-client-output.log
+: > logs/control-agent.log
 
-mkdir -p ./logs
-: > ./logs/test-client-output.log
-: > ./logs/control-agent.log
-
-../../cli/bin/mew.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1 || {
-  cat ./logs/space-up.log
+MEW_REPO_ROOT="${REPO_ROOT}" node "${CLI_BIN}" space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
+  printf "%b\n" "${YELLOW}space up failed, printing log:${NC}"
+  cat logs/space-up.log
   exit 1
 }
 
-if ../../cli/bin/mew.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
-  echo -e "${GREEN}✓ Space started${NC}"
-else
-  echo -e "${RED}✗ Space failed to start${NC}"
-  cat ./logs/space-up.log
-  exit 1
-fi
+health_url="http://localhost:${TEST_PORT}/health"
+for attempt in {1..20}; do
+  if curl -sf "${health_url}" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+  if [[ ${attempt} -eq 20 ]]; then
+    printf "%b\n" "${YELLOW}Gateway failed to start within timeout${NC}"
+    cat logs/gateway.log 2>/dev/null || true
+    exit 1
+  fi
+done
 
-echo "Waiting for participants to initialize..."
-sleep 4
+sleep 2
+printf "%b\n" "${GREEN}✓ Gateway is ready on port ${TEST_PORT}${NC}"
 
-export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
-export CONTROL_LOG="$TEST_DIR/logs/control-agent.log"
+cat > "${ENV_FILE}" <<ENV
+SCENARIO_DIR=${SCENARIO_DIR}
+REPO_ROOT=${REPO_ROOT}
+WORKSPACE_DIR=${WORKSPACE_DIR}
+TEMPLATE_NAME=${TEMPLATE_NAME}
+SPACE_NAME=${SPACE_NAME}
+TEST_PORT=${TEST_PORT}
+OUTPUT_LOG=${WORKSPACE_DIR}/logs/test-client-output.log
+CONTROL_LOG=${WORKSPACE_DIR}/logs/control-agent.log
+ENV
 
-echo -e "${GREEN}✓ Setup complete${NC}"
+printf "%b\n" "${GREEN}✓ Setup complete${NC}"
+printf "Workspace log directory: %s\n" "${WORKSPACE_DIR}/logs"
+printf "Gateway health: %s\n" "${health_url}"
+
+popd >/dev/null

@@ -1,0 +1,12 @@
+{
+  "name": "scenario-13-participant-controls",
+  "description": "Validate participant clear, restart, and shutdown envelopes",
+  "version": "0.1.0",
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Space identifier used for scenario 13",
+      "default": "scenario-13-participant-controls"
+    }
+  ]
+}

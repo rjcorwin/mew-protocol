@@ -1316,6 +1316,7 @@ The default interactive mode uses Ink (React for CLI) to provide a modern termin
 - Chat acknowledgement and cancellation shortcuts (`/ack`, `/cancel`) to manage UI queues
 - Participant control shortcuts (`/status`, `/pause`, `/resume`, `/forget`, `/clear`, `/restart`, `/shutdown`)
 - Stream negotiation helpers (`/stream request`, `/stream close`, `/streams`) with live frame previews
+- Schema-aware slash command autocomplete, including envelope helpers that suggest tool-specific JSON payload templates
 - Reasoning bar with token streaming, action display, and `/reason-cancel` control
 - Fixed-height UI components to prevent jitter during real-time updates
 
@@ -1551,6 +1552,13 @@ The CLI provides comprehensive terminal input capabilities through the EnhancedI
 - **Escape Sequence Detection**: Properly handles terminal escape sequences like `[27;2;13~` for Shift+Enter
 - **Cross-platform Support**: Works across macOS, Linux, and Windows terminals
 - **Fallback Options**: Alternative key bindings when primary ones don't work
+
+#### Slash Command Autocomplete
+- **Dynamic Suggestions**: When input starts with `/`, the CLI presents context-sensitive completions for each argument position, accepting the highlighted suggestion with `Tab`.
+- **Live Refresh**: Suggestions refresh immediately after inserting a value, so advancing to the next argument surfaces the correct completions without requiring extra keystrokes.
+- **Participant & Tool Resolvers**: `/envelope`, `/status`, and other commands resolve participants from live gateway state, and tool names from recent `tools/list` responses (including auto-discovered agents in the session).
+- **Schema-Aware JSON Templates**: For `/envelope mcp/request tool/call … [jsonArguments]`, the final argument offers insertable JSON objects derived from the tool’s declared schema (`inputSchema`, `schema`, or `parameters`). Required fields populate with empty values, and a fallback `{}` template remains available when no schema is published.
+- **Deduplicated Options**: Suggestions filter duplicates and ignore blank templates to keep the completion list concise.
 
 ### Input Processing
 

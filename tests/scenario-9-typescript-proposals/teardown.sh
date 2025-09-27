@@ -1,50 +1,32 @@
-#!/bin/bash
-# Teardown script - Cleans up the test space
-#
-# Can be run standalone or called by test.sh
+#!/usr/bin/env bash
+# Scenario 9 teardown - stop space and clean workspace
 
-set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+GREEN='\033[0;32m'
+NC='\033[0m'
 
-# If TEST_DIR not set, we're running standalone
-if [ -z "$TEST_DIR" ]; then
-  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
+printf "%b\n" "${YELLOW}=== Scenario 9 Teardown ===${NC}"
+
+if [[ -d "${WORKSPACE_DIR}" ]]; then
+  if [[ -f "${ENV_FILE}" ]]; then
+    # shellcheck disable=SC1090
+    source "${ENV_FILE}"
+  fi
+
+  if [[ -f "${CLI_BIN}" ]]; then
+    node "${CLI_BIN}" space down --space-dir "${WORKSPACE_DIR}" >/dev/null 2>&1 || true
+  fi
+
+  rm -rf "${WORKSPACE_DIR}"
+  printf "%b\n" "${GREEN}✓ Workspace removed${NC}"
+else
+  printf "No workspace directory found at %s\n" "${WORKSPACE_DIR}"
 fi
-
-echo -e "${YELLOW}=== Cleaning up Test Space ===${NC}"
-echo -e "${BLUE}Scenario: TypeScript Agent Proposals Only${NC}"
-echo ""
-
-cd "$TEST_DIR"
-
-# Stop the space
-echo "Stopping space..."
-../../cli/bin/mew.js space down 2>/dev/null || true
-
-# Wait for processes to terminate
-sleep 2
-
-# Clean up space artifacts
-echo "Cleaning up space artifacts..."
-../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
-
-# Clean up local test artifacts
-echo "Cleaning up test artifacts..."
-rm -rf ./logs/*.log 2>/dev/null || true
-rm -rf ./fifos/* 2>/dev/null || true
-
-# Remove directories if empty
-rmdir ./logs 2>/dev/null || true
-rmdir ./fifos 2>/dev/null || true
-
-echo -e "${GREEN}✓ Cleanup complete${NC}"
-echo ""
-
-# Unset the flag
-unset SPACE_RUNNING

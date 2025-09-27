@@ -1,31 +1,20 @@
-#!/bin/bash
-# Main test runner for Scenario 13 - Participant Lifecycle Controls
+#!/usr/bin/env bash
+# Scenario 13 orchestrator - run setup, checks, teardown
 
-set -e
+set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+SCENARIO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export SCENARIO_DIR
+export REPO_ROOT="$(cd "${SCENARIO_DIR}/../.." && pwd)"
+export WORKSPACE_DIR="${WORKSPACE_DIR:-${SCENARIO_DIR}/.workspace}"
+export TEMPLATE_NAME="${TEMPLATE_NAME:-scenario-13-participant-controls}"
+export SPACE_NAME="${SPACE_NAME:-scenario-13-participant-controls}"
+export TEST_PORT="${TEST_PORT:-$((8000 + RANDOM % 1000))}"
 
-echo -e "${YELLOW}=== Scenario 13: Participant Lifecycle Controls ===${NC}"
+cleanup() {
+  "${SCENARIO_DIR}/teardown.sh" || true
+}
+trap cleanup EXIT
 
-TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$TEST_DIR"
-
-export TEST_PORT=$((8700 + RANDOM % 100))
-
-echo -e "${BLUE}Using port:${NC} $TEST_PORT"
-
-echo -e "${YELLOW}Step 1: Setup${NC}"
-./setup.sh
-
-echo -e "${YELLOW}Step 2: Execute checks${NC}"
-./check.sh
-RESULT=$?
-
-echo -e "${YELLOW}Step 3: Teardown${NC}"
-./teardown.sh || true
-
-exit $RESULT
+"${SCENARIO_DIR}/setup.sh"
+"${SCENARIO_DIR}/check.sh"

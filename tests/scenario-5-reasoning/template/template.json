@@ -1,0 +1,8 @@
+{
+  "name": "scenario-5-reasoning",
+  "description": "Reasoning message flow with MCP context preservation",
+  "version": "0.1.0",
+  "variables": [
+    { "name": "SPACE_NAME", "description": "Space identifier", "default": "scenario-5-reasoning" }
+  ]
+}

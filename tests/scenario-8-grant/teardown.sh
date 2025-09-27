@@ -1,23 +1,32 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Scenario 8 teardown - stop space and clean workspace
 
-# Teardown script for scenario-8-grant
-# Can be run standalone for manual cleanup
+set -euo pipefail
 
-DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$DIR"
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
 
-echo "Tearing down scenario-8-grant test space..."
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
 
-# Stop the space
-../../cli/bin/mew.js space down 2>/dev/null || true
+printf "%b\n" "${YELLOW}=== Scenario 8 Teardown ===${NC}"
 
-# Kill any lingering processes
-pkill -f "scenario-8-grant" 2>/dev/null || true
+if [[ -d "${WORKSPACE_DIR}" ]]; then
+  if [[ -f "${ENV_FILE}" ]]; then
+    # shellcheck disable=SC1090
+    source "${ENV_FILE}"
+  fi
 
-# Clean up FIFOs
-rm -f fifos/human-input fifos/human-output 2>/dev/null || true
+  if [[ -f "${CLI_BIN}" ]]; then
+    node "${CLI_BIN}" space down --space-dir "${WORKSPACE_DIR}" >/dev/null 2>&1 || true
+  fi
 
-# Clean up test files (optional, comment out to preserve for inspection)
-# rm -f foo.txt bar.txt
-
-echo "Teardown complete!"
+  rm -rf "${WORKSPACE_DIR}"
+  printf "%b\n" "${GREEN}✓ Workspace removed${NC}"
+else
+  printf "No workspace directory found at %s\n" "${WORKSPACE_DIR}"
+fi

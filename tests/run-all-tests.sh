@@ -1,20 +1,16 @@
-#!/bin/bash
-# Run all MEW v0.2 test scenarios from test-spaces
+#!/usr/bin/env bash
+# MEW integration test runner compatible with the draft tests specification
 
-# Don't use set -e because we want to run all tests even if some fail
-# But do use pipefail to catch errors in pipes
 set -o pipefail
 
-# Get the directory of this script (tests directory)
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-# Get the repo root (parent of tests directory)
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "${SCRIPT_DIR}")"
 
-# Parse command line arguments
 NO_LLM=false
 VERBOSE=false
-for arg in "$@"; do
-  case $arg in
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --no-llm)
       NO_LLM=true
       shift
@@ -24,204 +20,187 @@ for arg in "$@"; do
       shift
       ;;
     --help)
-      echo "Usage: $0 [--no-llm] [--verbose|-v] [--help]"
-      echo ""
-      echo "Options:"
-      echo "  --no-llm       Skip scenarios that require OPENAI_API_KEY (8, 9, 10)"
-      echo "  --verbose, -v  Show detailed test output (useful for CI debugging)"
-      echo "  --help         Show this help message"
+      cat <<"HELP"
+Usage: $0 [--no-llm] [--verbose|-v] [--help]
+
+Options:
+  --no-llm       Skip scenarios that require external LLM access
+  --verbose|-v   Stream scenario output while running
+  --help         Show this help message
+HELP
       exit 0
       ;;
     *)
-      echo "Unknown option: $arg"
-      echo "Use --help for usage information"
+      echo "Unknown option: $1" >&2
       exit 1
       ;;
   esac
 done
 
-# Colors for output
-RED='\033[0;31m'
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'
+NC='\033[0m'
 
-echo -e "${BLUE}================================================${NC}"
-echo -e "${BLUE}        MEW v0.2 Test Suite Runner              ${NC}"
-echo -e "${BLUE}================================================${NC}"
-if [ "$NO_LLM" = true ]; then
-  echo -e "${YELLOW}        LLM scenarios disabled (--no-llm)       ${NC}"
-  echo -e "${BLUE}================================================${NC}"
+printf "%b\n" "${BLUE}================================================${NC}"
+printf "%b\n" "${BLUE}        MEW Test Suite Runner (Draft)          ${NC}"
+printf "%b\n" "${BLUE}================================================${NC}"
+if [[ ${NO_LLM} == true ]]; then
+  printf "%b\n" "${YELLOW}        LLM scenarios disabled (--no-llm)      ${NC}"
+  printf "%b\n" "${BLUE}================================================${NC}"
 fi
-if [ "$VERBOSE" = true ]; then
-  echo -e "${YELLOW}        Verbose mode enabled                    ${NC}"
-  echo -e "${BLUE}================================================${NC}"
+if [[ ${VERBOSE} == true ]]; then
+  printf "%b\n" "${YELLOW}        Verbose mode enabled                   ${NC}"
+  printf "%b\n" "${BLUE}================================================${NC}"
 fi
-echo ""
+printf "\n"
 
-# Track overall results
-TOTAL_PASS=0
-TOTAL_FAIL=0
+declare -i TOTAL_PASS=0
+declare -i TOTAL_FAIL=0
 FAILED_TESTS=""
 
-# Create test results log in repo root
-TEST_RESULTS_LOG="$REPO_ROOT/test-results.log"
-echo "MEW v0.2 Test Suite Results - $(date)" > "$TEST_RESULTS_LOG"
-echo "================================================" >> "$TEST_RESULTS_LOG"
+TEST_RESULTS_LOG="${REPO_ROOT}/test-results.log"
+{
+  printf "MEW Test Suite Results - %s\n" "$(date)"
+  printf "================================================\n"
+} > "${TEST_RESULTS_LOG}"
 
-# Function to run a test
-run_test() {
-  local test_name="$1"
-  local test_dir="$2"
-  
-  echo -e "${YELLOW}Running $test_name...${NC}"
-  echo "" >> "$TEST_RESULTS_LOG"
-  echo "[$test_name]" >> "$TEST_RESULTS_LOG"
-  
-  if [ -d "$test_dir" ] && [ -f "$test_dir/test.sh" ]; then
-    pushd "$test_dir" > /dev/null
-    
-    # Create logs directory if it doesn't exist
-    mkdir -p logs
-    
-    # Run the test with timeout directly
-    if [ "$VERBOSE" = true ]; then
-      # In verbose mode, show output directly
-      timeout 60 ./test.sh 2>&1 | tee ./logs/test-output.log
-      EXIT_CODE=${PIPESTATUS[0]}
-    else
-      # Normal mode - capture output to log file only
-      timeout 60 ./test.sh > ./logs/test-output.log 2>&1
-      EXIT_CODE=$?
-    fi
-
-    if [ $EXIT_CODE -eq 0 ]; then
-      TEST_SUCCESS=true
-    else
-      TEST_SUCCESS=false
-    fi
-
-    if [ "$TEST_SUCCESS" = true ]; then
-      echo -e "${GREEN}✅ $test_name PASSED${NC}"
-      echo "Status: PASSED" >> "$TEST_RESULTS_LOG"
-      TOTAL_PASS=$((TOTAL_PASS + 1))
-    else
-      if [ $EXIT_CODE -eq 124 ]; then
-        echo -e "${RED}❌ $test_name TIMEOUT${NC}"
-        echo "Status: TIMEOUT" >> "$TEST_RESULTS_LOG"
-        # Cleanup any hanging processes
-        pkill -f "mew.js|mew-bridge" 2>/dev/null || true
-        pkill -f "node.*calculator-participant" 2>/dev/null || true
-      else
-        echo -e "${RED}❌ $test_name FAILED${NC}"
-        echo "Status: FAILED (exit code: $EXIT_CODE)" >> "$TEST_RESULTS_LOG"
-      fi
-      echo "   See $test_dir/logs/test-output.log for details"
-
-      # In verbose mode, also show the last 20 lines of the log
-      if [ "$VERBOSE" = true ] && [ -f "$test_dir/logs/test-output.log" ]; then
-        echo -e "${YELLOW}--- Last 20 lines of test output ---${NC}"
-        tail -20 "$test_dir/logs/test-output.log"
-        echo -e "${YELLOW}--- End of test output ---${NC}"
-      fi
-
-      TOTAL_FAIL=$((TOTAL_FAIL + 1))
-      FAILED_TESTS="$FAILED_TESTS\n  - $test_name"
-    fi
-    
-    popd > /dev/null
-  else
-    echo -e "${RED}❌ $test_name directory or script not found${NC}"
-    echo "Status: NOT FOUND" >> "$TEST_RESULTS_LOG"
-    TOTAL_FAIL=$((TOTAL_FAIL + 1))
-    FAILED_TESTS="$FAILED_TESTS\n  - $test_name (not found)"
+format_display_name() {
+  local dir_name="$1"
+  local base="${dir_name#scenario-}"
+  local number="${base%%-*}"
+  local rest="${base#${number}-}"
+  if [[ "${rest}" == "${base}" ]]; then
+    rest="${base}"
   fi
-  
-  # Clean up any processes from this test
-  pkill -f "mew.js|mew-bridge" 2>/dev/null || true
+  rest=${rest//-/ }
+  rest=$(echo "${rest}" | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2)} print}')
+  if [[ -n "${number}" && "${number}" != "${base}" ]]; then
+    echo "Scenario ${number}: ${rest}"
+  else
+    local alt=${dir_name//-/ }
+    alt=$(echo "${alt}" | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2)} print}')
+    echo "${alt}"
+  fi
+}
+
+SCENARIO_DIRS=()
+while IFS= read -r scenario_dir; do
+  SCENARIO_DIRS+=("${scenario_dir}")
+done < <(find "${SCRIPT_DIR}" -maxdepth 1 -mindepth 1 -type d -name 'scenario-*' | sort)
+
+if [[ ${#SCENARIO_DIRS[@]} -eq 0 ]]; then
+  echo "No scenarios found under ${SCRIPT_DIR}" >&2
+  exit 1
+fi
+
+run_test() {
+  local display_name="$1"
+  local dir="$2"
+  local requires_llm="$3"
+
+  if [[ ${NO_LLM} == true && ${requires_llm} == true ]]; then
+    printf "%b\n" "${YELLOW}Skipping ${display_name} - requires LLM access${NC}"
+    return
+  fi
+
+  printf "%b\n" "${YELLOW}Running ${display_name}...${NC}"
+  {
+    printf "\n[%s]\n" "${display_name}"
+  } >> "${TEST_RESULTS_LOG}"
+
+  pushd "${dir}" >/dev/null || {
+    printf "%b\n" "${RED}❌ ${display_name} directory missing${NC}"
+    TOTAL_FAIL+=1
+    if [[ -z "${FAILED_TESTS}" ]]; then
+      FAILED_TESTS="  - ${display_name} (directory missing)"
+    else
+      FAILED_TESTS="${FAILED_TESTS}\n  - ${display_name} (directory missing)"
+    fi
+    return
+  }
+
+  mkdir -p logs
+
+  local log_file="logs/test-output.log"
+  local exit_code
+  if [[ ${VERBOSE} == true ]]; then
+    timeout 120 ./test.sh 2>&1 | tee "${log_file}"
+    exit_code=${PIPESTATUS[0]}
+  else
+    timeout 120 ./test.sh > "${log_file}" 2>&1
+    exit_code=$?
+  fi
+
+  if [[ ${exit_code} -eq 0 ]]; then
+    printf "%b\n" "${GREEN}✅ ${display_name} PASSED${NC}"
+    printf "Status: PASSED\n" >> "${TEST_RESULTS_LOG}"
+    TOTAL_PASS+=1
+  else
+    if [[ ${exit_code} -eq 124 ]]; then
+      printf "%b\n" "${RED}❌ ${display_name} TIMEOUT${NC}"
+      printf "Status: TIMEOUT\n" >> "${TEST_RESULTS_LOG}"
+    else
+      printf "%b\n" "${RED}❌ ${display_name} FAILED${NC}"
+      printf "Status: FAILED (exit code: %s)\n" "${exit_code}" >> "${TEST_RESULTS_LOG}"
+    fi
+    printf "   See %s for details\n" "${dir}/logs/test-output.log"
+    if [[ ${VERBOSE} == true ]]; then
+      tail -20 "${log_file}" || true
+    fi
+    TOTAL_FAIL+=1
+    if [[ -z "${FAILED_TESTS}" ]]; then
+      FAILED_TESTS="  - ${display_name}"
+    else
+      FAILED_TESTS="${FAILED_TESTS}\n  - ${display_name}"
+    fi
+  fi
+
+  popd >/dev/null
+
+  pkill -f "mew.js" 2>/dev/null || true
   pkill -f "pm2.*daemon" 2>/dev/null || true
-  pkill -f "calculator-participant.js" 2>/dev/null || true
   pkill -f "mew-bridge" 2>/dev/null || true
   pkill -f "@modelcontextprotocol" 2>/dev/null || true
   sleep 1
-  
-  echo ""
+
+  printf "\n"
 }
 
-# Clean up any leftover processes before starting
-echo -e "${YELLOW}Cleaning up any existing test processes...${NC}"
-pkill -f "mew.js|mew-bridge" 2>/dev/null || true
+printf "%b\n" "${YELLOW}Cleaning up any existing test processes...${NC}"
+pkill -f "mew.js" 2>/dev/null || true
 pkill -f "pm2.*daemon" 2>/dev/null || true
-pkill -f "calculator-participant.js" 2>/dev/null || true
 pkill -f "mew-bridge" 2>/dev/null || true
 pkill -f "@modelcontextprotocol" 2>/dev/null || true
 sleep 2
 
-# Run all test scenarios
-echo -e "${BLUE}Running Test Scenarios...${NC}"
-echo ""
+for dir in "${SCENARIO_DIRS[@]}"; do
+  scenario_basename="$(basename "${dir}")"
+  display_name="$(format_display_name "${scenario_basename}")"
+  requires_llm=false
+  if [[ -f "${dir}/requires-llm" ]]; then
+    requires_llm=true
+  fi
+  run_test "${display_name}" "${dir}" "${requires_llm}"
+done
 
-run_test "Scenario 1: Basic Message Flow" "$SCRIPT_DIR/scenario-1-basic"
-run_test "Scenario 2: MCP Tool Execution" "$SCRIPT_DIR/scenario-2-mcp"
-run_test "Scenario 3: Proposals with Capability Blocking" "$SCRIPT_DIR/scenario-3-proposals"
-run_test "Scenario 4: Dynamic Capability Granting" "$SCRIPT_DIR/scenario-4-capabilities"
-run_test "Scenario 5: Reasoning with Context Field" "$SCRIPT_DIR/scenario-5-reasoning"
-run_test "Scenario 6: Error Recovery and Edge Cases" "$SCRIPT_DIR/scenario-6-errors"
-run_test "Scenario 7: MCP Bridge Integration" "$SCRIPT_DIR/scenario-7-mcp-bridge"
-run_test "Scenario 11: Chat & Reasoning Controls" "$SCRIPT_DIR/scenario-11-chat-controls"
-run_test "Scenario 12: Stream Lifecycle Controls" "$SCRIPT_DIR/scenario-12-stream-controls"
-run_test "Scenario 13: Participant Lifecycle Controls" "$SCRIPT_DIR/scenario-13-participant-controls"
+printf "%b\n" "${BLUE}================================================${NC}"
+printf "%b\n" "${BLUE}                 TEST SUMMARY                   ${NC}"
+printf "%b\n" "${BLUE}================================================${NC}"
+printf "Tests Passed: %d\n" "${TOTAL_PASS}"
+printf "Tests Failed: %d\n" "${TOTAL_FAIL}"
 
-# LLM-dependent scenarios (require OPENAI_API_KEY)
-if [ "$NO_LLM" = false ]; then
-  run_test "Scenario 8: TypeScript Agent" "$SCRIPT_DIR/scenario-8-typescript-agent"
-  run_test "Scenario 9: TypeScript Proposals" "$SCRIPT_DIR/scenario-9-typescript-proposals"
-  run_test "Scenario 10: Multi-Agent" "$SCRIPT_DIR/scenario-10-multi-agent"
-else
-  echo -e "${YELLOW}Skipping Scenario 8 (TypeScript Agent) - requires OPENAI_API_KEY${NC}"
-  echo -e "${YELLOW}Skipping Scenario 9 (TypeScript Proposals) - requires OPENAI_API_KEY${NC}"
-  echo -e "${YELLOW}Skipping Scenario 10 (Multi-Agent) - requires OPENAI_API_KEY${NC}"
-  echo ""
-fi
+{
+  printf "\n================================================\n"
+  printf "SUMMARY\n"
+  printf "Tests Passed: %d\n" "${TOTAL_PASS}"
+  printf "Tests Failed: %d\n" "${TOTAL_FAIL}"
+  if [[ ${TOTAL_FAIL} -gt 0 ]]; then
+    printf "Failures:%s\n" "${FAILED_TESTS}"
+  fi
+} >> "${TEST_RESULTS_LOG}"
 
-# Summary
-echo -e "${BLUE}================================================${NC}"
-echo -e "${BLUE}                 TEST SUMMARY                   ${NC}"
-echo -e "${BLUE}================================================${NC}"
-echo ""
-
-# Write summary to log
-echo "" >> "$TEST_RESULTS_LOG"
-echo "================================================" >> "$TEST_RESULTS_LOG"
-echo "SUMMARY" >> "$TEST_RESULTS_LOG"
-echo "Tests Passed: $TOTAL_PASS" >> "$TEST_RESULTS_LOG"
-echo "Tests Failed: $TOTAL_FAIL" >> "$TEST_RESULTS_LOG"
-
-if [ $TOTAL_FAIL -eq 0 ]; then
-  echo -e "${GREEN}🎉 ALL TESTS PASSED! (${TOTAL_PASS}/${TOTAL_PASS})${NC}"
-  echo "Result: ALL PASSED" >> "$TEST_RESULTS_LOG"
-else
-  echo -e "${YELLOW}Tests Passed: ${TOTAL_PASS}${NC}"
-  echo -e "${RED}Tests Failed: ${TOTAL_FAIL}${NC}"
-  echo -e "${RED}Failed Tests:${FAILED_TESTS}${NC}"
-  echo "Result: SOME FAILED" >> "$TEST_RESULTS_LOG"
-fi
-
-echo ""
-echo -e "${GREEN}Test results saved to: $TEST_RESULTS_LOG${NC}"
-echo ""
-
-# Cleanup any lingering processes
-echo -e "${YELLOW}Cleaning up any lingering processes...${NC}"
-pkill -f "mew.js gateway" 2>/dev/null || true
-pkill -f "node.*agents" 2>/dev/null || true
-
-echo -e "${GREEN}Test run complete!${NC}"
-
-# Exit with appropriate code
-if [ $TOTAL_FAIL -eq 0 ]; then
-  exit 0
-else
+if [[ ${TOTAL_FAIL} -gt 0 ]]; then
   exit 1
 fi

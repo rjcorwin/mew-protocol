@@ -1,77 +1,97 @@
-#!/bin/bash
-# Setup script - Initializes the test space
-#
-# Can be run standalone for manual testing or called by test.sh
+#!/usr/bin/env bash
+# Scenario 7 setup - prepares disposable workspace for MCP bridge testing
 
-set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-7-mcp-bridge"}
+SPACE_NAME=${SPACE_NAME:-"scenario-7-mcp-bridge"}
+TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# If TEST_DIR not set, we're running standalone
-if [ -z "$TEST_DIR" ]; then
-  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
+printf "%b\n" "${YELLOW}=== Scenario 7 Setup ===${NC}"
+printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
+printf "%b\n" "${BLUE}Using port ${TEST_PORT}${NC}"
+
+rm -rf "${WORKSPACE_DIR}"
+mkdir -p "${WORKSPACE_DIR}/templates"
+
+template_dest="${WORKSPACE_DIR}/templates/${TEMPLATE_NAME}"
+cp -R "${SCENARIO_DIR}/template" "${template_dest}"
+
+pushd "${WORKSPACE_DIR}" >/dev/null
+node "${CLI_BIN}" init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 7 - MCP Bridge" > init.log 2>&1
+
+mkdir -p logs
+BRIDGE_DIST=${REPO_ROOT}/bridge/dist/mcp-bridge.js
+if [[ ! -f "${BRIDGE_DIST}" ]]; then
+  printf "%b\n" "${YELLOW}Building @mew-protocol/bridge (tsc)${NC}"
+  if ! (cd "${REPO_ROOT}" && npm run build > "${WORKSPACE_DIR}/logs/bridge-build.log" 2>&1); then
+    printf "%b\n" "${YELLOW}Bridge build failed, printing log:${NC}"
+    cat "${WORKSPACE_DIR}/logs/bridge-build.log"
+    exit 1
+  fi
 fi
+: > logs/test-client-output.log
+: > logs/bridge.log
 
-echo -e "${YELLOW}=== Setting up Test Space ===${NC}"
-echo -e "${BLUE}Scenario: MCP Bridge${NC}"
-echo -e "${BLUE}Directory: $TEST_DIR${NC}"
-echo ""
+TEST_FILES_DIR="${WORKSPACE_DIR}/test-files"
+mkdir -p "${TEST_FILES_DIR}/subdir"
+cat > "${TEST_FILES_DIR}/test.txt" <<'FILE'
+Test content
+FILE
+cat > "${TEST_FILES_DIR}/hello.txt" <<'FILE'
+Hello MCP
+FILE
+cat > "${TEST_FILES_DIR}/subdir/nested.txt" <<'FILE'
+Nested file
+FILE
 
-cd "$TEST_DIR"
-
-# Clean up any previous runs
-echo "Cleaning up previous test artifacts..."
-../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
-
-# Use random port to avoid conflicts
-if [ -z "$TEST_PORT" ]; then
-  export TEST_PORT=$((8000 + RANDOM % 1000))
-fi
-
-echo "Starting space on port $TEST_PORT..."
-
-# Ensure logs directory exists
-mkdir -p ./logs
-
-# Start the space using mew space up
-../../cli/bin/mew.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1
-
-# Check if space started successfully
-if ../../cli/bin/mew.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
-  echo -e "${GREEN}✓ Space started successfully${NC}"
-else
-  echo -e "${RED}✗ Space failed to start${NC}"
-  cat ./logs/space-up.log
+MEW_REPO_ROOT="${REPO_ROOT}" node "${CLI_BIN}" space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
+  printf "%b\n" "${YELLOW}space up failed, printing log:${NC}"
+  cat logs/space-up.log
   exit 1
-fi
+}
 
-# Wait for all components to be ready
-echo "Waiting for components to initialize..."
-sleep 3
+health_url="http://localhost:${TEST_PORT}/health"
+for attempt in {1..20}; do
+  if curl -sf "${health_url}" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+  if [[ ${attempt} -eq 20 ]]; then
+    printf "%b\n" "${YELLOW}Gateway failed to start within timeout${NC}"
+    cat logs/gateway.log 2>/dev/null || true
+    exit 1
+  fi
+done
 
-# Export paths for check.sh to use
-export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
+sleep 5
+printf "%b\n" "${GREEN}✓ Gateway is ready on port ${TEST_PORT}${NC}"
 
-# Create output log file if it doesn't exist
-mkdir -p "$(dirname "$OUTPUT_LOG")"
-touch "$OUTPUT_LOG"
+cat > "${ENV_FILE}" <<ENV
+SCENARIO_DIR=${SCENARIO_DIR}
+REPO_ROOT=${REPO_ROOT}
+WORKSPACE_DIR=${WORKSPACE_DIR}
+TEMPLATE_NAME=${TEMPLATE_NAME}
+SPACE_NAME=${SPACE_NAME}
+TEST_PORT=${TEST_PORT}
+OUTPUT_LOG=${WORKSPACE_DIR}/logs/test-client-output.log
+TEST_FILES_DIR=${TEST_FILES_DIR}
+RESPONSE_CAPTURE=${WORKSPACE_DIR}/logs/mcp-bridge-capture.log
+ENV
 
-echo -e "${GREEN}✓ Setup complete${NC}"
-echo ""
-echo "Gateway running on: ws://localhost:$TEST_PORT"
-echo "HTTP API available for test-client"
-echo "  Endpoint: http://localhost:$TEST_PORT/participants/test-client/messages"
-echo "  Output Log: $OUTPUT_LOG"
-echo ""
-echo "You can now:"
-echo "  - Run tests with: ./check.sh"
-echo "  - Send messages: curl -X POST http://localhost:$TEST_PORT/participants/test-client/messages -H 'Authorization: Bearer test-token' -H 'Content-Type: application/json' -d '{\"kind\":\"chat\",\"payload\":{\"text\":\"Hello\"}}'"
-echo "  - Read responses: tail -f $OUTPUT_LOG"
+printf "%b\n" "${GREEN}✓ Setup complete${NC}"
+printf "Workspace log directory: %s\n" "${WORKSPACE_DIR}/logs"
+printf "Gateway health: %s\n" "${health_url}"
+printf "Test files directory: %s\n" "${TEST_FILES_DIR}"
 
-# Set flag for check.sh
-export SPACE_RUNNING=true
+popd >/dev/null

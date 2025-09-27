@@ -1,0 +1,12 @@
+{
+  "name": "scenario-9-typescript-proposals",
+  "description": "TypeScript agent operating with proposal-only permissions",
+  "version": "0.1.0",
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Space identifier used for scenario 9",
+      "default": "scenario-9-typescript-proposals"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "scenario-10-multi-agent",
+  "description": "Multi-agent coordination with delegated MCP tool execution",
+  "version": "0.1.0",
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Space identifier used for scenario 10",
+      "default": "scenario-10-multi-agent"
+    }
+  ]
+}

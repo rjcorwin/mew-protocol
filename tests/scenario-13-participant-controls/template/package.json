@@ -1,0 +1,12 @@
+{
+  "name": "scenario-13-participant-controls-{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scenario 13 template for MEW integration tests (participant controls)",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

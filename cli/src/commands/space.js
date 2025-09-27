@@ -8,6 +8,108 @@ const http = require('http');
 const pm2 = require('pm2');
 const crypto = require('crypto');
 
+function findMonorepoRoot(startDir) {
+  let dir = startDir;
+  const root = path.parse(dir).root;
+
+  while (dir && dir !== root) {
+    const pkgPath = path.join(dir, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        if (
+          pkg?.name === 'mew-protocol' &&
+          Array.isArray(pkg.workspaces) &&
+          pkg.workspaces.some((entry) => String(entry).includes('sdk/typescript-sdk/agent'))
+        ) {
+          return dir;
+        }
+      } catch (error) {
+        // Ignore parse errors and keep walking up
+      }
+    }
+
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      break;
+    }
+    dir = parent;
+  }
+
+  return null;
+}
+
+function ensureLocalWorkspaceDependencies(spaceDir) {
+  const mewDir = path.join(spaceDir, '.mew');
+  const packagePath = path.join(mewDir, 'package.json');
+
+  if (!fs.existsSync(packagePath)) {
+    return;
+  }
+
+  const repoRoot = findMonorepoRoot(spaceDir);
+  if (!repoRoot) {
+    return;
+  }
+
+  let packageJson;
+  try {
+    packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  } catch (error) {
+    console.warn('⚠ Unable to read .mew/package.json:', error.message);
+    return;
+  }
+
+  const targets = {
+    '@mew-protocol/agent': path.join(repoRoot, 'sdk/typescript-sdk/agent'),
+    '@mew-protocol/bridge': path.join(repoRoot, 'bridge'),
+    '@mew-protocol/client': path.join(repoRoot, 'sdk/typescript-sdk/client'),
+    '@mew-protocol/participant': path.join(repoRoot, 'sdk/typescript-sdk/participant'),
+    '@mew-protocol/types': path.join(repoRoot, 'sdk/typescript-sdk/types')
+  };
+
+  let changed = false;
+  for (const [dep, targetPath] of Object.entries(targets)) {
+    if (!packageJson?.dependencies?.[dep]) {
+      continue;
+    }
+
+    try {
+      fs.accessSync(targetPath);
+    } catch {
+      continue;
+    }
+
+    const relativePath = path.relative(mewDir, targetPath) || '.';
+    const normalized = relativePath.split(path.sep).join('/');
+    const linkSpec = normalized.startsWith('.') ? `link:${normalized}` : `link:./${normalized}`;
+
+    if (packageJson.dependencies[dep] !== linkSpec) {
+      packageJson.dependencies[dep] = linkSpec;
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return;
+  }
+
+  fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
+  console.log('Linking local MEW workspace packages…');
+
+  try {
+    execSync('npm install --loglevel=error', {
+      cwd: mewDir,
+      stdio: 'inherit'
+    });
+  } catch (error) {
+    console.warn('⚠ Failed to reinstall .mew dependencies with local workspace links');
+    if (error.message) {
+      console.warn('  ', error.message);
+    }
+  }
+}
+
 const space = new Command('space').description('Manage MEW spaces');
 
 // PM2 connection helper
@@ -422,6 +524,9 @@ async function spaceUpAction(options) {
     const spaceId = config.space?.id || 'space-' + Date.now();
 
     console.log(`Space: ${spaceName} (${spaceId})`);
+
+    // Ensure existing spaces use local workspaces when running inside the monorepo
+    ensureLocalWorkspaceDependencies(spaceDir);
 
     // Check if space is already running
     const existingPids = loadPidFile(spaceDir);

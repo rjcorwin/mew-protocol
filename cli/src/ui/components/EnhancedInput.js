@@ -19,80 +19,6 @@ const { defaultKeyBindings } = require('../../config/keyBindings');
 const { getSlashCommandSuggestions } = require('../utils/slashCommands');
 const fs = require('fs');
 const path = require('path');
-
-function tokensFromCommand(commandText) {
-  if (!commandText) return [];
-  return commandText.trim().split(/\s+/);
-}
-
-function tokenMatchesSuggestion(inputToken, expectedToken) {
-  if (!inputToken || !expectedToken) return false;
-  const actual = inputToken.toLowerCase();
-  const expected = expectedToken.toLowerCase();
-  return expected.startsWith(actual) || actual.startsWith(expected);
-}
-
-function findSlashCommandArgsIndex(input, commandText) {
-  const tokens = tokensFromCommand(commandText);
-  if (!input) return 0;
-  if (tokens.length === 0) return input.length;
-
-  let idx = 0;
-  let tokenIdx = 0;
-  let tokenStart = null;
-
-  const consumeMatchedToken = () => {
-    tokenIdx += 1;
-    if (tokenIdx === tokens.length) {
-      while (idx < input.length && /\s/.test(input[idx])) {
-        idx += 1;
-      }
-      return true;
-    }
-    return false;
-  };
-
-  while (idx < input.length) {
-    const char = input[idx];
-    const isWhitespace = /\s/.test(char);
-
-    if (isWhitespace) {
-      if (tokenStart !== null) {
-        const tokenText = input.slice(tokenStart, idx);
-        if (tokenIdx < tokens.length && tokenMatchesSuggestion(tokenText, tokens[tokenIdx])) {
-          tokenStart = null;
-          idx += 1;
-          if (consumeMatchedToken()) {
-            return idx;
-          }
-          continue;
-        }
-        return tokenStart;
-      }
-      idx += 1;
-      continue;
-    }
-
-    if (tokenStart === null) {
-      tokenStart = idx;
-    }
-    idx += 1;
-  }
-
-  if (tokenStart !== null) {
-    const tokenText = input.slice(tokenStart, idx);
-    if (tokenIdx < tokens.length && tokenMatchesSuggestion(tokenText, tokens[tokenIdx])) {
-      tokenIdx += 1;
-      if (tokenIdx >= tokens.length) {
-        return idx;
-      }
-      return tokenStart;
-    }
-    return tokenStart;
-  }
-
-  return idx;
-}
 // Helper function for debug logging
 const debugLog = (message) => {
   const logFile = path.join(process.cwd(), '.mew', 'debug.log');
@@ -126,7 +52,8 @@ function EnhancedInput({
   onHistoryChange = () => {},
   keyBindings = defaultKeyBindings,
   showCursor = true,
-  prompt = '> '
+  prompt = '> ',
+  slashContext = null
 }) {
   // Text buffer for managing input
   const bufferRef = useRef(new TextBuffer());
@@ -152,7 +79,14 @@ function EnhancedInput({
 
     const text = buffer.getText();
     if (text.trim().startsWith('/')) {
-      const matches = getSlashCommandSuggestions(text);
+      const cursorIndex = typeof buffer.getCursorIndex === 'function'
+        ? buffer.getCursorIndex()
+        : text.length;
+      const matches = getSlashCommandSuggestions({
+        text,
+        cursorIndex,
+        context: slashContext || undefined
+      });
       setSuggestions(matches);
       setIsAutocompleting(matches.length > 0);
       setSelectedSuggestion(0);
@@ -161,7 +95,7 @@ function EnhancedInput({
       setSuggestions([]);
       setSelectedSuggestion(0);
     }
-  }, [buffer, updateCounter]);
+  }, [buffer, updateCounter, slashContext]);
 
   // Force re-render when buffer changes
   const update = useCallback(() => {
@@ -173,51 +107,23 @@ function EnhancedInput({
     if (suggestions.length === 0) return;
 
     const suggestion = suggestions[selectedSuggestion];
-    const template = suggestion.usage || suggestion.command;
-
     const currentText = buffer.getText();
-    const leadingWhitespaceMatch = currentText.match(/^\s*/);
-    const leadingWhitespace = leadingWhitespaceMatch ? leadingWhitespaceMatch[0] : '';
-    const trimmedInput = currentText.slice(leadingWhitespace.length);
+    const replacement = suggestion.replacement || { start: 0, end: currentText.length };
+    const start = Math.max(0, Math.min(replacement.start, currentText.length));
+    const end = Math.max(start, Math.min(replacement.end, currentText.length));
+    const insertText = typeof suggestion.insertText === 'string' ? suggestion.insertText : '';
+    const nextCursorIndex = typeof suggestion.nextCursorIndex === 'number'
+      ? suggestion.nextCursorIndex
+      : start + insertText.length;
 
-    const commandBase = template.endsWith(' ')
-      ? template
-      : `${template} `;
+    const newText = `${currentText.slice(0, start)}${insertText}${currentText.slice(end)}`;
 
-    let newText;
-
-    if (trimmedInput.startsWith('/')) {
-      const argsIndex = findSlashCommandArgsIndex(trimmedInput, suggestion.command);
-
-      let argsStartIndex = argsIndex;
-      if (argsStartIndex === 0) {
-        const firstWhitespaceMatch = trimmedInput.match(/\s+/);
-        if (firstWhitespaceMatch) {
-          const tentativeIndex = firstWhitespaceMatch.index + firstWhitespaceMatch[0].length;
-          if (tentativeIndex < trimmedInput.length) {
-            argsStartIndex = tentativeIndex;
-          } else {
-            argsStartIndex = -1;
-          }
-        } else {
-          argsStartIndex = -1;
-        }
-      }
-
-      const remainder = argsStartIndex >= 0 && argsStartIndex < trimmedInput.length
-        ? trimmedInput.slice(argsStartIndex).replace(/^\s*/, '')
-        : '';
-
-      newText = remainder
-        ? `${leadingWhitespace}${commandBase}${remainder}`
-        : `${leadingWhitespace}${commandBase}`;
-    } else {
-      newText = `${leadingWhitespace}${commandBase}`;
-    }
-
-    suppressSuggestionsRef.current = true;
     buffer.setText(newText);
-    buffer.move('bufferEnd');
+    if (typeof buffer.setCursorIndex === 'function') {
+      buffer.setCursorIndex(nextCursorIndex);
+    } else {
+      buffer.move('bufferEnd');
+    }
     setIsAutocompleting(false);
     setSuggestions([]);
     setSelectedSuggestion(0);
@@ -712,11 +618,11 @@ function EnhancedInput({
 
     return React.createElement(Box, { flexDirection: 'column', marginTop: 1 },
       suggestions.slice(0, 8).map((suggestion, index) =>
-        React.createElement(Box, { key: `${suggestion.command}-${index}` },
+        React.createElement(Box, { key: suggestion.id || `${suggestion.label}-${index}` },
           React.createElement(Text, {
             color: index === selectedSuggestion ? 'cyan' : 'gray'
           },
-            `${index === selectedSuggestion ? '→' : ' '} ${suggestion.usage || suggestion.command}`
+            `${index === selectedSuggestion ? '→' : ' '} ${suggestion.label}`
           ),
           suggestion.description && React.createElement(Text, { color: 'gray' }, ` — ${suggestion.description}`)
         )

@@ -1,77 +1,75 @@
-#!/bin/bash
-# Setup script - Initializes the test space
-#
-# Can be run standalone for manual testing or called by test.sh
+#!/usr/bin/env bash
+# Scenario 3 setup - prepares disposable workspace for proposal flow testing
 
-set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-3-proposals"}
+SPACE_NAME=${SPACE_NAME:-"scenario-3-proposals"}
+TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# If TEST_DIR not set, we're running standalone
-if [ -z "$TEST_DIR" ]; then
-  export TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
-fi
+printf "%b\n" "${YELLOW}=== Scenario 3 Setup ===${NC}"
+printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
+printf "%b\n" "${BLUE}Using port ${TEST_PORT}${NC}"
 
-echo -e "${YELLOW}=== Setting up Test Space ===${NC}"
-echo -e "${BLUE}Scenario: MCP Proposals${NC}"
-echo -e "${BLUE}Directory: $TEST_DIR${NC}"
-echo ""
+rm -rf "${WORKSPACE_DIR}"
+mkdir -p "${WORKSPACE_DIR}/templates"
 
-cd "$TEST_DIR"
+template_dest="${WORKSPACE_DIR}/templates/${TEMPLATE_NAME}"
+cp -R "${SCENARIO_DIR}/template" "${template_dest}"
 
-# Clean up any previous runs
-echo "Cleaning up previous test artifacts..."
-../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
+pushd "${WORKSPACE_DIR}" >/dev/null
+node "${CLI_BIN}" init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 3 - Proposal fulfilment" > init.log 2>&1
 
-# Use random port to avoid conflicts
-if [ -z "$TEST_PORT" ]; then
-  export TEST_PORT=$((8000 + RANDOM % 1000))
-fi
+mkdir -p logs
+: > logs/proposer-output.log
+: > logs/fulfiller.log
 
-echo "Starting space on port $TEST_PORT..."
-
-# Ensure logs directory exists
-mkdir -p ./logs
-
-# Start the space using mew space up
-../../cli/bin/mew.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1
-
-# Check if space started successfully
-if ../../cli/bin/mew.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
-  echo -e "${GREEN}✓ Space started successfully${NC}"
-else
-  echo -e "${RED}✗ Space failed to start${NC}"
-  cat ./logs/space-up.log
+MEW_REPO_ROOT="${REPO_ROOT}" node "${CLI_BIN}" space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
+  printf "%b\n" "${YELLOW}space up failed, printing log:${NC}"
+  cat logs/space-up.log
   exit 1
-fi
+}
 
-# Wait for all components to be ready
-echo "Waiting for components to initialize..."
-sleep 3
+health_url="http://localhost:${TEST_PORT}/health"
+for attempt in {1..20}; do
+  if curl -sf "${health_url}" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+  if [[ ${attempt} -eq 20 ]]; then
+    printf "%b\n" "${YELLOW}Gateway failed to start within timeout${NC}"
+    cat logs/gateway.log 2>/dev/null || true
+    exit 1
+  fi
+done
 
-# Export paths for check.sh to use
-export OUTPUT_LOG="$TEST_DIR/logs/test-client-output.log"
+printf "%b\n" "${GREEN}✓ Gateway is ready on port ${TEST_PORT}${NC}"
 
-# Create output log file if it doesn't exist
-mkdir -p "$(dirname "$OUTPUT_LOG")"
-touch "$OUTPUT_LOG"
+cat > "${ENV_FILE}" <<ENV
+SCENARIO_DIR=${SCENARIO_DIR}
+REPO_ROOT=${REPO_ROOT}
+WORKSPACE_DIR=${WORKSPACE_DIR}
+TEMPLATE_NAME=${TEMPLATE_NAME}
+SPACE_NAME=${SPACE_NAME}
+TEST_PORT=${TEST_PORT}
+PROPOSER_LOG=${WORKSPACE_DIR}/logs/proposer-output.log
+FULFILLER_LOG=${WORKSPACE_DIR}/logs/fulfiller.log
+ENV
 
-echo -e "${GREEN}✓ Setup complete${NC}"
-echo ""
-echo "Gateway running on: ws://localhost:$TEST_PORT"
-echo "HTTP API available for test-client"
-echo "  Endpoint: http://localhost:$TEST_PORT/participants/test-client/messages"
-echo "  Output Log: $OUTPUT_LOG"
-echo ""
-echo "You can now:"
-echo "  - Run tests with: ./check.sh"
-echo "  - Send messages: curl -X POST http://localhost:$TEST_PORT/participants/test-client/messages -H 'Authorization: Bearer test-token' -H 'Content-Type: application/json' -d '{\"kind\":\"chat\",\"payload\":{\"text\":\"Hello\"}}'"
-echo "  - Read responses: tail -f $OUTPUT_LOG"
+printf "%b\n" "${GREEN}✓ Setup complete${NC}"
+printf "Workspace log directory: %s\n" "${WORKSPACE_DIR}/logs"
+printf "Gateway health: %s\n" "${health_url}"
+printf "Proposer log: %s\n" "${WORKSPACE_DIR}/logs/proposer-output.log"
+printf "Fulfiller log: %s\n" "${WORKSPACE_DIR}/logs/fulfiller.log"
 
-# Set flag for check.sh
-export SPACE_RUNNING=true
+popd >/dev/null
