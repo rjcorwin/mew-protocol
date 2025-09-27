@@ -415,9 +415,10 @@ function EnhancedInput({
     if (suggestions.length === 0) return;
 
     const suggestion = suggestions[selectedSuggestion];
-    const text = suggestion.command.endsWith(' ')
-      ? suggestion.command
-      : `${suggestion.command} `;
+    const template = suggestion.usage || suggestion.command;
+    const text = template.endsWith(' ')
+      ? template
+      : `${template} `;
     suppressSuggestionsRef.current = true;
     buffer.setText(text);
     buffer.move('bufferEnd');
