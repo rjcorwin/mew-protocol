@@ -6,6 +6,8 @@ import {
   ParticipantForgetPayload,
   ParticipantRequestStatusPayload,
   ParticipantPausePayload,
+  ParticipantCompactPayload,
+  ParticipantCompactDonePayload,
   ParticipantClearPayload,
   ParticipantRestartPayload,
   ParticipantShutdownPayload,
@@ -98,6 +100,7 @@ export class MEWParticipant extends MEWClient {
   private defaultCacheTTL = 300000; // 5 minutes
   private participantDiscoveryStatus = new Map<string, ParticipantDiscoveryStatus>();
   private pauseState?: { id: string; reason?: string; until?: number; from: string };
+  private pauseTimer?: NodeJS.Timeout;
   private contextTokens = 0;
   private contextMaxTokens = 20000;
   private contextMessages = 0;
@@ -121,7 +124,8 @@ export class MEWParticipant extends MEWClient {
     const kind = (envelope as Envelope).kind || (envelope as any).kind;
     if (kind && this.isPauseActive() && !this.isAllowedDuringPause(kind)) {
       const reason = this.pauseState?.reason ? ` (${this.pauseState?.reason})` : '';
-      throw new Error(`Participant is paused${reason}`);
+      console.warn(`[MEWParticipant] Suppressed outbound ${kind} while paused${reason}`);
+      return;
     }
 
     await super.send(envelope);
@@ -647,6 +651,26 @@ export class MEWParticipant extends MEWClient {
     return this.contextMessages;
   }
 
+  protected isPaused(): boolean {
+    return !!this.pauseState;
+  }
+
+  protected getPauseInfo(): { id: string; reason?: string; until?: number; from: string } | undefined {
+    if (!this.pauseState) {
+      return undefined;
+    }
+
+    const { id, reason, until, from } = this.pauseState;
+    return { id, reason, until, from };
+  }
+
+  // Subclasses can override to react to pause/resume events
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected onPause(_envelope: Envelope): void {}
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected onResume(_envelope: Envelope): void {}
+
   protected estimateTokens(text: string): number {
     if (!text) return 0;
     return Math.max(1, Math.ceil(text.length / 4));
@@ -691,6 +715,10 @@ export class MEWParticipant extends MEWClient {
     return { messagesRemoved: 0, tokensFreed: 0 };
   }
 
+  protected async onCompact(_payload: ParticipantCompactPayload): Promise<ParticipantCompactDonePayload | void> {
+    return { skipped: true };
+  }
+
   protected async onClear(): Promise<void> {
     this.resetContextUsage();
   }
@@ -731,6 +759,7 @@ export class MEWParticipant extends MEWClient {
     const timeoutSeconds = payload.timeout_seconds;
     const until = timeoutSeconds ? Date.now() + timeoutSeconds * 1000 : undefined;
 
+    this.clearPauseTimer();
     this.pauseState = {
       id: envelope.id,
       reason: payload.reason,
@@ -738,12 +767,16 @@ export class MEWParticipant extends MEWClient {
       from: envelope.from
     };
 
+    this.schedulePauseAutoResume(timeoutSeconds, envelope.id, envelope.from);
     this.reportStatus('paused', [envelope.id]);
+    this.onPause(envelope);
   }
 
   private handleParticipantResumeMessage(envelope: Envelope): void {
+    this.clearPauseTimer();
     this.pauseState = undefined;
     this.reportStatus('active', [envelope.id]);
+    this.onResume(envelope);
   }
 
   private async handleParticipantForgetMessage(envelope: Envelope): Promise<void> {
@@ -761,6 +794,79 @@ export class MEWParticipant extends MEWClient {
     this.reportStatus('compacted', [envelope.id]);
   }
 
+  private async handleParticipantCompactMessage(envelope: Envelope): Promise<void> {
+    const payload = (envelope.payload || {}) as ParticipantCompactPayload;
+    this.reportStatus('compacting', [envelope.id]);
+
+    let result: ParticipantCompactDonePayload | void;
+    try {
+      result = await this.onCompact(payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      result = { skipped: true, reason: message };
+    }
+
+    const responsePayload: ParticipantCompactDonePayload = {
+      ...(result || {}),
+    };
+
+    if (responsePayload.freed_tokens) {
+      this.recordContextUsage({ tokens: -Math.max(0, responsePayload.freed_tokens) });
+    }
+
+    if (responsePayload.freed_messages) {
+      this.recordContextUsage({ messages: -Math.max(0, responsePayload.freed_messages) });
+    }
+
+    if (responsePayload.skipped === undefined) {
+      const freedSomething = Boolean(responsePayload.freed_tokens) || Boolean(responsePayload.freed_messages);
+      responsePayload.skipped = !freedSomething;
+    }
+
+    if (!responsePayload.status) {
+      responsePayload.status = responsePayload.skipped ? 'skipped' : 'compacted';
+    }
+
+    if (this.canSend({ kind: 'participant/compact-done', payload: responsePayload })) {
+      this.send({
+        kind: 'participant/compact-done',
+        to: envelope.from ? [envelope.from] : undefined,
+        correlation_id: [envelope.id],
+        payload: responsePayload,
+      });
+    }
+
+    this.reportStatus('compacted', [envelope.id]);
+  }
+
+  private async closeActiveStreams(reason: string): Promise<void> {
+    if (!this.activeStreams.size) {
+      return;
+    }
+
+    for (const [streamId, meta] of this.activeStreams.entries()) {
+      if (!this.canSend({ kind: 'stream/close', payload: { reason } })) {
+        continue;
+      }
+
+      try {
+        await this.send({
+          kind: 'stream/close',
+          correlation_id: meta?.correlationId ? [meta.correlationId] : undefined,
+          payload: {
+            stream_id: streamId,
+            reason
+          }
+        });
+      } catch (error) {
+        console.error(`[MEWParticipant] Failed to close stream ${streamId}:`, error);
+      }
+    }
+
+    this.activeStreams.clear();
+    this.openToStream.clear();
+  }
+
   private async handleParticipantClearMessage(envelope: Envelope): Promise<void> {
     const payload = (envelope.payload || {}) as ParticipantClearPayload;
     await this.onClear();
@@ -771,6 +877,7 @@ export class MEWParticipant extends MEWClient {
 
   private async handleParticipantRestartMessage(envelope: Envelope): Promise<void> {
     const payload = (envelope.payload || {}) as ParticipantRestartPayload;
+    await this.closeActiveStreams('restart');
     await this.onRestart(payload);
     this.resetContextUsage();
     this.reportStatus('restarted', [envelope.id]);
@@ -779,6 +886,7 @@ export class MEWParticipant extends MEWClient {
   private async handleParticipantShutdownMessage(envelope: Envelope): Promise<void> {
     const payload = (envelope.payload || {}) as ParticipantShutdownPayload;
     this.reportStatus(payload?.reason ? `shutting_down:${payload.reason}` : 'shutting_down', [envelope.id]);
+    await this.closeActiveStreams('shutdown');
     await this.onShutdown();
     this.disconnect();
   }
@@ -818,13 +926,42 @@ export class MEWParticipant extends MEWClient {
     if (!this.pauseState) {
       return false;
     }
+    return true;
+  }
 
-    if (this.pauseState.until && Date.now() > this.pauseState.until) {
-      this.pauseState = undefined;
-      return false;
+  private clearPauseTimer(): void {
+    if (this.pauseTimer) {
+      clearTimeout(this.pauseTimer);
+      this.pauseTimer = undefined;
+    }
+  }
+
+  private schedulePauseAutoResume(timeoutSeconds: number | undefined, pauseId: string, requestedBy?: string): void {
+    if (!timeoutSeconds || timeoutSeconds <= 0) {
+      return;
     }
 
-    return true;
+    const timeoutMs = timeoutSeconds * 1000;
+    this.pauseTimer = setTimeout(() => {
+      if (!this.pauseState || this.pauseState.id !== pauseId) {
+        return;
+      }
+
+      this.pauseState = undefined;
+      this.pauseTimer = undefined;
+      this.reportStatus('active', [pauseId]);
+
+      if (this.canSend({ kind: 'participant/resume', payload: { reason: 'timeout' } })) {
+        this.send({
+          kind: 'participant/resume',
+          to: requestedBy ? [requestedBy] : undefined,
+          correlation_id: [pauseId],
+          payload: { reason: 'timeout' }
+        }).catch(error => {
+          console.error('[MEWParticipant] Failed to emit auto-resume after pause timeout:', error);
+        });
+      }
+    }, timeoutMs);
   }
 
   private isAllowedDuringPause(kind: string): boolean {
@@ -837,7 +974,9 @@ export class MEWParticipant extends MEWClient {
       'reasoning/cancel',
       'participant/clear',
       'participant/forget',
+      'participant/compact-done',
       'participant/shutdown',
+      'stream/close',
       'system/presence',
       'system/error'
     ]);
@@ -969,6 +1108,8 @@ export class MEWParticipant extends MEWClient {
           this.handleParticipantRequestStatusMessage(envelope);
         } else if (envelope.kind === 'participant/forget') {
           await this.handleParticipantForgetMessage(envelope);
+        } else if (envelope.kind === 'participant/compact') {
+          await this.handleParticipantCompactMessage(envelope);
         } else if (envelope.kind === 'participant/clear') {
           await this.handleParticipantClearMessage(envelope);
         } else if (envelope.kind === 'participant/restart') {

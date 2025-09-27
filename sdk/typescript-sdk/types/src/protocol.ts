@@ -1,6 +1,6 @@
 /**
  * Core MEW Protocol Types
- * 
+ *
  * These types define the Multi-Entity Workspace Protocol v0.4
  */
 
@@ -25,7 +25,7 @@ export interface Envelope {
   from: string;
   to?: string[];
   kind: string;
-  correlation_id?: string | string[];
+  correlation_id?: string[];
   context?: ContextField;
   payload: any;
 }
@@ -36,7 +36,7 @@ export interface Envelope {
 export interface PartialEnvelope {
   to?: string[];
   kind: string;
-  correlation_id?: string | string[];
+  correlation_id?: string[];
   context?: ContextField;
   payload: any;
 }
@@ -69,30 +69,19 @@ export type ContextField = string | ContextOperation;
 export interface Participant {
   id: string;
   capabilities: Capability[];
+  [key: string]: unknown;
 }
 
 /**
  * Capability definition with JSON pattern matching
  */
 export interface Capability {
-  id: string;
+  id?: string;
   kind: string;
-  to?: string | string[];
+  to?: string[];
   payload?: any;
+  [key: string]: unknown;
 }
-
-/**
- * Capability grant from one participant to another
- */
-export interface CapabilityGrant {
-  from: string;
-  to: string;
-  capabilities: Capability[];
-}
-
-// ============================================================================
-// Proposal System Types
-// ============================================================================
 
 /**
  * Proposal for untrusted agents to request operations
@@ -123,46 +112,60 @@ export interface SystemErrorPayload {
   message: string;
   attempted_kind?: string;
   your_capabilities?: Capability[];
+  [key: string]: unknown;
 }
 
 /**
  * Presence event payload
  */
 export interface PresencePayload {
-  event: 'join' | 'leave' | 'heartbeat' | 'update';
+  event: 'join' | 'leave';
   participant: Participant;
+  [key: string]: unknown;
 }
 
 export type SystemPayload = SystemWelcomePayload | SystemErrorPayload | PresencePayload;
 
 // ============================================================================
-// MEW-specific Message Payloads
+// Capability & Space Management Payloads
 // ============================================================================
 
-export interface MewProposalPayload {
-  proposal: Proposal;
-}
-
-export interface MewProposalAcceptPayload {
-  correlation_id: string;
-  accepted_by: string;
-  envelope: Envelope;
-}
-
-export interface MewProposalRejectPayload {
-  correlation_id: string;
-  rejected_by: string;
+export interface CapabilityGrantPayload {
+  recipient: string;
+  capabilities: Capability[];
+  grant_id?: string;
   reason?: string;
+  [key: string]: unknown;
 }
 
-export interface MewCapabilityGrantPayload {
-  grant: CapabilityGrant;
+export interface CapabilityRevokePayload {
+  recipient: string;
+  grant_id?: string;
+  capabilities?: Capability[];
+  reason?: string;
+  [key: string]: unknown;
 }
 
-export interface MewCapabilityRevokePayload {
-  from: string;
-  to: string;
-  capabilities: string[];
+export interface CapabilityGrantAckPayload {
+  status?: 'accepted' | 'declined' | string;
+  grant_id?: string;
+  capabilities?: Capability[];
+  reason?: string;
+  [key: string]: unknown;
+}
+
+export interface SpaceInvitePayload {
+  participant_id: string;
+  email?: string;
+  initial_capabilities?: Capability[];
+  reason?: string;
+  [key: string]: unknown;
+}
+
+export interface SpaceKickPayload {
+  participant_id: string;
+  reason?: string;
+  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -175,31 +178,46 @@ export interface MewCapabilityRevokePayload {
 export interface ChatPayload {
   text: string;
   format?: 'plain' | 'markdown';
+  [key: string]: unknown;
 }
 
 export interface ChatAcknowledgePayload {
   status?: string;
+  [key: string]: unknown;
 }
 
 export interface ChatCancelPayload {
   reason?: string;
+  [key: string]: unknown;
 }
+
+// ============================================================================
+// Reasoning Transparency
+// ============================================================================
 
 export interface ReasoningCancelPayload {
   reason?: string;
+  [key: string]: unknown;
 }
+
+// ============================================================================
+// Participant Control Payloads
+// ============================================================================
 
 export interface ParticipantPausePayload {
   reason?: string;
   timeout_seconds?: number;
+  [key: string]: unknown;
 }
 
 export interface ParticipantResumePayload {
   reason?: string;
+  [key: string]: unknown;
 }
 
 export interface ParticipantRequestStatusPayload {
   fields?: string[];
+  [key: string]: unknown;
 }
 
 export interface ParticipantStatusPayload {
@@ -208,41 +226,68 @@ export interface ParticipantStatusPayload {
   messages_in_context: number;
   status?: string;
   latency_ms?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ParticipantForgetPayload {
   direction: 'oldest' | 'newest';
   entries?: number;
+  [key: string]: unknown;
+}
+
+export interface ParticipantCompactPayload {
+  reason?: string;
+  target_tokens?: number;
+  [key: string]: unknown;
+}
+
+export interface ParticipantCompactDonePayload {
+  freed_tokens?: number;
+  freed_messages?: number;
+  status?: string;
+  skipped?: boolean;
+  reason?: string;
+  [key: string]: unknown;
 }
 
 export interface ParticipantClearPayload {
   reason?: string;
+  [key: string]: unknown;
 }
 
 export interface ParticipantRestartPayload {
   mode?: string;
   reason?: string;
+  [key: string]: unknown;
 }
 
 export interface ParticipantShutdownPayload {
   reason?: string;
+  [key: string]: unknown;
 }
+
+// ============================================================================
+// Stream Payloads
+// ============================================================================
 
 export interface StreamRequestPayload {
   direction: string;
   expected_size_bytes?: number;
   description?: string;
+  [key: string]: unknown;
 }
 
 export interface StreamOpenPayload {
   stream_id: string;
   encoding?: string;
   compression?: string;
+  description?: string;
+  [key: string]: unknown;
 }
 
 export interface StreamClosePayload {
   reason?: string;
+  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -259,15 +304,17 @@ export const MessageKinds = {
   // MCP messages
   MCP_REQUEST: 'mcp/request',
   MCP_RESPONSE: 'mcp/response',
+  MCP_PROPOSAL: 'mcp/proposal',
+  MCP_WITHDRAW: 'mcp/withdraw',
+  MCP_REJECT: 'mcp/reject',
   MCP_NOTIFICATION: 'mcp/notification',
 
-  // MEW messages
-  MEW_PROPOSAL: 'mew/proposal',
-  MEW_PROPOSAL_ACCEPT: 'mew/proposal/accept',
-  MEW_PROPOSAL_REJECT: 'mew/proposal/reject',
-  MEW_CAPABILITY_GRANT: 'mew/capability/grant',
-  MEW_CAPABILITY_REVOKE: 'mew/capability/revoke',
-  MEW_CONTEXT: 'mew/context',
+  // Capability & space management
+  CAPABILITY_GRANT: 'capability/grant',
+  CAPABILITY_REVOKE: 'capability/revoke',
+  CAPABILITY_GRANT_ACK: 'capability/grant-ack',
+  SPACE_INVITE: 'space/invite',
+  SPACE_KICK: 'space/kick',
 
   // Application messages
   CHAT: 'chat',
@@ -286,6 +333,8 @@ export const MessageKinds = {
   PARTICIPANT_STATUS: 'participant/status',
   PARTICIPANT_REQUEST_STATUS: 'participant/request-status',
   PARTICIPANT_FORGET: 'participant/forget',
+  PARTICIPANT_COMPACT: 'participant/compact',
+  PARTICIPANT_COMPACT_DONE: 'participant/compact-done',
   PARTICIPANT_CLEAR: 'participant/clear',
   PARTICIPANT_RESTART: 'participant/restart',
   PARTICIPANT_SHUTDOWN: 'participant/shutdown',
@@ -294,7 +343,38 @@ export const MessageKinds = {
   STREAM_REQUEST: 'stream/request',
   STREAM_OPEN: 'stream/open',
   STREAM_CLOSE: 'stream/close',
-  STREAM_DATA: 'stream/data',
 } as const;
 
 export type MessageKind = typeof MessageKinds[keyof typeof MessageKinds];
+
+// ============================================================================
+// Legacy aliases
+// ============================================================================
+
+/** @deprecated Use {@link CapabilityGrantPayload}. */
+export type CapabilityGrant = CapabilityGrantPayload;
+
+/** @deprecated Use {@link CapabilityGrantPayload}. */
+export type MewCapabilityGrantPayload = CapabilityGrantPayload;
+
+/** @deprecated Use {@link CapabilityRevokePayload}. */
+export type MewCapabilityRevokePayload = CapabilityRevokePayload;
+
+/** @deprecated Legacy MEW proposal envelopes are no longer part of v0.4. */
+export interface MewProposalPayload {
+  proposal: Proposal;
+}
+
+/** @deprecated Legacy MEW proposal accept envelope. */
+export interface MewProposalAcceptPayload {
+  correlation_id: string;
+  accepted_by: string;
+  envelope: Envelope;
+}
+
+/** @deprecated Legacy MEW proposal reject envelope. */
+export interface MewProposalRejectPayload {
+  correlation_id: string;
+  rejected_by: string;
+  reason?: string;
+}

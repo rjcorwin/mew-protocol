@@ -9,6 +9,9 @@ import type {
   Proposal,
   SystemWelcomePayload,
   ChatPayload,
+  CapabilityGrantPayload,
+  CapabilityRevokePayload,
+  CapabilityGrantAckPayload,
 } from '@mew-protocol/types';
 
 // Re-export commonly used types from the shared types package (relative path for monorepo dev)
@@ -28,6 +31,9 @@ export type {
   MewProposalRejectPayload,
   MewCapabilityGrantPayload,
   MewCapabilityRevokePayload,
+  CapabilityGrantPayload,
+  CapabilityRevokePayload,
+  CapabilityGrantAckPayload,
   JsonRpcRequest,
   JsonRpcResponse,
   JsonRpcNotification,
@@ -94,8 +100,9 @@ export type ClientEventMap = {
     rejected_by: string;
     reason?: string;
   }) => void;
-  'capability-grant': (grant: { from: string; to: string; capabilities: Capability[] }) => void;
-  'capability-revoke': (data: { from: string; to: string; capabilities: string[] }) => void;
+  'capability-grant': (grant: CapabilityGrantPayload & { from: string }) => void;
+  'capability-grant-ack': (ack: CapabilityGrantAckPayload & { from: string }) => void;
+  'capability-revoke': (data: CapabilityRevokePayload & { from: string }) => void;
   'participant-joined': (participant: Participant) => void;
   'participant-left': (participant: Participant) => void;
   error: (error: Error) => void;

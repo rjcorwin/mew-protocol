@@ -1,5 +1,10 @@
 import { MEWParticipant, ParticipantOptions, Tool, Resource } from '@mew-protocol/participant';
-import { Envelope, ParticipantRestartPayload } from '@mew-protocol/types';
+import {
+  Envelope,
+  ParticipantRestartPayload,
+  ParticipantCompactPayload,
+  ParticipantCompactDonePayload,
+} from '@mew-protocol/types';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
@@ -146,7 +151,9 @@ export class MEWAgent extends MEWParticipant {
     this.on('stream/request', (envelope: Envelope) => this.handleStreamRequestEvent(envelope));
     this.on('stream/open', (envelope: Envelope) => this.handleStreamOpenEvent(envelope));
     this.on('stream/close', (envelope: Envelope) => this.handleStreamCloseEvent(envelope));
-    this.on('reasoning/cancel', (envelope: Envelope) => this.handleReasoningCancelEvent(envelope));
+    this.on('reasoning/cancel', (envelope: Envelope) => {
+      void this.handleReasoningCancelEvent(envelope);
+    });
 
     // Set up participant join handler for tracking
     this.onParticipantJoin((participant) => {
@@ -285,8 +292,11 @@ export class MEWAgent extends MEWParticipant {
    * Handle chat messages
    */
   private async handleChat(envelope: Envelope): Promise<void> {
+    const paused = this.isPaused();
+
     // Check if message queueing is enabled and we're currently processing
-    if (this.config.messageQueue?.enableQueueing && this.isProcessing) {
+    if (this.config.messageQueue?.enableQueueing && (this.isProcessing || paused)) {
+      const queueReason = this.isProcessing ? 'processing' : 'paused';
       // Check queue size limit
       const maxSize = this.config.messageQueue.maxQueueSize || 5;
 
@@ -296,34 +306,40 @@ export class MEWAgent extends MEWParticipant {
 
         if (dropStrategy === 'oldest') {
           const dropped = this.messageQueue.shift(); // Remove oldest
-          this.log('warn', `Queue full, dropped oldest message from ${dropped?.from}`);
+          this.log('warn', `Queue full, dropped oldest message from ${dropped?.from} (reason: ${queueReason})`);
           if (this.config.messageQueue.notifyQueueing) {
-            this.emitQueueEvent('queue-overflow', { dropped: dropped?.from, strategy: 'oldest' });
+            this.emitQueueEvent('queue-overflow', { dropped: dropped?.from, strategy: 'oldest', reason: queueReason });
           }
         } else if (dropStrategy === 'newest') {
-          this.log('warn', `Queue full, dropping newest message from ${envelope.from}`);
+          this.log('warn', `Queue full, dropping newest message from ${envelope.from} (reason: ${queueReason})`);
           if (this.config.messageQueue.notifyQueueing) {
-            this.emitQueueEvent('queue-overflow', { dropped: envelope.from, strategy: 'newest' });
+            this.emitQueueEvent('queue-overflow', { dropped: envelope.from, strategy: 'newest', reason: queueReason });
           }
           return; // Don't queue this message
         } else {
           // 'none' strategy - reject the message
-          this.log('error', `Queue full, rejecting message from ${envelope.from}`);
+          this.log('error', `Queue full, rejecting message from ${envelope.from} (reason: ${queueReason})`);
           return;
         }
       }
 
       // Queue the message
       this.messageQueue.push(envelope);
-      this.log('debug', `Message queued from ${envelope.from}, queue size: ${this.messageQueue.length}`);
+      this.log('debug', `Message queued from ${envelope.from}, queue size: ${this.messageQueue.length} (reason: ${queueReason})`);
 
       // Emit queue event if configured
       if (this.config.messageQueue.notifyQueueing) {
         this.emitQueueEvent('message-queued', {
           from: envelope.from,
-          queueSize: this.messageQueue.length
+          queueSize: this.messageQueue.length,
+          reason: queueReason,
         });
       }
+      return;
+    }
+
+    if (paused) {
+      this.log('info', `Ignoring chat from ${envelope.from} because agent is paused`);
       return;
     }
 
@@ -370,7 +386,7 @@ export class MEWAgent extends MEWParticipant {
     try {
       // Start reasoning if enabled
       if (this.config.reasoningEnabled) {
-        this.emitReasoning('reasoning/start', { input: text });
+        await this.emitReasoning('reasoning/start', { input: text });
 
         try {
           const response = await this.processWithReAct(text);
@@ -385,7 +401,7 @@ export class MEWAgent extends MEWParticipant {
           );
         }
 
-        this.emitReasoning('reasoning/conclusion', {});
+        await this.emitReasoning('reasoning/conclusion', {});
       }
     } finally {
       // Mark as no longer processing
@@ -395,12 +411,26 @@ export class MEWAgent extends MEWParticipant {
       }
 
       // Process any queued messages
-      if (this.messageQueue.length > 0) {
+      if (!this.isPaused() && this.messageQueue.length > 0) {
         const nextMessage = this.messageQueue.shift()!;
         this.log('debug', `Processing next queued message from ${nextMessage.from}`);
         // Process the next message (this will set isProcessing again)
         await this.handleChat(nextMessage);
       }
+    }
+  }
+
+  protected onPause(envelope: Envelope): void {
+    this.log('info', `Paused by ${envelope.from || 'unknown'}${envelope.payload?.reason ? ` (${envelope.payload.reason})` : ''}`);
+  }
+
+  protected onResume(envelope: Envelope): void {
+    this.log('info', `Resumed by ${envelope.from || 'unknown'}${envelope.payload?.reason ? ` (${envelope.payload.reason})` : ''}`);
+
+    if (!this.isProcessing && this.messageQueue.length > 0 && !this.isPaused()) {
+      const nextMessage = this.messageQueue.shift()!;
+      this.log('debug', `Processing queued message from ${nextMessage.from} after resume`);
+      void this.handleChat(nextMessage);
     }
   }
   
@@ -542,7 +572,7 @@ Return a JSON object:
       this.log('debug', `ReAct iteration ${iterations}/${this.config.maxIterations}`);
 
       if (this.reasoningCancelled) {
-        this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: this.reasoningCancelReason });
+        await this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: this.reasoningCancelReason });
         this.reasoningCancelled = false;
         this.reasoningCancelReason = undefined;
         return 'Reasoning cancelled.';
@@ -559,7 +589,7 @@ Return a JSON object:
       thoughts.push(thought);
       
       this.log('debug', `Thought action: ${thought.action}, reasoning: ${thought.reasoning}`);
-      this.emitReasoning('reasoning/thought', thought);
+      await this.emitReasoning('reasoning/thought', thought);
       
       // Track reasoning in conversation history
       this.conversationHistory.push({
@@ -573,7 +603,7 @@ Return a JSON object:
       // Act phase
       if (thought.action === 'cancelled') {
         // Reasoning was cancelled during stream
-        this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: thought.actionInput?.reason || 'cancelled by user' });
+        await this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: thought.actionInput?.reason || 'cancelled by user' });
         this.reasoningCancelled = false;
         this.reasoningCancelReason = undefined;
         return `Reasoning cancelled: ${thought.actionInput?.reason || 'cancelled by user'}`;
@@ -1293,7 +1323,7 @@ Return a JSON object:
     }
   }
 
-  private handleReasoningCancelEvent(envelope: Envelope): void {
+  private async handleReasoningCancelEvent(envelope: Envelope): Promise<void> {
     if (this.matchesReasoningContext(envelope.context)) {
       this.reasoningCancelled = true;
       this.reasoningCancelReason = envelope.payload?.reason || 'cancelled';
@@ -1309,7 +1339,7 @@ Return a JSON object:
       this.closeReasoningStream('cancelled');
 
       // Immediately send reasoning/conclusion to confirm cancellation
-      this.emitReasoning('reasoning/conclusion', {
+      await this.emitReasoning('reasoning/conclusion', {
         cancelled: true,
         reason: this.reasoningCancelReason,
         message: `Reasoning cancelled: ${this.reasoningCancelReason}`
@@ -1359,11 +1389,11 @@ Return a JSON object:
     this.compacting = false;
   }
 
-  private compactConversationHistory(): { tokens: number; messages: number } {
+  private compactConversationHistory(targetTokens?: number): { tokens: number; messages: number } {
     let tokensFreed = 0;
     let messagesRemoved = 0;
     let projectedTokens = this.getContextTokens();
-    const target = this.getContextTokenLimit() * 0.7;
+    const target = typeof targetTokens === 'number' ? targetTokens : this.getContextTokenLimit() * 0.7;
 
     while (projectedTokens > target && this.conversationHistory.length > 0) {
       const entry = this.conversationHistory.shift();
@@ -1376,6 +1406,30 @@ Return a JSON object:
     }
 
     return { tokens: tokensFreed, messages: messagesRemoved };
+  }
+
+  protected async onCompact(payload: ParticipantCompactPayload): Promise<ParticipantCompactDonePayload | void> {
+    if (this.compacting) {
+      return { skipped: true, reason: 'compaction_in_progress' };
+    }
+
+    this.compacting = true;
+    try {
+      const target = typeof payload.target_tokens === 'number' ? payload.target_tokens : undefined;
+      const result = this.compactConversationHistory(target);
+
+      if (result.tokens <= 0 && result.messages <= 0) {
+        return { skipped: true, reason: 'no_history' };
+      }
+
+      return {
+        freed_tokens: result.tokens > 0 ? result.tokens : undefined,
+        freed_messages: result.messages > 0 ? result.messages : undefined,
+        status: 'compacted'
+      };
+    } finally {
+      this.compacting = false;
+    }
   }
 
   protected async onForget(direction: 'oldest' | 'newest', entries?: number): Promise<{ messagesRemoved: number; tokensFreed: number }> {
@@ -1446,7 +1500,11 @@ Return a JSON object:
   /**
    * Emit reasoning events
    */
-  private emitReasoning(event: string, data: any): string | undefined {
+  private async emitReasoning(event: string, data: any): Promise<string | undefined> {
+    if (this.isPaused() && event !== 'reasoning/cancel' && event !== 'reasoning/conclusion') {
+      this.log('debug', `Skipping reasoning event ${event} while paused`);
+      return undefined;
+    }
     if (event !== 'reasoning/start' && this.reasoningCancelled && event !== 'reasoning/conclusion') {
       return undefined;
     }
@@ -1477,7 +1535,11 @@ Return a JSON object:
       return envelope.id as string | undefined;
     }
 
-    this.send(envelope);
+    try {
+      await this.send(envelope);
+    } catch (error) {
+      this.log('error', `Failed to emit reasoning event ${event}: ${error}`);
+    }
 
     if (event === 'reasoning/thought') {
       this.pushReasoningStreamChunk({ type: 'thought', value: data });
