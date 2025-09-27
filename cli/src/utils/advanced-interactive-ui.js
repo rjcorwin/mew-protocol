@@ -8,10 +8,36 @@
  */
 
 const React = require('react');
-const { render, Box, Text, Static, useInput, useApp, useFocus } = require('ink');
+const { render, Box, Text, Static, useInput, useApp, useFocus, useStdout } = require('ink');
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
 const { v4: uuidv4 } = require('uuid');
 const EnhancedInput = require('../ui/components/EnhancedInput');
+
+const DECORATIVE_SYSTEM_KINDS = new Set([
+  'system/welcome',
+  'system/heartbeat'
+]);
+
+function isDecorativeSystemMessage(message) {
+  if (!message || !message.kind) {
+    return false;
+  }
+  return DECORATIVE_SYSTEM_KINDS.has(message.kind);
+}
+
+function createSignalBoardSummary(ackCount, statusCount, pauseState, includeAck = true) {
+  const parts = [];
+  if (includeAck && ackCount > 0) {
+    parts.push(`acks:${ackCount}`);
+  }
+  if (statusCount > 0) {
+    parts.push(`status:${statusCount}`);
+  }
+  if (pauseState) {
+    parts.push('paused');
+  }
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
 
 /**
  * Main Advanced Interactive UI Component
@@ -20,7 +46,6 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const [messages, setMessages] = useState([]);
   const [commandHistory, setCommandHistory] = useState([]);
   const [pendingOperation, setPendingOperation] = useState(null);
-  const [showHelp, setShowHelp] = useState(false);
   const [verbose, setVerbose] = useState(false);
   const [showStreams, setShowStreams] = useState(false);
   const [activeReasoning, setActiveReasoning] = useState(null); // Track active reasoning sessions
@@ -36,7 +61,80 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   const reasoningUpdateTimerRef = useRef(null);
   const pendingReasoningUpdateRef = useRef(null);
   const contextUsageEntries = useMemo(() => buildContextUsageEntries(participantStatuses), [participantStatuses]);
+  const [signalBoardExpanded, setSignalBoardExpanded] = useState(false);
+  const [signalBoardOverride, setSignalBoardOverride] = useState(null);
   const { exit } = useApp();
+  const { stdout } = useStdout();
+  const [terminalWidth, setTerminalWidth] = useState(() => {
+    if (stdout && typeof stdout.columns === 'number') {
+      return stdout.columns;
+    }
+    if (typeof process?.stdout?.columns === 'number') {
+      return process.stdout.columns;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (!stdout || typeof stdout.on !== 'function') {
+      return undefined;
+    }
+
+    const handleResize = () => {
+      if (typeof stdout.columns === 'number') {
+        setTerminalWidth(stdout.columns);
+      }
+    };
+
+    stdout.on('resize', handleResize);
+    return () => {
+      stdout.off('resize', handleResize);
+    };
+  }, [stdout]);
+
+  const meaningfulMessageCount = useMemo(() => {
+    return messages.reduce((count, entry) => {
+      return count + (isDecorativeSystemMessage(entry.message) ? 0 : 1);
+    }, 0);
+  }, [messages]);
+  const signalBoardHasActivity = myPendingAcknowledgements.length > 0 ||
+    participantStatuses.size > 0 ||
+    Boolean(pauseState) ||
+    activeStreams.size > 0 ||
+    streamFrames.length > 0;
+  const wideEnoughForDockedLayout = terminalWidth === null || terminalWidth >= 110;
+  const desiredLayout = wideEnoughForDockedLayout && (signalBoardHasActivity || meaningfulMessageCount >= 2)
+    ? 'docked'
+    : 'stacked';
+  const [layoutMode, setLayoutMode] = useState(desiredLayout);
+
+  useEffect(() => {
+    setLayoutMode(prev => {
+      if (desiredLayout !== prev) {
+        return desiredLayout;
+      }
+      return prev;
+    });
+  }, [desiredLayout]);
+  const showEmptyStateCard = !signalBoardHasActivity && meaningfulMessageCount === 0;
+
+  useEffect(() => {
+    if (signalBoardOverride === 'open' && !signalBoardExpanded) {
+      setSignalBoardExpanded(true);
+    }
+    if (signalBoardOverride === 'closed' && signalBoardExpanded) {
+      setSignalBoardExpanded(false);
+    }
+  }, [signalBoardOverride, signalBoardExpanded]);
+
+  useEffect(() => {
+    if (signalBoardOverride === 'open') {
+      return;
+    }
+    if (!signalBoardHasActivity && signalBoardExpanded) {
+      setSignalBoardExpanded(false);
+    }
+  }, [signalBoardHasActivity, signalBoardExpanded, signalBoardOverride]);
 
   // Throttled reasoning update to prevent performance issues during streaming
   const updateReasoningThrottled = useCallback((updateFn) => {
@@ -761,6 +859,46 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     }]);
   };
 
+  const addHelpMessage = () => {
+    const lines = [
+      'Available Commands',
+      '/help                       Show this help',
+      '/verbose                    Toggle verbose output',
+      '/streams                    Toggle stream data display',
+      '/ui board [open|close|auto] Control Signal Board',
+      '/ui-clear                   Clear local UI buffers',
+      '/exit                       Exit application',
+      '',
+      'Chat Queue',
+      '/ack [selector] [status]    Acknowledge chat messages',
+      '/cancel [selector] [reason] Cancel reasoning or pending chats',
+      '',
+      'Participant Controls',
+      '/status <participant> [fields...]      Request status',
+      '/pause <participant> [timeout] [reason]',
+      '/resume <participant> [reason]',
+      '/forget <participant> [oldest|newest] [count]',
+      '/clear <participant> [reason]',
+      '/restart <participant> [mode] [reason]',
+      '/shutdown <participant> [reason]',
+      '',
+      'Streams',
+      '/stream request <participant> <direction> [description] [size=bytes]',
+      '/stream close <streamId> [reason]',
+      '/streams                    List active streams'
+    ];
+
+    setMessages(prev => [...prev, {
+      id: uuidv4(),
+      message: {
+        kind: 'system/help',
+        payload: { lines }
+      },
+      sent: false,
+      timestamp: new Date()
+    }]);
+  };
+
   const pickAcknowledgementEntries = (args) => {
     if (pendingAcknowledgements.length === 0) {
       return { entries: [], rest: [] };
@@ -860,7 +998,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
 
     switch (cmd) {
       case '/help':
-        setShowHelp(true);
+        addHelpMessage();
         break;
       case '/verbose':
         setVerbose(prev => !prev);
@@ -1155,6 +1293,44 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         addSystemMessage(`Active streams: ${summaries.join('; ')}`);
         break;
       }
+      case '/ui': {
+        if (args.length === 0) {
+          addSystemMessage('Usage: /ui board [open|close]');
+          break;
+        }
+        const sub = args[0];
+        if (sub !== 'board') {
+          addSystemMessage(`Unknown /ui subcommand: ${sub}`);
+          break;
+        }
+        let nextState;
+        if (args[1] === 'open') {
+          nextState = true;
+          setSignalBoardOverride('open');
+        } else if (args[1] === 'close') {
+          nextState = false;
+          setSignalBoardOverride('closed');
+        } else if (args[1] === 'auto') {
+          setSignalBoardOverride(null);
+          const autoState = signalBoardHasActivity;
+          setSignalBoardExpanded(autoState);
+          addSystemMessage(`Signal Board set to auto (currently ${autoState ? 'expanded' : 'collapsed'}).`);
+          break;
+        } else {
+          nextState = !signalBoardExpanded;
+          setSignalBoardOverride(nextState ? 'open' : 'closed');
+        }
+        setSignalBoardExpanded(nextState);
+        addSystemMessage(`Signal Board ${nextState ? 'expanded' : 'collapsed'}.`);
+        break;
+      }
+      case '/ui-board': {
+        const nextState = !signalBoardExpanded;
+        setSignalBoardOverride(nextState ? 'open' : 'closed');
+        setSignalBoardExpanded(nextState);
+        addSystemMessage(`Signal Board ${nextState ? 'expanded' : 'collapsed'}.`);
+        break;
+      }
       default:
         addSystemMessage(`Unknown command: ${cmd}`);
     }
@@ -1176,9 +1352,23 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     return obj && obj.protocol === 'mew/v0.3' && obj.id && obj.ts && obj.kind;
   };
 
+  const isDockedLayout = layoutMode === 'docked';
+
   return React.createElement(Box, { flexDirection: "column", height: "100%" },
-    React.createElement(Box, { flexDirection: "row", flexGrow: 1, marginTop: 1 },
-      React.createElement(Box, { flexGrow: 1, flexDirection: "column", marginRight: 1 },
+    React.createElement(Box, {
+      flexDirection: isDockedLayout ? "row" : "column",
+      flexGrow: 1,
+      marginTop: 1
+    },
+      React.createElement(Box, {
+        flexGrow: 1,
+        flexDirection: "column",
+        marginRight: signalBoardExpanded && isDockedLayout ? 1 : 0
+      },
+        showEmptyStateCard && React.createElement(EmptyStateCard, {
+          spaceId,
+          participantId
+        }),
         React.createElement(Static, { items: messages }, (item) =>
           React.createElement(MessageDisplay, {
             key: item.id,
@@ -1188,13 +1378,29 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
           })
         )
       ),
+      signalBoardExpanded && isDockedLayout && React.createElement(SidePanel, {
+        participantId,
+        myPendingAcknowledgements,
+        participantStatuses,
+        pauseState,
+        activeStreams,
+        streamFrames,
+        variant: 'docked'
+      })
+    ),
+    signalBoardExpanded && !isDockedLayout && React.createElement(Box, {
+      flexDirection: "row",
+      justifyContent: "flex-start",
+      marginTop: 1
+    },
       React.createElement(SidePanel, {
         participantId,
         myPendingAcknowledgements,
         participantStatuses,
         pauseState,
         activeStreams,
-        streamFrames
+        streamFrames,
+        variant: 'stacked'
       })
     ),
 
@@ -1316,23 +1522,17 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         setPendingOperation(null);
       }
     }),
-    
-    // Help Modal
-    showHelp && React.createElement(HelpModal, {
-      onClose: () => setShowHelp(false)
-    }),
-    
     // Reasoning Status
     activeReasoning && React.createElement(ReasoningStatus, {
       reasoning: activeReasoning
     }),
     
-    // Enhanced Input Component (disabled when dialog is shown)
+    // Enhanced Input Component
     React.createElement(EnhancedInput, {
       onSubmit: processInput,
       placeholder: 'Type a message or /help for commands...',
       multiline: true,  // Enable multi-line for Shift+Enter support
-      disabled: pendingOperation !== null || showHelp,
+      disabled: pendingOperation !== null,
       history: commandHistory,
       onHistoryChange: setCommandHistory,
       prompt: '> ',
@@ -1350,7 +1550,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       awaitingAckCount: myPendingAcknowledgements.length,
       pauseState: pauseState,
       activeStreamCount: activeStreams.size,
-      contextUsage: contextUsageEntries
+      contextUsage: contextUsageEntries,
+      participantStatusCount: participantStatuses.size
     })
   );
 }
@@ -1418,6 +1619,27 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
         marginLeft: 6,
         marginTop: 1
       }, `→ action: ${payload.action}`)
+    );
+  }
+
+  if (kind === 'system/help' && Array.isArray(payload.lines)) {
+    const sectionTitles = new Set(['Available Commands', 'Chat Queue', 'Participant Controls', 'Streams']);
+    const basePrefix = contextPrefix || '';
+    const firstLinePrefix = `${basePrefix}└─ `;
+    const baseSpaces = basePrefix.replace(/[^\s]/g, ' ');
+    const subsequentPrefix = `${baseSpaces}   `;
+    return React.createElement(Box, { flexDirection: "column" },
+      payload.lines.map((line, index) => {
+        if (!line) {
+          return React.createElement(Text, { key: index, color: "gray" }, ' ');
+        }
+        const color = sectionTitles.has(line) ? 'cyan' : 'gray';
+        return React.createElement(Text, {
+          key: index,
+          color,
+          wrap: "wrap"
+        }, `${index === 0 ? firstLinePrefix : subsequentPrefix}${line}`);
+      })
     );
   }
 
@@ -1570,62 +1792,6 @@ function OperationConfirmation({ operation, onApprove, onDeny, onGrant }) {
 }
 
 /**
- * Help Modal
- */
-function HelpModal({ onClose }) {
-  useInput((input, key) => {
-    if (key.escape || input === 'q') {
-      onClose();
-    }
-  });
-
-  return React.createElement(Box, {
-      borderStyle: "round",
-      borderColor: "blue",
-      paddingX: 2,
-      paddingY: 1,
-      position: "absolute",
-      top: 2,
-      left: 2,
-      width: "50%"
-    },
-    React.createElement(Box, { flexDirection: "column" },
-      React.createElement(Text, { color: "blue", bold: true }, "Available Commands"),
-      React.createElement(Text, null, "/help                       Show this help"),
-      React.createElement(Text, null, "/verbose                    Toggle verbose output"),
-      React.createElement(Text, null, "/streams                    Toggle stream data display"),
-      React.createElement(Text, null, "/ui-clear                   Clear local UI buffers"),
-      React.createElement(Text, null, "/exit                       Exit application"),
-
-      React.createElement(Box, { marginTop: 1 }),
-      React.createElement(Text, { color: "yellow", bold: true }, "Chat Queue"),
-      React.createElement(Text, null, "/ack [selector] [status]     Acknowledge chat messages"),
-      React.createElement(Text, null, "/cancel [selector] [reason]  Cancel reasoning or pending chats"),
-
-      React.createElement(Box, { marginTop: 1 }),
-      React.createElement(Text, { color: "green", bold: true }, "Participant Controls"),
-      React.createElement(Text, null, "/status <participant> [fields...]      Request status"),
-      React.createElement(Text, null, "/pause <participant> [timeout] [reason]"),
-      React.createElement(Text, null, "/resume <participant> [reason]"),
-      React.createElement(Text, null, "/forget <participant> [oldest|newest] [count]"),
-      React.createElement(Text, null, "/clear <participant> [reason]"),
-      React.createElement(Text, null, "/restart <participant> [mode] [reason]"),
-      React.createElement(Text, null, "/shutdown <participant> [reason]"),
-
-      React.createElement(Box, { marginTop: 1 }),
-      React.createElement(Text, { color: "cyan", bold: true }, "Streams"),
-      React.createElement(Text, null, "/stream request <participant> <direction> [description] [size=bytes]"),
-      React.createElement(Text, null, "/stream close <streamId> [reason]"),
-      React.createElement(Text, null, "/streams                    List active streams"),
-
-      React.createElement(Box, { marginTop: 1 },
-        React.createElement(Text, { color: "gray" }, "Press Esc or 'q' to close")
-      )
-    )
-  );
-}
-
-/**
  * Reasoning Status Component
  */
 function ReasoningStatus({ reasoning }) {
@@ -1714,7 +1880,7 @@ function ReasoningStatus({ reasoning }) {
 /**
  * Status Bar Component
  */
-function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [] }) {
+function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [], participantStatusCount = 0 }) {
   const status = connected ? 'Connected' : 'Disconnected';
   const statusColor = connected ? 'green' : 'red';
 
@@ -1744,6 +1910,11 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId
     }
   }
 
+  const boardSummary = createSignalBoardSummary(awaitingAckCount, participantStatusCount, pauseState, awaitingAckCount === 0);
+  if (boardSummary) {
+    extras.push(boardSummary);
+  }
+
   const extrasText = extras.length > 0 ? ` | ${extras.join(' | ')}` : '';
 
   return React.createElement(Box, { justifyContent: "space-between", paddingX: 1 },
@@ -1771,6 +1942,10 @@ function getColorForKind(kind) {
 }
 
 function getPayloadPreview(payload, kind) {
+  if (kind === 'system/help') {
+    return 'help overview';
+  }
+
   if (kind === 'chat' && payload.text) {
     return `"${payload.text}"`;
   }
@@ -2299,7 +2474,22 @@ function formatAckRecipients(recipients, participantId) {
     .join(', ');
 }
 
-function SidePanel({ participantId, myPendingAcknowledgements, participantStatuses, pauseState, activeStreams, streamFrames }) {
+function EmptyStateCard({ spaceId, participantId }) {
+  return React.createElement(Box, {
+      borderStyle: "round",
+      borderColor: "gray",
+      paddingX: 2,
+      paddingY: 1,
+      marginBottom: 1,
+      flexDirection: "column"
+    },
+    React.createElement(Text, { color: "gray" }, `Connected to ${spaceId} as ${participantId}.`),
+    React.createElement(Text, { color: "gray" }, "Type a message or use /help to get started."),
+    React.createElement(Text, { color: "gray" }, "Signal Board docks once there is activity.")
+  );
+}
+
+function SidePanel({ participantId, myPendingAcknowledgements, participantStatuses, pauseState, activeStreams, streamFrames, variant = 'docked' }) {
   const ackEntries = myPendingAcknowledgements
     .slice()
     .sort((a, b) => {
@@ -2318,14 +2508,20 @@ function SidePanel({ participantId, myPendingAcknowledgements, participantStatus
   const streamEntries = Array.from(activeStreams.values());
   const latestFrames = streamFrames.slice(-3);
 
-  return React.createElement(Box, {
-    width: 42,
+  const panelProps = {
     flexDirection: "column",
     borderStyle: "round",
     borderColor: "gray",
     paddingX: 1,
-    paddingY: 0
-  },
+    paddingY: 0,
+    width: variant === 'docked' ? 42 : undefined
+  };
+
+  if (variant === 'stacked') {
+    panelProps.alignSelf = 'flex-start';
+  }
+
+  return React.createElement(Box, panelProps,
     React.createElement(Text, { color: "cyan", bold: true }, "Signal Board"),
 
     React.createElement(Box, { marginTop: 1 }),
@@ -2369,6 +2565,9 @@ function SidePanel({ participantId, myPendingAcknowledgements, participantStatus
         `${frame.streamId}: ${truncateText(frame.payload, 30)}`
       ))
     )
+    ,
+    React.createElement(Box, { marginTop: 1 }),
+    React.createElement(Text, { color: "gray" }, 'Use /ui board close or /ui board auto')
   );
 }
 
