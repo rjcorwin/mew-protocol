@@ -1,0 +1,8 @@
+{
+  "name": "scenario-4-capabilities",
+  "description": "Dynamic capability flow validation for integration tests",
+  "version": "0.1.0",
+  "variables": [
+    { "name": "SPACE_NAME", "description": "Space identifier", "default": "scenario-4-capabilities" }
+  ]
+}

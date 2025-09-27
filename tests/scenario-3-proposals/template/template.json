@@ -1,0 +1,8 @@
+{
+  "name": "scenario-3-proposals",
+  "description": "Proposal fulfilment flow with dedicated fulfiller agent",
+  "version": "0.1.0",
+  "variables": [
+    { "name": "SPACE_NAME", "description": "Space identifier", "default": "scenario-3-proposals" }
+  ]
+}

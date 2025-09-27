@@ -1,0 +1,35 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 2 - MCP Tool Execution"
+  description: "Test MCP tool execution with a calculator participant"
+
+participants:
+  calculator-agent:
+    type: local
+    tokens: ["calculator-token"]
+    auto_start: true
+    command: "node"
+    args:
+      - "./.mew/agents/calculator-agent.js"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "calculator-token"
+    capabilities:
+      - kind: "mcp/response"
+      - kind: "system/*"
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "system/*"
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true
+
+defaults:
+  capabilities:
+    - kind: "system/*"
