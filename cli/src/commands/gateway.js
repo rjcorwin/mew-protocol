@@ -571,13 +571,15 @@ gateway
     }
 
     // Validate message structure
+    const SUPPORTED_PROTOCOL_VERSIONS = new Set(['mew/v0.4', 'mew/v0.3']);
+
     function validateMessage(message) {
       if (!message || typeof message !== 'object') {
         return 'Message must be an object';
       }
 
       // Protocol version check
-      if (message.protocol && message.protocol !== 'mew/v0.4') {
+      if (message.protocol && !SUPPORTED_PROTOCOL_VERSIONS.has(message.protocol)) {
         return `Invalid protocol version: ${message.protocol}`;
       }
 
@@ -636,6 +638,10 @@ gateway
           // Validate message
           const validationError = validateMessage(message);
           if (validationError) {
+            const senderId = participantId || message.from || 'unknown';
+            console.log(
+              `[GATEWAY WARNING] Validation error from ${senderId}: ${validationError}. Message: ${dataStr}`,
+            );
             ws.send(
               JSON.stringify({
                 protocol: 'mew/v0.4',
