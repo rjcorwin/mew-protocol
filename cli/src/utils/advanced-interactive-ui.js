@@ -12,6 +12,7 @@ const { render, Box, Text, Static, useInput, useApp, useFocus, useStdout } = req
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
 const { v4: uuidv4 } = require('uuid');
 const EnhancedInput = require('../ui/components/EnhancedInput');
+const { slashCommandList, slashCommandGroups } = require('../ui/utils/slashCommands');
 
 const DECORATIVE_SYSTEM_KINDS = new Set([
   'system/welcome',
@@ -860,33 +861,25 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   const addHelpMessage = () => {
-    const lines = [
-      'Available Commands',
-      '/help                       Show this help',
-      '/verbose                    Toggle verbose output',
-      '/streams                    Toggle stream data display',
-      '/ui board [open|close|auto] Control Signal Board',
-      '/ui-clear                   Clear local UI buffers',
-      '/exit                       Exit application',
-      '',
-      'Chat Queue',
-      '/ack [selector] [status]    Acknowledge chat messages',
-      '/cancel [selector] [reason] Cancel reasoning or pending chats',
-      '',
-      'Participant Controls',
-      '/status <participant> [fields...]      Request status',
-      '/pause <participant> [timeout] [reason]',
-      '/resume <participant> [reason]',
-      '/forget <participant> [oldest|newest] [count]',
-      '/clear <participant> [reason]',
-      '/restart <participant> [mode] [reason]',
-      '/shutdown <participant> [reason]',
-      '',
-      'Streams',
-      '/stream request <participant> <direction> [description] [size=bytes]',
-      '/stream close <streamId> [reason]',
-      '/streams                    List active streams'
-    ];
+    const lines = ['Available Commands'];
+
+    const generalCommands = slashCommandList.filter(entry => entry.category === 'General');
+    generalCommands.forEach(entry => {
+      const label = (entry.usage || entry.command).padEnd(48);
+      lines.push(`${label}${entry.description}`);
+    });
+
+    const otherGroups = slashCommandGroups.filter(group => group !== 'General');
+    otherGroups.forEach(group => {
+      const commands = slashCommandList.filter(entry => entry.category === group);
+      if (commands.length === 0) return;
+      lines.push('');
+      lines.push(group);
+      commands.forEach(entry => {
+        const label = (entry.usage || entry.command).padEnd(48);
+        lines.push(`${label}${entry.description}`);
+      });
+    });
 
     setMessages(prev => [...prev, {
       id: uuidv4(),

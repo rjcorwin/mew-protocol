@@ -16,6 +16,7 @@ const TextBuffer = require('../utils/text-buffer');
 const { useKeypress } = require('../hooks/useKeypress');
 const { getCommand } = require('../keyMatchers');
 const { defaultKeyBindings } = require('../../config/keyBindings');
+const { getSlashCommandSuggestions } = require('../utils/slashCommands');
 const fs = require('fs');
 const path = require('path');
 
@@ -58,6 +59,7 @@ function EnhancedInput({
   const bufferRef = useRef(new TextBuffer());
   const buffer = bufferRef.current;
   const [updateCounter, setUpdateCounter] = useState(0);
+  const suppressSuggestionsRef = useRef(false);
 
   // History navigation
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -67,6 +69,26 @@ function EnhancedInput({
   const [isAutocompleting, setIsAutocompleting] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+
+  // Update slash command suggestions whenever the buffer changes
+  useEffect(() => {
+    if (suppressSuggestionsRef.current) {
+      suppressSuggestionsRef.current = false;
+      return;
+    }
+
+    const text = buffer.getText();
+    if (text.trim().startsWith('/')) {
+      const matches = getSlashCommandSuggestions(text);
+      setSuggestions(matches);
+      setIsAutocompleting(matches.length > 0);
+      setSelectedSuggestion(0);
+    } else {
+      setIsAutocompleting(false);
+      setSuggestions([]);
+      setSelectedSuggestion(0);
+    }
+  }, [buffer, updateCounter]);
 
   // Force re-render when buffer changes
   const update = useCallback(() => {
@@ -174,6 +196,10 @@ function EnhancedInput({
 
       // Multi-line navigation
       case 'MOVE_UP':
+        if (isAutocompleting && suggestions.length > 0) {
+          setSelectedSuggestion(prev => Math.max(prev - 1, 0));
+          break;
+        }
         if (multiline && buffer.lines.length > 1) {
           const cursorPos = buffer.getCursorPosition();
           // If at the first line, navigate to previous history instead
@@ -209,6 +235,10 @@ function EnhancedInput({
         break;
 
       case 'MOVE_DOWN':
+        if (isAutocompleting && suggestions.length > 0) {
+          setSelectedSuggestion(prev => Math.min(prev + 1, suggestions.length - 1));
+          break;
+        }
         if (multiline && buffer.lines.length > 1) {
           const cursorPos = buffer.getCursorPosition();
           // If at the last line, navigate to next history instead
@@ -309,12 +339,18 @@ function EnhancedInput({
       // Autocomplete
       case 'AUTOCOMPLETE':
         if (suggestions.length > 0) {
-          handleAutocompleteCycle();
+          handleAutocompleteAccept();
+        }
+        break;
+
+      case 'AUTOCOMPLETE_PREV':
+        if (isAutocompleting && suggestions.length > 0) {
+          setSelectedSuggestion(prev => Math.max(prev - 1, 0));
         }
         break;
 
       case 'AUTOCOMPLETE_ACCEPT':
-        if (isAutocompleting && suggestions.length > 0) {
+        if (suggestions.length > 0) {
           handleAutocompleteAccept();
         }
         break;
@@ -323,6 +359,7 @@ function EnhancedInput({
         if (isAutocompleting) {
           setIsAutocompleting(false);
           setSuggestions([]);
+          setSelectedSuggestion(0);
         }
         break;
 
@@ -366,22 +403,19 @@ function EnhancedInput({
   }, [history, historyIndex, tempInput, buffer, update]);
 
   // Handle autocomplete
-  const handleAutocompleteCycle = useCallback(() => {
-    if (suggestions.length === 0) return;
-
-    const newIndex = (selectedSuggestion + 1) % suggestions.length;
-    setSelectedSuggestion(newIndex);
-  }, [suggestions, selectedSuggestion]);
-
   const handleAutocompleteAccept = useCallback(() => {
     if (suggestions.length === 0) return;
 
     const suggestion = suggestions[selectedSuggestion];
-    // Implementation depends on autocomplete type
-    // For now, just append the suggestion
-    buffer.insert(suggestion);
+    const text = suggestion.command.endsWith(' ')
+      ? suggestion.command
+      : `${suggestion.command} `;
+    suppressSuggestionsRef.current = true;
+    buffer.setText(text);
+    buffer.move('bufferEnd');
     setIsAutocompleting(false);
     setSuggestions([]);
+    setSelectedSuggestion(0);
     update();
   }, [suggestions, selectedSuggestion, buffer, update]);
 
@@ -552,13 +586,14 @@ function EnhancedInput({
     if (!isAutocompleting || suggestions.length === 0) return null;
 
     return React.createElement(Box, { flexDirection: 'column', marginTop: 1 },
-      suggestions.slice(0, 5).map((suggestion, index) =>
-        React.createElement(Text, {
-          key: index,
-          color: index === selectedSuggestion ? 'blue' : 'gray'
-        },
-          index === selectedSuggestion ? '→ ' : '  ',
-          suggestion
+      suggestions.slice(0, 8).map((suggestion, index) =>
+        React.createElement(Box, { key: `${suggestion.command}-${index}` },
+          React.createElement(Text, {
+            color: index === selectedSuggestion ? 'cyan' : 'gray'
+          },
+            `${index === selectedSuggestion ? '→' : ' '} ${suggestion.usage || suggestion.command}`
+          ),
+          suggestion.description && React.createElement(Text, { color: 'gray' }, ` — ${suggestion.description}`)
         )
       )
     );
