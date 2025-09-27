@@ -114,7 +114,7 @@ gateway
     });
 
     // HTTP API for message injection
-    app.post('/participants/:participantId/messages', (req, res) => {
+    app.post('/participants/:participantId/messages', async (req, res) => {
       const { participantId } = req.params;
       const authHeader = req.headers.authorization;
       const spaceName = req.query.space || 'default';
@@ -161,10 +161,48 @@ gateway
         from: participantId,
         ...req.body
       };
-      
-      // Validate capabilities (skip for now - participant is already authenticated)
-      // TODO: Implement capability check for HTTP-injected messages
-      
+
+      const emitError = (payload) => {
+        const errorEnvelope = {
+          protocol: 'mew/v0.4',
+          id: `error-${Date.now()}`,
+          ts: new Date().toISOString(),
+          from: 'system:gateway',
+          to: [participantId],
+          kind: 'system/error',
+          correlation_id: envelope.id ? [envelope.id] : undefined,
+          payload,
+        };
+
+        const participantSocket = space.participants.get(participantId);
+        if (participantSocket && participantSocket.readyState === WebSocket.OPEN) {
+          participantSocket.send(JSON.stringify(errorEnvelope));
+        }
+      };
+
+      if (envelope.kind === 'system/register') {
+        emitError({
+          error: 'invalid_request',
+          message: 'system/register is reserved for the gateway. Use capability/grant instead.',
+        });
+        return res.status(400).json({
+          error: 'invalid_request',
+          message: 'system/register is reserved for the gateway. Use capability/grant instead.',
+        });
+      }
+
+      if (!(await hasCapabilityForMessage(participantId, envelope))) {
+        emitError({
+          error: 'capability_violation',
+          attempted_kind: envelope.kind,
+          your_capabilities: participantCapabilities.get(participantId) || [],
+        });
+        return res.status(403).json({
+          error: 'capability_violation',
+          message: `Participant ${participantId} lacks capability for ${envelope.kind}`,
+        });
+      }
+
       // Broadcast message to space
       const envelopeStr = JSON.stringify(envelope);
       for (const [pid, ws] of space.participants) {
@@ -256,7 +294,6 @@ gateway
         }
       };
 
-      ensure({ id: 'system-register', kind: 'system/register' });
       ensure({ id: 'mcp-response', kind: 'mcp/response' });
 
       return Array.from(deduped.values());
@@ -746,59 +783,20 @@ gateway
           }
 
           if (message.kind === 'system/register') {
-            const requestedCapabilities = message.payload?.capabilities;
-            if (!Array.isArray(requestedCapabilities)) {
-              const errorMessage = {
-                protocol: 'mew/v0.4',
-                id: `error-${Date.now()}`,
-                ts: new Date().toISOString(),
-                from: 'system:gateway',
-                to: [participantId],
-                kind: 'system/error',
-                correlation_id: message.id ? [message.id] : undefined,
-                payload: {
-                  error: 'invalid_request',
-                  message: 'system/register payload must include capabilities array',
-                },
-              };
-              ws.send(JSON.stringify(errorMessage));
-              return;
-            }
-
-            const existingCapabilities = participantCapabilities.get(participantId) || [];
-            const mergedCapabilities = mergeCapabilities(existingCapabilities, requestedCapabilities);
-            participantCapabilities.set(participantId, mergedCapabilities);
-
-            if (options.logLevel === 'debug') {
-              console.log(
-                `Updated capabilities for ${participantId}: ${JSON.stringify(mergedCapabilities)}`,
-              );
-            }
-
-            const space = spaces.get(spaceId);
-            if (space) {
-              const presenceUpdate = {
-                protocol: 'mew/v0.4',
-                id: `presence-${Date.now()}`,
-                ts: new Date().toISOString(),
-                from: 'system:gateway',
-                kind: 'system/presence',
-                payload: {
-                  event: 'update',
-                  participant: {
-                    id: participantId,
-                    capabilities: mergedCapabilities,
-                  },
-                },
-              };
-
-              for (const [pid, pws] of space.participants.entries()) {
-                if (pid !== participantId && pws.readyState === WebSocket.OPEN) {
-                  pws.send(JSON.stringify(presenceUpdate));
-                }
-              }
-            }
-
+            const errorMessage = {
+              protocol: 'mew/v0.4',
+              id: `error-${Date.now()}`,
+              ts: new Date().toISOString(),
+              from: 'system:gateway',
+              to: [participantId],
+              kind: 'system/error',
+              correlation_id: message.id ? [message.id] : undefined,
+              payload: {
+                error: 'invalid_request',
+                message: 'system/register is reserved for the gateway. Use capability/grant instead.',
+              },
+            };
+            ws.send(JSON.stringify(errorMessage));
             return;
           }
 
@@ -878,22 +876,6 @@ gateway
               const space = spaces.get(spaceId);
               const recipientWs = space?.participants.get(recipient);
               if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
-                const ackMessage = {
-                  protocol: 'mew/v0.4',
-                  id: `ack-${Date.now()}`,
-                  ts: new Date().toISOString(),
-                  from: 'system:gateway',
-                  to: [recipient],
-                  kind: 'capability/grant-ack',
-                  correlation_id: [grantId],
-                  payload: {
-                    status: 'accepted',
-                    grant_id: grantId,
-                    capabilities: grantCapabilities,
-                  },
-                };
-                recipientWs.send(JSON.stringify(ackMessage));
-
                 // Send updated welcome message with new capabilities
                 // This allows the participant to update their internal capability tracking
                 // Get both static capabilities and runtime capabilities
