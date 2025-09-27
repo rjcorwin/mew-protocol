@@ -16,9 +16,83 @@ const TextBuffer = require('../utils/text-buffer');
 const { useKeypress } = require('../hooks/useKeypress');
 const { getCommand } = require('../keyMatchers');
 const { defaultKeyBindings } = require('../../config/keyBindings');
+const { getSlashCommandSuggestions } = require('../utils/slashCommands');
 const fs = require('fs');
 const path = require('path');
 
+function tokensFromCommand(commandText) {
+  if (!commandText) return [];
+  return commandText.trim().split(/\s+/);
+}
+
+function tokenMatchesSuggestion(inputToken, expectedToken) {
+  if (!inputToken || !expectedToken) return false;
+  const actual = inputToken.toLowerCase();
+  const expected = expectedToken.toLowerCase();
+  return expected.startsWith(actual) || actual.startsWith(expected);
+}
+
+function findSlashCommandArgsIndex(input, commandText) {
+  const tokens = tokensFromCommand(commandText);
+  if (!input) return 0;
+  if (tokens.length === 0) return input.length;
+
+  let idx = 0;
+  let tokenIdx = 0;
+  let tokenStart = null;
+
+  const consumeMatchedToken = () => {
+    tokenIdx += 1;
+    if (tokenIdx === tokens.length) {
+      while (idx < input.length && /\s/.test(input[idx])) {
+        idx += 1;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  while (idx < input.length) {
+    const char = input[idx];
+    const isWhitespace = /\s/.test(char);
+
+    if (isWhitespace) {
+      if (tokenStart !== null) {
+        const tokenText = input.slice(tokenStart, idx);
+        if (tokenIdx < tokens.length && tokenMatchesSuggestion(tokenText, tokens[tokenIdx])) {
+          tokenStart = null;
+          idx += 1;
+          if (consumeMatchedToken()) {
+            return idx;
+          }
+          continue;
+        }
+        return tokenStart;
+      }
+      idx += 1;
+      continue;
+    }
+
+    if (tokenStart === null) {
+      tokenStart = idx;
+    }
+    idx += 1;
+  }
+
+  if (tokenStart !== null) {
+    const tokenText = input.slice(tokenStart, idx);
+    if (tokenIdx < tokens.length && tokenMatchesSuggestion(tokenText, tokens[tokenIdx])) {
+      tokenIdx += 1;
+      if (tokenIdx >= tokens.length) {
+        return idx;
+      }
+      return tokenStart;
+    }
+    return tokenStart;
+  }
+
+  return idx;
+}
 // Helper function for debug logging
 const debugLog = (message) => {
   const logFile = path.join(process.cwd(), '.mew', 'debug.log');
@@ -58,6 +132,7 @@ function EnhancedInput({
   const bufferRef = useRef(new TextBuffer());
   const buffer = bufferRef.current;
   const [updateCounter, setUpdateCounter] = useState(0);
+  const suppressSuggestionsRef = useRef(false);
 
   // History navigation
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -68,10 +143,86 @@ function EnhancedInput({
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
 
+  // Update slash command suggestions whenever the buffer changes
+  useEffect(() => {
+    if (suppressSuggestionsRef.current) {
+      suppressSuggestionsRef.current = false;
+      return;
+    }
+
+    const text = buffer.getText();
+    if (text.trim().startsWith('/')) {
+      const matches = getSlashCommandSuggestions(text);
+      setSuggestions(matches);
+      setIsAutocompleting(matches.length > 0);
+      setSelectedSuggestion(0);
+    } else {
+      setIsAutocompleting(false);
+      setSuggestions([]);
+      setSelectedSuggestion(0);
+    }
+  }, [buffer, updateCounter]);
+
   // Force re-render when buffer changes
   const update = useCallback(() => {
     setUpdateCounter(c => c + 1);
   }, []);
+
+  // Handle autocomplete (defined early so other hooks can depend on it)
+  const handleAutocompleteAccept = useCallback(() => {
+    if (suggestions.length === 0) return;
+
+    const suggestion = suggestions[selectedSuggestion];
+    const template = suggestion.usage || suggestion.command;
+
+    const currentText = buffer.getText();
+    const leadingWhitespaceMatch = currentText.match(/^\s*/);
+    const leadingWhitespace = leadingWhitespaceMatch ? leadingWhitespaceMatch[0] : '';
+    const trimmedInput = currentText.slice(leadingWhitespace.length);
+
+    const commandBase = template.endsWith(' ')
+      ? template
+      : `${template} `;
+
+    let newText;
+
+    if (trimmedInput.startsWith('/')) {
+      const argsIndex = findSlashCommandArgsIndex(trimmedInput, suggestion.command);
+
+      let argsStartIndex = argsIndex;
+      if (argsStartIndex === 0) {
+        const firstWhitespaceMatch = trimmedInput.match(/\s+/);
+        if (firstWhitespaceMatch) {
+          const tentativeIndex = firstWhitespaceMatch.index + firstWhitespaceMatch[0].length;
+          if (tentativeIndex < trimmedInput.length) {
+            argsStartIndex = tentativeIndex;
+          } else {
+            argsStartIndex = -1;
+          }
+        } else {
+          argsStartIndex = -1;
+        }
+      }
+
+      const remainder = argsStartIndex >= 0 && argsStartIndex < trimmedInput.length
+        ? trimmedInput.slice(argsStartIndex).replace(/^\s*/, '')
+        : '';
+
+      newText = remainder
+        ? `${leadingWhitespace}${commandBase}${remainder}`
+        : `${leadingWhitespace}${commandBase}`;
+    } else {
+      newText = `${leadingWhitespace}${commandBase}`;
+    }
+
+    suppressSuggestionsRef.current = true;
+    buffer.setText(newText);
+    buffer.move('bufferEnd');
+    setIsAutocompleting(false);
+    setSuggestions([]);
+    setSelectedSuggestion(0);
+    update();
+  }, [suggestions, selectedSuggestion, buffer, update]);
 
   // Handle input submission (defined before handleCommand which uses it)
   const handleSubmit = useCallback(() => {
@@ -174,6 +325,10 @@ function EnhancedInput({
 
       // Multi-line navigation
       case 'MOVE_UP':
+        if (isAutocompleting && suggestions.length > 0) {
+          setSelectedSuggestion(prev => Math.max(prev - 1, 0));
+          break;
+        }
         if (multiline && buffer.lines.length > 1) {
           const cursorPos = buffer.getCursorPosition();
           // If at the first line, navigate to previous history instead
@@ -185,6 +340,7 @@ function EnhancedInput({
               }
               const newIndex = Math.min(historyIndex + 1, history.length - 1);
               setHistoryIndex(newIndex);
+              suppressSuggestionsRef.current = true;
               buffer.setText(history[history.length - 1 - newIndex]);
               buffer.move('bufferEnd');
               update();
@@ -201,6 +357,7 @@ function EnhancedInput({
             }
             const newIndex = Math.min(historyIndex + 1, history.length - 1);
             setHistoryIndex(newIndex);
+            suppressSuggestionsRef.current = true;
             buffer.setText(history[history.length - 1 - newIndex]);
             buffer.move('bufferEnd');
             update();
@@ -209,6 +366,10 @@ function EnhancedInput({
         break;
 
       case 'MOVE_DOWN':
+        if (isAutocompleting && suggestions.length > 0) {
+          setSelectedSuggestion(prev => Math.min(prev + 1, suggestions.length - 1));
+          break;
+        }
         if (multiline && buffer.lines.length > 1) {
           const cursorPos = buffer.getCursorPosition();
           // If at the last line, navigate to next history instead
@@ -217,6 +378,7 @@ function EnhancedInput({
             if (historyIndex !== -1) {
               const newIndex = historyIndex - 1;
               setHistoryIndex(newIndex);
+              suppressSuggestionsRef.current = true;
               if (newIndex === -1) {
                 buffer.setText(tempInput);
               } else {
@@ -234,6 +396,7 @@ function EnhancedInput({
           if (historyIndex !== -1) {
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
+            suppressSuggestionsRef.current = true;
             if (newIndex === -1) {
               buffer.setText(tempInput);
             } else {
@@ -285,6 +448,7 @@ function EnhancedInput({
           }
           const newIndex = Math.min(historyIndex + 1, history.length - 1);
           setHistoryIndex(newIndex);
+          suppressSuggestionsRef.current = true;
           buffer.setText(history[history.length - 1 - newIndex]);
           buffer.move('bufferEnd');
           update();
@@ -296,6 +460,7 @@ function EnhancedInput({
         if (historyIndex !== -1) {
           const newIndex = historyIndex - 1;
           setHistoryIndex(newIndex);
+          suppressSuggestionsRef.current = true;
           if (newIndex === -1) {
             buffer.setText(tempInput);
           } else {
@@ -309,12 +474,18 @@ function EnhancedInput({
       // Autocomplete
       case 'AUTOCOMPLETE':
         if (suggestions.length > 0) {
-          handleAutocompleteCycle();
+          handleAutocompleteAccept();
+        }
+        break;
+
+      case 'AUTOCOMPLETE_PREV':
+        if (isAutocompleting && suggestions.length > 0) {
+          setSelectedSuggestion(prev => Math.max(prev - 1, 0));
         }
         break;
 
       case 'AUTOCOMPLETE_ACCEPT':
-        if (isAutocompleting && suggestions.length > 0) {
+        if (suggestions.length > 0) {
           handleAutocompleteAccept();
         }
         break;
@@ -323,6 +494,7 @@ function EnhancedInput({
         if (isAutocompleting) {
           setIsAutocompleting(false);
           setSuggestions([]);
+          setSelectedSuggestion(0);
         }
         break;
 
@@ -330,7 +502,7 @@ function EnhancedInput({
         // Unknown command
         break;
     }
-  }, [disabled, buffer, multiline, update, handleSubmit, suggestions, history, historyIndex, tempInput, setHistoryIndex, setTempInput]);
+  }, [disabled, buffer, multiline, update, handleSubmit, suggestions, history, historyIndex, tempInput, setHistoryIndex, setTempInput, handleAutocompleteAccept]);
 
   // Handle history navigation
   const handleHistoryPrev = useCallback(() => {
@@ -343,6 +515,7 @@ function EnhancedInput({
 
     const newIndex = Math.min(historyIndex + 1, history.length - 1);
     setHistoryIndex(newIndex);
+    suppressSuggestionsRef.current = true;
     buffer.setText(history[history.length - 1 - newIndex]);
     buffer.move('bufferEnd');
     update();
@@ -354,6 +527,7 @@ function EnhancedInput({
     const newIndex = historyIndex - 1;
     setHistoryIndex(newIndex);
 
+    suppressSuggestionsRef.current = true;
     if (newIndex === -1) {
       // Restore temp input
       buffer.setText(tempInput);
@@ -366,25 +540,6 @@ function EnhancedInput({
   }, [history, historyIndex, tempInput, buffer, update]);
 
   // Handle autocomplete
-  const handleAutocompleteCycle = useCallback(() => {
-    if (suggestions.length === 0) return;
-
-    const newIndex = (selectedSuggestion + 1) % suggestions.length;
-    setSelectedSuggestion(newIndex);
-  }, [suggestions, selectedSuggestion]);
-
-  const handleAutocompleteAccept = useCallback(() => {
-    if (suggestions.length === 0) return;
-
-    const suggestion = suggestions[selectedSuggestion];
-    // Implementation depends on autocomplete type
-    // For now, just append the suggestion
-    buffer.insert(suggestion);
-    setIsAutocompleting(false);
-    setSuggestions([]);
-    update();
-  }, [suggestions, selectedSuggestion, buffer, update]);
-
   // Keyboard input handler
   useKeypress((key) => {
 
@@ -428,11 +583,15 @@ function EnhancedInput({
     // Get command from key binding first
     let command = getCommand(key, keyBindings);
 
-    // Special case: empty key object might be forward delete on Mac
-    // Note: On Mac, the "delete" key often acts like backspace
+    // Special case: empty key object might be forward delete on Mac or Tab without a name
     if (!key.input && !key.name && !command) {
-      debugLog(`Detected empty key - treating as DELETE_BACKWARD (Mac delete key)\n`);
-      command = 'DELETE_BACKWARD';  // Changed to backward for Mac compatibility
+      if (key.tab) {
+        debugLog(`Detected nameless key with tab flag - treating as AUTOCOMPLETE\n`);
+        command = 'AUTOCOMPLETE';
+      } else {
+        debugLog(`Detected empty key - treating as DELETE_BACKWARD (Mac delete key)\n`);
+        command = 'DELETE_BACKWARD';  // Changed to backward for Mac compatibility
+      }
     }
 
     debugLog(`Command matched: ${command || 'NONE'}\n`);
@@ -552,13 +711,14 @@ function EnhancedInput({
     if (!isAutocompleting || suggestions.length === 0) return null;
 
     return React.createElement(Box, { flexDirection: 'column', marginTop: 1 },
-      suggestions.slice(0, 5).map((suggestion, index) =>
-        React.createElement(Text, {
-          key: index,
-          color: index === selectedSuggestion ? 'blue' : 'gray'
-        },
-          index === selectedSuggestion ? '→ ' : '  ',
-          suggestion
+      suggestions.slice(0, 8).map((suggestion, index) =>
+        React.createElement(Box, { key: `${suggestion.command}-${index}` },
+          React.createElement(Text, {
+            color: index === selectedSuggestion ? 'cyan' : 'gray'
+          },
+            `${index === selectedSuggestion ? '→' : ' '} ${suggestion.usage || suggestion.command}`
+          ),
+          suggestion.description && React.createElement(Text, { color: 'gray' }, ` — ${suggestion.description}`)
         )
       )
     );

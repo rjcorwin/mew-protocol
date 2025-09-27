@@ -41,11 +41,19 @@ function useKeypress(handler, options = {}) {
       fs.appendFileSync(logFile, `\nRAW DELETE KEY FROM INK: ${JSON.stringify({ input, key })}\n`);
     }
 
+    // Determine special cases before building the enhanced key
+    const isTabKey = key.name === 'tab' || key.tab === true || input === '\t' || key.sequence === '\t';
+
+    let resolvedName = key.name || input || '';
+    if (!resolvedName && isTabKey) {
+      resolvedName = 'tab';
+    }
+
     // Build enhanced key object
     const enhancedKey = {
       // Basic key info
       input: input || '',
-      name: key.name || input || '',
+      name: resolvedName,
 
       // Modifiers
       ctrl: Boolean(key.ctrl),
@@ -61,7 +69,7 @@ function useKeypress(handler, options = {}) {
       shiftEnter: input === '\x1b[27;2;13~' || input === '[27;2;13~' || (key.shift && (key.return || key.enter)),
       backspace: key.name === 'backspace' || input === '\x7F' || input === '\b',
       delete: key.name === 'delete' || key.sequence === '\x1B[3~',
-      tab: key.name === 'tab',
+      tab: isTabKey,
       escape: key.name === 'escape' || key.name === 'esc',
       space: key.name === 'space' || input === ' ',
 
@@ -110,6 +118,7 @@ function useKeypress(handler, options = {}) {
     let keyName = enhancedKey.name;
     if (enhancedKey.return) keyName = 'enter';
     if (enhancedKey.escape) keyName = 'escape';
+    if (enhancedKey.tab) keyName = 'tab';
 
     enhancedKey.sequence = modifiers.length > 0
       ? `${modifiers.join('+')}+${keyName}`
