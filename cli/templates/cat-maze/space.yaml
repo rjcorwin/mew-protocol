@@ -1,0 +1,73 @@
+# Cat Maze Cooperative Space
+space:
+  id: "{{SPACE_NAME}}"
+  name: "{{SPACE_NAME}}"
+  description: "Guide the 🐈 through 10 MCP maze levels to reach the goal!"
+  default_participant: human
+
+participants:
+  human:
+    capabilities:
+      - kind: "chat"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+
+  mew:
+    type: local
+    command: "npx"
+    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
+    auto_start: true
+    capabilities:
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
+      - kind: "reasoning/*"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+    env:
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
+      OPENAI_MODEL: "{{AGENT_MODEL}}"
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"
+      MEW_AGENT_CONFIG: '{"maxIterations": 80, "requestTimeout": 600000, "reasoningEnabled": true, "conversationHistoryLength": 25}'
+
+  cat-maze:
+    type: local
+    command: "npx"
+    args: ["--yes", "@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "cat-maze", "--mcp-command", "node", "--mcp-args", "./.mew/agents/cat-maze-server.js", "--mcp-cwd", "./"]
+    auto_start: true
+    capabilities:
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "mcp/notification"
+
+  cat-maze-narrator:
+    type: local
+    command: "node"
+    args: ["./.mew/agents/cat-maze-narrator.js"]
+    auto_start: true
+    capabilities:
+      - kind: "chat"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+      - kind: "mcp/response"
+      - kind: "system/log"
+    env:
+      NODE_PATH: "./.mew/node_modules"
+      MEW_GATEWAY: "ws://localhost:${PORT}"
+      MEW_SPACE: "{{SPACE_NAME}}"
+      MEW_TOKEN: "${TOKEN}"
+      MEW_PARTICIPANT_ID: "cat-maze-narrator"
+      CAT_MAZE_PARTICIPANT: "cat-maze"
+
+defaults:
+  capabilities:
+    - kind: "chat"
