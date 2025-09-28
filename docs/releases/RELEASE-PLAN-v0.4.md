@@ -260,9 +260,72 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
 4. **Timeline?** Execute today or schedule for specific time?
 5. **Risk tolerance?** Comfortable with major version jumps?
 
+## Lessons Learned (Real-Time)
+
+### Critical Process Gap: Internal Package Dependencies
+
+**Issue Discovered**: During release execution, we discovered that the RELEASE.md process is missing a critical step for managing internal package dependencies in a monorepo.
+
+**What Happened**:
+1. ✅ We bumped package versions correctly (0.2.0 → 0.4.0)
+2. ❌ We published packages with stale internal dependencies
+3. 🔍 **Discovery**: All packages had internal `@mew-protocol/*` dependencies still pointing to `^0.2.0`
+
+**Examples of Stale Dependencies Found**:
+- `agent/package.json`: Still referenced `@mew-protocol/participant: ^0.2.0`
+- `participant/package.json`: Still referenced `@mew-protocol/client: ^0.2.0`
+- `bridge/package.json`: Still referenced `@mew-protocol/participant: ^0.2.0`
+
+**Root Cause**: The RELEASE.md process doesn't include a step to update internal package dependencies before version bumping.
+
+**Impact**:
+- Published packages can't properly resolve their internal dependencies
+- Consumers may get inconsistent package versions
+- Requires patch releases to fix dependency references
+
+**Required Fix**:
+1. Update all internal dependencies to new versions
+2. Bump patch versions for affected packages
+3. Re-publish affected packages with correct dependencies
+
+### Missing Process Steps
+
+#### 1. **Changelog Updates**
+- **Missing**: We skipped the "Phase 1: Review Changes & Update Changelogs" entirely
+- **Impact**: No changelog documentation for this major release
+- **Should Do**: Update CHANGELOG.md with comprehensive v0.4.0 changes
+
+#### 2. **Internal Dependency Audit**
+- **Missing**: No systematic check of internal `@mew-protocol/*` dependencies
+- **Should Add**: Pre-release audit step to update internal dependencies
+
+### Proposed RELEASE.md Improvements
+
+#### Add New Phase 1.5: Internal Dependency Management
+```bash
+# BEFORE version bumping, update internal dependencies
+# Find all internal dependencies
+grep -r "@mew-protocol" sdk/typescript-sdk/*/package.json bridge/package.json
+
+# Update internal dependencies to target versions
+# Example: If bumping to 0.4.0, update all internal refs to ^0.4.0
+```
+
+#### Enhanced Pre-Release Checklist
+- [ ] Verify all internal `@mew-protocol/*` dependencies are updated
+- [ ] Check that dependency versions align with planned release versions
+- [ ] Test that packages can resolve internal dependencies
+
+### Process Improvements for Next Release
+1. **Add internal dependency audit** to RELEASE.md
+2. **Create script** to automatically update internal dependencies
+3. **Add verification step** to ensure dependency consistency
+4. **Update changelog process** to be more systematic
+
 ---
 
-**Status**: 🎯 Ready for Approval & Execution
+**Status**: 🚨 In Progress - Fixing Internal Dependencies
 **Last Updated**: 2025-01-28
 **Total Commits Since v0.3**: 183
 **Release Scope**: MAJOR (Protocol v0.4, Streaming, CLI Overhaul, New Templates)
+**Critical Issue**: Internal package dependencies required fix during release
