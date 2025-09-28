@@ -99,7 +99,7 @@ participants:
       # Configure the agent with 100 max iterations for complex multi-step tasks
       # and 1 hour timeout for proposals to allow human review time
       # and 50 message conversation history for context across interactions
-      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 3600000, "conversationHistoryLength": 50, "reasoningEnabled": true}'
+      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 3600000, "conversationHistoryLength": 50, "reasoningEnabled": true, "systemPrompt": {{AGENT_PROMPT_JSON}}}'
 
   # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:
