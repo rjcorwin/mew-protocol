@@ -48,26 +48,6 @@ participants:
       - kind: "mcp/response"
       - kind: "mcp/notification"
 
-  cat-maze-narrator:
-    type: local
-    command: "node"
-    args: ["./.mew/agents/cat-maze-narrator.js"]
-    auto_start: true
-    capabilities:
-      - kind: "chat"
-      - kind: "mcp/request"
-        payload:
-          method: "tools/call"
-      - kind: "mcp/response"
-      - kind: "system/log"
-    env:
-      NODE_PATH: "./.mew/node_modules"
-      MEW_GATEWAY: "ws://localhost:${PORT}"
-      MEW_SPACE: "{{SPACE_NAME}}"
-      MEW_TOKEN: "${TOKEN}"
-      MEW_PARTICIPANT_ID: "cat-maze-narrator"
-      CAT_MAZE_PARTICIPANT: "cat-maze"
-
 defaults:
   capabilities:
     - kind: "chat"
