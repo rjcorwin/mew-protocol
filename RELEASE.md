@@ -206,11 +206,56 @@ grep "@mew-protocol" cli/templates/TEMPLATE_NAME/package.json
 grep -r "@mew-protocol" cli/templates/*/package.json
 ```
 
+#### Commit Template Updates
+```bash
+# Add template changes
+git add cli/templates/*/package.json
+
+# Commit template updates
+git commit -m "Update CLI templates to use latest package versions
+
+- Update @mew-protocol dependencies to match published versions
+- Ensures new spaces use correct package versions
+
+# Push template updates
+git push origin main
+```
+
 ### Phase 6: CLI Package
 
 ```bash
 cd cli
 npm publish --access public --otp=YOUR_OTP
+```
+
+## Git Workflow
+
+### Commit Version Changes
+After bumping versions but before publishing:
+
+```bash
+# Check what files were modified by version bumps
+git status
+
+# Add version changes
+git add sdk/typescript-sdk/*/package.json  # Add all package.json changes
+git add CHANGELOG.md  # If you updated it in Phase 1
+
+# Commit the version bump
+git commit -m "Bump package versions for release
+
+- types: 0.2.0 → 0.2.1
+- client: 0.2.0 → 0.2.1
+- participant: 0.2.0 → 0.2.1
+- agent: 0.4.1 → 0.4.2
+- (list all changed packages)
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# Push the version bump commit
+git push origin main
 ```
 
 ## Post-Release Tasks
@@ -242,7 +287,132 @@ npm view @mew-protocol/bridge
 npm view @mew-protocol/cli
 ```
 
-### 3. Finalize Changelogs
+### 3. Post-Publish Verification Testing
+
+Verify that published packages work correctly in a clean environment:
+
+#### Create Test Environment
+```bash
+# Create temporary test directory
+mkdir /tmp/mew-release-test
+cd /tmp/mew-release-test
+
+# Initialize test project
+npm init -y
+```
+
+#### Test SDK Package Installation
+```bash
+# Install published SDK packages
+npm install @mew-protocol/types@latest
+npm install @mew-protocol/client@latest
+npm install @mew-protocol/participant@latest
+npm install @mew-protocol/agent@latest
+npm install @mew-protocol/bridge@latest
+
+# Verify installations
+npm list @mew-protocol/types
+npm list @mew-protocol/client
+npm list @mew-protocol/participant
+npm list @mew-protocol/agent
+npm list @mew-protocol/bridge
+```
+
+#### Test CLI Package Installation
+```bash
+# Test global CLI installation
+npm install -g @mew-protocol/cli@latest
+
+# Verify CLI works
+mew --version
+mew --help
+
+# Test CLI functionality
+mew space init --template coder-agent test-space
+cd test-space
+
+# Verify template dependencies installed correctly
+npm list @mew-protocol/types
+npm list @mew-protocol/agent
+npm list @mew-protocol/bridge
+npm list @mew-protocol/client
+npm list @mew-protocol/participant
+```
+
+#### Test Package Imports (Quick Smoke Test)
+```bash
+# Create simple test script
+cat > test-imports.js << 'EOF'
+try {
+  // Test core type imports
+  const types = require('@mew-protocol/types');
+  console.log('✓ Types package imports successfully');
+
+  // Test client import
+  const { MEWClient } = require('@mew-protocol/client');
+  console.log('✓ Client package imports successfully');
+
+  // Test participant import
+  const { MEWParticipant } = require('@mew-protocol/participant');
+  console.log('✓ Participant package imports successfully');
+
+  console.log('🎉 All published packages import successfully!');
+} catch (error) {
+  console.error('❌ Package import failed:', error.message);
+  process.exit(1);
+}
+EOF
+
+# Run import test
+node test-imports.js
+```
+
+#### Test End-to-End Workflow
+```bash
+# Test complete workflow with published packages
+cd test-space
+
+# Start the space (this uses published CLI)
+mew space up --port 8081 &
+SPACE_PID=$!
+
+# Wait for startup
+sleep 5
+
+# Test basic health check
+curl -f http://localhost:8081/health
+
+# Test basic message flow (if agents are running)
+curl -X POST http://localhost:8081/participants/human/messages \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer human-token" \
+  -d '{"kind":"chat","payload":{"text":"Hello from published packages!"}}' || true
+
+# Cleanup
+mew space down
+kill $SPACE_PID 2>/dev/null || true
+```
+
+#### Cleanup Test Environment
+```bash
+# Remove test directory
+cd /
+rm -rf /tmp/mew-release-test
+
+# Uninstall global CLI if desired
+# npm uninstall -g @mew-protocol/cli
+```
+
+#### Verification Checklist
+- [ ] All packages install from npm without errors
+- [ ] Package versions match what was published
+- [ ] CLI global installation works
+- [ ] CLI templates use correct package versions
+- [ ] Basic package imports work without errors
+- [ ] End-to-end space creation and startup works
+- [ ] No dependency resolution conflicts
+
+### 4. Finalize Changelogs
 ```bash
 # Update changelog dates to actual release date
 # Edit CHANGELOG.md or package-specific changelog files
@@ -254,7 +424,7 @@ git commit -m "Update changelogs for release"
 git push origin main
 ```
 
-### 4. Update Documentation
+### 5. Update Documentation
 - Update README.md files with new version numbers
 - Update any getting started guides
 - Consider announcing the release
