@@ -8,7 +8,38 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
+export interface ChatCompletionsAPI {
+  create(params: any): Promise<any>;
+}
+
+export interface OpenAIClientInterface {
+  chat: {
+    completions: ChatCompletionsAPI;
+  };
+}
+
+export interface OpenAIClientFactoryOptions {
+  apiKey?: string;
+  baseURL?: string;
+}
+
+export type OpenAIClientFactory = (options: OpenAIClientFactoryOptions) => OpenAIClientInterface;
+
 const PROTOCOL_VERSION = 'mew/v0.4';
+
+const defaultOpenAIClientFactory: OpenAIClientFactory = (options) => {
+  const openaiConfig: OpenAIClientFactoryOptions = {};
+
+  if (options.apiKey) {
+    openaiConfig.apiKey = options.apiKey;
+  }
+
+  if (options.baseURL) {
+    openaiConfig.baseURL = options.baseURL;
+  }
+
+  return new OpenAI(openaiConfig) as OpenAIClientInterface;
+};
 
 export interface AgentConfig extends ParticipantOptions {
   name?: string;
@@ -16,6 +47,8 @@ export interface AgentConfig extends ParticipantOptions {
   model?: string;
   apiKey?: string;
   baseURL?: string;  // Custom OpenAI API base URL (for alternative providers)
+  openAIClient?: OpenAIClientInterface; // Injected OpenAI-compatible client (overrides apiKey/baseURL)
+  openAIClientFactory?: OpenAIClientFactory; // Factory for creating OpenAI-compatible clients
   reasoningEnabled?: boolean;  // Emit reasoning events (reasoning/start, reasoning/thought, reasoning/conclusion)
   autoRespond?: boolean;
   mockLLM?: boolean;  // Use deterministic heuristics instead of calling external LLMs
@@ -76,7 +109,7 @@ interface OtherParticipant {
 
 export class MEWAgent extends MEWParticipant {
   private config: AgentConfig;
-  private openai?: OpenAI;
+  private openai?: OpenAIClientInterface;
   private mockLLM = false;
   private otherParticipants = new Map<string, OtherParticipant>();
   private isRunning = false;
@@ -113,13 +146,14 @@ export class MEWAgent extends MEWParticipant {
     };
 
     this.mockLLM = Boolean(this.config.mockLLM);
+    const hasInjectedClient = Boolean(this.config.openAIClient || this.config.openAIClientFactory);
 
     if (this.mockLLM) {
       this.log('info', '🧪 Running MEWAgent in mock LLM mode (no external OpenAI dependency)');
     }
 
-    // LOUDLY FAIL if no API key provided
-    if (!this.config.apiKey && !this.mockLLM) {
+    // LOUDLY FAIL if no API key provided and no injected client available
+    if (!this.config.apiKey && !this.mockLLM && !hasInjectedClient) {
       console.error('');
       console.error('🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨');
       console.error('❌ FATAL ERROR: OPENAI_API_KEY is not configured! ❌');
@@ -141,12 +175,15 @@ export class MEWAgent extends MEWParticipant {
     }
 
     if (!this.mockLLM) {
-      // Initialize OpenAI with the API key
-      const openaiConfig: any = { apiKey: this.config.apiKey };
-      if (this.config.baseURL) {
-        openaiConfig.baseURL = this.config.baseURL;
+      if (this.config.openAIClient) {
+        this.openai = this.config.openAIClient;
+      } else {
+        const factory = this.config.openAIClientFactory || defaultOpenAIClientFactory;
+        this.openai = factory({
+          apiKey: this.config.apiKey,
+          baseURL: this.config.baseURL
+        });
       }
-      this.openai = new OpenAI(openaiConfig);
     }
 
     this.setupAgentBehavior();
