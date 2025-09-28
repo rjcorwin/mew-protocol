@@ -15,6 +15,19 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
+ensure_request_delivery() {
+  local envelope_id="$1"
+
+  wait_for_envelope "${envelope_id}" && \
+    wait_for_delivery "${envelope_id}" "calculator-agent" && \
+    wait_for_capability_grant "test-client" "mcp/request"
+}
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
 TEST_PORT=${TEST_PORT:-8080}
 
@@ -113,7 +126,7 @@ if post_message "$(cat <<JSON
 {"id":"${tools_list_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}
 JSON
 )"; then
-  if wait_for_correlation "${tools_list_id}"; then
+  if ensure_request_delivery "${tools_list_id}" && wait_for_correlation "${tools_list_id}"; then
     if response_matches "${tools_list_id}" '"name":"add"' && \
       response_matches "${tools_list_id}" '"name":"multiply"' && \
       response_matches "${tools_list_id}" '"name":"evaluate"'; then
@@ -134,7 +147,7 @@ if post_message "$(cat <<JSON
 {"id":"${add_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}
 JSON
 )"; then
-  if wait_for_correlation "${add_id}"; then
+  if ensure_request_delivery "${add_id}" && wait_for_correlation "${add_id}"; then
     if response_matches "${add_id}" '"result":8'; then
       record_pass "Add tool returns 8"
     else
@@ -153,7 +166,7 @@ if post_message "$(cat <<JSON
 {"id":"${multiply_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":9}}}}
 JSON
 )"; then
-  if wait_for_correlation "${multiply_id}"; then
+  if ensure_request_delivery "${multiply_id}" && wait_for_correlation "${multiply_id}"; then
     if response_matches "${multiply_id}" '"result":63'; then
       record_pass "Multiply tool returns 63"
     else
@@ -172,7 +185,7 @@ if post_message "$(cat <<JSON
 {"id":"${evaluate_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"20 / 4"}}}}
 JSON
 )"; then
-  if wait_for_correlation "${evaluate_id}"; then
+  if ensure_request_delivery "${evaluate_id}" && wait_for_correlation "${evaluate_id}"; then
     if response_matches "${evaluate_id}" '"result":5'; then
       record_pass "Evaluate tool returns 5"
     else
@@ -191,7 +204,7 @@ if post_message "$(cat <<JSON
 {"id":"${div_zero_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"evaluate","arguments":{"expression":"10 / 0"}}}}
 JSON
 )"; then
-  if wait_for_correlation "${div_zero_id}"; then
+  if ensure_request_delivery "${div_zero_id}" && wait_for_correlation "${div_zero_id}"; then
     if response_matches "${div_zero_id}" '"result":"Infinity"|"result":null|division by zero|"code":"EVALUATION_ERROR"'; then
       record_pass "Division by zero handled"
     else
@@ -210,7 +223,7 @@ if post_message "$(cat <<JSON
 {"id":"${invalid_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"invalid","arguments":{}}}}
 JSON
 )"; then
-  if wait_for_correlation "${invalid_id}"; then
+  if ensure_request_delivery "${invalid_id}" && wait_for_correlation "${invalid_id}"; then
     if response_matches "${invalid_id}" 'Tool not found|"error":'; then
       record_pass "Invalid tool returns error"
     else

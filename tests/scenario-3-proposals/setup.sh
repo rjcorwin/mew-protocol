@@ -64,6 +64,7 @@ SPACE_NAME=${SPACE_NAME}
 TEST_PORT=${TEST_PORT}
 PROPOSER_LOG=${WORKSPACE_DIR}/logs/proposer-output.log
 FULFILLER_LOG=${WORKSPACE_DIR}/logs/fulfiller.log
+GATEWAY_LOG_DIR=${WORKSPACE_DIR}/.mew/logs
 ENV
 
 printf "%b\n" "${GREEN}✓ Setup complete${NC}"
