@@ -8,10 +8,9 @@ participants:
     type: local
     tokens: ["ts-agent-token"]
     auto_start: true
-    command: "npx"
+    command: "node"
     args:
-      - "--yes"
-      - "@mew-protocol/agent"
+      - "../../../sdk/typescript-sdk/agent/dist/index.js"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
@@ -25,6 +24,8 @@ participants:
       - kind: "mcp/response"
       - kind: "chat"
       - kind: "reasoning/*"
+    env:
+      MEW_AGENT_CONFIG: '{"mockLLM":true,"autoRespond":true}'
 
   test-client:
     tokens: ["test-token"]
