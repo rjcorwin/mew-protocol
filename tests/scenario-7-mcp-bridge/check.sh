@@ -15,6 +15,11 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
 RESPONSE_CAPTURE=${RESPONSE_CAPTURE:-"${WORKSPACE_DIR}/logs/mcp-bridge-capture.log"}
 TEST_FILES_DIR=${TEST_FILES_DIR:-"${WORKSPACE_DIR}/test-files"}
@@ -105,9 +110,16 @@ run_check "Output log exists" test -f "${OUTPUT_LOG}"
 run_check "Test files directory populated" test -f "${TEST_FILES_DIR}/test.txt"
 
 printf "\n%b\n" "${YELLOW}Test: List MCP tools${NC}"
+list_envelope_id=$(generate_envelope_id)
 : > "${RESPONSE_CAPTURE}"
-if send_request '{"kind":"mcp/request","id":"list-tools","to":["filesystem"],"payload":{"method":"tools/list","params":{}}}'; then
-  if wait_for_pattern "${RESPONSE_CAPTURE}" '"read_file"'; then
+if send_request "$(cat <<JSON
+{"id":"${list_envelope_id}","kind":"mcp/request","to":["filesystem"],"payload":{"method":"tools/list","params":{}}}
+JSON
+)"; then
+  if wait_for_envelope "${list_envelope_id}" && \
+     wait_for_delivery "${list_envelope_id}" "filesystem" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${list_envelope_id}" && \
+     wait_for_pattern "${RESPONSE_CAPTURE}" '"read_file"'; then
     record_pass "List tools returns filesystem methods"
   else
     record_fail "List tools returns filesystem methods"
@@ -118,13 +130,15 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test: Read file via MCP${NC}"
+read_envelope_id=$(generate_envelope_id)
 : > "${RESPONSE_CAPTURE}"
-read_request=$(python - <<'PY'
+read_request=$(python - "$read_envelope_id" <<'PY'
 import json
 import os
+import sys
 print(json.dumps({
+  "id": sys.argv[1],
   "kind": "mcp/request",
-  "id": "read-file",
   "to": ["filesystem"],
   "payload": {
     "method": "tools/call",
@@ -137,7 +151,10 @@ print(json.dumps({
 PY
 )
 if send_request "${read_request}"; then
-  if wait_for_pattern "${RESPONSE_CAPTURE}" "Test content"; then
+  if wait_for_envelope "${read_envelope_id}" && \
+     wait_for_delivery "${read_envelope_id}" "filesystem" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${read_envelope_id}" && \
+     wait_for_pattern "${RESPONSE_CAPTURE}" "Test content"; then
     record_pass "Read file returns contents"
   else
     record_fail "Read file returns contents"
@@ -148,13 +165,15 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test: List directory entries${NC}"
+list_dir_envelope_id=$(generate_envelope_id)
 : > "${RESPONSE_CAPTURE}"
-list_request=$(python - <<'PY'
+list_request=$(python - "$list_dir_envelope_id" <<'PY'
 import json
 import os
+import sys
 print(json.dumps({
+  "id": sys.argv[1],
   "kind": "mcp/request",
-  "id": "list-directory",
   "to": ["filesystem"],
   "payload": {
     "method": "tools/call",
@@ -167,7 +186,10 @@ print(json.dumps({
 PY
 )
 if send_request "${list_request}"; then
-  if wait_for_pattern "${RESPONSE_CAPTURE}" "hello.txt"; then
+  if wait_for_envelope "${list_dir_envelope_id}" && \
+     wait_for_delivery "${list_dir_envelope_id}" "filesystem" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${list_dir_envelope_id}" && \
+     wait_for_pattern "${RESPONSE_CAPTURE}" "hello.txt"; then
     record_pass "Directory listing includes expected files"
   else
     record_fail "Directory listing includes expected files"

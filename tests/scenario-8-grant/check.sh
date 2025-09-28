@@ -15,12 +15,32 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
 AGENT_LOG=${AGENT_LOG:-"${WORKSPACE_DIR}/logs/test-agent.log"}
 FILE_SERVER_LOG=${FILE_SERVER_LOG:-"${WORKSPACE_DIR}/logs/file-server.log"}
 DATA_DIR=${DATA_DIR:-"${WORKSPACE_DIR}/workspace-files"}
 TEST_PORT=${TEST_PORT:-8080}
 SPACE_NAME=${SPACE_NAME:-scenario-8-grant}
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
+if [[ ! -f "${OUTPUT_LOG}" ]]; then
+  echo "Expected output log ${OUTPUT_LOG} was not created" >&2
+  exit 1
+fi
+
+if [[ ! -f "${AGENT_LOG}" ]]; then
+  echo "Expected agent log ${AGENT_LOG} was not created" >&2
+  exit 1
+fi
+
+if [[ ! -f "${FILE_SERVER_LOG}" ]]; then
+  echo "Expected file server log ${FILE_SERVER_LOG} was not created" >&2
+  exit 1
+fi
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -97,6 +117,10 @@ PROPOSAL_ID=""
 PROPOSAL_TARGETS="file-server"
 PROPOSAL_PATH="foo.txt"
 PROPOSAL_CONTENT="foo"
+grant_envelope_id=""
+fulfill_envelope_id=""
+grant_ack_id=""
+direct_request_id=""
 
 if proposal_data=$(OUTPUT_LOG="${OUTPUT_LOG}" python - <<'PY'
 import json
@@ -146,9 +170,17 @@ else
 fi
 
 if [[ -n "${PROPOSAL_ID}" ]]; then
-  grant_payload=$(python - <<'PY'
+  grant_envelope_id=$(generate_envelope_id)
+  fulfill_envelope_id=$(generate_envelope_id)
+
+  grant_payload=$(GRANT_ID="${grant_envelope_id}" python - <<'PY'
 import json
+import os
+
+grant_id = os.environ['GRANT_ID']
+
 print(json.dumps({
+    "id": grant_id,
     "kind": "capability/grant",
     "to": ["test-agent"],
     "payload": {
@@ -167,9 +199,9 @@ print(json.dumps({
     }
 }))
 PY
-)
+  )
 
-  fulfill_payload=$(PROPOSAL_ID="${PROPOSAL_ID}" PROPOSAL_TARGETS="${PROPOSAL_TARGETS}" PROPOSAL_PATH="${PROPOSAL_PATH}" PROPOSAL_CONTENT="${PROPOSAL_CONTENT}" python - <<'PY'
+  fulfill_payload=$(PROPOSAL_ID="${PROPOSAL_ID}" PROPOSAL_TARGETS="${PROPOSAL_TARGETS}" PROPOSAL_PATH="${PROPOSAL_PATH}" PROPOSAL_CONTENT="${PROPOSAL_CONTENT}" FULFILL_ID="${fulfill_envelope_id}" python - <<'PY'
 import json
 import os
 
@@ -177,8 +209,10 @@ proposal_id = os.environ['PROPOSAL_ID']
 targets = os.environ.get('PROPOSAL_TARGETS', '')
 path_value = os.environ.get('PROPOSAL_PATH', 'foo.txt')
 content_value = os.environ.get('PROPOSAL_CONTENT', 'foo')
+fulfill_id = os.environ['FULFILL_ID']
 
 message = {
+    "id": fulfill_id,
     "kind": "mcp/request",
     "correlation_id": [proposal_id],
     "payload": {
@@ -201,7 +235,7 @@ if participants:
 
 print(json.dumps(message))
 PY
-)
+  )
 
   if node "${SCENARIO_DIR}/send_ws_messages.js" \
     "ws://localhost:${TEST_PORT}/ws?space=${SPACE_NAME}" \
@@ -211,6 +245,22 @@ PY
     "${fulfill_payload}"; then
     record_pass "Capability grant sent"
     record_pass "Fulfill proposal via tools/call"
+
+    if wait_for_envelope "${grant_envelope_id}" && \
+       wait_for_delivery "${grant_envelope_id}" "test-agent" && \
+       wait_for_capability_grant "test-client" "capability/grant" "${grant_envelope_id}"; then
+      record_pass "Gateway logged capability grant"
+    else
+      record_fail "Gateway logged capability grant"
+    fi
+
+    if wait_for_envelope "${fulfill_envelope_id}" && \
+       wait_for_delivery "${fulfill_envelope_id}" "file-server" && \
+       wait_for_capability_grant "test-client" "mcp/request" "${fulfill_envelope_id}"; then
+      record_pass "Fulfilment routed to file-server"
+    else
+      record_fail "Fulfilment routed to file-server"
+    fi
   else
     record_fail "Capability grant sent"
     record_fail "Fulfill proposal via tools/call"
@@ -247,6 +297,50 @@ else
   record_fail "Agent issued direct request"
 fi
 
+if direct_request_id=$(AGENT_LOG_PATH="${AGENT_LOG}" python - <<'PY'
+import json
+import os
+
+log_path = os.environ.get('AGENT_LOG_PATH')
+if not log_path:
+    raise SystemExit(1)
+
+try:
+    with open(log_path, 'r', encoding='utf-8') as handle:
+        direct_id = ''
+        for raw in handle:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                entry = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if entry.get('message') != 'Sent envelope':
+                continue
+            extra = entry.get('extra', {})
+            if extra.get('kind') == 'mcp/request' and 'file-server' in (extra.get('to') or []):
+                direct_id = extra.get('id', '')
+        if direct_id:
+            print(direct_id)
+            raise SystemExit(0)
+except FileNotFoundError:
+    pass
+
+raise SystemExit(1)
+PY
+); then
+  if wait_for_envelope "${direct_request_id}" && \
+     wait_for_delivery "${direct_request_id}" "file-server" && \
+     wait_for_capability_grant "test-agent" "mcp/request" "${direct_request_id}"; then
+    record_pass "Gateway logged direct request envelope"
+  else
+    record_fail "Gateway logged direct request envelope"
+  fi
+else
+  record_fail "Gateway logged direct request envelope"
+fi
+
 if wait_for_pattern "${FILE_SERVER_LOG}" 'Wrote file' 40; then
   record_pass "File server handled write requests"
 else
@@ -255,6 +349,49 @@ fi
 
 if wait_for_pattern "${AGENT_LOG}" '"message":"Sent envelope","extra":{"kind":"capability/grant-ack"' 40; then
   record_pass "Grant acknowledgment originates from recipient"
+
+  if grant_ack_id=$(AGENT_LOG_PATH="${AGENT_LOG}" python - <<'PY'
+import json
+import os
+
+log_path = os.environ.get('AGENT_LOG_PATH')
+if not log_path:
+    raise SystemExit(1)
+
+try:
+    with open(log_path, 'r', encoding='utf-8') as handle:
+        ack_id = ''
+        for raw in handle:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                entry = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if entry.get('message') != 'Sent envelope':
+                continue
+            extra = entry.get('extra', {})
+            if extra.get('kind') == 'capability/grant-ack':
+                ack_id = extra.get('id', '')
+        if ack_id:
+            print(ack_id)
+            raise SystemExit(0)
+except FileNotFoundError:
+    pass
+
+raise SystemExit(1)
+PY
+); then
+    if wait_for_envelope "${grant_ack_id}" && \
+       wait_for_envelope_receipt "${grant_ack_id}" "test-agent"; then
+      record_pass "Gateway recorded grant acknowledgment"
+    else
+      record_fail "Gateway recorded grant acknowledgment"
+    fi
+  else
+    record_fail "Gateway recorded grant acknowledgment"
+  fi
 else
   record_fail "Grant acknowledgment originates from recipient"
 fi
