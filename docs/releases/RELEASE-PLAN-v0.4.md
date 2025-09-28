@@ -69,8 +69,8 @@ This is a major release transitioning from MEW Protocol v0.3 to v0.4, featuring:
 #### **New Templates**:
 - ✅ **Cat maze template**: `e2d2f39 Add cat maze narrator agent to broadcast maze views (#21)`
   - Features: Stateful MCP server, 10 maze levels, cooperative play
-  - Includes narrator agent for move broadcasts
-  - MCP integration with filesystem tools
+  - Custom maze MCP server with navigation tools
+  - Cooperative human + AI gameplay
 
 ### 2. Breaking Changes Analysis ✅
 - **Minimal breaking changes detected**: Only one commit flagged
@@ -137,7 +137,7 @@ This is a major release transitioning from MEW Protocol v0.3 to v0.4, featuring:
 #### 4. **New Templates & Features**
 - **Cat Maze Template**: Cooperative gameplay with stateful MCP server
   - 10 handcrafted maze levels with escalating difficulty
-  - Narrator agent for move broadcasting
+  - Custom maze MCP server with navigation tools (`view`, `up`, `down`, `left`, `right`)
   - Cooperative human + AI gameplay
 - **Tool Discovery**: Robust state tracking and retry logic for MCP tools
 - **Proposal System**: Enhanced capability granting from CLI
@@ -241,7 +241,7 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
 
 ### 4. **CHANGELOG FOCUS**: Emphasize the major features
 - Streaming as headline feature
-- Cat maze as showcase template
+- Cat maze as showcase template (custom MCP server demo)
 - CLI UX improvements as developer experience win
 
 ## Execution Timeline
