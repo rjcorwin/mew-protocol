@@ -11,6 +11,25 @@ const targetParticipant = process.env.CAT_MAZE_PARTICIPANT || 'cat-maze';
 const moveTools = new Set(['up', 'down', 'left', 'right']);
 const watchTools = new Set([...moveTools, 'restart']);
 
+function extractResultText(result) {
+  if (!result) {
+    return null;
+  }
+
+  if (Array.isArray(result.content)) {
+    const text = result.content
+      .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+      .map((part) => part.text.trim())
+      .filter(Boolean)
+      .join('\n\n');
+    if (text) {
+      return text;
+    }
+  }
+
+  return null;
+}
+
 let envelopeCounter = 0;
 const observedMoves = new Set();
 const narratorRequests = new Set();
@@ -106,15 +125,9 @@ function extractViewText(result) {
     return null;
   }
 
-  if (Array.isArray(result.content)) {
-    const text = result.content
-      .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
-      .map((part) => part.text.trim())
-      .filter(Boolean)
-      .join('\n\n');
-    if (text) {
-      return text;
-    }
+  const text = extractResultText(result);
+  if (text) {
+    return text;
   }
 
   if (result.state && typeof result.state.board === 'string') {
@@ -170,6 +183,21 @@ function handleMoveResponse(message) {
 
   if (observedMoves.has(correlationId)) {
     observedMoves.delete(correlationId);
+    const result = message.payload?.result;
+    const errorMessage = message.payload?.error?.message;
+    if (result) {
+      const moveText = extractResultText(result);
+      if (moveText) {
+        const decorated = `🎙️ Move update\n${moveText}`;
+        sendChat(decorated, correlationId);
+      } else {
+        log('Move response missing relay text', { correlationId });
+      }
+    } else if (errorMessage) {
+      sendChat(`🚫 Move failed: ${errorMessage}`, correlationId);
+    } else {
+      log('Move response missing result payload', { correlationId });
+    }
     requestView('move');
   }
 }

@@ -3,6 +3,7 @@
 const readline = require('readline');
 
 const WALL = '🟫';
+const WALKWAY = '◻️';
 
 const LEVEL_DEFINITIONS = [
   {
@@ -258,10 +259,12 @@ function buildLevels(definitions) {
         const cell = grid[row][col];
         if (cell === 'S') {
           start = { row, col };
-          grid[row][col] = ' ';
+          grid[row][col] = WALKWAY;
         } else if (cell === 'G') {
           goal = { row, col };
-          grid[row][col] = ' ';
+          grid[row][col] = WALKWAY;
+        } else if (cell === ' ') {
+          grid[row][col] = WALKWAY;
         }
       }
     }
@@ -341,7 +344,7 @@ function buildBoardString() {
           if (level.goal.row === rowIdx && level.goal.col === colIdx) {
             return '🏁';
           }
-          return cell === WALL ? WALL : ' ';
+          return cell === WALL ? WALL : WALKWAY;
         })
         .join(''),
     )

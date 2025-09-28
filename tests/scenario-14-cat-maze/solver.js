@@ -48,12 +48,28 @@ function createLogger(logPath) {
 }
 
 const WALL = '🟫';
+const WALKWAY = '◻️';
+
+const graphemeSegmenter =
+  typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : null;
+
+function splitGraphemes(value) {
+  if (!value) {
+    return [];
+  }
+  if (graphemeSegmenter) {
+    return Array.from(graphemeSegmenter.segment(value), (segment) => segment.segment);
+  }
+  return Array.from(value);
+}
 
 function findPath(board) {
   const rows = board.split('\n');
   const height = rows.length;
-  const width = Array.from(rows[0] || '').length;
-  const grid = rows.map((row) => Array.from(row));
+  const grid = rows.map((row) => splitGraphemes(row));
+  const width = grid[0]?.length || 0;
   let start = null;
   let goal = null;
 
@@ -62,10 +78,10 @@ function findPath(board) {
       const cell = grid[row][col];
       if (cell === '🐈') {
         start = { row, col };
-        grid[row][col] = ' ';
+        grid[row][col] = WALKWAY;
       } else if (cell === '🏁') {
         goal = { row, col };
-        grid[row][col] = ' ';
+        grid[row][col] = WALKWAY;
       }
     }
   }
@@ -224,6 +240,9 @@ async function main() {
     while (!runComplete) {
       if (!currentState) {
         const view = await callTool('view');
+        if (!view.state?.board?.includes(WALKWAY)) {
+          throw new Error('View response missing walkway glyph ◻️');
+        }
         currentState = view.state;
       }
 

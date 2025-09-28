@@ -7,7 +7,8 @@ Guide a curious 🐈 through 10 handcrafted mazes using MCP tools. Humans can ca
 - 🎮 **Stateful MCP server** that tracks the current maze level, cat position, and total moves
 - 🧭 **Maze tools**: `view`, `up`, `down`, `left`, `right`, `restart`
 - 🟫 **Emoji walls** that align visually with the 🐈 for clean board snapshots
-- 🗣️ **Narrator companion** that watches every move and drops fresh `view` snapshots in chat
+- ◻️ **Walkable tiles** that keep pathing clear against the brown walls
+- 🗣️ **Narrator companion** that relays move results and drops fresh `view` snapshots in chat
 - 🤝 **Cooperative play** between human participants and the MEW agent
 - 🧩 10 levels that escalate in difficulty from straight corridors to winding labyrinths
 
@@ -48,8 +49,9 @@ Invalid moves keep the cat in place and report the wall you bumped into. Reachin
 
 A built-in narrator participant auto-starts with the space. Whenever someone moves (or restarts) the cat, it:
 
-1. Calls the `view` tool to capture the latest board state.
-2. Shares the output in chat with a clear heading and progress counters.
+1. Echoes the move or restart narration back into chat.
+2. Calls the `view` tool to capture the latest board state.
+3. Shares the output in chat with a clear heading and progress counters.
 
 This keeps everyone in the space aligned without manually requesting `view` after every move.
 

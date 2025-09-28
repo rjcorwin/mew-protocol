@@ -8,6 +8,7 @@ REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
 WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
 SERVER_PATH="${REPO_ROOT}/cli/templates/cat-maze/agents/cat-maze-server.js"
+NARRATOR_PATH="${REPO_ROOT}/cli/templates/cat-maze/agents/cat-maze-narrator.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -32,6 +33,8 @@ REPO_ROOT=${REPO_ROOT}
 WORKSPACE_DIR=${WORKSPACE_DIR}
 SERVER_PATH=${SERVER_PATH}
 SOLVER_LOG=${WORKSPACE_DIR}/logs/solver.log
+NARRATOR_PATH=${NARRATOR_PATH}
+NARRATOR_LOG=${WORKSPACE_DIR}/logs/narrator.log
 ENV
 
 printf "%b\n" "${GREEN}✓ Setup complete${NC}"
