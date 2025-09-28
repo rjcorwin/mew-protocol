@@ -427,6 +427,13 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
 - **Fix**: Updated `buildLevels()` function to convert hardcoded `🟫` → current `WALL` constant
 - **Learning**: When changing emoji constants, audit all hardcoded usages in data
 
+#### 4. **Participant Streaming Crash** 🟡 MEDIUM
+- **Issue**: `@mew-protocol/participant@0.4.1` crashed with `ReferenceError: WebSocket is not defined`
+- **Root Cause**: Participant package relied on the monorepo `@mew-protocol/client` bringing in `ws`; the published build lacked the dependency/import
+- **Symptoms**: Tool discovery timed out and stream delivery failed in clean installs (e.g. `npx @mew-protocol/agent`)
+- **Fix**: Added explicit `ws` import in `MEWParticipant` and declared `ws` runtime dependency (will publish patch release)
+- **Learning**: Each SDK package must declare transport dependencies explicitly; monorepo cross-talk hides missing deps
+
 ### Missing Process Steps
 
 #### 1. **Changelog Updates**
