@@ -2,6 +2,8 @@
 
 This guide covers the complete process for releasing all MEW Protocol packages to npm.
 
+> **📋 Release Documentation**: For versioned release plans and reports, see [`docs/releases/`](./docs/releases/README.md)
+
 ## Release Order
 
 The packages must be published in dependency order:
