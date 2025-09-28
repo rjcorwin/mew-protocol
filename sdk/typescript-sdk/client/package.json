@@ -1,6 +1,6 @@
 {
   "name": "@mew-protocol/client",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "MEW protocol client - Multi-Entity Workspace Protocol client SDK",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

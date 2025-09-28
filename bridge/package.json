@@ -1,6 +1,6 @@
 {
   "name": "@mew-protocol/bridge",
-  "version": "0.1.1",
+  "version": "0.4.0",
   "description": "MCP–MEW Protocol Bridge",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
