@@ -1,6 +1,6 @@
 {
   "name": "@mew-protocol/participant",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "MEW Participant base class for building agents and services",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

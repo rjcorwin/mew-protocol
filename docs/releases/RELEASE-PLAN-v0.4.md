@@ -232,7 +232,7 @@ This is a major release transitioning from MEW Protocol v0.3 to v0.4, featuring:
 npm view @mew-protocol/types version          # Expected: 0.4.0
 npm view @mew-protocol/capability-matcher     # Expected: 0.4.1
 npm view @mew-protocol/client version         # Expected: 0.4.1
-npm view @mew-protocol/participant version    # Expected: 0.4.1
+npm view @mew-protocol/participant version    # Expected: 0.4.2
 npm view @mew-protocol/agent version          # Expected: 0.4.3
 npm view @mew-protocol/bridge version         # Expected: 0.4.1
 npm view @mew-protocol/cli version            # Expected: 0.4.3
@@ -248,7 +248,7 @@ npm init -y
 # Test that packages can resolve their internal dependencies
 npm install @mew-protocol/agent@latest
 npm list @mew-protocol/agent --depth=1
-# Should show: participant@0.4.1, client@0.4.1, types@0.4.0
+# Should show: participant@0.4.2, client@0.4.1, types@0.4.0
 
 npm install @mew-protocol/participant@latest
 npm list @mew-protocol/participant --depth=1
@@ -428,7 +428,7 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
 - **Learning**: When changing emoji constants, audit all hardcoded usages in data
 
 #### 4. **Participant Streaming Crash** 🟡 MEDIUM
-- **Issue**: `@mew-protocol/participant@0.4.1` crashed with `ReferenceError: WebSocket is not defined`
+- **Issue**: `@mew-protocol/participant@0.4.1` crashed with `ReferenceError: WebSocket is not defined` (fixed in `0.4.2`)
 - **Root Cause**: Participant package relied on the monorepo `@mew-protocol/client` bringing in `ws`; the published build lacked the dependency/import
 - **Symptoms**: Tool discovery timed out and stream delivery failed in clean installs (e.g. `npx @mew-protocol/agent`)
 - **Fix**: Added explicit `ws` import in `MEWParticipant` and declared `ws` runtime dependency (will publish patch release)
@@ -509,7 +509,7 @@ grep -r "@mew-protocol" sdk/typescript-sdk/*/package.json bridge/package.json
 - `@mew-protocol/types@0.4.0`
 - `@mew-protocol/capability-matcher@0.4.1`
 - `@mew-protocol/client@0.4.1`
-- `@mew-protocol/participant@0.4.1`
+- `@mew-protocol/participant@0.4.2`
 - `@mew-protocol/agent@0.4.5` ⚠️ (Fixed build issues)
 - `@mew-protocol/bridge@0.4.1`
 - `@mew-protocol/cli@0.4.8` ⚠️ (Fixed truncation + maze bugs)
