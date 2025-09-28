@@ -1,0 +1,60 @@
+{
+  "name": "cat-maze",
+  "description": "Cooperative maze adventure with a cat emoji and MCP tools",
+  "author": "MEW Protocol Team",
+  "version": "1.0.0",
+  "tags": [
+    "game",
+    "demo",
+    "mcp"
+  ],
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Name of your space",
+      "default": "${dirname}",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_API_KEY",
+      "description": "API key for the AI model (needed if you want the MEW agent to play)",
+      "env_sources": [
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "API_KEY"
+      ],
+      "default": "",
+      "prompt": true,
+      "sensitive": true,
+      "required": false
+    },
+    {
+      "name": "AGENT_BASE_URL",
+      "description": "Base URL for the AI model API",
+      "env_sources": [
+        "OPENAI_BASE_URL",
+        "ANTHROPIC_BASE_URL",
+        "BASE_URL"
+      ],
+      "default": "https://api.openai.com/v1",
+      "prompt": true,
+      "sensitive": false
+    },
+    {
+      "name": "AGENT_MODEL",
+      "description": "AI model to use if the MEW agent takes over",
+      "env_sources": [
+        "AGENT_MODEL",
+        "MODEL_NAME"
+      ],
+      "default": "gpt-5",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_PROMPT",
+      "description": "System prompt for the MEW agent",
+      "default": "You are a playful navigator who helps guide a cat emoji through cooperative MCP mazes.\\n- Always use the available maze tools (`view`, `up`, `down`, `left`, `right`).\\n- Keep the team updated on the cat's level, position, and remaining challenges.\\n- Ask for confirmation before making risky moves or when unsure which direction to take.\\n- Celebrate victories with cat-themed encouragement.",
+      "prompt": false
+    }
+  ]
+}
