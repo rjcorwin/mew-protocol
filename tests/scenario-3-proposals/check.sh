@@ -15,6 +15,19 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
+ensure_proposal_delivery() {
+  local envelope_id="$1"
+
+  wait_for_envelope "${envelope_id}" && \
+    wait_for_delivery "${envelope_id}" "fulfiller" && \
+    wait_for_capability_grant "proposer" "mcp/proposal"
+}
+
 PROPOSER_LOG=${PROPOSER_LOG:-"${WORKSPACE_DIR}/logs/proposer-output.log"}
 FULFILLER_LOG=${FULFILLER_LOG:-"${WORKSPACE_DIR}/logs/fulfiller.log"}
 TEST_PORT=${TEST_PORT:-8080}
@@ -112,7 +125,8 @@ if post_message "$(cat <<JSON
 {"id":"${proposal_simple_id}","kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":10,"b":5}}}}
 JSON
 )"; then
-  if wait_for_pattern "${FULFILLER_LOG}" "Fulfilling proposal ${proposal_simple_id}"; then
+  if ensure_proposal_delivery "${proposal_simple_id}" && \
+     wait_for_pattern "${FULFILLER_LOG}" "Fulfilling proposal ${proposal_simple_id}"; then
     if wait_for_pattern "${PROPOSER_LOG}" '"kind":"chat"' && \
        wait_for_pattern "${PROPOSER_LOG}" '"text":"15"'; then
       record_pass "Proposal 1 fulfilled with result 15"
@@ -132,7 +146,8 @@ if post_message "$(cat <<JSON
 {"id":"${proposal_multiply_id}","kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":7,"b":8}}}}
 JSON
 )"; then
-  if wait_for_pattern "${FULFILLER_LOG}" "Fulfilling proposal ${proposal_multiply_id}"; then
+  if ensure_proposal_delivery "${proposal_multiply_id}" && \
+     wait_for_pattern "${FULFILLER_LOG}" "Fulfilling proposal ${proposal_multiply_id}"; then
     if wait_for_pattern "${PROPOSER_LOG}" '"kind":"chat"' && \
        wait_for_pattern "${PROPOSER_LOG}" '"text":"56"'; then
       record_pass "Proposal 2 fulfilled with result 56"
@@ -152,7 +167,8 @@ if post_message "$(cat <<JSON
 {"id":"${proposal_invalid_id}","kind":"mcp/proposal","payload":{"method":"tools/call","params":{"name":"not-a-tool","arguments":{}}}}
 JSON
 )"; then
-if wait_for_pattern "${FULFILLER_LOG}" "Calculator returned error for proposal ${proposal_invalid_id}"; then
+if ensure_proposal_delivery "${proposal_invalid_id}" && \
+   wait_for_pattern "${FULFILLER_LOG}" "Calculator returned error for proposal ${proposal_invalid_id}"; then
     if wait_for_pattern "${PROPOSER_LOG}" 'Error fulfilling proposal'; then
       record_pass "Invalid proposal error surfaced"
     else

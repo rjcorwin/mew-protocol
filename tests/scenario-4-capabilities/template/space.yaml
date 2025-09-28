@@ -35,8 +35,11 @@ participants:
     auto_connect: true
     output_log: "./logs/limited-agent-output.log"
     capabilities:
-      - kind: "system/*"
+      - kind: "chat"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
 
 defaults:
   capabilities:
-    - kind: "system/*"
+    - kind: "chat"

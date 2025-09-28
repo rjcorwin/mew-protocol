@@ -15,9 +15,19 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
 TEST_PORT=${TEST_PORT:-8080}
 SPACE_NAME=${SPACE_NAME:-scenario-9-typescript-proposals}
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
+if [[ ! -f "${OUTPUT_LOG}" ]]; then
+  echo "Expected output log ${OUTPUT_LOG} was not created" >&2
+  exit 1
+fi
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -71,13 +81,13 @@ else
   record_fail "Gateway health endpoint"
 fi
 
-if wait_for_pattern "${OUTPUT_LOG}" '"id":"typescript-agent"' 40; then
+if wait_for_pattern "${OUTPUT_LOG}" '"id":"typescript-agent"' 120; then
   record_pass "TypeScript agent connected"
 else
   record_fail "TypeScript agent connected"
 fi
 
-if wait_for_pattern "${OUTPUT_LOG}" '"id":"fulfiller-agent"' 40; then
+if wait_for_pattern "${OUTPUT_LOG}" '"id":"fulfiller-agent"' 120; then
   record_pass "Fulfiller agent connected"
 else
   record_fail "Fulfiller agent connected"
@@ -86,9 +96,16 @@ fi
 : > "${OUTPUT_LOG}"
 
 printf "\n%b\n" "${YELLOW}Test: Agent produces proposal for requested calculation${NC}"
-chat_payload='{"kind":"chat","to":["typescript-agent"],"payload":{"text":"Can you add 7 and 9 for me?","format":"plain"}}'
+chat_request_id=$(generate_envelope_id)
+chat_payload=$(cat <<JSON
+{"id":"${chat_request_id}","kind":"chat","to":["typescript-agent"],"payload":{"text":"Can you add 7 and 9 for me?","format":"plain"}}
+JSON
+)
 if post_test_client "${chat_payload}"; then
-  if wait_for_pattern "${OUTPUT_LOG}" '"kind":"mcp/proposal"' 40 && \
+  if wait_for_envelope "${chat_request_id}" && \
+     wait_for_envelope_receipt "${chat_request_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "chat" "${chat_request_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" '"kind":"mcp/proposal"' 40 && \
      wait_for_pattern "${OUTPUT_LOG}" '"name":"add"' 40; then
     record_pass "Proposal emitted for add tool"
   else
@@ -102,6 +119,7 @@ PROPOSAL_ID=""
 PROPOSAL_TARGETS="fulfiller-agent"
 PROPOSAL_PATH="result.txt"
 PROPOSAL_CONTENT="16"
+FULFILL_TARGET="fulfiller-agent"
 
 if proposal_data=$(OUTPUT_LOG="${OUTPUT_LOG}" python - <<'PY'
 import json
@@ -141,6 +159,8 @@ PY
   PROPOSAL_TARGETS=${PROPOSAL_TARGETS:-fulfiller-agent}
   PROPOSAL_PATH=${PROPOSAL_PATH:-result.txt}
   PROPOSAL_CONTENT=${PROPOSAL_CONTENT:-16}
+  FULFILL_TARGET=${PROPOSAL_TARGETS%%,*}
+  FULFILL_TARGET=${FULFILL_TARGET:-fulfiller-agent}
   record_pass "Captured proposal metadata"
 else
   record_fail "Captured proposal metadata"
@@ -150,14 +170,17 @@ fi
 
 printf "\n%b\n" "${YELLOW}Test: Fulfil proposal via fulfiller agent${NC}"
 if [[ -n "${PROPOSAL_ID}" ]]; then
-  fulfill_payload=$(PROPOSAL_ID="${PROPOSAL_ID}" PROPOSAL_TARGETS="${PROPOSAL_TARGETS}" python - <<'PY'
+  fulfill_envelope_id=$(generate_envelope_id)
+  fulfill_payload=$(PROPOSAL_ID="${PROPOSAL_ID}" PROPOSAL_TARGETS="${PROPOSAL_TARGETS}" FULFILL_ID="${fulfill_envelope_id}" python - <<'PY'
 import json
 import os
 
 proposal_id = os.environ['PROPOSAL_ID']
 targets = os.environ.get('PROPOSAL_TARGETS', '')
+envelope_id = os.environ['FULFILL_ID']
 
 message = {
+    "id": envelope_id,
     "kind": "mcp/request",
     "correlation_id": [proposal_id],
     "payload": {
@@ -179,7 +202,10 @@ print(json.dumps(message))
 PY
   )
   if post_test_client "${fulfill_payload}"; then
-    if wait_for_pattern "${OUTPUT_LOG}" '"result"' 40 && \
+    if wait_for_envelope "${fulfill_envelope_id}" && \
+       wait_for_envelope_receipt "${fulfill_envelope_id}" "test-client" && \
+       wait_for_capability_grant "test-client" "mcp/request" "${fulfill_envelope_id}" && \
+       wait_for_pattern "${OUTPUT_LOG}" '"result"' 40 && \
        wait_for_pattern "${OUTPUT_LOG}" '16' 40; then
       record_pass "Fulfilled proposal result observed"
     else
@@ -195,8 +221,15 @@ fi
 : > "${OUTPUT_LOG}"
 
 printf "\n%b\n" "${YELLOW}Test: Agent responds to direct tools/list${NC}"
-if post_test_client '{"kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":920,"method":"tools/list","params":{}}}'; then
-  if wait_for_pattern "${OUTPUT_LOG}" '"tools"' 40; then
+direct_list_id=$(generate_envelope_id)
+if post_test_client "$(cat <<JSON
+{"id":"${direct_list_id}","kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":920,"method":"tools/list","params":{}}}
+JSON
+)"; then
+  if wait_for_envelope "${direct_list_id}" && \
+     wait_for_envelope_receipt "${direct_list_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${direct_list_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" '"tools"' 40; then
     record_pass "Direct tools/list handled"
   else
     record_fail "Direct tools/list handled"

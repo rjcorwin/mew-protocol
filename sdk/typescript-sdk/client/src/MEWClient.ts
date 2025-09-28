@@ -146,6 +146,13 @@ export class MEWClient extends EventEmitter {
       ...envelope
     } as Envelope;
 
+    if (
+      typeof (fullEnvelope as any).correlation_id !== 'undefined' &&
+      !Array.isArray(fullEnvelope.correlation_id)
+    ) {
+      throw new Error('correlation_id must be an array per MEW Protocol v0.4');
+    }
+
     this.ws.send(JSON.stringify(fullEnvelope));
   }
 

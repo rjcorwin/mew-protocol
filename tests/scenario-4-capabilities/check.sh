@@ -15,6 +15,11 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
 COORD_LOG=${COORD_LOG:-"${WORKSPACE_DIR}/logs/coordinator-output.log"}
 LIMITED_LOG=${LIMITED_LOG:-"${WORKSPACE_DIR}/logs/limited-agent-output.log"}
 TEST_PORT=${TEST_PORT:-8080}
@@ -102,12 +107,47 @@ run_check "Gateway health endpoint" curl -sf "http://localhost:${TEST_PORT}/heal
 run_check "Coordinator log exists" test -f "${COORD_LOG}"
 run_check "Limited agent log exists" test -f "${LIMITED_LOG}"
 
+printf "\n%b\n" "${YELLOW}Test: Gateway rejects participant system/register${NC}"
+sysreg_id=$(generate_envelope_id)
+sysreg_response=$(mktemp)
+http_status=$(curl -s -o "${sysreg_response}" -w '%{http_code}' \
+  -X POST "http://localhost:${TEST_PORT}/participants/limited-agent/messages" \
+  -H "Authorization: Bearer limited-token" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"${sysreg_id}\",\"kind\":\"system/register\",\"payload\":{\"capabilities\":[]}}" || true)
+
+wait_for_envelope_receipt "${sysreg_id}" "limited-agent" || true
+
+if [[ "${http_status}" == "400" ]] && grep -Fq 'system/register is reserved for the gateway' "${sysreg_response}"; then
+  record_pass "HTTP rejection of system/register"
+else
+  record_fail "HTTP rejection of system/register"
+fi
+
+rm -f "${sysreg_response}"
+
+if wait_for_pattern "${LIMITED_LOG}" '"kind":"system/error"' 20; then
+  record_pass "system/register triggers system/error"
+else
+  record_fail "system/register triggers system/error"
+fi
+
+if wait_for_pattern "${LIMITED_LOG}" 'system/register is reserved for the gateway' 20; then
+  record_pass "system/register rejection message"
+else
+  record_fail "system/register rejection message"
+fi
+
 printf "\n%b\n" "${YELLOW}Test: Limited agent can list calculator tools${NC}"
+list_envelope_id=$(generate_envelope_id)
 if post_limited "$(cat <<JSON
-{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}
+{"id":"${list_envelope_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/list","params":{}}}
 JSON
 )"; then
-  if wait_for_pattern "${LIMITED_LOG}" '"kind":"mcp/response"' && \
+  if wait_for_envelope "${list_envelope_id}" && \
+     wait_for_delivery "${list_envelope_id}" "calculator-agent" && \
+     wait_for_capability_grant "limited-agent" "mcp/request" "${list_envelope_id}" && \
+     wait_for_pattern "${LIMITED_LOG}" '"kind":"mcp/response"' && \
      wait_for_pattern "${LIMITED_LOG}" '"tools"'; then
     record_pass "tools/list response captured"
   else
@@ -118,11 +158,15 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test: Limited agent can call add tool${NC}"
+add_envelope_id=$(generate_envelope_id)
 if post_limited "$(cat <<JSON
-{"kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}
+{"id":"${add_envelope_id}","kind":"mcp/request","to":["calculator-agent"],"payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}}
 JSON
 )"; then
-  if wait_for_pattern "${LIMITED_LOG}" '"kind":"mcp/response"' && \
+  if wait_for_envelope "${add_envelope_id}" && \
+     wait_for_delivery "${add_envelope_id}" "calculator-agent" && \
+     wait_for_capability_grant "limited-agent" "mcp/request" "${add_envelope_id}" && \
+     wait_for_pattern "${LIMITED_LOG}" '"kind":"mcp/response"' && \
      wait_for_pattern "${LIMITED_LOG}" '"result":8|"text":"8"'; then
     record_pass "tools/call add succeeded"
   else
@@ -136,11 +180,15 @@ printf "\n%b\n" "${YELLOW}Test: Capability grant enforcement${NC}"
 printf "Grant enforcement: %b\n" "${YELLOW}SKIPPED (capability granting not implemented)${NC}"
 
 printf "\n%b\n" "${YELLOW}Test: Coordinator revokes capability${NC}"
+revoke_envelope_id=$(generate_envelope_id)
 if post_coordinator "$(cat <<JSON
-{"kind":"capability/revoke","payload":{"recipient":"limited-agent","capabilities":[{"kind":"mcp/request","payload":{"method":"tools/*"}}]}}
+{"id":"${revoke_envelope_id}","kind":"capability/revoke","payload":{"recipient":"limited-agent","capabilities":[{"kind":"mcp/request","payload":{"method":"tools/*"}}]}}
 JSON
 )"; then
-  if wait_for_pattern "${LIMITED_LOG}" '"kind":"capability/revoke"'; then
+  if wait_for_envelope "${revoke_envelope_id}" && \
+     wait_for_delivery "${revoke_envelope_id}" "limited-agent" && \
+     wait_for_capability_grant "coordinator" "capability/revoke" "${revoke_envelope_id}" && \
+     wait_for_pattern "${LIMITED_LOG}" '"kind":"capability/revoke"'; then
     record_pass "revoke notification delivered"
   else
     record_fail "revoke notification delivered"

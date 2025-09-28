@@ -13,6 +13,7 @@ The MEW CLI (`@mew/cli`) provides minimal command-line tools needed to execute t
 This specification covers:
 - Space initialization with template system
 - Gateway server with space configuration support
+- Gateway envelope and capability decision logging
 - Client connections with FIFO mode for automation
 - Interactive space connection via terminal UI
 - Capability management through space.yaml
@@ -833,6 +834,56 @@ The test plan uses the CLI as follows:
 - Route messages between participants in same space
 - Load space.yaml for capability configuration
 - Provide hooks for capability resolution
+
+#### Gateway Envelope Logging
+
+The gateway provides comprehensive envelope and capability decision logging enabled by default for testing and debugging visibility.
+
+**Dual-Log Architecture:**
+- **Envelope History** (`.mew/logs/envelope-history.jsonl`) - Tracks message flow, delivery, failures
+- **Capability Decisions** (`.mew/logs/capability-decisions.jsonl`) - Tracks routing decisions, capability checks, grants
+
+**Configuration:**
+```yaml
+# space.yaml - minimal configuration (all optional)
+gateway_logging:
+  enabled: true                    # Default: true (master switch)
+  envelope_history:
+    enabled: true                  # Default: true
+  capability_decisions:
+    enabled: true                  # Default: true
+```
+
+**Environment Variable Overrides:**
+```bash
+export ENVELOPE_HISTORY=false          # Disable envelope history log
+export CAPABILITY_DECISIONS=false      # Disable capability decisions log
+export GATEWAY_LOGGING=false           # Disable both logs
+```
+
+**Log Formats:**
+
+Envelope History:
+```json
+{"timestamp":"2025-09-28T10:30:00.123Z","event":"received","id":"msg-456","envelope":{"kind":"chat","from":"human","to":["agent"],"payload":{"text":"hello"}},"metadata":{"connection_id":"conn-123","processing_time_ms":2}}
+```
+
+Capability Decisions:
+```json
+{"timestamp":"2025-09-28T10:30:00.124Z","event":"capability_check","envelope_id":"msg-456","participant":"agent","details":{"required_capability":"chat","granted_capabilities":["chat","mcp/*"],"result":"allowed","source":"space_config"}}
+```
+
+**Usage for Testing:**
+```bash
+# Direct access with standard tools
+tail -f .mew/logs/envelope-history.jsonl
+grep '"participant":"agent"' .mew/logs/envelope-history.jsonl
+jq '.event' .mew/logs/capability-decisions.jsonl
+
+# Test helper functions
+wait_for_envelope() { local id="$1"; grep -q "\"id\":\"$id\"" .mew/logs/envelope-history.jsonl; }
+assert_capability_granted() { local participant="$1" capability="$2"; grep -q "\"result\":\"allowed\".*\"participant\":\"$participant\".*\"required_capability\":\"$capability\"" .mew/logs/capability-decisions.jsonl; }
+```
 
 ### Client
 - Connect to gateway WebSocket

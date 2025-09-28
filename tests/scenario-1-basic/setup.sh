@@ -71,6 +71,7 @@ TEMPLATE_NAME=${TEMPLATE_NAME}
 SPACE_NAME=${SPACE_NAME}
 TEST_PORT=${TEST_PORT}
 OUTPUT_LOG=${WORKSPACE_DIR}/logs/test-client-output.log
+GATEWAY_LOG_DIR=${WORKSPACE_DIR}/.mew/logs
 ENV
 
 printf "%b\n" "${GREEN}✓ Setup complete${NC}"

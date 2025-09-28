@@ -1,9 +1,45 @@
 import { MEWParticipant, ParticipantOptions, Tool, Resource } from '@mew-protocol/participant';
-import { Envelope, ParticipantRestartPayload } from '@mew-protocol/types';
+import {
+  Envelope,
+  ParticipantRestartPayload,
+  ParticipantCompactPayload,
+  ParticipantCompactDonePayload,
+} from '@mew-protocol/types';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
+export interface ChatCompletionsAPI {
+  create(params: any): Promise<any>;
+}
+
+export interface OpenAIClientInterface {
+  chat: {
+    completions: ChatCompletionsAPI;
+  };
+}
+
+export interface OpenAIClientFactoryOptions {
+  apiKey?: string;
+  baseURL?: string;
+}
+
+export type OpenAIClientFactory = (options: OpenAIClientFactoryOptions) => OpenAIClientInterface;
+
 const PROTOCOL_VERSION = 'mew/v0.4';
+
+const defaultOpenAIClientFactory: OpenAIClientFactory = (options) => {
+  const openaiConfig: OpenAIClientFactoryOptions = {};
+
+  if (options.apiKey) {
+    openaiConfig.apiKey = options.apiKey;
+  }
+
+  if (options.baseURL) {
+    openaiConfig.baseURL = options.baseURL;
+  }
+
+  return new OpenAI(openaiConfig) as OpenAIClientInterface;
+};
 
 export interface AgentConfig extends ParticipantOptions {
   name?: string;
@@ -11,8 +47,11 @@ export interface AgentConfig extends ParticipantOptions {
   model?: string;
   apiKey?: string;
   baseURL?: string;  // Custom OpenAI API base URL (for alternative providers)
+  openAIClient?: OpenAIClientInterface; // Injected OpenAI-compatible client (overrides apiKey/baseURL)
+  openAIClientFactory?: OpenAIClientFactory; // Factory for creating OpenAI-compatible clients
   reasoningEnabled?: boolean;  // Emit reasoning events (reasoning/start, reasoning/thought, reasoning/conclusion)
   autoRespond?: boolean;
+  mockLLM?: boolean;  // Use deterministic heuristics instead of calling external LLMs
   maxIterations?: number;
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
   conversationHistoryLength?: number;  // Number of previous messages to include in context (default: 0 = only current)
@@ -70,7 +109,8 @@ interface OtherParticipant {
 
 export class MEWAgent extends MEWParticipant {
   private config: AgentConfig;
-  private openai?: OpenAI;
+  private openai?: OpenAIClientInterface;
+  private mockLLM = false;
   private otherParticipants = new Map<string, OtherParticipant>();
   private isRunning = false;
   private currentConversation: Array<{ role: string; content: string }> = [];
@@ -105,8 +145,15 @@ export class MEWAgent extends MEWParticipant {
       ...config
     };
 
-    // LOUDLY FAIL if no API key provided
-    if (!this.config.apiKey) {
+    this.mockLLM = Boolean(this.config.mockLLM);
+    const hasInjectedClient = Boolean(this.config.openAIClient || this.config.openAIClientFactory);
+
+    if (this.mockLLM) {
+      this.log('info', '🧪 Running MEWAgent in mock LLM mode (no external OpenAI dependency)');
+    }
+
+    // LOUDLY FAIL if no API key provided and no injected client available
+    if (!this.config.apiKey && !this.mockLLM && !hasInjectedClient) {
       console.error('');
       console.error('🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨');
       console.error('❌ FATAL ERROR: OPENAI_API_KEY is not configured! ❌');
@@ -127,12 +174,17 @@ export class MEWAgent extends MEWParticipant {
       process.exit(1);
     }
 
-    // Initialize OpenAI with the API key
-    const openaiConfig: any = { apiKey: this.config.apiKey };
-    if (this.config.baseURL) {
-      openaiConfig.baseURL = this.config.baseURL;
+    if (!this.mockLLM) {
+      if (this.config.openAIClient) {
+        this.openai = this.config.openAIClient;
+      } else {
+        const factory = this.config.openAIClientFactory || defaultOpenAIClientFactory;
+        this.openai = factory({
+          apiKey: this.config.apiKey,
+          baseURL: this.config.baseURL
+        });
+      }
     }
-    this.openai = new OpenAI(openaiConfig);
 
     this.setupAgentBehavior();
 
@@ -146,7 +198,9 @@ export class MEWAgent extends MEWParticipant {
     this.on('stream/request', (envelope: Envelope) => this.handleStreamRequestEvent(envelope));
     this.on('stream/open', (envelope: Envelope) => this.handleStreamOpenEvent(envelope));
     this.on('stream/close', (envelope: Envelope) => this.handleStreamCloseEvent(envelope));
-    this.on('reasoning/cancel', (envelope: Envelope) => this.handleReasoningCancelEvent(envelope));
+    this.on('reasoning/cancel', (envelope: Envelope) => {
+      void this.handleReasoningCancelEvent(envelope);
+    });
 
     // Set up participant join handler for tracking
     this.onParticipantJoin((participant) => {
@@ -285,8 +339,11 @@ export class MEWAgent extends MEWParticipant {
    * Handle chat messages
    */
   private async handleChat(envelope: Envelope): Promise<void> {
+    const paused = this.isPaused();
+
     // Check if message queueing is enabled and we're currently processing
-    if (this.config.messageQueue?.enableQueueing && this.isProcessing) {
+    if (this.config.messageQueue?.enableQueueing && (this.isProcessing || paused)) {
+      const queueReason = this.isProcessing ? 'processing' : 'paused';
       // Check queue size limit
       const maxSize = this.config.messageQueue.maxQueueSize || 5;
 
@@ -296,34 +353,40 @@ export class MEWAgent extends MEWParticipant {
 
         if (dropStrategy === 'oldest') {
           const dropped = this.messageQueue.shift(); // Remove oldest
-          this.log('warn', `Queue full, dropped oldest message from ${dropped?.from}`);
+          this.log('warn', `Queue full, dropped oldest message from ${dropped?.from} (reason: ${queueReason})`);
           if (this.config.messageQueue.notifyQueueing) {
-            this.emitQueueEvent('queue-overflow', { dropped: dropped?.from, strategy: 'oldest' });
+            this.emitQueueEvent('queue-overflow', { dropped: dropped?.from, strategy: 'oldest', reason: queueReason });
           }
         } else if (dropStrategy === 'newest') {
-          this.log('warn', `Queue full, dropping newest message from ${envelope.from}`);
+          this.log('warn', `Queue full, dropping newest message from ${envelope.from} (reason: ${queueReason})`);
           if (this.config.messageQueue.notifyQueueing) {
-            this.emitQueueEvent('queue-overflow', { dropped: envelope.from, strategy: 'newest' });
+            this.emitQueueEvent('queue-overflow', { dropped: envelope.from, strategy: 'newest', reason: queueReason });
           }
           return; // Don't queue this message
         } else {
           // 'none' strategy - reject the message
-          this.log('error', `Queue full, rejecting message from ${envelope.from}`);
+          this.log('error', `Queue full, rejecting message from ${envelope.from} (reason: ${queueReason})`);
           return;
         }
       }
 
       // Queue the message
       this.messageQueue.push(envelope);
-      this.log('debug', `Message queued from ${envelope.from}, queue size: ${this.messageQueue.length}`);
+      this.log('debug', `Message queued from ${envelope.from}, queue size: ${this.messageQueue.length} (reason: ${queueReason})`);
 
       // Emit queue event if configured
       if (this.config.messageQueue.notifyQueueing) {
         this.emitQueueEvent('message-queued', {
           from: envelope.from,
-          queueSize: this.messageQueue.length
+          queueSize: this.messageQueue.length,
+          reason: queueReason,
         });
       }
+      return;
+    }
+
+    if (paused) {
+      this.log('info', `Ignoring chat from ${envelope.from} because agent is paused`);
       return;
     }
 
@@ -368,9 +431,10 @@ export class MEWAgent extends MEWParticipant {
     }
 
     try {
-      // Start reasoning if enabled
-      if (this.config.reasoningEnabled) {
-        this.emitReasoning('reasoning/start', { input: text });
+      if (this.mockLLM) {
+        await this.handleMockChat(envelope, text);
+      } else if (this.config.reasoningEnabled) {
+        await this.emitReasoning('reasoning/start', { input: text });
 
         try {
           const response = await this.processWithReAct(text);
@@ -385,7 +449,7 @@ export class MEWAgent extends MEWParticipant {
           );
         }
 
-        this.emitReasoning('reasoning/conclusion', {});
+        await this.emitReasoning('reasoning/conclusion', {});
       }
     } finally {
       // Mark as no longer processing
@@ -395,12 +459,130 @@ export class MEWAgent extends MEWParticipant {
       }
 
       // Process any queued messages
-      if (this.messageQueue.length > 0) {
+      if (!this.isPaused() && this.messageQueue.length > 0) {
         const nextMessage = this.messageQueue.shift()!;
         this.log('debug', `Processing next queued message from ${nextMessage.from}`);
         // Process the next message (this will set isProcessing again)
         await this.handleChat(nextMessage);
       }
+    }
+  }
+
+  private async handleMockChat(envelope: Envelope, text: string): Promise<void> {
+    const lower = text.toLowerCase();
+    const additionMatch = lower.match(/add\s+(-?\d+(?:\.\d+)?)\s+(?:and|with|plus)\s+(-?\d+(?:\.\d+)?)/);
+    const multiplyMatch = lower.match(/multiply\s+(-?\d+(?:\.\d+)?)\s+(?:and|with|by)\s+(-?\d+(?:\.\d+)?)/);
+
+    if (additionMatch) {
+      const a = Number(additionMatch[1]);
+      const b = Number(additionMatch[2]);
+      const handled = await this.executeMockTool(
+        'add',
+        { a, b },
+        envelope.from,
+        (result) => `The sum of ${a} and ${b} is ${result}.`
+      );
+
+      if (!handled) {
+        await this.sendResponse(
+          `I'm waiting for a collaborator with an add tool to help compute ${a} and ${b}.`,
+          envelope.from
+        );
+      }
+      return;
+    }
+
+    if (multiplyMatch) {
+      const a = Number(multiplyMatch[1]);
+      const b = Number(multiplyMatch[2]);
+      const handled = await this.executeMockTool(
+        'multiply',
+        { a, b },
+        envelope.from,
+        (result) => `${a} multiplied by ${b} equals ${result}.`
+      );
+
+      if (!handled) {
+        await this.sendResponse(
+          `I need a fulfiller to join before I can multiply ${a} by ${b}.`,
+          envelope.from
+        );
+      }
+      return;
+    }
+
+    await this.sendResponse("I'm here to help! (mock response)", envelope.from);
+  }
+
+  private async executeMockTool(
+    toolName: string,
+    args: Record<string, any>,
+    recipient: string,
+    formatResult: (result: any) => string
+  ): Promise<boolean> {
+    await this.waitForPendingDiscoveries();
+
+    let availableTools = this.getAvailableTools();
+    let remoteTool = availableTools.find(
+      (tool) => tool.participantId !== this.options.participant_id && tool.name === toolName
+    );
+
+    if (!remoteTool) {
+      for (const participant of this.otherParticipants.values()) {
+        try {
+          await this.discoverTools(participant.id);
+        } catch (error) {
+          this.log('warn', `Tool discovery failed for ${participant.id}: ${error}`);
+        }
+      }
+
+      await this.waitForPendingDiscoveries();
+      availableTools = this.getAvailableTools();
+      remoteTool = availableTools.find(
+        (tool) => tool.participantId !== this.options.participant_id && tool.name === toolName
+      );
+    }
+
+    if (!remoteTool) {
+      return false;
+    }
+
+    try {
+      const result = await this.mcpRequest(
+        [remoteTool.participantId],
+        {
+          method: 'tools/call',
+          params: {
+            name: toolName,
+            arguments: args
+          }
+        },
+        30000
+      );
+
+      await this.sendResponse(formatResult(result), recipient);
+    } catch (error: any) {
+      const description = error instanceof Error ? error.message : String(error);
+      await this.sendResponse(
+        `I attempted to use ${remoteTool.participantId}/${toolName} but encountered: ${description}`,
+        recipient
+      );
+    }
+
+    return true;
+  }
+
+  protected onPause(envelope: Envelope): void {
+    this.log('info', `Paused by ${envelope.from || 'unknown'}${envelope.payload?.reason ? ` (${envelope.payload.reason})` : ''}`);
+  }
+
+  protected onResume(envelope: Envelope): void {
+    this.log('info', `Resumed by ${envelope.from || 'unknown'}${envelope.payload?.reason ? ` (${envelope.payload.reason})` : ''}`);
+
+    if (!this.isProcessing && this.messageQueue.length > 0 && !this.isPaused()) {
+      const nextMessage = this.messageQueue.shift()!;
+      this.log('debug', `Processing queued message from ${nextMessage.from} after resume`);
+      void this.handleChat(nextMessage);
     }
   }
   
@@ -412,7 +594,28 @@ export class MEWAgent extends MEWParticipant {
     if (!this.config.autoRespond) {
       return false;
     }
-    
+
+    if (this.mockLLM) {
+      const text = envelope.payload?.text || '';
+      if (envelope.to?.includes(this.options.participant_id!)) {
+        return true;
+      }
+
+      const myId = this.options.participant_id!;
+      const myName = this.config.name || myId;
+      const mentionPattern = new RegExp(`\\b(${myId}|${myName})\\b`, 'i');
+
+      if (mentionPattern.test(text)) {
+        return true;
+      }
+
+      if (text.includes('?')) {
+        return true;
+      }
+
+      return false;
+    }
+
     const chatConfig = {
       respondToQuestions: true,
       respondToMentions: true,
@@ -542,7 +745,7 @@ Return a JSON object:
       this.log('debug', `ReAct iteration ${iterations}/${this.config.maxIterations}`);
 
       if (this.reasoningCancelled) {
-        this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: this.reasoningCancelReason });
+        await this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: this.reasoningCancelReason });
         this.reasoningCancelled = false;
         this.reasoningCancelReason = undefined;
         return 'Reasoning cancelled.';
@@ -559,7 +762,7 @@ Return a JSON object:
       thoughts.push(thought);
       
       this.log('debug', `Thought action: ${thought.action}, reasoning: ${thought.reasoning}`);
-      this.emitReasoning('reasoning/thought', thought);
+      await this.emitReasoning('reasoning/thought', thought);
       
       // Track reasoning in conversation history
       this.conversationHistory.push({
@@ -573,7 +776,7 @@ Return a JSON object:
       // Act phase
       if (thought.action === 'cancelled') {
         // Reasoning was cancelled during stream
-        this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: thought.actionInput?.reason || 'cancelled by user' });
+        await this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: thought.actionInput?.reason || 'cancelled by user' });
         this.reasoningCancelled = false;
         this.reasoningCancelReason = undefined;
         return `Reasoning cancelled: ${thought.actionInput?.reason || 'cancelled by user'}`;
@@ -1293,7 +1496,7 @@ Return a JSON object:
     }
   }
 
-  private handleReasoningCancelEvent(envelope: Envelope): void {
+  private async handleReasoningCancelEvent(envelope: Envelope): Promise<void> {
     if (this.matchesReasoningContext(envelope.context)) {
       this.reasoningCancelled = true;
       this.reasoningCancelReason = envelope.payload?.reason || 'cancelled';
@@ -1309,7 +1512,7 @@ Return a JSON object:
       this.closeReasoningStream('cancelled');
 
       // Immediately send reasoning/conclusion to confirm cancellation
-      this.emitReasoning('reasoning/conclusion', {
+      await this.emitReasoning('reasoning/conclusion', {
         cancelled: true,
         reason: this.reasoningCancelReason,
         message: `Reasoning cancelled: ${this.reasoningCancelReason}`
@@ -1359,11 +1562,11 @@ Return a JSON object:
     this.compacting = false;
   }
 
-  private compactConversationHistory(): { tokens: number; messages: number } {
+  private compactConversationHistory(targetTokens?: number): { tokens: number; messages: number } {
     let tokensFreed = 0;
     let messagesRemoved = 0;
     let projectedTokens = this.getContextTokens();
-    const target = this.getContextTokenLimit() * 0.7;
+    const target = typeof targetTokens === 'number' ? targetTokens : this.getContextTokenLimit() * 0.7;
 
     while (projectedTokens > target && this.conversationHistory.length > 0) {
       const entry = this.conversationHistory.shift();
@@ -1376,6 +1579,30 @@ Return a JSON object:
     }
 
     return { tokens: tokensFreed, messages: messagesRemoved };
+  }
+
+  protected async onCompact(payload: ParticipantCompactPayload): Promise<ParticipantCompactDonePayload | void> {
+    if (this.compacting) {
+      return { skipped: true, reason: 'compaction_in_progress' };
+    }
+
+    this.compacting = true;
+    try {
+      const target = typeof payload.target_tokens === 'number' ? payload.target_tokens : undefined;
+      const result = this.compactConversationHistory(target);
+
+      if (result.tokens <= 0 && result.messages <= 0) {
+        return { skipped: true, reason: 'no_history' };
+      }
+
+      return {
+        freed_tokens: result.tokens > 0 ? result.tokens : undefined,
+        freed_messages: result.messages > 0 ? result.messages : undefined,
+        status: 'compacted'
+      };
+    } finally {
+      this.compacting = false;
+    }
   }
 
   protected async onForget(direction: 'oldest' | 'newest', entries?: number): Promise<{ messagesRemoved: number; tokensFreed: number }> {
@@ -1446,7 +1673,11 @@ Return a JSON object:
   /**
    * Emit reasoning events
    */
-  private emitReasoning(event: string, data: any): string | undefined {
+  private async emitReasoning(event: string, data: any): Promise<string | undefined> {
+    if (this.isPaused() && event !== 'reasoning/cancel' && event !== 'reasoning/conclusion') {
+      this.log('debug', `Skipping reasoning event ${event} while paused`);
+      return undefined;
+    }
     if (event !== 'reasoning/start' && this.reasoningCancelled && event !== 'reasoning/conclusion') {
       return undefined;
     }
@@ -1477,7 +1708,11 @@ Return a JSON object:
       return envelope.id as string | undefined;
     }
 
-    this.send(envelope);
+    try {
+      await this.send(envelope);
+    } catch (error) {
+      this.log('error', `Failed to emit reasoning event ${event}: ${error}`);
+    }
 
     if (event === 'reasoning/thought') {
       this.pushReasoningStreamChunk({ type: 'thought', value: data });

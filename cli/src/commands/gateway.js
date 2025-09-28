@@ -19,6 +19,12 @@ gateway
   .option('--no-auto-start', 'Disable auto-starting participants defined in the space configuration')
   .action(async (options) => {
     const port = parseInt(options.port);
+    const configPath = path.resolve(options.spaceConfig);
+    const spaceDir = path.dirname(configPath);
+    const mewDir = fs.existsSync(path.join(spaceDir, '.mew'))
+      ? path.join(spaceDir, '.mew')
+      : spaceDir;
+    const logsDir = path.join(mewDir, 'logs');
 
     // If we're running as a detached process, redirect console output to a log file
     if (process.env.GATEWAY_LOG_FILE) {
@@ -45,7 +51,6 @@ gateway
     let tokenMap = new Map(); // Map of participantId -> token
 
     try {
-      const configPath = path.resolve(options.spaceConfig);
       const configContent = fs.readFileSync(configPath, 'utf8');
       spaceConfig = yaml.load(configContent);
       console.log(`Loaded space configuration from ${configPath}`);
@@ -53,10 +58,6 @@ gateway
       console.log(`Participants configured: ${Object.keys(spaceConfig.participants).length}`);
 
       // Load tokens from secure storage
-      const spaceDir = path.dirname(configPath);
-      const mewDir = fs.existsSync(path.join(spaceDir, '.mew'))
-        ? path.join(spaceDir, '.mew')
-        : spaceDir;
       const tokensDir = path.join(mewDir, 'tokens');
 
       // Load tokens for all participants
@@ -95,6 +96,14 @@ gateway
       console.log('Continuing with default configuration...');
     }
 
+    const gatewayLogger = createGatewayLogger({
+      logsDir,
+      config: spaceConfig?.gateway_logging,
+      env: process.env,
+      logger: console,
+    });
+    const { logEnvelopeEvent, logCapabilityDecision } = gatewayLogger;
+
     // Create Express app for health endpoint
     const app = express();
     app.use(express.json());
@@ -114,7 +123,7 @@ gateway
     });
 
     // HTTP API for message injection
-    app.post('/participants/:participantId/messages', (req, res) => {
+    app.post('/participants/:participantId/messages', async (req, res) => {
       const { participantId } = req.params;
       const authHeader = req.headers.authorization;
       const spaceName = req.query.space || 'default';
@@ -161,15 +170,106 @@ gateway
         from: participantId,
         ...req.body
       };
-      
-      // Validate capabilities (skip for now - participant is already authenticated)
-      // TODO: Implement capability check for HTTP-injected messages
-      
+
+      logEnvelopeEvent({
+        event: 'received',
+        id: envelope.id,
+        envelope,
+        participant: participantId,
+        space_id: actualSpaceName,
+        direction: 'inbound',
+        transport: 'http',
+      });
+
+      const emitError = (payload) => {
+        const errorEnvelope = {
+          protocol: 'mew/v0.4',
+          id: `error-${Date.now()}`,
+          ts: new Date().toISOString(),
+          from: 'system:gateway',
+          to: [participantId],
+          kind: 'system/error',
+          correlation_id: envelope.id ? [envelope.id] : undefined,
+          payload,
+        };
+
+        const participantSocket = space.participants.get(participantId);
+        if (participantSocket && participantSocket.readyState === WebSocket.OPEN) {
+          participantSocket.send(JSON.stringify(errorEnvelope));
+          logEnvelopeEvent({
+            event: 'delivered',
+            id: errorEnvelope.id,
+            envelope: errorEnvelope,
+            participant: participantId,
+            space_id: actualSpaceName,
+            direction: 'outbound',
+            transport: 'websocket',
+            metadata: {
+              reason: payload?.error || 'unknown',
+              source_envelope: envelope.id,
+            },
+          });
+        }
+      };
+
+      if (envelope.kind === 'system/register') {
+        emitError({
+          error: 'invalid_request',
+          message: 'system/register is reserved for the gateway. Use capability/grant instead.',
+        });
+        return res.status(400).json({
+          error: 'invalid_request',
+          message: 'system/register is reserved for the gateway. Use capability/grant instead.',
+        });
+      }
+
+      if (
+        !(await hasCapabilityForMessage(participantId, envelope, {
+          source: 'http_api',
+          spaceId: actualSpaceName,
+          transport: 'http',
+        }))
+      ) {
+        emitError({
+          error: 'capability_violation',
+          attempted_kind: envelope.kind,
+          your_capabilities: participantCapabilities.get(participantId) || [],
+        });
+        logEnvelopeEvent({
+          event: 'rejected',
+          id: envelope.id,
+          envelope,
+          participant: participantId,
+          space_id: actualSpaceName,
+          direction: 'inbound',
+          transport: 'http',
+          metadata: {
+            reason: 'capability_violation',
+          },
+        });
+        return res.status(403).json({
+          error: 'capability_violation',
+          message: `Participant ${participantId} lacks capability for ${envelope.kind}`,
+        });
+      }
+
       // Broadcast message to space
       const envelopeStr = JSON.stringify(envelope);
       for (const [pid, ws] of space.participants) {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(envelopeStr);
+          logEnvelopeEvent({
+            event: 'delivered',
+            id: envelope.id,
+            envelope,
+            participant: pid,
+            space_id: actualSpaceName,
+            direction: 'outbound',
+            transport: 'websocket',
+            metadata: {
+              source_participant: participantId,
+            },
+          });
         }
       }
       
@@ -256,7 +356,6 @@ gateway
         }
       };
 
-      ensure({ id: 'system-register', kind: 'system/register' });
       ensure({ id: 'mcp-response', kind: 'mcp/response' });
 
       return Array.from(deduped.values());
@@ -404,12 +503,14 @@ gateway
     }
 
     // Check if participant has capability for message
-    async function hasCapabilityForMessage(participantId, message) {
-      // Always allow heartbeat messages
-      if (message.kind === 'system/heartbeat') {
-        return true;
-      }
-      
+    async function hasCapabilityForMessage(participantId, message, context = {}) {
+      const requiredKind = message?.kind || 'unknown';
+      const correlationIds = Array.isArray(message?.correlation_id)
+        ? message.correlation_id
+        : message?.correlation_id
+          ? [message.correlation_id]
+          : undefined;
+
       // Get static capabilities from config
       const staticCapabilities = participantCapabilities.get(participantId) || [];
 
@@ -420,6 +521,31 @@ gateway
       // Merge static and dynamic capabilities
       const allCapabilities = [...staticCapabilities, ...dynamicCapabilities];
 
+      const logDecision = (result, matchedCapability = null, matchedSource = null) => {
+        logCapabilityDecision({
+          event: 'capability_check',
+          envelope_id: message?.id,
+          participant: participantId,
+          space_id: context.spaceId,
+          result: result ? 'allowed' : 'denied',
+          required_capability: requiredKind,
+          matched_capability: matchedCapability || undefined,
+          matched_source: matchedSource || undefined,
+          granted_capabilities: allCapabilities,
+          metadata: {
+            source: context.source || 'unknown',
+            transport: context.transport,
+            correlation_id: correlationIds,
+          },
+        });
+      };
+
+      // Always allow heartbeat messages
+      if (requiredKind === 'system/heartbeat') {
+        logDecision(true, { kind: 'system/heartbeat' }, 'implicit');
+        return true;
+      }
+
       if (options.logLevel === 'debug' && dynamicCapabilities.length > 0) {
         console.log(`Checking capabilities for ${participantId}:`, {
           static: staticCapabilities,
@@ -429,12 +555,18 @@ gateway
       }
 
       // Check each capability pattern
+      let matchedCapability = null;
+      let matchedSource = null;
       for (const cap of allCapabilities) {
         if (matchesCapability(message, cap)) {
+          matchedCapability = cap;
+          matchedSource = staticCapabilities.includes(cap) ? 'static' : 'dynamic';
+          logDecision(true, matchedCapability, matchedSource);
           return true;
         }
       }
 
+      logDecision(false);
       return false;
     }
 
@@ -680,6 +812,16 @@ gateway
             ws.participantId = participantId;
             ws.spaceId = spaceId;
 
+            logEnvelopeEvent({
+              event: 'received',
+              id: message.id,
+              envelope: message,
+              participant: participantId,
+              space_id: spaceId,
+              direction: 'inbound',
+              transport: 'websocket',
+            });
+
             // Store token and resolve capabilities
             participantTokens.set(participantId, token);
             const capabilities = ensureBaselineCapabilities(
@@ -710,6 +852,18 @@ gateway
             };
 
             ws.send(JSON.stringify(welcomeMessage));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: welcomeMessage.id,
+              envelope: welcomeMessage,
+              participant: participantId,
+              space_id: spaceId,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                type: 'system/welcome',
+              },
+            });
 
             // Broadcast presence to others
             const presenceMessage = {
@@ -730,6 +884,19 @@ gateway
             for (const [pid, pws] of space.participants.entries()) {
               if (pid !== participantId && pws.readyState === WebSocket.OPEN) {
                 pws.send(JSON.stringify(presenceMessage));
+                logEnvelopeEvent({
+                  event: 'delivered',
+                  id: presenceMessage.id,
+                  envelope: presenceMessage,
+                  participant: pid,
+                  space_id: spaceId,
+                  direction: 'outbound',
+                  transport: 'websocket',
+                  metadata: {
+                    type: 'system/presence',
+                    source_participant: participantId,
+                  },
+                });
               }
             }
 
@@ -746,64 +913,44 @@ gateway
           }
 
           if (message.kind === 'system/register') {
-            const requestedCapabilities = message.payload?.capabilities;
-            if (!Array.isArray(requestedCapabilities)) {
-              const errorMessage = {
-                protocol: 'mew/v0.4',
-                id: `error-${Date.now()}`,
-                ts: new Date().toISOString(),
-                from: 'system:gateway',
-                to: [participantId],
-                kind: 'system/error',
-                correlation_id: message.id ? [message.id] : undefined,
-                payload: {
-                  error: 'invalid_request',
-                  message: 'system/register payload must include capabilities array',
-                },
-              };
-              ws.send(JSON.stringify(errorMessage));
-              return;
-            }
-
-            const existingCapabilities = participantCapabilities.get(participantId) || [];
-            const mergedCapabilities = mergeCapabilities(existingCapabilities, requestedCapabilities);
-            participantCapabilities.set(participantId, mergedCapabilities);
-
-            if (options.logLevel === 'debug') {
-              console.log(
-                `Updated capabilities for ${participantId}: ${JSON.stringify(mergedCapabilities)}`,
-              );
-            }
-
-            const space = spaces.get(spaceId);
-            if (space) {
-              const presenceUpdate = {
-                protocol: 'mew/v0.4',
-                id: `presence-${Date.now()}`,
-                ts: new Date().toISOString(),
-                from: 'system:gateway',
-                kind: 'system/presence',
-                payload: {
-                  event: 'update',
-                  participant: {
-                    id: participantId,
-                    capabilities: mergedCapabilities,
-                  },
-                },
-              };
-
-              for (const [pid, pws] of space.participants.entries()) {
-                if (pid !== participantId && pws.readyState === WebSocket.OPEN) {
-                  pws.send(JSON.stringify(presenceUpdate));
-                }
-              }
-            }
-
+            const errorMessage = {
+              protocol: 'mew/v0.4',
+              id: `error-${Date.now()}`,
+              ts: new Date().toISOString(),
+              from: 'system:gateway',
+              to: [participantId],
+              kind: 'system/error',
+              correlation_id: message.id ? [message.id] : undefined,
+              payload: {
+                error: 'invalid_request',
+                message: 'system/register is reserved for the gateway. Use capability/grant instead.',
+              },
+            };
+            ws.send(JSON.stringify(errorMessage));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: errorMessage.id,
+              envelope: errorMessage,
+              participant: participantId,
+              space_id: spaceId,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                reason: 'system_register_blocked',
+                source_envelope: message.id,
+              },
+            });
             return;
           }
 
           // Check capabilities for non-join messages
-          if (!(await hasCapabilityForMessage(participantId, message))) {
+          if (
+            !(await hasCapabilityForMessage(participantId, message, {
+              source: 'websocket',
+              spaceId,
+              transport: 'websocket',
+            }))
+          ) {
             const errorMessage = {
               protocol: 'mew/v0.4',
               id: `error-${Date.now()}`,
@@ -820,6 +967,19 @@ gateway
             };
 
             ws.send(JSON.stringify(errorMessage));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: errorMessage.id,
+              envelope: errorMessage,
+              participant: participantId,
+              space_id: spaceId,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                reason: 'capability_violation',
+                source_envelope: message.id,
+              },
+            });
 
             if (options.logLevel === 'debug') {
               console.log(`Capability denied for ${participantId}: ${message.kind}`);
@@ -830,9 +990,17 @@ gateway
           // Handle capability management messages
           if (message.kind === 'capability/grant') {
             // Check if sender has capability to grant capabilities
-            const canGrant = await hasCapabilityForMessage(participantId, {
-              kind: 'capability/grant',
-            });
+            const canGrant = await hasCapabilityForMessage(
+              participantId,
+              {
+                kind: 'capability/grant',
+              },
+              {
+                source: 'capability/grant',
+                spaceId,
+                transport: 'websocket',
+              },
+            );
             if (!canGrant) {
               const errorMessage = {
                 protocol: 'mew/v0.4',
@@ -849,6 +1017,19 @@ gateway
                 },
               };
               ws.send(JSON.stringify(errorMessage));
+              logEnvelopeEvent({
+                event: 'delivered',
+                id: errorMessage.id,
+                envelope: errorMessage,
+                participant: participantId,
+                space_id: spaceId,
+                direction: 'outbound',
+                transport: 'websocket',
+                metadata: {
+                  reason: 'capability_violation',
+                  source_envelope: message.id,
+                },
+              });
               return;
             }
 
@@ -877,27 +1058,11 @@ gateway
               // Send acknowledgment to recipient
               const space = spaces.get(spaceId);
               const recipientWs = space?.participants.get(recipient);
-              if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
-                const ackMessage = {
-                  protocol: 'mew/v0.4',
-                  id: `ack-${Date.now()}`,
-                  ts: new Date().toISOString(),
-                  from: 'system:gateway',
-                  to: [recipient],
-                  kind: 'capability/grant-ack',
-                  correlation_id: [grantId],
-                  payload: {
-                    status: 'accepted',
-                    grant_id: grantId,
-                    capabilities: grantCapabilities,
-                  },
-                };
-                recipientWs.send(JSON.stringify(ackMessage));
-
-                // Send updated welcome message with new capabilities
-                // This allows the participant to update their internal capability tracking
-                // Get both static capabilities and runtime capabilities
-                const staticCapabilities = participantCapabilities.get(recipient) || [];
+                if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
+                  // Send updated welcome message with new capabilities
+                  // This allows the participant to update their internal capability tracking
+                  // Get both static capabilities and runtime capabilities
+                  const staticCapabilities = participantCapabilities.get(recipient) || [];
                 const runtimeCaps = runtimeCapabilities.get(recipient);
                 const dynamicCapabilities = runtimeCaps ? Array.from(runtimeCaps.values()).flat() : [];
 
@@ -929,18 +1094,40 @@ gateway
                         };
                       }),
                   },
-                };
-                recipientWs.send(JSON.stringify(updatedWelcomeMessage));
-                console.log(`Sent updated welcome message to ${recipient} with ${updatedCapabilities.length} total capabilities`);
-                console.log('  Static capabilities:', staticCapabilities.length);
-                console.log('  Granted capabilities:', dynamicCapabilities.length);
+                  };
+                  recipientWs.send(JSON.stringify(updatedWelcomeMessage));
+                  logEnvelopeEvent({
+                    event: 'delivered',
+                    id: updatedWelcomeMessage.id,
+                    envelope: updatedWelcomeMessage,
+                    participant: recipient,
+                    space_id: spaceId,
+                    direction: 'outbound',
+                    transport: 'websocket',
+                    metadata: {
+                      type: 'system/welcome',
+                      reason: 'capability_grant_update',
+                      source_participant: participantId,
+                    },
+                  });
+                  console.log(`Sent updated welcome message to ${recipient} with ${updatedCapabilities.length} total capabilities`);
+                  console.log('  Static capabilities:', staticCapabilities.length);
+                  console.log('  Granted capabilities:', dynamicCapabilities.length);
+                }
               }
-            }
           } else if (message.kind === 'capability/revoke') {
             // Check if sender has capability to revoke capabilities
-            const canRevoke = await hasCapabilityForMessage(participantId, {
-              kind: 'capability/revoke',
-            });
+            const canRevoke = await hasCapabilityForMessage(
+              participantId,
+              {
+                kind: 'capability/revoke',
+              },
+              {
+                source: 'capability/revoke',
+                spaceId,
+                transport: 'websocket',
+              },
+            );
             if (!canRevoke) {
               const errorMessage = {
                 protocol: 'mew/v0.4',
@@ -957,6 +1144,19 @@ gateway
                 },
               };
               ws.send(JSON.stringify(errorMessage));
+              logEnvelopeEvent({
+                event: 'delivered',
+                id: errorMessage.id,
+                envelope: errorMessage,
+                participant: participantId,
+                space_id: spaceId,
+                direction: 'outbound',
+                transport: 'websocket',
+                metadata: {
+                  reason: 'capability_violation',
+                  source_envelope: message.id,
+                },
+              });
               return;
             }
 
@@ -1015,6 +1215,16 @@ gateway
             ...message,
           };
 
+          logEnvelopeEvent({
+            event: 'received',
+            id: envelope.id,
+            envelope,
+            participant: participantId,
+            space_id: spaceId,
+            direction: 'inbound',
+            transport: 'websocket',
+          });
+
           // Ensure correlation_id is always an array if present
           if (envelope.correlation_id && !Array.isArray(envelope.correlation_id)) {
             envelope.correlation_id = [envelope.correlation_id];
@@ -1055,6 +1265,20 @@ gateway
             for (const [pid, pws] of space.participants.entries()) {
               if (pws.readyState === WebSocket.OPEN) {
                 pws.send(JSON.stringify(streamOpenResponse));
+                logEnvelopeEvent({
+                  event: 'delivered',
+                  id: streamOpenResponse.id,
+                  envelope: streamOpenResponse,
+                  participant: pid,
+                  space_id: spaceId,
+                  direction: 'outbound',
+                  transport: 'websocket',
+                  metadata: {
+                    type: 'stream/open',
+                    source_participant: participantId,
+                    stream_id: streamId,
+                  },
+                });
               }
             }
 
@@ -1096,6 +1320,18 @@ gateway
                 if (options.logLevel === 'debug') {
                   console.log(`[GATEWAY DEBUG] Sent to ${pid}`);
                 }
+                logEnvelopeEvent({
+                  event: 'delivered',
+                  id: envelope.id,
+                  envelope,
+                  participant: pid,
+                  space_id: spaceId,
+                  direction: 'outbound',
+                  transport: 'websocket',
+                  metadata: {
+                    source_participant: participantId,
+                  },
+                });
               }
             }
 
@@ -1148,6 +1384,20 @@ gateway
           for (const [pid, pws] of space.participants.entries()) {
             if (pws.readyState === WebSocket.OPEN) {
               pws.send(JSON.stringify(presenceMessage));
+              logEnvelopeEvent({
+                event: 'delivered',
+                id: presenceMessage.id,
+                envelope: presenceMessage,
+                participant: pid,
+                space_id: spaceId,
+                direction: 'outbound',
+                transport: 'websocket',
+                metadata: {
+                  type: 'system/presence',
+                  source_participant: participantId,
+                  reason: 'disconnect',
+                },
+              });
             }
           }
 
@@ -1235,3 +1485,191 @@ gateway
   });
 
 module.exports = gateway;
+
+function parseOptionalBoolean(value) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['false', '0', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+  return undefined;
+}
+
+function createGatewayLogger({ logsDir, config = {}, env = {}, logger = console }) {
+  const warn = logger && typeof logger.warn === 'function' ? logger.warn.bind(logger) : console.warn.bind(console);
+
+  let loggingEnabled = config?.enabled !== undefined ? Boolean(config.enabled) : true;
+  const envAll = parseOptionalBoolean(env.GATEWAY_LOGGING);
+  if (envAll !== undefined) {
+    loggingEnabled = envAll;
+  }
+
+  let envelopeEnabled = config?.envelope_history?.enabled !== undefined
+    ? Boolean(config.envelope_history.enabled)
+    : true;
+  let capabilityEnabled = config?.capability_decisions?.enabled !== undefined
+    ? Boolean(config.capability_decisions.enabled)
+    : true;
+
+  const envEnvelope = parseOptionalBoolean(env.ENVELOPE_HISTORY);
+  if (envEnvelope !== undefined) {
+    envelopeEnabled = envEnvelope;
+  }
+
+  const envCapability = parseOptionalBoolean(env.CAPABILITY_DECISIONS);
+  if (envCapability !== undefined) {
+    capabilityEnabled = envCapability;
+  }
+
+  if (!loggingEnabled) {
+    envelopeEnabled = false;
+    capabilityEnabled = false;
+  }
+
+  if (!envelopeEnabled && !capabilityEnabled) {
+    return {
+      logEnvelopeEvent: () => {},
+      logCapabilityDecision: () => {},
+    };
+  }
+
+  try {
+    fs.mkdirSync(logsDir, { recursive: true });
+    const gitignorePath = path.join(logsDir, '.gitignore');
+    if (!fs.existsSync(gitignorePath)) {
+      fs.writeFileSync(gitignorePath, '*\n!.gitignore\n');
+    }
+  } catch (error) {
+    warn(`Failed to prepare gateway log directory at ${logsDir}: ${error.message}`);
+    return {
+      logEnvelopeEvent: () => {},
+      logCapabilityDecision: () => {},
+    };
+  }
+
+  const streams = {};
+
+  if (envelopeEnabled) {
+    try {
+      const envelopePath = path.join(logsDir, 'envelope-history.jsonl');
+      streams.envelope = fs.createWriteStream(envelopePath, { flags: 'a' });
+    } catch (error) {
+      warn(`Failed to open envelope history log: ${error.message}`);
+      envelopeEnabled = false;
+    }
+  }
+
+  if (capabilityEnabled) {
+    try {
+      const capabilityPath = path.join(logsDir, 'capability-decisions.jsonl');
+      streams.capability = fs.createWriteStream(capabilityPath, { flags: 'a' });
+    } catch (error) {
+      warn(`Failed to open capability decisions log: ${error.message}`);
+      capabilityEnabled = false;
+    }
+  }
+
+  if (!streams.envelope && !streams.capability) {
+    return {
+      logEnvelopeEvent: () => {},
+      logCapabilityDecision: () => {},
+    };
+  }
+
+  let cleanedUp = false;
+  const performCleanup = () => {
+    if (cleanedUp) {
+      return;
+    }
+    cleanedUp = true;
+    if (streams.envelope) {
+      try {
+        streams.envelope.end();
+      } catch (error) {
+        warn(`Failed to close envelope history log: ${error.message}`);
+      }
+    }
+    if (streams.capability) {
+      try {
+        streams.capability.end();
+      } catch (error) {
+        warn(`Failed to close capability decisions log: ${error.message}`);
+      }
+    }
+  };
+
+  process.once('exit', performCleanup);
+  process.once('SIGINT', performCleanup);
+  process.once('SIGTERM', performCleanup);
+
+  const pruneUndefined = (record) => {
+    for (const key of Object.keys(record)) {
+      if (record[key] === undefined || record[key] === null ||
+        (typeof record[key] === 'object' && !Array.isArray(record[key]) && Object.keys(record[key]).length === 0)) {
+        if (record[key] === undefined || record[key] === null || Object.keys(record[key] || {}).length === 0) {
+          delete record[key];
+        }
+      }
+    }
+    return record;
+  };
+
+  const safeWrite = (stream, entry, label) => {
+    if (!stream) {
+      return;
+    }
+
+    try {
+      stream.write(`${JSON.stringify(entry)}\n`);
+    } catch (error) {
+      warn(`Failed to write ${label} entry: ${error.message}`);
+    }
+  };
+
+  return {
+    logEnvelopeEvent(entry = {}) {
+      if (!streams.envelope) {
+        return;
+      }
+      const metadata = entry.metadata && Object.keys(entry.metadata).length > 0 ? entry.metadata : undefined;
+      const record = pruneUndefined({
+        timestamp: new Date().toISOString(),
+        event: entry.event,
+        id: entry.id,
+        envelope: entry.envelope,
+        participant: entry.participant,
+        space_id: entry.space_id,
+        direction: entry.direction,
+        transport: entry.transport,
+        metadata,
+      });
+      safeWrite(streams.envelope, record, 'envelope history');
+    },
+    logCapabilityDecision(entry = {}) {
+      if (!streams.capability) {
+        return;
+      }
+      const metadata = entry.metadata && Object.keys(entry.metadata).length > 0 ? entry.metadata : undefined;
+      const record = pruneUndefined({
+        timestamp: new Date().toISOString(),
+        event: entry.event || 'capability_check',
+        envelope_id: entry.envelope_id,
+        participant: entry.participant,
+        space_id: entry.space_id,
+        result: entry.result,
+        required_capability: entry.required_capability,
+        matched_capability: entry.matched_capability,
+        matched_source: entry.matched_source,
+        granted_capabilities: entry.granted_capabilities,
+        metadata,
+      });
+      safeWrite(streams.capability, record, 'capability decision');
+    },
+  };
+}

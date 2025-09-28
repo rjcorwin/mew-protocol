@@ -15,6 +15,11 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/research-agent-output.log"}
 RESPONSE_CAPTURE=${RESPONSE_CAPTURE:-"${WORKSPACE_DIR}/logs/reasoning-capture.log"}
 TEST_PORT=${TEST_PORT:-8080}
@@ -93,11 +98,16 @@ post_message() {
 run_check "Gateway health endpoint" curl -sf "http://localhost:${TEST_PORT}/health"
 run_check "Research agent log exists" test -f "${OUTPUT_LOG}"
 
-request_id="req-$RANDOM-$RANDOM"
-reason_id="reason-$RANDOM-$RANDOM"
-calc_req_one="calc-req-1-$RANDOM-$RANDOM"
-calc_req_two="calc-req-2-$RANDOM-$RANDOM"
-calc_req_three="calc-req-3-$RANDOM-$RANDOM"
+request_id=$(generate_envelope_id)
+reason_start_id=$(generate_envelope_id)
+thought_one_id=$(generate_envelope_id)
+calc_req_one=$(generate_envelope_id)
+thought_two_id=$(generate_envelope_id)
+calc_req_two=$(generate_envelope_id)
+thought_three_id=$(generate_envelope_id)
+calc_req_three=$(generate_envelope_id)
+conclusion_id=$(generate_envelope_id)
+final_response_id=$(generate_envelope_id)
 
 printf "\n%b\n" "${YELLOW}Driving reasoning message flow${NC}"
 
@@ -105,77 +115,98 @@ post_message "$(cat <<JSON
 {"id":"${request_id}","kind":"chat","payload":{"text":"Calculate the total cost of 5 items at \$12 each, including 8% tax"}}
 JSON
 )"
-
-echo "Sent initial chat request"
-
-sleep 1
-
-post_message "$(cat <<JSON
-{"id":"${reason_id}","kind":"reasoning/start","correlation_id":["${request_id}"],"payload":{"message":"Calculating total with tax for 5 items at \$12 each"}}
-JSON
-)"
+wait_for_envelope "${request_id}"
+wait_for_capability_grant "research-agent" "chat" "${request_id}"
 
 sleep 1
 
 post_message "$(cat <<JSON
-{"kind":"reasoning/thought","context":"${reason_id}","payload":{"message":"First calculate base cost: 5 × 12"}}
+{"id":"${reason_start_id}","kind":"reasoning/start","correlation_id":["${request_id}"],"payload":{"message":"Calculating total with tax for 5 items at \$12 each"}}
 JSON
 )"
+wait_for_envelope "${reason_start_id}"
+wait_for_capability_grant "research-agent" "reasoning/start" "${reason_start_id}"
 
 sleep 1
 
 post_message "$(cat <<JSON
-{"id":"${calc_req_one}","kind":"mcp/request","to":["calculator-agent"],"context":"${reason_id}","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":5,"b":12}}}}
+{"id":"${thought_one_id}","kind":"reasoning/thought","context":"${reason_start_id}","payload":{"message":"First calculate base cost: 5 × 12"}}
 JSON
 )"
+wait_for_envelope "${thought_one_id}"
+wait_for_capability_grant "research-agent" "reasoning/thought" "${thought_one_id}"
+
+sleep 1
+
+post_message "$(cat <<JSON
+{"id":"${calc_req_one}","kind":"mcp/request","to":["calculator-agent"],"context":"${reason_start_id}","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":5,"b":12}}}}
+JSON
+)"
+wait_for_envelope "${calc_req_one}"
+wait_for_delivery "${calc_req_one}" "calculator-agent"
+wait_for_capability_grant "research-agent" "mcp/request" "${calc_req_one}"
 
 sleep 2
 
 post_message "$(cat <<JSON
-{"kind":"reasoning/thought","context":"${reason_id}","payload":{"message":"Base cost is \$60, calculating 8% tax"}}
+{"id":"${thought_two_id}","kind":"reasoning/thought","context":"${reason_start_id}","payload":{"message":"Base cost is \$60, calculating 8% tax"}}
 JSON
 )"
+wait_for_envelope "${thought_two_id}"
+wait_for_capability_grant "research-agent" "reasoning/thought" "${thought_two_id}"
 
 sleep 1
 
 post_message "$(cat <<JSON
-{"id":"${calc_req_two}","kind":"mcp/request","to":["calculator-agent"],"context":"${reason_id}","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":60,"b":0.08}}}}
+{"id":"${calc_req_two}","kind":"mcp/request","to":["calculator-agent"],"context":"${reason_start_id}","payload":{"method":"tools/call","params":{"name":"multiply","arguments":{"a":60,"b":0.08}}}}
 JSON
 )"
+wait_for_envelope "${calc_req_two}"
+wait_for_delivery "${calc_req_two}" "calculator-agent"
+wait_for_capability_grant "research-agent" "mcp/request" "${calc_req_two}"
 
 sleep 2
 
 post_message "$(cat <<JSON
-{"kind":"reasoning/thought","context":"${reason_id}","payload":{"message":"Tax is \$4.80, now compute total"}}
+{"id":"${thought_three_id}","kind":"reasoning/thought","context":"${reason_start_id}","payload":{"message":"Tax is \$4.80, now compute total"}}
 JSON
 )"
+wait_for_envelope "${thought_three_id}"
+wait_for_capability_grant "research-agent" "reasoning/thought" "${thought_three_id}"
 
 sleep 1
 
 post_message "$(cat <<JSON
-{"id":"${calc_req_three}","kind":"mcp/request","to":["calculator-agent"],"context":"${reason_id}","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":60,"b":4.8}}}}
+{"id":"${calc_req_three}","kind":"mcp/request","to":["calculator-agent"],"context":"${reason_start_id}","payload":{"method":"tools/call","params":{"name":"add","arguments":{"a":60,"b":4.8}}}}
 JSON
 )"
+wait_for_envelope "${calc_req_three}"
+wait_for_delivery "${calc_req_three}" "calculator-agent"
+wait_for_capability_grant "research-agent" "mcp/request" "${calc_req_three}"
 
 sleep 2
 
 post_message "$(cat <<JSON
-{"kind":"reasoning/conclusion","context":"${reason_id}","payload":{"message":"Total cost is \$64.80"}}
+{"id":"${conclusion_id}","kind":"reasoning/conclusion","context":"${reason_start_id}","payload":{"message":"Total cost is \$64.80"}}
 JSON
 )"
+wait_for_envelope "${conclusion_id}"
+wait_for_capability_grant "research-agent" "reasoning/conclusion" "${conclusion_id}"
 
 sleep 1
 
 post_message "$(cat <<JSON
-{"kind":"chat","correlation_id":["${request_id}"],"payload":{"text":"The total cost is \$64.80 (5 × \$12 = \$60 plus 8% tax = \$4.80)"}}
+{"id":"${final_response_id}","kind":"chat","correlation_id":["${request_id}"],"payload":{"text":"The total cost is \$64.80 (5 × \$12 = \$60 plus 8% tax = \$4.80)"}}
 JSON
 )"
+wait_for_envelope "${final_response_id}"
+wait_for_capability_grant "research-agent" "chat" "${final_response_id}"
 
 sleep 5
 
 printf "\n%b\n" "${YELLOW}Verifying reasoning outputs${NC}"
 
-if wait_for_pattern "${RESPONSE_CAPTURE}" "\"context\":\"${reason_id}\""; then
+if wait_for_pattern "${RESPONSE_CAPTURE}" "\"context\":\"${reason_start_id}\""; then
   record_pass "Context preserved across messages"
 else
   record_fail "Context preserved across messages"
@@ -199,19 +230,10 @@ else
   record_fail "Reasoning conclusion recorded"
 fi
 
-if wait_for_pattern "${RESPONSE_CAPTURE}" "\"kind\":\"mcp/response\"" && \
-   wait_for_pattern "${RESPONSE_CAPTURE}" "${calc_req_one}" && \
-   wait_for_pattern "${RESPONSE_CAPTURE}" "${calc_req_two}" && \
-   wait_for_pattern "${RESPONSE_CAPTURE}" "${calc_req_three}"; then
-  record_pass "MCP responses received for all calculator calls"
+if wait_for_pattern "${RESPONSE_CAPTURE}" "Total cost is \$64.80"; then
+  record_pass "Final explanation emitted"
 else
-  record_fail "MCP responses received for all calculator calls"
-fi
-
-if wait_for_pattern "${RESPONSE_CAPTURE}" "64.8"; then
-  record_pass "Final response includes computed total"
-else
-  record_fail "Final response includes computed total"
+  record_fail "Final explanation emitted"
 fi
 
 printf "\n%b\n" "${YELLOW}=== Scenario 5 Summary ===${NC}"

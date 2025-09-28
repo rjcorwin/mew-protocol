@@ -15,6 +15,11 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
 TEST_PORT=${TEST_PORT:-8080}
 
@@ -57,12 +62,25 @@ run_check "Gateway health endpoint" curl -sf "http://localhost:${TEST_PORT}/heal
 run_check "Client output log exists" test -f "${OUTPUT_LOG}"
 
 printf "\n%b\n" "${YELLOW}Test: Simple chat message${NC}"
+simple_envelope_id=$(generate_envelope_id)
 curl -sf -X POST "http://localhost:${TEST_PORT}/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
-  -d '{"kind":"chat","payload":{"text":"Hello, echo!"}}' > /dev/null
+  -d "{\"id\":\"${simple_envelope_id}\",\"kind\":\"chat\",\"payload\":{\"text\":\"Hello, echo!\"}}" > /dev/null
+
+simple_checks_passed=true
+if ! wait_for_envelope "${simple_envelope_id}"; then
+  simple_checks_passed=false
+fi
+if ! wait_for_delivery "${simple_envelope_id}" "echo-agent"; then
+  simple_checks_passed=false
+fi
+if ! wait_for_capability_grant "test-client" "chat"; then
+  simple_checks_passed=false
+fi
+
 sleep 2
-if grep -q '"text":"Echo: Hello, echo!"' "${OUTPUT_LOG}"; then
+if ${simple_checks_passed} && grep -q '"text":"Echo: Hello, echo!"' "${OUTPUT_LOG}"; then
   printf "Echo response: %b\n" "${GREEN}✓${NC}"
   tests_passed=$((tests_passed + 1))
 else
@@ -71,10 +89,15 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test: Message with correlation ID${NC}"
+correlated_id="msg-123"
 curl -sf -X POST "http://localhost:${TEST_PORT}/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
   -d '{"id":"msg-123","kind":"chat","payload":{"text":"Test with ID"}}' > /dev/null
+wait_for_envelope "${correlated_id}"
+wait_for_delivery "${correlated_id}" "echo-agent"
+wait_for_capability_grant "test-client" "chat"
+
 sleep 2
 if grep -q 'correlation_id.*msg-123' "${OUTPUT_LOG}"; then
   printf "Correlation ID preserved: %b\n" "${GREEN}✓${NC}"
@@ -85,16 +108,36 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test: Multiple messages${NC}"
+multi_checks_passed=true
+declare -a multi_ids=()
 for text in "Message 1" "Message 2" "Message 3"; do
+  envelope_id=$(generate_envelope_id)
+  multi_ids+=("${envelope_id}")
   curl -sf -X POST "http://localhost:${TEST_PORT}/participants/test-client/messages" \
     -H "Authorization: Bearer test-token" \
     -H "Content-Type: application/json" \
-    -d "{\"kind\":\"chat\",\"payload\":{\"text\":\"${text}\"}}" > /dev/null
-  sleep 0.5
+    -d "{\"id\":\"${envelope_id}\",\"kind\":\"chat\",\"payload\":{\"text\":\"${text}\"}}" > /dev/null
+  sleep 0.2
 done
+
+for envelope_id in "${multi_ids[@]}"; do
+  if ! wait_for_envelope "${envelope_id}"; then
+    multi_checks_passed=false
+    break
+  fi
+  if ! wait_for_delivery "${envelope_id}" "echo-agent"; then
+    multi_checks_passed=false
+    break
+  fi
+done
+
+if ! wait_for_capability_grant "test-client" "chat"; then
+  multi_checks_passed=false
+fi
+
 sleep 2
 msg_count=$(grep -c '"text":"Echo: Message' "${OUTPUT_LOG}" || true)
-if [[ "${msg_count}" -eq 3 ]]; then
+if ${multi_checks_passed} && [[ "${msg_count}" -eq 3 ]]; then
   printf "All 3 messages received: %b\n" "${GREEN}✓${NC}"
   tests_passed=$((tests_passed + 1))
 else
@@ -104,12 +147,25 @@ fi
 
 printf "\n%b\n" "${YELLOW}Test: Large message handling${NC}"
 large_text=$(printf 'A%.0s' {1..1000})
+large_envelope_id=$(generate_envelope_id)
 curl -sf -X POST "http://localhost:${TEST_PORT}/participants/test-client/messages" \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
-  -d "{\"kind\":\"chat\",\"payload\":{\"text\":\"${large_text}\"}}" > /dev/null
+  -d "{\"id\":\"${large_envelope_id}\",\"kind\":\"chat\",\"payload\":{\"text\":\"${large_text}\"}}" > /dev/null
+
+large_checks_passed=true
+if ! wait_for_envelope "${large_envelope_id}"; then
+  large_checks_passed=false
+fi
+if ! wait_for_delivery "${large_envelope_id}" "echo-agent"; then
+  large_checks_passed=false
+fi
+if ! wait_for_capability_grant "test-client" "chat"; then
+  large_checks_passed=false
+fi
+
 sleep 2
-if grep -q "Echo: ${large_text}" "${OUTPUT_LOG}"; then
+if ${large_checks_passed} && grep -q "Echo: ${large_text}" "${OUTPUT_LOG}"; then
   printf "Large message handled: %b\n" "${GREEN}✓${NC}"
   tests_passed=$((tests_passed + 1))
 else
@@ -118,16 +174,36 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test: Rapid message handling${NC}"
+rapid_checks_passed=true
+declare -a rapid_ids=()
 for i in {1..5}; do
+  envelope_id=$(generate_envelope_id)
+  rapid_ids+=("${envelope_id}")
   curl -sf -X POST "http://localhost:${TEST_PORT}/participants/test-client/messages" \
     -H "Authorization: Bearer test-token" \
     -H "Content-Type: application/json" \
-    -d "{\"kind\":\"chat\",\"payload\":{\"text\":\"Rapid ${i}\"}}" > /dev/null
+    -d "{\"id\":\"${envelope_id}\",\"kind\":\"chat\",\"payload\":{\"text\":\"Rapid ${i}\"}}" > /dev/null
   sleep 0.1
 done
+
+for envelope_id in "${rapid_ids[@]}"; do
+  if ! wait_for_envelope "${envelope_id}"; then
+    rapid_checks_passed=false
+    break
+  fi
+  if ! wait_for_delivery "${envelope_id}" "echo-agent"; then
+    rapid_checks_passed=false
+    break
+  fi
+done
+
+if ! wait_for_capability_grant "test-client" "chat"; then
+  rapid_checks_passed=false
+fi
+
 sleep 2
 rapid_count=$(grep -c '"text":"Echo: Rapid' "${OUTPUT_LOG}" || true)
-if [[ "${rapid_count}" -eq 5 ]]; then
+if ${rapid_checks_passed} && [[ "${rapid_count}" -eq 5 ]]; then
   printf "All 5 rapid messages processed: %b\n" "${GREEN}✓${NC}"
   tests_passed=$((tests_passed + 1))
 else

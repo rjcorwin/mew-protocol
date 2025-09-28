@@ -6,8 +6,6 @@ import { MCPClient, MCPServerConfig } from './mcp-client';
 const debug = Debug('mew:bridge');
 
 const DEFAULT_CAPABILITIES: Capability[] = [
-  { id: 'system-register', kind: 'system/register' },
-  { id: 'system-heartbeat', kind: 'system/heartbeat' },
   { id: 'chat', kind: 'chat' },
   { id: 'mcp-response', kind: 'mcp/response' },
 ];
@@ -27,7 +25,7 @@ function mergeCapabilities(...groups: Array<Capability[] | undefined>): Capabili
     }
   }
 
-  // Ensure default capabilities are always present so we can re-register later
+  // Ensure default capabilities are always present for local bookkeeping
   for (const capability of DEFAULT_CAPABILITIES) {
     const key = JSON.stringify(capability);
     if (!merged.has(key)) {
@@ -283,29 +281,8 @@ export class MCPBridge extends MEWParticipant {
 
     console.log('Bridge: Effective capabilities:', JSON.stringify(combinedCapabilities));
 
-    // Send registration with MCP capabilities
+    // Track the final set locally so operators can audit what we discovered.
     this.advertisedCapabilities = combinedCapabilities;
-
-    this.sendRegistration(combinedCapabilities);
-  }
-
-  /**
-   * Send registration message with MCP server capabilities
-   */
-  private sendRegistration(capabilities: Capability[]): void {
-    const envelope = {
-      kind: 'system/register',
-      payload: {
-        capabilities,
-      },
-    };
-
-    console.log(
-      'Bridge: Sending system/register with capabilities:',
-      JSON.stringify(capabilities),
-    );
-    debug('Sending registration with MCP capabilities:', envelope);
-    this.send(envelope);
   }
 
   /**
@@ -314,12 +291,20 @@ export class MCPBridge extends MEWParticipant {
   private handleMCPNotification(notification: any): void {
     debug('MCP notification:', notification);
 
-    // Translate MCP notifications to MEW messages if needed
     if (notification.method === 'notifications/message') {
-      this.send({
-        kind: 'system/log',
-        payload: notification.params,
-      });
+      console.log('Bridge: MCP notification message:', notification.params);
+
+      if (this.canSend({ kind: 'chat' })) {
+        void this.send({
+          kind: 'chat',
+          payload: {
+            text: `[MCP] ${JSON.stringify(notification.params)}`,
+            format: 'plain',
+          },
+        }).catch((err) => {
+          console.error('Bridge: Failed to forward MCP notification as chat:', err);
+        });
+      }
     }
   }
 
@@ -327,14 +312,24 @@ export class MCPBridge extends MEWParticipant {
    * Handle MCP error
    */
   private handleMCPError(error: any): void {
-    // Send error to MEW space
-    this.send({
-      kind: 'system/error',
-      payload: {
-        error: error.message,
-        source: 'mcp-bridge',
-      },
-    });
+    console.error('Bridge: MCP error encountered:', error);
+
+    const payload = {
+      status: 'error',
+      error: error.message,
+      tokens: 0,
+      max_tokens: 0,
+      messages_in_context: 0,
+    };
+
+    if (this.canSend({ kind: 'participant/status', payload })) {
+      void this.send({
+        kind: 'participant/status',
+        payload,
+      }).catch((sendError) => {
+        console.error('Bridge: Failed to report MCP error via participant/status:', sendError);
+      });
+    }
   }
 
   /**
@@ -365,10 +360,7 @@ export class MCPBridge extends MEWParticipant {
       debug('MCP server restarted successfully');
       this.restartAttempts = 0; // Reset counter on success
 
-      // Re-send registration with updated capabilities
-      if (this.participantInfo) {
-        this.sendRegistration(this.participantInfo.capabilities);
-      }
+      // Capabilities are managed by the gateway; nothing else to send here.
     } catch (error) {
       console.error(`Failed to restart MCP server (attempt ${this.restartAttempts}):`, error);
       

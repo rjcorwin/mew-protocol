@@ -64,6 +64,8 @@ const ws = new WebSocket(options.gateway, { handshakeTimeout: 15000 });
 
 let messagesInContext = 0;
 let tokensUsed = 0;
+let paused = false;
+let resumeTimer = null;
 
 function sendEnvelope(envelope) {
   const fullEnvelope = {
@@ -89,6 +91,22 @@ function sendStatus(status, correlationId, target) {
       max_tokens: 20000,
       messages_in_context: messagesInContext,
     }
+  });
+}
+
+function clearResumeTimer() {
+  if (resumeTimer) {
+    clearTimeout(resumeTimer);
+    resumeTimer = null;
+  }
+}
+
+function sendCompactDone(requestId, target, payload) {
+  sendEnvelope({
+    kind: 'participant/compact-done',
+    to: target ? [target] : undefined,
+    correlation_id: [requestId],
+    payload,
   });
 }
 
@@ -131,6 +149,29 @@ ws.on('message', (data) => {
         sendStatus('restarted', message.id, message.from);
       }
       break;
+    case 'participant/compact':
+      if (addressedToMe) {
+        sendStatus('compacting', message.id, message.from);
+
+        const freedTokens = Math.min(tokensUsed, Math.max(64, Math.ceil(tokensUsed * 0.25)));
+        const freedMessages = Math.min(messagesInContext, Math.max(1, Math.ceil(messagesInContext * 0.25)));
+
+        tokensUsed = Math.max(0, tokensUsed - freedTokens);
+        messagesInContext = Math.max(0, messagesInContext - freedMessages);
+
+        const compactPayload = {
+          status: freedTokens === 0 && freedMessages === 0 ? 'skipped' : 'compacted',
+        };
+        if (freedTokens > 0) {
+          compactPayload.freed_tokens = freedTokens;
+        }
+        if (freedMessages > 0) {
+          compactPayload.freed_messages = freedMessages;
+        }
+        sendCompactDone(message.id, message.from, compactPayload);
+        sendStatus('compacted', message.id, message.from);
+      }
+      break;
     case 'participant/shutdown':
       if (addressedToMe) {
         const reason = message.payload?.reason || 'manual';
@@ -141,13 +182,45 @@ ws.on('message', (data) => {
         }, 200);
       }
       break;
+    case 'participant/pause':
+      if (addressedToMe) {
+        paused = true;
+        clearResumeTimer();
+        const reason = message.payload?.reason;
+        const statusValue = reason ? `paused:${reason}` : 'paused';
+        sendStatus(statusValue, message.id, message.from);
+
+        const timeoutSeconds = message.payload?.timeout_seconds;
+        if (timeoutSeconds && timeoutSeconds > 0) {
+          resumeTimer = setTimeout(() => {
+            paused = false;
+            sendEnvelope({
+              kind: 'participant/resume',
+              to: message.from ? [message.from] : undefined,
+              correlation_id: [message.id],
+              payload: {
+                reason: 'timeout'
+              }
+            });
+            sendStatus('active', message.id, message.from);
+          }, timeoutSeconds * 1000);
+        }
+      }
+      break;
+    case 'participant/resume':
+      if (addressedToMe) {
+        paused = false;
+        clearResumeTimer();
+        sendStatus('active', message.id, message.from);
+      }
+      break;
     case 'participant/request-status':
       if (addressedToMe) {
         sendStatus('active', message.id, message.from);
       }
       break;
     case 'chat':
-      if (addressedToMe && message.from !== participantId) {
+      if (addressedToMe && message.from !== participantId && !paused) {
         const text = message.payload?.text ?? '';
         const estimatedTokens = Math.max(1, Math.ceil(text.length / 4));
         tokensUsed += estimatedTokens;

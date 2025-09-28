@@ -432,6 +432,11 @@ class InitCommand {
       // Sensitive values remain in environment only
     }
 
+    // Provide JSON-escaped variants for templates that need to embed values inside JSON
+    if (typeof variables.AGENT_PROMPT === 'string') {
+      variables.AGENT_PROMPT_JSON = JSON.stringify(variables.AGENT_PROMPT);
+    }
+
     return variables;
   }
 
