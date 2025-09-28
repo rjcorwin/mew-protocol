@@ -15,6 +15,11 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
 TEST_PORT=${TEST_PORT:-8080}
 
@@ -118,7 +123,7 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test 3: Non-existent participant${NC}"
-status_nonexistent=$(send_http_message '{"kind":"chat","payload":{"text":"hello"}}' 'ghost' 'test-token')
+status_nonexistent=$(send_http_message '{"id":"ghost-msg","kind":"chat","payload":{"text":"hello"}}' 'ghost' 'test-token')
 if [[ "${status_nonexistent}" == 4* || "${status_nonexistent}" == 5* ]]; then
   record_pass "Ghost participant rejected with ${status_nonexistent}"
 else
@@ -132,14 +137,26 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test 4: Large message acceptance${NC}"
-large_payload=$(python - <<'PY'
-import json
-print(json.dumps({"kind": "chat", "payload": {"text": "A" * 10000}}))
+large_envelope_id=$(generate_envelope_id)
+large_payload=$(python - "$large_envelope_id" <<'PY'
+import json, sys
+print(json.dumps({
+  "id": sys.argv[1],
+  "kind": "chat",
+  "payload": {"text": "A" * 10000}
+}))
 PY
 )
 status_large=$(send_http_message "${large_payload}")
 if [[ "${status_large}" == 2* ]]; then
   record_pass "Large message accepted with ${status_large}"
+  if wait_for_envelope "${large_envelope_id}" && \
+     wait_for_delivery "${large_envelope_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "chat" "${large_envelope_id}"; then
+    record_pass "Large message logged and delivered"
+  else
+    record_fail "Large message logged and delivered"
+  fi
 else
   record_fail "Large message accepted with ${status_large}"
 fi
@@ -152,10 +169,14 @@ fi
 
 printf "\n%b\n" "${YELLOW}Test 5: Rapid message burst${NC}"
 rapid_success=0
+last_burst_id=""
 for i in {1..20}; do
-  status=$(send_http_message "{\"kind\":\"chat\",\"payload\":{\"text\":\"Message ${i}\"}}")
+  envelope_id=$(generate_envelope_id)
+  payload="{\"id\":\"${envelope_id}\",\"kind\":\"chat\",\"payload\":{\"text\":\"Message ${i}\"}}"
+  status=$(send_http_message "${payload}")
   if [[ "${status}" == 2* ]]; then
     rapid_success=$((rapid_success + 1))
+    last_burst_id="${envelope_id}"
   fi
   sleep 0.1
 done
@@ -163,6 +184,15 @@ if [[ ${rapid_success} -eq 20 ]]; then
   record_pass "All rapid messages accepted"
 else
   record_fail "All rapid messages accepted"
+fi
+
+if [[ -n "${last_burst_id}" ]] && \
+   wait_for_envelope "${last_burst_id}" && \
+   wait_for_delivery "${last_burst_id}" "test-client" && \
+   wait_for_capability_grant "test-client" "chat" "${last_burst_id}"; then
+  record_pass "Burst messages reflected in gateway logs"
+else
+  record_fail "Burst messages reflected in gateway logs"
 fi
 
 if gateway_alive; then
@@ -204,14 +234,26 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test 8: Special characters${NC}"
-special_payload=$(python - <<'PY'
-import json
-print(json.dumps({"kind": "chat", "payload": {"text": "Symbols: © ™ 漢字 😊"}}))
+special_envelope_id=$(generate_envelope_id)
+special_payload=$(python - "$special_envelope_id" <<'PY'
+import json, sys
+print(json.dumps({
+  "id": sys.argv[1],
+  "kind": "chat",
+  "payload": {"text": "Symbols: © ™ 漢字 😊"}
+}))
 PY
 )
 status_special=$(send_http_message "${special_payload}")
 if [[ "${status_special}" == 2* ]]; then
   record_pass "Special characters accepted with ${status_special}"
+  if wait_for_envelope "${special_envelope_id}" && \
+     wait_for_delivery "${special_envelope_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "chat" "${special_envelope_id}"; then
+    record_pass "Special character message logged"
+  else
+    record_fail "Special character message logged"
+  fi
 else
   record_fail "Special characters accepted with ${status_special}"
 fi

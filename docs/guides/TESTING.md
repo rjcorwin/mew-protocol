@@ -134,6 +134,13 @@ wait_for_delivery "$envelope_id" "calculator-agent"
 wait_for_capability_grant "test-client" "mcp/request"
 ```
 
+### Scenario Coverage
+
+- **Scenario 4 – Capabilities:** verifies limited agents can only invoke authorised MCP methods by asserting HTTP envelopes are logged, delivered, and matched against `mcp/request` capability decisions.
+- **Scenario 5 – Reasoning:** tracks every reasoning and MCP envelope to ensure the gateway records the reasoning context, calculator requests, and final chat response.
+- **Scenario 6 – Errors:** cross-checks acceptance cases (large payloads, bursts, unicode) against the gateway logs so the suite proves both HTTP status codes and downstream delivery traces.
+- **Scenario 7 – MCP Bridge:** confirms filesystem requests are routed to the MCP bridge with matching capability grants before asserting on the bridge's textual responses.
+
 Connect as human to interact:
 ```bash
 mew client connect --space my-test-space --token human-token
