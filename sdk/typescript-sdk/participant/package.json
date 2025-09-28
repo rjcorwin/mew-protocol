@@ -29,7 +29,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjcorwin/mew-protocol.git",
+    "url": "git+https://github.com/rjcorwin/mew-protocol.git",
     "directory": "sdk/typescript-sdk/participant"
   },
   "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
