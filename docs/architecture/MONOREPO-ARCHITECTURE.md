@@ -242,20 +242,15 @@ Keep existing tsconfig.json but add separate configs for the build script.
 
 ### Publishing Workflow
 
-For packages intended to be published:
+For comprehensive package publishing instructions, see the main release guide:
 
-1. **Version Update**
-   ```bash
-   # Update version in specific package
-   cd sdk/typescript-sdk/types
-   npm version patch
-   ```
+**📖 See [RELEASE.md](../../RELEASE.md) for complete publishing process**
 
-2. **Build & Publish**
-   ```bash
-   npm run build
-   npm publish --workspace=@mew-protocol/types
-   ```
+The release guide covers:
+- Version management strategies
+- Dependency order publishing
+- CLI template updates
+- Post-release verification
 
 ### Dependency Management
 
