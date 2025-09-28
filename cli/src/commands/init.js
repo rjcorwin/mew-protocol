@@ -192,8 +192,15 @@ class InitCommand {
    * List available templates
    */
   listTemplates(templates) {
+    // Sort templates with coder-agent first, then alphabetical
+    const sortedTemplates = [...templates].sort((a, b) => {
+      if (a.name === 'coder-agent') return -1;
+      if (b.name === 'coder-agent') return 1;
+      return a.name.localeCompare(b.name);
+    });
+
     console.log('\nAvailable templates:\n');
-    for (const template of templates) {
+    for (const template of sortedTemplates) {
       console.log(`  ${template.name} (${template.source})`);
     }
   }
@@ -525,6 +532,13 @@ class InitCommand {
       const meta = await this.loadTemplateMetadata(t);
       templatesWithMeta.push({ ...t, meta });
     }
+
+    // Sort templates with coder-agent first, then alphabetical
+    templatesWithMeta.sort((a, b) => {
+      if (a.name === 'coder-agent') return -1;
+      if (b.name === 'coder-agent') return 1;
+      return a.name.localeCompare(b.name);
+    });
 
     return new Promise((resolve) => {
       const rl = readline.createInterface({
