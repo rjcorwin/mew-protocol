@@ -2267,7 +2267,7 @@ function getPayloadPreview(payload, kind) {
         const firstContent = payload.result.content[0];
         if (firstContent?.type === 'text') {
           const text = firstContent.text;
-          return `result: "${text.length > 150 ? text.substring(0, 150) + '...' : text}"`;
+          return `result: "${text.length > 1000 ? text.substring(0, 1000) + '...' : text}"`;
         }
         return `result: ${payload.result.content.length} content items`;
       }

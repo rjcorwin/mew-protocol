@@ -2,8 +2,8 @@
 
 const readline = require('readline');
 
-const WALL = '🟫';
-const WALKWAY = '◻️';
+const WALL = '⬛';
+const WALKWAY = '🟩';
 
 const LEVEL_DEFINITIONS = [
   {
@@ -265,6 +265,8 @@ function buildLevels(definitions) {
           grid[row][col] = WALKWAY;
         } else if (cell === ' ') {
           grid[row][col] = WALKWAY;
+        } else if (cell === '🟫') {
+          grid[row][col] = WALL;
         }
       }
     }

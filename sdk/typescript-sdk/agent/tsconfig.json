@@ -1,16 +1,10 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,
-    "outDir": "./dist",
+    "outDir": "dist",
     "rootDir": "./src",
     "allowJs": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [
-    { "path": "../types" },
-    { "path": "../client" },
-    { "path": "../participant" }
-  ]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

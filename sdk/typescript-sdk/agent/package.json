@@ -1,6 +1,6 @@
 {
   "name": "@mew-protocol/agent",
-  "version": "0.4.3",
+  "version": "0.4.5",
   "description": "TypeScript agent for MEW Protocol",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,15 +8,15 @@
     "mew-agent": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc",
     "postbuild": "node -e \"const fs=require('fs');const path=require('path');const target=path.join(__dirname,'dist','index.js');if(fs.existsSync(target)){fs.chmodSync(target,0o755);}\"",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build"
+    "clean": "rm -rf dist && rm -f *.tsbuildinfo",
+    "prepublishOnly": "npm run clean && npm run build && ls -la dist/"
   },
   "dependencies": {
     "@mew-protocol/client": "^0.4.0",
