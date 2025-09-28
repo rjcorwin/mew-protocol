@@ -1,4 +1,5 @@
 import { MEWClient, ClientOptions } from '@mew-protocol/client';
+import WebSocket from 'ws';
 import {
   Envelope,
   Capability,
