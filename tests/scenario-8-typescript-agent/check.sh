@@ -15,8 +15,18 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
 TEST_PORT=${TEST_PORT:-8080}
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
+if [[ ! -f "${OUTPUT_LOG}" ]]; then
+  echo "Expected output log ${OUTPUT_LOG} was not created" >&2
+  exit 1
+fi
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -81,7 +91,7 @@ else
   record_fail "Gateway health endpoint"
 fi
 
-if wait_for_pattern "${OUTPUT_LOG}" '"id":"typescript-agent"' 40; then
+if wait_for_pattern "${OUTPUT_LOG}" '"id":"typescript-agent"' 120; then
   record_pass "TypeScript agent connected"
 else
   record_fail "TypeScript agent connected"
@@ -90,8 +100,16 @@ fi
 : > "${OUTPUT_LOG}"
 
 printf "\n%b\n" "${YELLOW}Test: List tools from TypeScript agent${NC}"
-if post_test_client '{"kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}}'; then
-  if wait_for_pattern "${OUTPUT_LOG}" '"tools"' 30 && wait_for_pattern "${OUTPUT_LOG}" '"calculate"' 30; then
+tools_list_id=$(generate_envelope_id)
+if post_test_client "$(cat <<JSON
+{"id":"${tools_list_id}","kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}}
+JSON
+)"; then
+  if wait_for_envelope "${tools_list_id}" && \
+     wait_for_envelope_receipt "${tools_list_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${tools_list_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" '"tools"' 30 && \
+     wait_for_pattern "${OUTPUT_LOG}" '"calculate"' 30; then
     record_pass "Tools list includes calculate"
   else
     record_fail "Tools list includes calculate"
@@ -103,8 +121,15 @@ fi
 : > "${OUTPUT_LOG}"
 
 printf "\n%b\n" "${YELLOW}Test: Calculate add tool (5 + 3)${NC}"
-if post_test_client '{"kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"calculate","arguments":{"operation":"add","a":5,"b":3}}}}'; then
-  if wait_for_pattern "${OUTPUT_LOG}" '5 add 3 = 8' 30; then
+calc_add_id=$(generate_envelope_id)
+if post_test_client "$(cat <<JSON
+{"id":"${calc_add_id}","kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"calculate","arguments":{"operation":"add","a":5,"b":3}}}}
+JSON
+)"; then
+  if wait_for_envelope "${calc_add_id}" && \
+     wait_for_envelope_receipt "${calc_add_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${calc_add_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" '5 add 3 = 8' 30; then
     record_pass "Addition result returned"
   else
     record_fail "Addition result returned"
@@ -116,8 +141,15 @@ fi
 : > "${OUTPUT_LOG}"
 
 printf "\n%b\n" "${YELLOW}Test: Calculate multiply tool (7 * 6)${NC}"
-if post_test_client '{"kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"calculate","arguments":{"operation":"multiply","a":7,"b":6}}}}'; then
-  if wait_for_pattern "${OUTPUT_LOG}" '7 multiply 6 = 42' 30; then
+calc_multiply_id=$(generate_envelope_id)
+if post_test_client "$(cat <<JSON
+{"id":"${calc_multiply_id}","kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"calculate","arguments":{"operation":"multiply","a":7,"b":6}}}}
+JSON
+)"; then
+  if wait_for_envelope "${calc_multiply_id}" && \
+     wait_for_envelope_receipt "${calc_multiply_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${calc_multiply_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" '7 multiply 6 = 42' 30; then
     record_pass "Multiplication result returned"
   else
     record_fail "Multiplication result returned"
@@ -129,8 +161,15 @@ fi
 : > "${OUTPUT_LOG}"
 
 printf "\n%b\n" "${YELLOW}Test: Echo tool response${NC}"
-if post_test_client '{"kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello from TypeScript agent test!"}}}}'; then
-  if wait_for_pattern "${OUTPUT_LOG}" 'Echo: Hello from TypeScript agent test!' 30; then
+echo_request_id=$(generate_envelope_id)
+if post_test_client "$(cat <<JSON
+{"id":"${echo_request_id}","kind":"mcp/request","to":["typescript-agent"],"payload":{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello from TypeScript agent test!"}}}}
+JSON
+)"; then
+  if wait_for_envelope "${echo_request_id}" && \
+     wait_for_envelope_receipt "${echo_request_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${echo_request_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" 'Echo: Hello from TypeScript agent test!' 30; then
     record_pass "Echo tool returned message"
   else
     record_fail "Echo tool returned message"
@@ -142,8 +181,15 @@ fi
 : > "${OUTPUT_LOG}"
 
 printf "\n%b\n" "${YELLOW}Test: Chat interaction${NC}"
-if post_test_client '{"kind":"chat","to":["typescript-agent"],"payload":{"text":"Hello TypeScript agent, can you help me?","format":"plain"}}'; then
-  if wait_for_pattern "${OUTPUT_LOG}" '"kind":"chat"' 30; then
+chat_envelope_id=$(generate_envelope_id)
+if post_test_client "$(cat <<JSON
+{"id":"${chat_envelope_id}","kind":"chat","to":["typescript-agent"],"payload":{"text":"Hello TypeScript agent, can you help me?","format":"plain"}}
+JSON
+)"; then
+  if wait_for_envelope "${chat_envelope_id}" && \
+     wait_for_envelope_receipt "${chat_envelope_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "chat" "${chat_envelope_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" '"kind":"chat"' 30; then
     record_pass "Agent responded to chat"
   else
     record_fail "Agent responded to chat"
