@@ -6,6 +6,7 @@ Guide a curious 🐈 through 10 handcrafted mazes using MCP tools. Humans can ca
 
 - 🎮 **Stateful MCP server** that tracks the current maze level, cat position, and total moves
 - 🧭 **Maze tools**: `view`, `up`, `down`, `left`, `right`, `restart`
+- 🟫 **Emoji walls** that align visually with the 🐈 for clean board snapshots
 - 🗣️ **Narrator companion** that watches every move and drops fresh `view` snapshots in chat
 - 🤝 **Cooperative play** between human participants and the MEW agent
 - 🧩 10 levels that escalate in difficulty from straight corridors to winding labyrinths

@@ -47,10 +47,12 @@ function createLogger(logPath) {
   };
 }
 
+const WALL = '🟫';
+
 function findPath(board) {
   const rows = board.split('\n');
   const height = rows.length;
-  const width = rows[0]?.length || 0;
+  const width = Array.from(rows[0] || '').length;
   const grid = rows.map((row) => Array.from(row));
   let start = null;
   let goal = null;
@@ -102,7 +104,7 @@ function findPath(board) {
         next.row >= height ||
         next.col < 0 ||
         next.col >= width ||
-        grid[next.row][next.col] === '#'
+        grid[next.row][next.col] === WALL
       ) {
         continue;
       }
