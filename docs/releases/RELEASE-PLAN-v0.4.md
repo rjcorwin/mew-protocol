@@ -233,7 +233,7 @@ npm view @mew-protocol/types version          # Expected: 0.4.0
 npm view @mew-protocol/capability-matcher     # Expected: 0.4.1
 npm view @mew-protocol/client version         # Expected: 0.4.1
 npm view @mew-protocol/participant version    # Expected: 0.4.2
-npm view @mew-protocol/agent version          # Expected: 0.4.3
+npm view @mew-protocol/agent version          # Expected: 0.4.6
 npm view @mew-protocol/bridge version         # Expected: 0.4.1
 npm view @mew-protocol/cli version            # Expected: 0.4.3
 ```
@@ -263,7 +263,7 @@ mew space init --template coder-agent test-coder
 cd test-coder
 npm install
 # Verify no dependency resolution errors
-npm list @mew-protocol/agent  # Should show 0.4.3
+npm list @mew-protocol/agent  # Should show 0.4.6
 npm list @mew-protocol/bridge # Should show 0.4.1
 
 # Test cat-maze template (NEW in v0.4!)
@@ -272,7 +272,7 @@ mew space init --template cat-maze test-maze
 cd test-maze
 npm install
 # Should install without errors
-npm list @mew-protocol/agent  # Should show 0.4.3
+npm list @mew-protocol/agent  # Should show 0.4.6
 ```
 
 ### Phase 4: Feature Verification (v0.4 Specific)
@@ -407,7 +407,7 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
   - Fixed `outDir: "./dist"` → `outDir: "dist"` in tsconfig.json
   - Updated clean script to remove `*.tsbuildinfo` files
   - Removed problematic project references temporarily
-  - Published `@mew-protocol/agent@0.4.5` with working binary
+  - Published `@mew-protocol/agent@0.4.5` with working binary, then republished `0.4.6` to depend on participant `0.4.2`
 - **Future Prevention**:
   - Add post-publish verification step to test binary execution
   - Include `.tsbuildinfo` cleanup in all package clean scripts
@@ -510,7 +510,7 @@ grep -r "@mew-protocol" sdk/typescript-sdk/*/package.json bridge/package.json
 - `@mew-protocol/capability-matcher@0.4.1`
 - `@mew-protocol/client@0.4.1`
 - `@mew-protocol/participant@0.4.2`
-- `@mew-protocol/agent@0.4.5` ⚠️ (Fixed build issues)
+- `@mew-protocol/agent@0.4.6` ⚠️ (Fixed build issues, updated participant dependency)
 - `@mew-protocol/bridge@0.4.1`
 - `@mew-protocol/cli@0.4.8` ⚠️ (Fixed truncation + maze bugs)
 

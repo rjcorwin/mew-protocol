@@ -1,11 +1,11 @@
 {
   "name": "@mew-protocol/agent",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "TypeScript agent for MEW Protocol",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "mew-agent": "./dist/index.js"
+    "mew-agent": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@mew-protocol/client": "^0.4.0",
-    "@mew-protocol/participant": "^0.4.0",
+    "@mew-protocol/participant": "^0.4.2",
     "@mew-protocol/types": "^0.4.0",
     "@types/uuid": "^9.0.8",
     "js-yaml": "^4.1.0",
@@ -49,7 +49,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjcorwin/mew-protocol.git",
+    "url": "git+https://github.com/rjcorwin/mew-protocol.git",
     "directory": "sdk/typescript-sdk/agent"
   },
   "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
