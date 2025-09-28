@@ -9,9 +9,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mew-protocol/capability-matcher": "^0.2.0",
-    "@mew-protocol/client": "^0.2.0",
-    "@mew-protocol/types": "^0.2.0",
+    "@mew-protocol/capability-matcher": "^0.4.0",
+    "@mew-protocol/client": "^0.4.0",
+    "@mew-protocol/types": "^0.4.0",
     "@types/uuid": "^9.0.8",
     "uuid": "^9.0.1"
   },
