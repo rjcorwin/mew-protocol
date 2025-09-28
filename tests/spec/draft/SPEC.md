@@ -49,9 +49,6 @@ tests/
     └── teardown.sh                     # shuts down & deletes workspace dir
 ```
 
-Legacy scenarios are archived under `tests-deprecated/` and are not executed by
-CI once the migration completes.
-
 ---
 
 ## 4. Scenario Lifecycle
@@ -102,24 +99,12 @@ CI once the migration completes.
 - `.workspace/` (or the chosen scratch directory name) is gitignored at the
   scenario level.
 - Only template files, scripts, and documentation are tracked.
-- Legacy directories remain under `tests-deprecated/` until migration finishes.
 
 ---
 
-## 8. Migration Strategy
-
-1. Move the old `tests/` tree to `tests-deprecated/` (completed).
-2. For each scenario:
-   - Port the configuration into `template/.mew/space.yaml`.
-   - Update scripts to use the disposable workspace lifecycle outlined above.
-   - Validate the scenario locally.
-3. Update the test runner (`run-all-tests.sh` or replacement) to operate on the
-   new scenario directories.
-4. Remove `tests-deprecated/` once all scenarios are migrated and passing.
-
 ---
 
-## 9. Validation
+## 8. Validation
 
 - CI invokes the new scenarios via the updated test runner.
 - Manual smoke tests cover representative scenarios (e.g. basic message flow,
@@ -129,13 +114,84 @@ CI once the migration completes.
 
 ---
 
+## 9. Envelope Monitoring and Assertions
+
+Test scenarios leverage gateway envelope logging for comprehensive protocol validation alongside traditional participant log monitoring.
+
+### Gateway Log Integration
+
+The CLI provides dual-log architecture (available v0.5.0+) enabled by default:
+- **Envelope History** (`.mew/logs/envelope-history.jsonl`) - Message flow, delivery, failures
+- **Capability Decisions** (`.mew/logs/capability-decisions.jsonl`) - Routing decisions, capability checks
+
+### Hybrid Monitoring Approach
+
+**Protocol-level validation** (gateway logs):
+- Envelope routing and delivery confirmation
+- Capability matching and grant decisions
+- Timing and performance metrics
+- Complete envelope flow tracing
+
+**Application-level validation** (participant logs):
+- Business logic and content validation
+- Agent-specific behavior verification
+- User interaction and response patterns
+
+### Shared Test Utilities
+
+**Standard Helper Library** (`tests/lib/gateway-logs.sh`):
+```bash
+# Envelope monitoring functions
+wait_for_envelope() {
+  local envelope_id="$1"
+  timeout 30 bash -c "until grep -q '\"id\":\"$envelope_id\"' .mew/logs/envelope-history.jsonl; do sleep 0.1; done"
+}
+
+assert_envelope_delivered() {
+  local envelope_id="$1" participant="$2"
+  grep -q "\"event\":\"delivered\".*\"id\":\"$envelope_id\".*\"participant\":\"$participant\"" .mew/logs/envelope-history.jsonl
+}
+
+assert_capability_granted() {
+  local participant="$1" capability="$2"
+  grep -q "\"result\":\"allowed\".*\"participant\":\"$participant\".*\"required_capability\":\"$capability\"" .mew/logs/capability-decisions.jsonl
+}
+```
+
+### Usage Pattern
+
+**Enhanced Test Flow:**
+```bash
+# In check.sh
+source ../lib/gateway-logs.sh
+
+# Send test message with envelope ID
+envelope_id=$(generate_envelope_id)
+send_test_message "$envelope_id" "Hello agent"
+
+# Validate protocol-level delivery
+wait_for_envelope "$envelope_id"
+assert_envelope_delivered "$envelope_id" "agent"
+assert_capability_granted "agent" "chat"
+
+# Validate application-level response
+wait_for_pattern "${OUTPUT_LOG}" "Echo: Hello agent"
+```
+
+### Migration Strategy
+
+**New scenarios**: Use gateway logs as primary monitoring with participant logs for application validation.
+
+**Existing scenarios**: Add gateway log assertions alongside existing participant log checks, migrating critical validations incrementally.
+
+---
+
 ## 10. Open Questions
 
 - Final naming for the scratch workspace directory (`.workspace/` vs another).
 - Standardising shared template structure vs per-scenario duplication.
 - Whether to add a convenience flag to the CLI for “use local template”.
-- CI strategy during migration (run both new and deprecated scenarios or adopt a
-  phased rollout).
+- CI strategy for running scenarios (parallel execution vs sequential).
 
 ---
 

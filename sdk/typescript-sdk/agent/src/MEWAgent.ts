@@ -8,7 +8,38 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
+export interface ChatCompletionsAPI {
+  create(params: any): Promise<any>;
+}
+
+export interface OpenAIClientInterface {
+  chat: {
+    completions: ChatCompletionsAPI;
+  };
+}
+
+export interface OpenAIClientFactoryOptions {
+  apiKey?: string;
+  baseURL?: string;
+}
+
+export type OpenAIClientFactory = (options: OpenAIClientFactoryOptions) => OpenAIClientInterface;
+
 const PROTOCOL_VERSION = 'mew/v0.4';
+
+const defaultOpenAIClientFactory: OpenAIClientFactory = (options) => {
+  const openaiConfig: OpenAIClientFactoryOptions = {};
+
+  if (options.apiKey) {
+    openaiConfig.apiKey = options.apiKey;
+  }
+
+  if (options.baseURL) {
+    openaiConfig.baseURL = options.baseURL;
+  }
+
+  return new OpenAI(openaiConfig) as OpenAIClientInterface;
+};
 
 export interface AgentConfig extends ParticipantOptions {
   name?: string;
@@ -16,8 +47,11 @@ export interface AgentConfig extends ParticipantOptions {
   model?: string;
   apiKey?: string;
   baseURL?: string;  // Custom OpenAI API base URL (for alternative providers)
+  openAIClient?: OpenAIClientInterface; // Injected OpenAI-compatible client (overrides apiKey/baseURL)
+  openAIClientFactory?: OpenAIClientFactory; // Factory for creating OpenAI-compatible clients
   reasoningEnabled?: boolean;  // Emit reasoning events (reasoning/start, reasoning/thought, reasoning/conclusion)
   autoRespond?: boolean;
+  mockLLM?: boolean;  // Use deterministic heuristics instead of calling external LLMs
   maxIterations?: number;
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
   conversationHistoryLength?: number;  // Number of previous messages to include in context (default: 0 = only current)
@@ -75,7 +109,8 @@ interface OtherParticipant {
 
 export class MEWAgent extends MEWParticipant {
   private config: AgentConfig;
-  private openai?: OpenAI;
+  private openai?: OpenAIClientInterface;
+  private mockLLM = false;
   private otherParticipants = new Map<string, OtherParticipant>();
   private isRunning = false;
   private currentConversation: Array<{ role: string; content: string }> = [];
@@ -110,8 +145,15 @@ export class MEWAgent extends MEWParticipant {
       ...config
     };
 
-    // LOUDLY FAIL if no API key provided
-    if (!this.config.apiKey) {
+    this.mockLLM = Boolean(this.config.mockLLM);
+    const hasInjectedClient = Boolean(this.config.openAIClient || this.config.openAIClientFactory);
+
+    if (this.mockLLM) {
+      this.log('info', '🧪 Running MEWAgent in mock LLM mode (no external OpenAI dependency)');
+    }
+
+    // LOUDLY FAIL if no API key provided and no injected client available
+    if (!this.config.apiKey && !this.mockLLM && !hasInjectedClient) {
       console.error('');
       console.error('🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨');
       console.error('❌ FATAL ERROR: OPENAI_API_KEY is not configured! ❌');
@@ -132,12 +174,17 @@ export class MEWAgent extends MEWParticipant {
       process.exit(1);
     }
 
-    // Initialize OpenAI with the API key
-    const openaiConfig: any = { apiKey: this.config.apiKey };
-    if (this.config.baseURL) {
-      openaiConfig.baseURL = this.config.baseURL;
+    if (!this.mockLLM) {
+      if (this.config.openAIClient) {
+        this.openai = this.config.openAIClient;
+      } else {
+        const factory = this.config.openAIClientFactory || defaultOpenAIClientFactory;
+        this.openai = factory({
+          apiKey: this.config.apiKey,
+          baseURL: this.config.baseURL
+        });
+      }
     }
-    this.openai = new OpenAI(openaiConfig);
 
     this.setupAgentBehavior();
 
@@ -384,8 +431,9 @@ export class MEWAgent extends MEWParticipant {
     }
 
     try {
-      // Start reasoning if enabled
-      if (this.config.reasoningEnabled) {
+      if (this.mockLLM) {
+        await this.handleMockChat(envelope, text);
+      } else if (this.config.reasoningEnabled) {
         await this.emitReasoning('reasoning/start', { input: text });
 
         try {
@@ -420,6 +468,110 @@ export class MEWAgent extends MEWParticipant {
     }
   }
 
+  private async handleMockChat(envelope: Envelope, text: string): Promise<void> {
+    const lower = text.toLowerCase();
+    const additionMatch = lower.match(/add\s+(-?\d+(?:\.\d+)?)\s+(?:and|with|plus)\s+(-?\d+(?:\.\d+)?)/);
+    const multiplyMatch = lower.match(/multiply\s+(-?\d+(?:\.\d+)?)\s+(?:and|with|by)\s+(-?\d+(?:\.\d+)?)/);
+
+    if (additionMatch) {
+      const a = Number(additionMatch[1]);
+      const b = Number(additionMatch[2]);
+      const handled = await this.executeMockTool(
+        'add',
+        { a, b },
+        envelope.from,
+        (result) => `The sum of ${a} and ${b} is ${result}.`
+      );
+
+      if (!handled) {
+        await this.sendResponse(
+          `I'm waiting for a collaborator with an add tool to help compute ${a} and ${b}.`,
+          envelope.from
+        );
+      }
+      return;
+    }
+
+    if (multiplyMatch) {
+      const a = Number(multiplyMatch[1]);
+      const b = Number(multiplyMatch[2]);
+      const handled = await this.executeMockTool(
+        'multiply',
+        { a, b },
+        envelope.from,
+        (result) => `${a} multiplied by ${b} equals ${result}.`
+      );
+
+      if (!handled) {
+        await this.sendResponse(
+          `I need a fulfiller to join before I can multiply ${a} by ${b}.`,
+          envelope.from
+        );
+      }
+      return;
+    }
+
+    await this.sendResponse("I'm here to help! (mock response)", envelope.from);
+  }
+
+  private async executeMockTool(
+    toolName: string,
+    args: Record<string, any>,
+    recipient: string,
+    formatResult: (result: any) => string
+  ): Promise<boolean> {
+    await this.waitForPendingDiscoveries();
+
+    let availableTools = this.getAvailableTools();
+    let remoteTool = availableTools.find(
+      (tool) => tool.participantId !== this.options.participant_id && tool.name === toolName
+    );
+
+    if (!remoteTool) {
+      for (const participant of this.otherParticipants.values()) {
+        try {
+          await this.discoverTools(participant.id);
+        } catch (error) {
+          this.log('warn', `Tool discovery failed for ${participant.id}: ${error}`);
+        }
+      }
+
+      await this.waitForPendingDiscoveries();
+      availableTools = this.getAvailableTools();
+      remoteTool = availableTools.find(
+        (tool) => tool.participantId !== this.options.participant_id && tool.name === toolName
+      );
+    }
+
+    if (!remoteTool) {
+      return false;
+    }
+
+    try {
+      const result = await this.mcpRequest(
+        [remoteTool.participantId],
+        {
+          method: 'tools/call',
+          params: {
+            name: toolName,
+            arguments: args
+          }
+        },
+        30000
+      );
+
+      await this.sendResponse(formatResult(result), recipient);
+    } catch (error: any) {
+      const description = error instanceof Error ? error.message : String(error);
+      await this.sendResponse(
+        `I attempted to use ${remoteTool.participantId}/${toolName} but encountered: ${description}`,
+        recipient
+      );
+    }
+
+    return true;
+  }
+
   protected onPause(envelope: Envelope): void {
     this.log('info', `Paused by ${envelope.from || 'unknown'}${envelope.payload?.reason ? ` (${envelope.payload.reason})` : ''}`);
   }
@@ -442,7 +594,28 @@ export class MEWAgent extends MEWParticipant {
     if (!this.config.autoRespond) {
       return false;
     }
-    
+
+    if (this.mockLLM) {
+      const text = envelope.payload?.text || '';
+      if (envelope.to?.includes(this.options.participant_id!)) {
+        return true;
+      }
+
+      const myId = this.options.participant_id!;
+      const myName = this.config.name || myId;
+      const mentionPattern = new RegExp(`\\b(${myId}|${myName})\\b`, 'i');
+
+      if (mentionPattern.test(text)) {
+        return true;
+      }
+
+      if (text.includes('?')) {
+        return true;
+      }
+
+      return false;
+    }
+
     const chatConfig = {
       respondToQuestions: true,
       respondToMentions: true,

@@ -15,10 +15,30 @@ fi
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 
+# shellcheck disable=SC1091
+source "${SCENARIO_DIR}/../lib/gateway-logs.sh"
+
 OUTPUT_LOG=${OUTPUT_LOG:-"${WORKSPACE_DIR}/logs/test-client-output.log"}
 COORDINATOR_LOG=${COORDINATOR_LOG:-"${WORKSPACE_DIR}/logs/coordinator.log"}
 WORKER_LOG=${WORKER_LOG:-"${WORKSPACE_DIR}/logs/worker.log"}
 TEST_PORT=${TEST_PORT:-8080}
+
+: "${GATEWAY_LOG_DIR:=${WORKSPACE_DIR}/.mew/logs}"
+
+if [[ ! -f "${OUTPUT_LOG}" ]]; then
+  echo "Expected output log ${OUTPUT_LOG} was not created" >&2
+  exit 1
+fi
+
+if [[ ! -f "${COORDINATOR_LOG}" ]]; then
+  echo "Expected coordinator log ${COORDINATOR_LOG} was not created" >&2
+  exit 1
+fi
+
+if [[ ! -f "${WORKER_LOG}" ]]; then
+  echo "Expected worker log ${WORKER_LOG} was not created" >&2
+  exit 1
+fi
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -87,9 +107,16 @@ else
 fi
 
 printf "\n%b\n" "${YELLOW}Test: Coordinator delegates addition via worker${NC}"
-request_payload='{"kind":"chat","to":["coordinator-agent"],"payload":{"text":"Please add 4 and 6","format":"plain"}}'
+chat_envelope_id=$(generate_envelope_id)
+request_payload=$(cat <<JSON
+{"id":"${chat_envelope_id}","kind":"chat","to":["coordinator-agent"],"payload":{"text":"Please add 4 and 6","format":"plain"}}
+JSON
+)
 if post_test_client "${request_payload}"; then
-  if wait_for_pattern "${OUTPUT_LOG}" '4 + 6 = 10' 40; then
+  if wait_for_envelope "${chat_envelope_id}" && \
+     wait_for_envelope_receipt "${chat_envelope_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "chat" "${chat_envelope_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" '4 + 6 = 10' 40; then
     record_pass "Chat response includes result"
   else
     record_fail "Chat response includes result"
@@ -112,8 +139,15 @@ fi
 
 printf "\n%b\n" "${YELLOW}Test: Coordinator can request tools list via worker${NC}"
 : > "${OUTPUT_LOG}"
-if post_test_client '{"kind":"mcp/request","to":["worker-agent"],"payload":{"jsonrpc":"2.0","id":512,"method":"tools/list","params":{}}}'; then
-  if wait_for_pattern "${OUTPUT_LOG}" '"tools"' 40; then
+tools_list_id=$(generate_envelope_id)
+if post_test_client "$(cat <<JSON
+{"id":"${tools_list_id}","kind":"mcp/request","to":["worker-agent"],"payload":{"jsonrpc":"2.0","id":512,"method":"tools/list","params":{}}}
+JSON
+)"; then
+  if wait_for_envelope "${tools_list_id}" && \
+     wait_for_envelope_receipt "${tools_list_id}" "test-client" && \
+     wait_for_capability_grant "test-client" "mcp/request" "${tools_list_id}" && \
+     wait_for_pattern "${OUTPUT_LOG}" '"tools"' 40; then
     record_pass "tools/list proxied"
   else
     record_fail "tools/list proxied"

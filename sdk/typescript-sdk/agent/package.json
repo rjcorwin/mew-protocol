@@ -8,7 +8,7 @@
     "mew-agent": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -b",
     "postbuild": "node -e \"const fs=require('fs');const path=require('path');const target=path.join(__dirname,'dist','index.js');if(fs.existsSync(target)){fs.chmodSync(target,0o755);}\"",
     "dev": "tsc --watch",
     "start": "node dist/index.js",

@@ -98,6 +98,49 @@ pm2 logs mcp-fs-bridge
 pm2 logs gateway
 ```
 
+### Gateway Envelope Tracing
+
+The CLI writes protocol-level traces for every message routed through the gateway. When a space is running you will find two
+JSON Lines logs under `.mew/logs/` in the workspace directory:
+
+- `.mew/logs/envelope-history.jsonl` – envelope lifecycle events (`received`, `delivered`, `rejected`, etc.)
+- `.mew/logs/capability-decisions.jsonl` – capability checks and their outcomes
+
+Logging is enabled by default. Set any of the following environment variables before `mew space up` to disable specific files:
+
+```bash
+export GATEWAY_LOGGING=false           # Disable both logs
+export ENVELOPE_HISTORY=false          # Disable envelope history only
+export CAPABILITY_DECISIONS=false      # Disable capability decisions only
+```
+
+Tail or query the logs with standard tools:
+
+```bash
+tail -f .mew/logs/envelope-history.jsonl
+jq '.event' .mew/logs/capability-decisions.jsonl | sort | uniq -c
+```
+
+Automated scenarios source `tests/lib/gateway-logs.sh` for common helpers:
+
+```bash
+source tests/lib/gateway-logs.sh
+envelope_id=$(generate_envelope_id)
+# Wait until the envelope is observed by the gateway
+wait_for_envelope "$envelope_id"
+# Confirm the target participant received it
+wait_for_delivery "$envelope_id" "calculator-agent"
+# Assert the sender had the required capability
+wait_for_capability_grant "test-client" "mcp/request"
+```
+
+### Scenario Coverage
+
+- **Scenario 4 – Capabilities:** verifies limited agents can only invoke authorised MCP methods by asserting HTTP envelopes are logged, delivered, and matched against `mcp/request` capability decisions.
+- **Scenario 5 – Reasoning:** tracks every reasoning and MCP envelope to ensure the gateway records the reasoning context, calculator requests, and final chat response.
+- **Scenario 6 – Errors:** cross-checks acceptance cases (large payloads, bursts, unicode) against the gateway logs so the suite proves both HTTP status codes and downstream delivery traces.
+- **Scenario 7 – MCP Bridge:** confirms filesystem requests are routed to the MCP bridge with matching capability grants before asserting on the bridge's textual responses.
+
 Connect as human to interact:
 ```bash
 mew client connect --space my-test-space --token human-token
