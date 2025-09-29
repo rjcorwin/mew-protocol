@@ -3,7 +3,7 @@
   "version": "0.4.9",
   "description": "MEW Protocol CLI - Minimal implementation for testing",
   "bin": {
-    "mew": "./bin/mew.js"
+    "mew": "bin/mew.js"
   },
   "main": "src/index.js",
   "scripts": {
@@ -46,7 +46,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjcorwin/mew-protocol.git",
+    "url": "git+https://github.com/rjcorwin/mew-protocol.git",
     "directory": "cli"
   },
   "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
