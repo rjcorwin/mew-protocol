@@ -2,6 +2,11 @@
 
 All notable changes to the MEW Protocol CLI will be documented in this file.
 
+## [v0.4.9] - 2025-09-29
+
+### Changed
+- **Cat Maze template polish** – swapped the finish tile to a 🏡 house and updated solver/narrator glyph expectations to match the refreshed maze visuals.
+
 ## [v0.3.2] - 2025-01-16
 
 ### Added
