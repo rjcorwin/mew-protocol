@@ -10,7 +10,7 @@ Create development spaces here to automatically use local packages via npm works
 cd spaces/
 mkdir my-space
 cd my-space
-../../cli/bin/mew.js space init .
+../../packages/mew/src/bin/mew.js space init .
 ```
 
 ## How it Works

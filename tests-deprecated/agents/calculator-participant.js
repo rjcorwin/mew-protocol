@@ -7,7 +7,7 @@
 const path = require('path');
 
 // Import MEWParticipant from the SDK
-const participantPath = path.resolve(__dirname, '../../sdk/typescript-sdk/participant/dist/index.js');
+const participantPath = path.resolve(__dirname, '../../packages/mew/dist/participant/index.js');
 const { MEWParticipant } = require(participantPath);
 
 class CalculatorAgent extends MEWParticipant {

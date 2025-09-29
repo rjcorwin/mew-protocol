@@ -52,76 +52,36 @@ Create a shared base configuration at the root:
 
 ### Step 2: Configure Package TSConfigs
 
-Each package should extend the base and enable `composite`:
+The unified workspace keeps a single TypeScript project configuration. Extend the base settings
+and exclude CLI/templates so that only library sources participate in incremental builds:
 
 ```json
-// sdk/typescript-sdk/types/tsconfig.json
+// packages/mew/tsconfig.build.json
 {
-  "extends": "../../../tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": "src",
+    "paths": {
+      "@mew-protocol/mew": ["index.ts"],
+      "@mew-protocol/mew/*": ["*/index.ts", "*/MEWAgent.ts"]
+    }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
-}
-```
-
-```json
-// sdk/typescript-sdk/client/tsconfig.json
-{
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [
-    { "path": "../types" }
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "src/cli/**",
+    "src/bin/**",
+    "src/templates/**",
+    "**/*.test.ts"
   ]
 }
 ```
 
-```json
-// sdk/typescript-sdk/participant/tsconfig.json
-{
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [
-    { "path": "../types" },
-    { "path": "../client" },
-    { "path": "../capability-matcher" }
-  ]
-}
-```
-
-```json
-// sdk/typescript-sdk/agent/tsconfig.json
-{
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [
-    { "path": "../types" },
-    { "path": "../client" },
-    { "path": "../participant" }
-  ]
-}
-```
+Add additional `references` only when introducing new subprojects under `packages/mew/src`
+(for example, if a future module requires its own build output). For the current layout, the
+single build config is sufficient.
 
 ### Step 3: Create Root TSConfig for Building
 
@@ -132,13 +92,7 @@ Create a root configuration that references all packages:
 {
   "files": [],
   "references": [
-    { "path": "./sdk/typescript-sdk/types" },
-    { "path": "./sdk/typescript-sdk/capability-matcher" },
-    { "path": "./sdk/typescript-sdk/client" },
-    { "path": "./sdk/typescript-sdk/participant" },
-    { "path": "./sdk/typescript-sdk/agent" },
-    { "path": "./sdk/typescript-sdk/gateway" },
-    { "path": "./bridge" }
+    { "path": "./packages/mew" }
   ]
 }
 ```
@@ -162,7 +116,7 @@ Replace individual TypeScript compilation with project-wide builds:
 For individual packages:
 
 ```json
-// sdk/typescript-sdk/agent/package.json
+// packages/mew/src/agent/package.json
 {
   "scripts": {
     "build": "tsc -b",
@@ -177,10 +131,10 @@ For individual packages:
 Delete all `paths` configurations from individual tsconfig.json files:
 
 ```json
-// REMOVE THIS from sdk/typescript-sdk/agent/tsconfig.json
+// REMOVE THIS from packages/mew/src/agent/tsconfig.json
 "paths": {
-  "@mew-protocol/client": ["../client/dist"],
-  "@mew-protocol/client/*": ["../client/dist/*"],
+  "@mew-protocol/mew/client": ["../client/dist"],
+  "@mew-protocol/mew/client/*": ["../client/dist/*"],
   // ... etc
 }
 ```
@@ -206,7 +160,7 @@ Delete all `paths` configurations from individual tsconfig.json files:
 
 ## Common Issues and Solutions
 
-### Issue: "Cannot find module '@mew-protocol/types'"
+### Issue: "Cannot find module '@mew-protocol/mew/types'"
 
 **Solution**: Ensure the package is listed in both:
 - `package.json` dependencies

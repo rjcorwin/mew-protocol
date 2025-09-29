@@ -9,7 +9,7 @@ cd "$DIR"
 echo "Tearing down scenario-8-grant test space..."
 
 # Stop the space
-../../cli/bin/mew.js space down 2>/dev/null || true
+../../packages/mew/src/bin/mew.js space down 2>/dev/null || true
 
 # Kill any lingering processes
 pkill -f "scenario-8-grant" 2>/dev/null || true

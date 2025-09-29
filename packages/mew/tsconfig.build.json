@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "baseUrl": "src",
+    "paths": {
+      "@mew-protocol/mew": ["index.ts"],
+      "@mew-protocol/mew/*": ["*/index.ts", "*/MEWAgent.ts"]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/cli/**",
+    "src/bin/**",
+    "src/templates/**",
+    "**/*.test.ts"
+  ]
+}

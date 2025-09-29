@@ -498,7 +498,7 @@ The CLI isolates all MEW-related dependencies (MCP servers, agents, etc.) in a `
   "description": "Dependencies for MEW {{SPACE_NAME}} space",
   "dependencies": {
     "@modelcontextprotocol/server-filesystem": "^0.5.0",
-    "@mew-protocol/agent": "^0.2.0",
+    "@mew-protocol/mew/agent": "^0.2.0",
     "openai": "^4.0.0"
   },
   "engines": {

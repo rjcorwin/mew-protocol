@@ -14,17 +14,13 @@ MEW Protocol is a monorepo using npm workspaces. The main packages are:
 
 ```
 mew-protocol/
-├── sdk/typescript-sdk/     # Core SDK packages
-│   ├── types/             # TypeScript type definitions
-│   ├── capability-matcher/ # Capability pattern matching
-│   ├── client/            # WebSocket client
-│   ├── participant/       # MCP participant base class
-│   ├── agent/             # Autonomous agent implementation
-│   └── gateway/           # Gateway server
-├── bridge/                # MCP-MEW Protocol bridge
-├── cli/                   # Command-line interface
-├── tests/                 # Test scenarios
-└── spaces/                # Example spaces
+├── packages/mew/          # Consolidated workspace (@mew-protocol/mew)
+│   ├── src/               # Source for types, client, participant, agent, bridge, CLI
+│   ├── templates/         # Space templates bundled with the CLI
+│   └── docs/              # Package-specific notes and TODOs
+├── tests/                 # Scenario tests
+├── spaces/                # Example development spaces
+└── docs/                  # Architecture, guides, bugs, progress
 ```
 
 ## Initial Setup
@@ -67,7 +63,7 @@ npm run build:force
 
 ```bash
 # Check that the CLI is available
-npx mew --version
+node packages/mew/src/bin/mew.js --help
 
 # Run tests to verify everything works
 npm test
@@ -94,7 +90,7 @@ npm run build
 npm run build:force
 
 # Build a specific package
-npm run build --workspace=@mew-protocol/participant
+npm run build --workspace=@mew-protocol/mew/participant
 ```
 
 ### Running Tests
@@ -260,7 +256,7 @@ Bridges MCP servers to MEW Protocol. Requires the participant package to be buil
 ## Additional Resources
 
 - [MEW Protocol Specification](spec/v0.4/SPEC.md)
-- [TypeScript SDK Documentation](sdk/typescript-sdk/README.md)
+- [Unified MEW workspace documentation](packages/mew/README.md)
 - [Test Scenarios](tests/README.md)
 - [Architecture Decision Records](decisions/)
 

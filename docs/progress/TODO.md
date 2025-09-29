@@ -16,8 +16,8 @@
 
 ## Fast Follow
 
-* [ ] Restore `sdk/typescript-sdk/agent` composite/project-references build for monorepo development; see note in `docs/releases/RELEASE-PLAN-v0.4.md:445`.
-* [ ] Add CI smoke test that runs the published agent binary (`npx @mew-protocol/agent`) post-publish; reference `docs/releases/RELEASE-PLAN-v0.4.md:319`.
+* [ ] Restore `packages/mew/src/agent` composite/project-references build for monorepo development; see note in `docs/releases/RELEASE-PLAN-v0.4.md:445`.
+* [ ] Add CI smoke test that runs the published agent binary (`npx @mew-protocol/mew/agent`) post-publish; reference `docs/releases/RELEASE-PLAN-v0.4.md:319`.
 * [ ] After approval dialog, the input box is in the wrong location with lots of whitespace below it, not on the bottom.
 * [ ] mew command, after initial init process, should connect not stop
 * [ ] running mew in a space that is up should just connect
@@ -56,7 +56,7 @@
     * Allows spaces to pin specific mew versions
 * [ ] mew detects when running inside mew-protocol monorepo
     * Check if cwd is within mew-protocol repo (look for root package.json with name: "mew-protocol")
-    * If found, use ./cli/bin/mew.js instead of global
+    * If found, use ./packages/mew/src/bin/mew.js instead of global
     * Enables developers to always use local version when developing
     * Implementation: Check process.cwd() and traverse up looking for package.json
 * [ ] Clean up CLAUDE.md file (incorporate testing)

@@ -15,12 +15,12 @@ This is a major release transitioning from MEW Protocol v0.3 to v0.4, featuring:
 ## Current State Analysis
 
 ### Package Versions (Pre-Release)
-- `@mew-protocol/types`: 0.2.0
-- `@mew-protocol/capability-matcher`: 0.2.0
-- `@mew-protocol/client`: 0.2.0
-- `@mew-protocol/participant`: 0.2.0
-- `@mew-protocol/agent`: 0.4.1
-- `@mew-protocol/bridge`: 0.1.1
+- `@mew-protocol/mew/types`: 0.2.0
+- `@mew-protocol/mew/capability-matcher`: 0.2.0
+- `@mew-protocol/mew/client`: 0.2.0
+- `@mew-protocol/mew/participant`: 0.2.0
+- `@mew-protocol/mew/agent`: 0.4.1
+- `@mew-protocol/mew/bridge`: 0.1.1
 - `@mew-protocol/cli`: 0.4.2
 
 ### Version Inconsistencies Identified
@@ -31,11 +31,11 @@ This is a major release transitioning from MEW Protocol v0.3 to v0.4, featuring:
 
 ### Template Dependencies Analysis
 #### `coder-agent` template:
-- `@mew-protocol/agent`: ^0.4.1 ✅
-- `@mew-protocol/bridge`: ^0.1.1 ✅
-- `@mew-protocol/client`: ^0.2.0 ⚠️ (needs update)
-- `@mew-protocol/participant`: ^0.2.0 ⚠️ (needs update)
-- `@mew-protocol/types`: ^0.2.0 ⚠️ (needs update)
+- `@mew-protocol/mew/agent`: ^0.4.1 ✅
+- `@mew-protocol/mew/bridge`: ^0.1.1 ✅
+- `@mew-protocol/mew/client`: ^0.2.0 ⚠️ (needs update)
+- `@mew-protocol/mew/participant`: ^0.2.0 ⚠️ (needs update)
+- `@mew-protocol/mew/types`: ^0.2.0 ⚠️ (needs update)
 
 #### `cat-maze` template:
 - Same MEW dependencies as coder-agent ⚠️ (all need updates)
@@ -102,12 +102,12 @@ This is a major release transitioning from MEW Protocol v0.3 to v0.4, featuring:
 ### RECOMMENDED DECISION: **Option A - Coordinated v0.4.0 Release**
 
 #### Proposed New Versions:
-- `@mew-protocol/types`: 0.2.0 → **0.4.0**
-- `@mew-protocol/capability-matcher`: 0.2.0 → **0.4.0**
-- `@mew-protocol/client`: 0.2.0 → **0.4.0**
-- `@mew-protocol/participant`: 0.2.0 → **0.4.0**
-- `@mew-protocol/agent`: 0.4.1 → **0.4.2** (patch)
-- `@mew-protocol/bridge`: 0.1.1 → **0.4.0** (major jump to align)
+- `@mew-protocol/mew/types`: 0.2.0 → **0.4.0**
+- `@mew-protocol/mew/capability-matcher`: 0.2.0 → **0.4.0**
+- `@mew-protocol/mew/client`: 0.2.0 → **0.4.0**
+- `@mew-protocol/mew/participant`: 0.2.0 → **0.4.0**
+- `@mew-protocol/mew/agent`: 0.4.1 → **0.4.2** (patch)
+- `@mew-protocol/mew/bridge`: 0.1.1 → **0.4.0** (major jump to align)
 - `@mew-protocol/cli`: 0.4.2 → **0.4.3** (patch, already aligned)
 
 ## Changelog Strategy
@@ -229,12 +229,12 @@ This is a major release transitioning from MEW Protocol v0.3 to v0.4, featuring:
 **Verify Published Versions:**
 ```bash
 # Check all packages show correct versions
-npm view @mew-protocol/types version          # Expected: 0.4.0
-npm view @mew-protocol/capability-matcher     # Expected: 0.4.1
-npm view @mew-protocol/client version         # Expected: 0.4.1
-npm view @mew-protocol/participant version    # Expected: 0.4.2
-npm view @mew-protocol/agent version          # Expected: 0.4.6
-npm view @mew-protocol/bridge version         # Expected: 0.4.1
+npm view @mew-protocol/mew/types version          # Expected: 0.4.0
+npm view @mew-protocol/mew/capability-matcher     # Expected: 0.4.1
+npm view @mew-protocol/mew/client version         # Expected: 0.4.1
+npm view @mew-protocol/mew/participant version    # Expected: 0.4.2
+npm view @mew-protocol/mew/agent version          # Expected: 0.4.6
+npm view @mew-protocol/mew/bridge version         # Expected: 0.4.1
 npm view @mew-protocol/cli version            # Expected: 0.4.3
 ```
 
@@ -246,12 +246,12 @@ mkdir /tmp/mew-v0.4-test && cd /tmp/mew-v0.4-test
 npm init -y
 
 # Test that packages can resolve their internal dependencies
-npm install @mew-protocol/agent@latest
-npm list @mew-protocol/agent --depth=1
+npm install @mew-protocol/mew/agent@latest
+npm list @mew-protocol/mew/agent --depth=1
 # Should show: participant@0.4.2, client@0.4.1, types@0.4.0
 
-npm install @mew-protocol/participant@latest
-npm list @mew-protocol/participant --depth=1
+npm install @mew-protocol/mew/participant@latest
+npm list @mew-protocol/mew/participant --depth=1
 # Should show: capability-matcher@0.4.1, client@0.4.1, types@0.4.0
 ```
 
@@ -263,8 +263,8 @@ mew space init --template coder-agent test-coder
 cd test-coder
 npm install
 # Verify no dependency resolution errors
-npm list @mew-protocol/agent  # Should show 0.4.6
-npm list @mew-protocol/bridge # Should show 0.4.1
+npm list @mew-protocol/mew/agent  # Should show 0.4.6
+npm list @mew-protocol/mew/bridge # Should show 0.4.1
 
 # Test cat-maze template (NEW in v0.4!)
 cd ../
@@ -272,7 +272,7 @@ mew space init --template cat-maze test-maze
 cd test-maze
 npm install
 # Should install without errors
-npm list @mew-protocol/agent  # Should show 0.4.6
+npm list @mew-protocol/mew/agent  # Should show 0.4.6
 ```
 
 ### Phase 4: Feature Verification (v0.4 Specific)
@@ -381,9 +381,9 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
 3. 🔍 **Discovery**: All packages had internal `@mew-protocol/*` dependencies still pointing to `^0.2.0`
 
 **Examples of Stale Dependencies Found**:
-- `agent/package.json`: Still referenced `@mew-protocol/participant: ^0.2.0`
-- `participant/package.json`: Still referenced `@mew-protocol/client: ^0.2.0`
-- `bridge/package.json`: Still referenced `@mew-protocol/participant: ^0.2.0`
+- `agent/package.json`: Still referenced `@mew-protocol/mew/participant: ^0.2.0`
+- `participant/package.json`: Still referenced `@mew-protocol/mew/client: ^0.2.0`
+- `bridge/package.json`: Still referenced `@mew-protocol/mew/participant: ^0.2.0`
 
 **Root Cause**: The RELEASE.md process doesn't include a step to update internal package dependencies before version bumping.
 
@@ -400,14 +400,14 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
 ### Critical Issues Encountered During Release
 
 #### 1. **Agent Package Build Failure** 🚨 CRITICAL
-- **Issue**: `@mew-protocol/agent@0.4.3` published without `dist/` directory
+- **Issue**: `@mew-protocol/mew/agent@0.4.3` published without `dist/` directory
 - **Root Cause**: TypeScript composite build with stale `.tsbuildinfo` files + incorrect `outDir` path format
-- **Symptoms**: `npx @mew-protocol/agent` failed with "command not found"
+- **Symptoms**: `npx @mew-protocol/mew/agent` failed with "command not found"
 - **Fix Required**:
   - Fixed `outDir: "./dist"` → `outDir: "dist"` in tsconfig.json
   - Updated clean script to remove `*.tsbuildinfo` files
   - Removed problematic project references temporarily
-  - Published `@mew-protocol/agent@0.4.5` with working binary, then republished `0.4.6` to depend on participant `0.4.2`
+  - Published `@mew-protocol/mew/agent@0.4.5` with working binary, then republished `0.4.6` to depend on participant `0.4.2`
 - **Future Prevention**:
   - Add post-publish verification step to test binary execution
   - Include `.tsbuildinfo` cleanup in all package clean scripts
@@ -428,9 +428,9 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
 - **Learning**: When changing emoji constants, audit all hardcoded usages in data
 
 #### 4. **Participant Streaming Crash** 🟡 MEDIUM
-- **Issue**: `@mew-protocol/participant@0.4.1` crashed with `ReferenceError: WebSocket is not defined` (fixed in `0.4.2`)
-- **Root Cause**: Participant package relied on the monorepo `@mew-protocol/client` bringing in `ws`; the published build lacked the dependency/import
-- **Symptoms**: Tool discovery timed out and stream delivery failed in clean installs (e.g. `npx @mew-protocol/agent`)
+- **Issue**: `@mew-protocol/mew/participant@0.4.1` crashed with `ReferenceError: WebSocket is not defined` (fixed in `0.4.2`)
+- **Root Cause**: Participant package relied on the monorepo `@mew-protocol/mew/client` bringing in `ws`; the published build lacked the dependency/import
+- **Symptoms**: Tool discovery timed out and stream delivery failed in clean installs (e.g. `npx @mew-protocol/mew/agent`)
 - **Fix**: Added explicit `ws` import in `MEWParticipant` and declared `ws` runtime dependency (will publish patch release)
 - **Learning**: Each SDK package must declare transport dependencies explicitly; monorepo cross-talk hides missing deps
 
@@ -481,7 +481,7 @@ bridge (0.4.0) → UPDATE TEMPLATES → cli (0.4.3)
 ```bash
 # BEFORE version bumping, update internal dependencies
 # Find all internal dependencies
-grep -r "@mew-protocol" sdk/typescript-sdk/*/package.json bridge/package.json
+grep -r "@mew-protocol" packages/mew/package.json packages/mew/templates/*/package.json
 
 # Update internal dependencies to target versions
 # Example: If bumping to 0.4.0, update all internal refs to ^0.4.0
@@ -506,12 +506,12 @@ grep -r "@mew-protocol" sdk/typescript-sdk/*/package.json bridge/package.json
 **Release Scope**: MAJOR (Protocol v0.4, Streaming, CLI Overhaul, New Templates)
 
 ### Final Published Versions:
-- `@mew-protocol/types@0.4.0`
-- `@mew-protocol/capability-matcher@0.4.1`
-- `@mew-protocol/client@0.4.1`
-- `@mew-protocol/participant@0.4.2`
-- `@mew-protocol/agent@0.4.6` ⚠️ (Fixed build issues, updated participant dependency)
-- `@mew-protocol/bridge@0.4.1`
+- `@mew-protocol/mew/types@0.4.0`
+- `@mew-protocol/mew/capability-matcher@0.4.1`
+- `@mew-protocol/mew/client@0.4.1`
+- `@mew-protocol/mew/participant@0.4.2`
+- `@mew-protocol/mew/agent@0.4.6` ⚠️ (Fixed build issues, updated participant dependency)
+- `@mew-protocol/mew/bridge@0.4.1`
 - `@mew-protocol/cli@0.4.8` ⚠️ (Fixed truncation + maze bugs)
 
 ### Post-Release Fixes Applied:

@@ -1,19 +1,19 @@
 # Bug Report: Published Agent Package Not Writing Files
 
 ## Summary
-The published npm package `@mew-protocol/agent@0.3.0` used in the CLI template is not functioning correctly. While it emits reasoning messages, it fails to actually execute tool calls to write files, unlike the local development version used in demos.
+The published npm package `@mew-protocol/mew/agent@0.3.0` used in the CLI template is not functioning correctly. While it emits reasoning messages, it fails to actually execute tool calls to write files, unlike the local development version used in demos.
 
 ## Steps to Reproduce
 
 1. **Create a test directory and initialize with coder-agent template:**
 ```bash
 mkdir /tmp/test-mew-bug && cd /tmp/test-mew-bug
-/path/to/mew-protocol/cli/bin/mew.js init coder-agent --name test-bug --port 8090
+/path/to/mew-protocol/packages/mew/src/bin/mew.js init coder-agent --name test-bug --port 8090
 ```
 
 2. **Start the gateway with space configuration:**
 ```bash
-/path/to/mew-protocol/cli/bin/mew.js gateway start --port 8090 --space-config .mew/space.yaml
+/path/to/mew-protocol/packages/mew/src/bin/mew.js gateway start --port 8090 --space-config .mew/space.yaml
 ```
 
 3. **Send a request to create a file:**
@@ -49,7 +49,7 @@ npx pm2 logs coder-agent --lines 50 --nostream
 - **Location**: `/tmp/mew-test-verify/`
 - **Template**: `coder-agent` from `/cli/templates/coder-agent/`
 - **Gateway**: Port 8090
-- **Package Version**: @mew-protocol/agent@0.3.0 (published to npm)
+- **Package Version**: @mew-protocol/mew/agent@0.3.0 (published to npm)
 
 ## Expected Behavior (from demos/coder-agent)
 When asked to "create foo.txt with foo", the agent should:
@@ -144,7 +144,7 @@ configPath = actualConfigPath;
 
 | Aspect | Demo (Working) | Template (Broken) |
 |--------|---------------|-------------------|
-| Agent Binary | Local: `node ../../sdk/typescript-sdk/agent/dist/index.js` | NPM: `npx @mew-protocol/agent` |
+| Agent Binary | Local: `node ../../packages/mew/dist/agent/index.js` | NPM: `npx @mew-protocol/mew/agent` |
 | Version | Development (current source) | Published 0.3.0 |
 | YOLO Mode | Enabled (can call tools directly) | Disabled (must use proposals) |
 | File Writing | ✅ Works | ❌ Doesn't attempt |
@@ -155,24 +155,24 @@ configPath = actualConfigPath;
 ### 1. Compare Source vs Published
 ```bash
 # Check what's actually in the published package
-npm pack @mew-protocol/agent@0.3.0
+npm pack @mew-protocol/mew/agent@0.3.0
 tar -xzf mew-protocol-agent-0.3.0.tgz
-diff -r package/dist /Users/rj/Git/rjcorwin/mew-protocol/sdk/typescript-sdk/agent/dist
+diff -r package/dist /Users/rj/Git/rjcorwin/mew-protocol/packages/mew/dist/agent
 ```
 
 ### 2. Test Local vs Published Directly
 ```bash
 # Test with local version
-node /Users/rj/Git/rjcorwin/mew-protocol/sdk/typescript-sdk/agent/dist/index.js \
+node /Users/rj/Git/rjcorwin/mew-protocol/packages/mew/dist/agent/index.js \
   --gateway ws://localhost:8090 --space test-verify --token test-token
 
 # Test with published version
-npx @mew-protocol/agent@0.3.0 \
+npx @mew-protocol/mew/agent@0.3.0 \
   --gateway ws://localhost:8090 --space test-verify --token test-token
 ```
 
 ### 3. Check Build Process
-- Review `/sdk/typescript-sdk/agent/tsconfig.json`
+- Review `/packages/mew/src/agent/tsconfig.json`
 - Check if all files are included in the build
 - Verify the `dist/` output matches expectations
 
@@ -186,29 +186,29 @@ Add logging to trace where the loop breaks:
 ## Key Files to Review
 
 ### Core Agent Implementation
-1. `/sdk/typescript-sdk/agent/src/MEWAgent.ts`
+1. `/packages/mew/src/agent/MEWAgent.ts`
    - Lines 206-223: Reasoning emission logic
    - Lines 376-378: Thought processing
    - `processWithReAct()` method: Main ReAct loop
    - `emitReasoning()` method (line 927): How reasoning messages are sent
 
-2. `/sdk/typescript-sdk/agent/src/index.ts`
+2. `/packages/mew/src/agent/index.ts`
    - Entry point for the agent
    - Configuration parsing
    - Tool registration
 
 ### Build Configuration
-3. `/sdk/typescript-sdk/agent/package.json`
+3. `/packages/mew/src/agent/package.json`
    - Build scripts
    - Dependencies
    - Files included in package
 
-4. `/sdk/typescript-sdk/agent/tsconfig.json`
+4. `/packages/mew/src/agent/tsconfig.json`
    - TypeScript compilation settings
    - Output configuration
 
 ### Capability System
-5. `/sdk/typescript-sdk/capability-matcher/`
+5. `/packages/mew/src/capability-matcher/`
    - How capabilities are evaluated
    - Pattern matching logic
 
@@ -234,7 +234,7 @@ Uncomment lines 32-35 in template's space.yaml to give agent direct tool access:
 Change the agent command in space.yaml:
 ```yaml
 command: "node"
-args: ["/path/to/sdk/typescript-sdk/agent/dist/index.js", ...]
+args: ["/path/to/packages/mew/dist/agent/index.js", ...]
 ```
 
 ### Option 3: Add Auto-fulfiller

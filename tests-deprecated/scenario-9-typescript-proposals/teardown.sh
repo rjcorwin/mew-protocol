@@ -25,14 +25,14 @@ cd "$TEST_DIR"
 
 # Stop the space
 echo "Stopping space..."
-../../cli/bin/mew.js space down 2>/dev/null || true
+../../packages/mew/src/bin/mew.js space down 2>/dev/null || true
 
 # Wait for processes to terminate
 sleep 2
 
 # Clean up space artifacts
 echo "Cleaning up space artifacts..."
-../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
+../../packages/mew/src/bin/mew.js space clean --all --force 2>/dev/null || true
 
 # Clean up local test artifacts
 echo "Cleaning up test artifacts..."

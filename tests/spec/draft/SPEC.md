@@ -43,7 +43,7 @@ tests/
 ├── templates/                          # shared base templates (optional)
 └── scenario-*/
     ├── template/                       # scenario-specific template
-    │   └── (files mirroring cli/templates/* structure)
+    │   └── (files mirroring packages/mew/templates/* structure)
     ├── setup.sh                        # initialises disposable workspace
     ├── check.sh / test.sh              # scenario assertions
     └── teardown.sh                     # shuts down & deletes workspace dir
@@ -55,8 +55,8 @@ tests/
 
 1. **Setup (`setup.sh`)**
    - Creates a scratch directory (default: `.workspace/`) and `cd`s into it.
-   - Runs `../../cli/bin/mew.js space init --template ../template --space-dir .` so the local template is treated exactly like the built-in CLI templates.
-   - Starts the space via `../../cli/bin/mew.js space up --space-dir . [--port N]`.
+   - Runs `../../packages/mew/src/bin/mew.js space init --template ../template --space-dir .` so the local template is treated exactly like the built-in CLI templates.
+   - Starts the space via `../../packages/mew/src/bin/mew.js space up --space-dir . [--port N]`.
    - Exports environment variables needed by the scenario scripts (e.g. port,
      log paths).
 
@@ -83,7 +83,7 @@ tests/
 
 ## 6. Templates
 
-- Scenario templates mimic the layout of `cli/templates/*` (e.g. `package.json`,
+- Scenario templates mimic the layout of `packages/mew/templates/*` (e.g. `package.json`,
   `.mew/space.yaml`, supporting files). This allows `mew space init --template`
   to operate without special handling.
 - Templates follow the usual substitution tokens (`{{SPACE_NAME}}`, etc.).

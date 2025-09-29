@@ -26,7 +26,7 @@ Currently, the `MEWParticipant.request()` method in the SDK already implements t
 
 ### Option 1: Keep Enhanced Logic in MEWParticipant (Current Location)
 
-Keep and enhance the existing implementation in `sdk/typescript-sdk/participant/src/MEWParticipant.ts`.
+Keep and enhance the existing implementation in `packages/mew/src/participant/MEWParticipant.ts`.
 
 **Current Implementation:**
 - Already has basic auto-conversion logic
@@ -56,7 +56,7 @@ Move the logic down to the MEWClient level and create a dedicated RequestManager
 
 **Structure:**
 ```typescript
-// sdk/typescript-sdk/client/src/RequestManager.ts
+// packages/mew/src/client/RequestManager.ts
 class RequestManager {
   constructor(client: MEWClient, capabilities: Capability[])
   async smartRequest(target, method, params): Promise<any>
@@ -80,7 +80,7 @@ Create a new package `@mew-protocol/smart-request` that provides the enhanced lo
 
 **Structure:**
 ```typescript
-// sdk/typescript-sdk/smart-request/
+// packages/mew/src/smart-request/
 import { SmartRequestManager } from '@mew-protocol/smart-request';
 
 class MEWParticipant {
@@ -111,7 +111,7 @@ Keep request logic in MEWParticipant but enhance only the capability checking to
 **Implementation:**
 ```typescript
 // In MEWParticipant
-import { hasCapability } from '@mew-protocol/capability-matcher';
+import { hasCapability } from '@mew-protocol/mew/capability-matcher';
 
 canSend(kind: string, payload?: any): boolean {
   // Use advanced matcher if available, fall back to simple
@@ -238,6 +238,6 @@ private canSendEnhanced(kind: string, payload?: any): boolean {
 ## References
 
 - [MEW Protocol v0.3 Specification](../../spec/v0.3/SPEC.md)
-- [Current MEWParticipant Implementation](../../sdk/typescript-sdk/participant/src/MEWParticipant.ts)
-- [Capability Matcher Package](../../sdk/typescript-sdk/capability-matcher/)
+- [Current MEWParticipant Implementation](../../packages/mew/src/participant/MEWParticipant.ts)
+- [Capability Matcher Package](../../packages/mew/src/capability-matcher/)
 - [MEW Agent Specification](../../mew-agent/spec/draft/SPEC.md)

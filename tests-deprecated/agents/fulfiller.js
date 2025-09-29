@@ -7,7 +7,7 @@
 const path = require('path');
 
 // Import MEWClient from the SDK
-const clientPath = path.resolve(__dirname, '../../sdk/typescript-sdk/client/dist/index.js');
+const clientPath = path.resolve(__dirname, '../../packages/mew/dist/client/index.js');
 const { MEWClient } = require(clientPath);
 
 // Parse command line arguments

@@ -14,12 +14,12 @@ types → capability-matcher → client → participant → agent → bridge →
 
 ## Current Package Versions
 
-- `@mew-protocol/types`: 0.2.0
-- `@mew-protocol/capability-matcher`: 0.2.0
-- `@mew-protocol/client`: 0.2.0
-- `@mew-protocol/participant`: 0.2.0
-- `@mew-protocol/agent`: 0.4.1
-- `@mew-protocol/bridge`: 0.1.1
+- `@mew-protocol/mew/types`: 0.2.0
+- `@mew-protocol/mew/capability-matcher`: 0.2.0
+- `@mew-protocol/mew/client`: 0.2.0
+- `@mew-protocol/mew/participant`: 0.2.0
+- `@mew-protocol/mew/agent`: 0.4.1
+- `@mew-protocol/mew/bridge`: 0.1.1
 - `@mew-protocol/cli`: 0.4.2
 
 ## Pre-Release Checklist
@@ -51,8 +51,8 @@ npm access ls-packages
 
 ### 3. Review Package Contents
 ```bash
-# Check each package dry-run (example for types)
-cd sdk/typescript-sdk/types
+# Check package contents with a dry-run
+cd packages/mew
 npm pack --dry-run
 ```
 
@@ -67,22 +67,20 @@ Before versioning, review what has changed and update changelogs:
 # See commits since last tag (adjust tag name as needed)
 git log --oneline v0.2.0..HEAD
 
-# See changes in specific package directory
-git log --oneline v0.2.0..HEAD -- sdk/typescript-sdk/agent/
+# See changes in the published workspace
+git log --oneline v0.2.0..HEAD -- packages/mew/
 
 # Compare with last published version on npm
-npm view @mew-protocol/agent versions --json
-npm view @mew-protocol/agent@latest version
+npm view @mew-protocol/mew versions --json
+npm view @mew-protocol/mew@latest version
 ```
 
 #### Update Changelogs
 Each package should have its changelog updated:
 
 ```bash
-# Update package-specific changelogs (if they exist)
-# Edit sdk/typescript-sdk/types/CHANGELOG.md
-# Edit sdk/typescript-sdk/agent/CHANGELOG.md
-# etc.
+# Update package-specific changelog (if it exists)
+# Edit packages/mew/CHANGELOG.md
 
 # Or update root changelog with package sections
 # Edit CHANGELOG.md
@@ -114,18 +112,14 @@ Choose your versioning strategy and bump package versions:
 # Decide on version strategy (patch/minor/major)
 NEW_VERSION="0.2.1"  # Example
 
-# Bump each package version
-cd sdk/typescript-sdk/types && npm version $NEW_VERSION --no-git-tag-version
-cd ../capability-matcher && npm version $NEW_VERSION --no-git-tag-version
-cd ../client && npm version $NEW_VERSION --no-git-tag-version
-cd ../participant && npm version $NEW_VERSION --no-git-tag-version
-cd ../agent && npm version $NEW_VERSION --no-git-tag-version
+# Bump workspace version
+cd packages/mew && npm version $NEW_VERSION --no-git-tag-version
 ```
 
 #### Option B: Selective Release (Individual Packages)
 ```bash
-# Example: Only bump agent package
-cd sdk/typescript-sdk/agent
+# Example: Bump just the workspace (when avoiding coordinated release)
+cd packages/mew
 npm version patch --no-git-tag-version  # or minor/major
 ```
 
@@ -138,7 +132,7 @@ Publish packages in dependency order, only publishing packages that have version
 npm whoami  # Verify you're logged in
 
 # Publish in dependency order (skip packages that don't need updates)
-cd sdk/typescript-sdk/types && npm publish --access public --otp=YOUR_OTP
+cd packages/mew && npm publish --access public --otp=YOUR_OTP
 cd ../capability-matcher && npm publish --access public --otp=YOUR_OTP
 cd ../client && npm publish --access public --otp=YOUR_OTP
 cd ../participant && npm publish --access public --otp=YOUR_OTP
@@ -188,11 +182,11 @@ grep "@mew-protocol" cli/templates/TEMPLATE_NAME/package.json
 ```json
 {
   "dependencies": {
-    "@mew-protocol/agent": "^[NEW_VERSION]",
-    "@mew-protocol/bridge": "^[NEW_VERSION]",
-    "@mew-protocol/client": "^[NEW_VERSION]",
-    "@mew-protocol/participant": "^[NEW_VERSION]",
-    "@mew-protocol/types": "^[NEW_VERSION]"
+    "@mew-protocol/mew/agent": "^[NEW_VERSION]",
+    "@mew-protocol/mew/bridge": "^[NEW_VERSION]",
+    "@mew-protocol/mew/client": "^[NEW_VERSION]",
+    "@mew-protocol/mew/participant": "^[NEW_VERSION]",
+    "@mew-protocol/mew/types": "^[NEW_VERSION]"
   }
 }
 ```
@@ -240,7 +234,7 @@ After bumping versions but before publishing:
 git status
 
 # Add version changes
-git add sdk/typescript-sdk/*/package.json  # Add all package.json changes
+git add packages/mew/package.json  # Add workspace version bump
 git add CHANGELOG.md  # If you updated it in Phase 1
 
 # Commit the version bump
@@ -280,12 +274,12 @@ git push origin --tags
 ### 2. Verify Publications
 ```bash
 # Check each package on npm
-npm view @mew-protocol/types
-npm view @mew-protocol/capability-matcher
-npm view @mew-protocol/client
-npm view @mew-protocol/participant
-npm view @mew-protocol/agent
-npm view @mew-protocol/bridge
+npm view @mew-protocol/mew/types
+npm view @mew-protocol/mew/capability-matcher
+npm view @mew-protocol/mew/client
+npm view @mew-protocol/mew/participant
+npm view @mew-protocol/mew/agent
+npm view @mew-protocol/mew/bridge
 npm view @mew-protocol/cli
 ```
 
@@ -306,18 +300,18 @@ npm init -y
 #### Test SDK Package Installation
 ```bash
 # Install published SDK packages
-npm install @mew-protocol/types@latest
-npm install @mew-protocol/client@latest
-npm install @mew-protocol/participant@latest
-npm install @mew-protocol/agent@latest
-npm install @mew-protocol/bridge@latest
+npm install @mew-protocol/mew/types@latest
+npm install @mew-protocol/mew/client@latest
+npm install @mew-protocol/mew/participant@latest
+npm install @mew-protocol/mew/agent@latest
+npm install @mew-protocol/mew/bridge@latest
 
 # Verify installations
-npm list @mew-protocol/types
-npm list @mew-protocol/client
-npm list @mew-protocol/participant
-npm list @mew-protocol/agent
-npm list @mew-protocol/bridge
+npm list @mew-protocol/mew/types
+npm list @mew-protocol/mew/client
+npm list @mew-protocol/mew/participant
+npm list @mew-protocol/mew/agent
+npm list @mew-protocol/mew/bridge
 ```
 
 #### Test CLI Package Installation
@@ -334,11 +328,11 @@ mew space init --template coder-agent test-space
 cd test-space
 
 # Verify template dependencies installed correctly
-npm list @mew-protocol/types
-npm list @mew-protocol/agent
-npm list @mew-protocol/bridge
-npm list @mew-protocol/client
-npm list @mew-protocol/participant
+npm list @mew-protocol/mew/types
+npm list @mew-protocol/mew/agent
+npm list @mew-protocol/mew/bridge
+npm list @mew-protocol/mew/client
+npm list @mew-protocol/mew/participant
 ```
 
 #### Test Package Imports (Quick Smoke Test)
@@ -347,15 +341,15 @@ npm list @mew-protocol/participant
 cat > test-imports.js << 'EOF'
 try {
   // Test core type imports
-  const types = require('@mew-protocol/types');
+  const types = require('@mew-protocol/mew/types');
   console.log('✓ Types package imports successfully');
 
   // Test client import
-  const { MEWClient } = require('@mew-protocol/client');
+  const { MEWClient } = require('@mew-protocol/mew/client');
   console.log('✓ Client package imports successfully');
 
   // Test participant import
-  const { MEWParticipant } = require('@mew-protocol/participant');
+  const { MEWParticipant } = require('@mew-protocol/mew/participant');
   console.log('✓ Participant package imports successfully');
 
   console.log('🎉 All published packages import successfully!');
@@ -476,7 +470,7 @@ npm run clean
 npm run build
 
 # Check specific package
-cd sdk/typescript-sdk/[package-name]
+cd packages/mew
 npm run build
 ```
 

@@ -19,7 +19,7 @@ echo -e "${YELLOW}=== Setting up Scenario 12: Stream Lifecycle Controls ===${NC}
 echo -e "${BLUE}Directory: $TEST_DIR${NC}"
 
 echo "Cleaning up previous runs..."
-../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
+../../packages/mew/src/bin/mew.js space clean --all --force 2>/dev/null || true
 
 if [ -z "$TEST_PORT" ]; then
   export TEST_PORT=$((8600 + RANDOM % 100))
@@ -31,12 +31,12 @@ mkdir -p ./logs
 : > ./logs/test-client-output.log
 : > ./logs/control-agent.log
 
-../../cli/bin/mew.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1 || {
+../../packages/mew/src/bin/mew.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1 || {
   cat ./logs/space-up.log
   exit 1
 }
 
-if ../../cli/bin/mew.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
+if ../../packages/mew/src/bin/mew.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
   echo -e "${GREEN}✓ Space started${NC}"
 else
   echo -e "${RED}✗ Space failed to start${NC}"

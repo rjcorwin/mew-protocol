@@ -44,7 +44,7 @@ echo -e "\n${YELLOW}Simulating human approval with grant...${NC}"
 
 # Connect as human in the foreground (reading from FIFO)
 echo -e "${GREEN}Connecting as human participant...${NC}"
-../../cli/bin/mew.js client connect \
+../../packages/mew/src/bin/mew.js client connect \
     --participant human \
     --non-interactive < fifos/human-input > fifos/human-output 2>&1 &
 HUMAN_PID=$!
