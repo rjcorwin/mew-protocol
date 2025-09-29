@@ -2,6 +2,11 @@
 
 All notable changes to the MEW Protocol CLI will be documented in this file.
 
+## [v0.4.10] - 2025-09-29
+
+### Fixed
+- **Template capability coverage** – every human participant now receives `kind: "*"`, ensuring access to reasoning cancel and future capability channels across all bundled templates.
+
 ## [v0.4.9] - 2025-09-29
 
 ### Changed
