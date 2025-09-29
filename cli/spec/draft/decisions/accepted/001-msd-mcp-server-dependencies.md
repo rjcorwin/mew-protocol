@@ -286,7 +286,7 @@ Templates will declare their MCP server dependencies:
     }
   ],
   "agent_dependencies": [
-    "@mew-protocol/agent",
+    "@mew-protocol/mew/agent",
     "openai"
   ]
 }
@@ -339,7 +339,7 @@ This template needs the filesystem MCP server to provide file access.
 
 Installing in .mew directory (keeping your project clean)...
 ✓ Installed @modelcontextprotocol/server-filesystem
-✓ Installed @mew-protocol/agent dependencies
+✓ Installed @mew-protocol/mew/agent dependencies
 
 ? Space name: (my-python-project)
 ? AI model: (gpt-4)

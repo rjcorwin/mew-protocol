@@ -10,7 +10,7 @@ TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-8-grant"}
 SPACE_NAME=${SPACE_NAME:-"scenario-8-grant"}
 TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
-CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+CLI_BIN="${REPO_ROOT}/packages/mew/src/bin/mew.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'

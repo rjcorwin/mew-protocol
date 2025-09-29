@@ -19,7 +19,7 @@ participants:
     auto_start: true
     command: "node"
     args: 
-      - "../../sdk/typescript-sdk/agent/dist/index.js"
+      - "../../packages/mew/dist/agent/index.js"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
@@ -43,7 +43,7 @@ participants:
     auto_start: true
     command: "node"
     args: 
-      - "../../sdk/typescript-sdk/agent/dist/index.js"
+      - "../../packages/mew/dist/agent/index.js"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"

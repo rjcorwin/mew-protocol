@@ -16,10 +16,10 @@ PORT=$((8000 + RANDOM % 1000))
 
 # Start the space
 echo "Starting space with 'mew space up'..."
-../../cli/bin/mew.js space up --port "$PORT" > space-up.log 2>&1
+../../packages/mew/src/bin/mew.js space up --port "$PORT" > space-up.log 2>&1
 
 # Check if space started
-if ../../cli/bin/mew.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
+if ../../packages/mew/src/bin/mew.js space status | grep -q "Gateway: ws://localhost:$PORT"; then
   echo -e "${GREEN}✓ Space started successfully${NC}"
 else
   echo -e "${RED}✗ Space failed to start${NC}"
@@ -45,7 +45,7 @@ sleep 2
 if ! kill -0 $ECHO_PID 2>/dev/null; then
   echo -e "${RED}Echo agent failed to start${NC}"
   cat ./logs/echo.log
-  ../../cli/bin/mew.js space down
+  ../../packages/mew/src/bin/mew.js space down
   exit 1
 fi
 
@@ -57,7 +57,7 @@ if [ -p ./fifos/test-client-in ]; then
 else
   echo -e "${RED}✗ Input FIFO not created${NC}"
   kill $ECHO_PID 2>/dev/null || true
-  ../../cli/bin/mew.js space down
+  ../../packages/mew/src/bin/mew.js space down
   exit 1
 fi
 
@@ -125,7 +125,7 @@ kill $ECHO_PID 2>/dev/null || true
 
 # Use space down command
 echo "Stopping space with 'mew space down'..."
-../../cli/bin/mew.js space down
+../../packages/mew/src/bin/mew.js space down
 
 echo -e "${GREEN}✓ Cleanup complete${NC}"
 

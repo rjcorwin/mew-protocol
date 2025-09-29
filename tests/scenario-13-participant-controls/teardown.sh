@@ -6,7 +6,7 @@ set -euo pipefail
 SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
 REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
 WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
-CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+CLI_BIN="${REPO_ROOT}/packages/mew/src/bin/mew.js"
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
 
 YELLOW='\033[1;33m'

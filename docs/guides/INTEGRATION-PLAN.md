@@ -39,7 +39,7 @@
    - Update template documentation to instruct operators on new controls and telemetry signals.
 
 ## Testing & Verification Strategy
-- Use workspace builds (`npm run build --workspace=@mew-protocol/types|client|participant|agent`) to guarantee TypeScript
+- Use workspace builds (`npm run build --workspace=@mew-protocol/mew/types|client|participant|agent`) to guarantee TypeScript
   compatibility after every spec or SDK change.
 - Introduce targeted Vitest suites for stream frame parsing and participant control enforcement.
 - Script CLI walkthroughs (e.g., via `expect` or Ink testing utilities) to assert command output and signal board updates.

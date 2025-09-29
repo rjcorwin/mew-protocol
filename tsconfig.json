@@ -1,11 +1,6 @@
 {
   "files": [],
   "references": [
-    { "path": "./sdk/typescript-sdk/types" },
-    { "path": "./sdk/typescript-sdk/capability-matcher" },
-    { "path": "./sdk/typescript-sdk/client" },
-    { "path": "./sdk/typescript-sdk/participant" },
-    { "path": "./sdk/typescript-sdk/agent" },
-    { "path": "./bridge" }
+    { "path": "./packages/mew" }
   ]
 }

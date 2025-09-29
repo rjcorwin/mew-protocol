@@ -25,7 +25,7 @@ cd "$TEST_DIR"
 
 # Stop the space using mew space down
 echo "Stopping space..."
-../../cli/bin/mew.js space down 2>/dev/null || true
+../../packages/mew/src/bin/mew.js space down 2>/dev/null || true
 
 # Additional cleanup for any orphaned processes
 if [ -f ".mew/pids.json" ]; then
@@ -47,7 +47,7 @@ if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
   rm -rf test-files 2>/dev/null || true
 
   # Use the new mew space clean command
-  ../../cli/bin/mew.js space clean --all --force 2>/dev/null || {
+  ../../packages/mew/src/bin/mew.js space clean --all --force 2>/dev/null || {
     # Fallback to manual cleanup if clean command fails
     echo "Clean command failed, using manual cleanup..."
     rm -rf logs fifos .mew 2>/dev/null || true
@@ -57,7 +57,7 @@ if [ "${PRESERVE_LOGS:-false}" = "false" ]; then
 else
   echo -e "${YELLOW}Preserving logs (PRESERVE_LOGS=true)${NC}"
   # Clean only fifos and .mew, preserve logs
-  ../../cli/bin/mew.js space clean --fifos --force 2>/dev/null || true
+  ../../packages/mew/src/bin/mew.js space clean --fifos --force 2>/dev/null || true
 fi
 
 echo -e "${GREEN}✓ Cleanup complete${NC}"

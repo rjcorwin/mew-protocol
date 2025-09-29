@@ -454,7 +454,7 @@ Emit events for:
 
 ## References
 
-- Current implementation: `sdk/typescript-sdk/agent/src/MEWAgent.ts`
+- Current implementation: `packages/mew/src/agent/MEWAgent.ts`
 - ReAct pattern specification: `sdk/spec/draft/SPEC.md` (Section: ReAct Loop)
 - Message handling: `setupAgentBehavior()` and `handleChat()` methods
 - Related: Conversation history management in MEWAgent

@@ -22,14 +22,14 @@ mkfifo fifos/human-output
 
 # Start the space
 echo "Starting MEW space..."
-../../cli/bin/mew.js space up -d
+../../packages/mew/src/bin/mew.js space up -d
 
 # Wait for space to be ready
 echo "Waiting for space to be ready..."
 sleep 3
 
 # Check space status
-../../cli/bin/mew.js space status
+../../packages/mew/src/bin/mew.js space status
 
 echo "Space setup complete!"
 echo "Participants should now be running:"
@@ -37,4 +37,4 @@ echo "  - test-agent (proposer/requester)"
 echo "  - file-server (handles file operations)"
 echo ""
 echo "To connect as human:"
-echo "  ../../cli/bin/mew.js client connect --participant human"
+echo "  ../../packages/mew/src/bin/mew.js client connect --participant human"

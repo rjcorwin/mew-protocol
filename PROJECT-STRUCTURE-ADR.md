@@ -32,7 +32,7 @@ Goals:
 ### Option 1 — Keep current monorepo, add disciplined release tooling (Changesets), and standardize builds
 
 Summary:
-- Keep the existing per-package layout under `sdk/typescript-sdk/*`, `bridge/`, and `cli/`.
+- Keep the previous multi-package layout (separate SDK, bridge, and CLI packages).
 - Adopt Changesets for versioning and publishing with dependency graph awareness.
 - Convert CLI to TypeScript for a single toolchain, or keep JS with consistent build/verif.
 - Add dual tsconfigs (monorepo vs publish) and a bundler for packages with bins.
@@ -115,7 +115,7 @@ Pros:
 - Subpath exports retain modular import ergonomics for consumers.
 
 Cons:
-- Breaking import path change for existing users (`@mew-protocol/agent` → `@mew-protocol/mew/agent`).
+- Breaking import path change for existing users (`@mew-protocol/mew/agent` → `@mew-protocol/mew/agent`).
 - Larger single package; requires careful exports and externalization to keep install size reasonable.
 - Requires migration plan for existing dependent projects and templates.
 
@@ -127,7 +127,7 @@ Impact on A/B/C:
 Migration notes:
 - Provide compatibility stubs: keep publishing very thin `@mew-protocol/*` packages for 1–2 minor releases that re-export from `@mew-protocol/mew/*`, with deprecation warnings.
 - Update CLI templates and docs to use `@mew-protocol/mew`.
-- Add a wrapper at `./cli/bin/mew.js` that forwards to the built CLI location to preserve test/dev scripts during transition.
+- Add a wrapper at `./packages/mew/src/bin/mew.js` that forwards to the built CLI location to preserve test/dev scripts during transition.
 
 ---
 
@@ -212,7 +212,7 @@ Phase 2 — Update consumers and templates
 - Keep a local dev rewrite in the CLI so spaces in `tests/` and `spaces/` link to the aggregator workspace automatically.
 
 Phase 3 — Publish compatibility stubs
-- Publish thin `@mew-protocol/agent`, `@mew-protocol/client`, etc., that re-export from `@mew-protocol/mew/*` and emit console deprecation warnings. Mark them as deprecated on npm.
+- Publish thin `@mew-protocol/mew/agent`, `@mew-protocol/mew/client`, etc., that re-export from `@mew-protocol/mew/*` and emit console deprecation warnings. Mark them as deprecated on npm.
 - Maintain for 1–2 minor versions, then retire.
 
 Phase 4 — Decommission individual SDK packages (publish)
@@ -241,8 +241,8 @@ Spaces (spaces/README.md):
 - With Option 3, rewrite to `@mew-protocol/mew` only. This actually shortens the rewrite surface.
 
 Tests (tests/spec/draft/SPEC.md):
-- The disposable workspace strategy is unaffected: `cli/bin/mew.js space init --template ../template --space-dir .` still works.
-- Ensure we keep a stable wrapper at `./cli/bin/mew.js` (or forwards to the built CLI) so existing scripts and docs don’t break.
+- The disposable workspace strategy is unaffected: `packages/mew/src/bin/mew.js space init --template ../template --space-dir .` still works.
+- Ensure we keep a stable wrapper at `./packages/mew/src/bin/mew.js` (or forwards to the built CLI) so existing scripts and docs don’t break.
 - Add a minimal shared test util to assert `@mew-protocol/mew` version inside the workspace to catch template drift early.
 
 ---

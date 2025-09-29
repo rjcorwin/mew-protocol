@@ -26,8 +26,8 @@ cd "$TEST_DIR"
 
 # Build the TypeScript agent if needed
 echo "Building TypeScript agent..."
-cd ../../sdk/typescript-sdk/agent
-if [ ! -d "dist" ]; then
+cd ../../packages/mew
+if [ ! -d "dist/agent" ]; then
   npm install
   npm run build
 fi
@@ -35,7 +35,7 @@ cd "$TEST_DIR"
 
 # Clean up any previous runs
 echo "Cleaning up previous test artifacts..."
-../../cli/bin/mew.js space clean --all --force 2>/dev/null || true
+../../packages/mew/src/bin/mew.js space clean --all --force 2>/dev/null || true
 
 # Use random port to avoid conflicts
 if [ -z "$TEST_PORT" ]; then
@@ -48,10 +48,10 @@ echo "Starting space on port $TEST_PORT..."
 mkdir -p ./logs
 
 # Start the space using mew space up
-../../cli/bin/mew.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1
+../../packages/mew/src/bin/mew.js space up --port "$TEST_PORT" > ./logs/space-up.log 2>&1
 
 # Check if space started successfully
-if ../../cli/bin/mew.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
+if ../../packages/mew/src/bin/mew.js space status | grep -q "Gateway: ws://localhost:$TEST_PORT"; then
   echo -e "${GREEN}✓ Space started successfully${NC}"
 else
   echo -e "${RED}✗ Space failed to start${NC}"

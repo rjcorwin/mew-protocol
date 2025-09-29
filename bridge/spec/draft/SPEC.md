@@ -6,7 +6,7 @@
 
 ## Overview
 
-The MEW-MCP Bridge (`@mew-protocol/bridge`) enables MCP (Model Context Protocol) servers to participate in MEW Protocol spaces. It acts as a translation layer between the MCP protocol (JSON-RPC over stdio) and the MEW Protocol (message-oriented over WebSocket), allowing existing MCP servers to be seamlessly integrated into MEW spaces without modification.
+The MEW-MCP Bridge (`@mew-protocol/mew/bridge`) enables MCP (Model Context Protocol) servers to participate in MEW Protocol spaces. It acts as a translation layer between the MCP protocol (JSON-RPC over stdio) and the MEW Protocol (message-oriented over WebSocket), allowing existing MCP servers to be seamlessly integrated into MEW spaces without modification.
 
 The bridge leverages the MEWParticipant base class from the MEW SDK to provide automatic tool registration and MCP request handling, making MCP servers appear as native MEW participants.
 
@@ -37,7 +37,7 @@ MEW Space
     ├── Gateway (WebSocket)
     │      ↕ MEW Protocol v0.4
     │
-    ├── MCP Bridge Process (@mew-protocol/bridge)
+    ├── MCP Bridge Process (@mew-protocol/mew/bridge)
     │   ├── MEWParticipant (SDK base class)
     │   │    └── Automatic tool/resource handling
     │   └── MCPClient (stdio manager)

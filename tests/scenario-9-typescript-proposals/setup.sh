@@ -10,9 +10,9 @@ TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-9-typescript-proposals"}
 SPACE_NAME=${SPACE_NAME:-"scenario-9-typescript-proposals"}
 TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
-CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
-AGENT_DIST="${REPO_ROOT}/sdk/typescript-sdk/agent/dist/index.js"
-PARTICIPANT_DIST="${REPO_ROOT}/sdk/typescript-sdk/participant/dist/index.js"
+CLI_BIN="${REPO_ROOT}/packages/mew/src/bin/mew.js"
+AGENT_DIST="${REPO_ROOT}/packages/mew/dist/agent/index.js"
+PARTICIPANT_DIST="${REPO_ROOT}/packages/mew/dist/participant/index.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -24,7 +24,7 @@ printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
 printf "%b\n" "${BLUE}Using port ${TEST_PORT}${NC}"
 
 if [[ ! -f "${AGENT_DIST}" || ! -f "${PARTICIPANT_DIST}" ]]; then
-  printf "%b\n" "${YELLOW}Building TypeScript SDK packages (tsc)${NC}"
+  printf "%b\n" "${YELLOW}Building @mew-protocol/mew dist (tsc)${NC}"
   if ! (cd "${REPO_ROOT}" && npm run build > "${SCENARIO_DIR}/ts-build.log" 2>&1); then
     printf "%b\n" "${YELLOW}TypeScript build failed, printing log:${NC}"
     cat "${SCENARIO_DIR}/ts-build.log"

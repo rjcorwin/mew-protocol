@@ -1,0 +1,14 @@
+{
+  "name": "mew-space-{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cooperative cat maze game template for MEW Protocol",
+  "dependencies": {
+    "@mew-protocol/mew": "^0.5.0",
+    "openai": "^5.20.1",
+    "ws": "^8.14.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

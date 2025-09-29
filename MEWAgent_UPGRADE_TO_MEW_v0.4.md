@@ -2,26 +2,26 @@
 
 ## Scope of Review
 - Read the released protocol spec and the CLI/spec drafts to inventory every envelope kind and control flow added in v0.4.【F:spec/v0.4/SPEC.md†L41-L108】【F:spec/draft/SPEC.md†L70-L150】
-- Audited the TypeScript SDK packages (`types`, `participant`, `agent`, `client`), bridge, CLI gateway/UX, and existing tests for protocol drift or missing functionality against the v0.4 requirements.【F:sdk/typescript-sdk/types/src/protocol.ts†L21-L299】【F:sdk/typescript-sdk/participant/src/MEWParticipant.ts†L120-L879】【F:bridge/src/mcp-bridge.ts†L8-L337】【F:cli/src/commands/gateway.js†L235-L937】
-- Reviewed prior notes in `sdk/typescript-sdk/agent/TODO.md` and previous upgrade research to align priorities and avoid duplication.【F:sdk/typescript-sdk/agent/TODO.md†L1-L34】
+- Audited the TypeScript SDK packages (`types`, `participant`, `agent`, `client`), bridge, CLI gateway/UX, and existing tests for protocol drift or missing functionality against the v0.4 requirements.【F:packages/mew/src/types/protocol.ts†L21-L299】【F:packages/mew/src/participant/MEWParticipant.ts†L120-L879】【F:bridge/src/mcp-bridge.ts†L8-L337】【F:cli/src/commands/gateway.js†L235-L937】
+- Reviewed prior notes in `packages/mew/src/agent/TODO.md` and previous upgrade research to align priorities and avoid duplication.【F:packages/mew/src/agent/TODO.md†L1-L34】
 
 ## SDK Gap Analysis
 
-### `@mew-protocol/types`
-- ✅ `Envelope`/`PartialEnvelope` now enforce array `correlation_id`, and the message-kind catalog matches the v0.4 namespace. Payload types for capability and space management were expanded to the current schema, with legacy aliases preserved for gradual upgrades.【F:sdk/typescript-sdk/types/src/protocol.ts†L21-L348】
-- ✅ Presence payloads now follow the spec’s `join`/`leave` vocabulary, eliminating the unofficial `update`/`heartbeat` entries.【F:sdk/typescript-sdk/types/src/protocol.ts†L121-L126】
+### `@mew-protocol/mew/types`
+- ✅ `Envelope`/`PartialEnvelope` now enforce array `correlation_id`, and the message-kind catalog matches the v0.4 namespace. Payload types for capability and space management were expanded to the current schema, with legacy aliases preserved for gradual upgrades.【F:packages/mew/src/types/protocol.ts†L21-L348】
+- ✅ Presence payloads now follow the spec’s `join`/`leave` vocabulary, eliminating the unofficial `update`/`heartbeat` entries.【F:packages/mew/src/types/protocol.ts†L121-L126】
 
-### `@mew-protocol/participant`
-- ✅ Participant base now handles `participant/compact`/`participant/compact-done`, suppresses outbound traffic while paused, emits auto-resume events when timeouts elapse, and closes active streams on restart/shutdown in line with §3.9.【F:sdk/typescript-sdk/participant/src/MEWParticipant.ts†L120-L894】
+### `@mew-protocol/mew/participant`
+- ✅ Participant base now handles `participant/compact`/`participant/compact-done`, suppresses outbound traffic while paused, emits auto-resume events when timeouts elapse, and closes active streams on restart/shutdown in line with §3.9.【F:packages/mew/src/participant/MEWParticipant.ts†L120-L894】
 
-### `@mew-protocol/agent`
-- ✅ Agent runtime now gates work while paused, awaits reasoning emissions, closes reasoning streams during lifecycle events, and responds to `participant/compact` with detailed `participant/compact-done` payloads.【F:sdk/typescript-sdk/agent/src/MEWAgent.ts†L320-L1428】
+### `@mew-protocol/mew/agent`
+- ✅ Agent runtime now gates work while paused, awaits reasoning emissions, closes reasoning streams during lifecycle events, and responds to `participant/compact` with detailed `participant/compact-done` payloads.【F:packages/mew/src/agent/MEWAgent.ts†L320-L1428】
 
-### `@mew-protocol/client`
-- 🔄 Follow-up: evaluate whether `MEWClient.send` should coerce legacy `correlation_id` strings now that the type signature enforces arrays, or whether callers should be required to update first.【F:sdk/typescript-sdk/client/src/MEWClient.ts†L68-L124】
+### `@mew-protocol/mew/client`
+- 🔄 Follow-up: evaluate whether `MEWClient.send` should coerce legacy `correlation_id` strings now that the type signature enforces arrays, or whether callers should be required to update first.【F:packages/mew/src/client/MEWClient.ts†L68-L124】
 
-### `@mew-protocol/capability-matcher`
-- No blocking spec deltas discovered; once capability payload shapes change, update the local `CapabilityPattern` type so downstream packages share the richer structure.【F:sdk/typescript-sdk/capability-matcher/src/types.ts†L1-L60】
+### `@mew-protocol/mew/capability-matcher`
+- No blocking spec deltas discovered; once capability payload shapes change, update the local `CapabilityPattern` type so downstream packages share the richer structure.【F:packages/mew/src/capability-matcher/types.ts†L1-L60】
 
 ## Bridge Gap Analysis
 - ✅ Bridge no longer attempts `system/register` or other `system/*` emits; it now uses chat/status updates for diagnostics and treats gateway capabilities as authoritative.【F:bridge/src/mcp-bridge.ts†L8-L337】

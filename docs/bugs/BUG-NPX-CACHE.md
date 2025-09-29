@@ -8,9 +8,9 @@ When running `mew space up` after a fresh install, the coder-agent fails to star
 ```
 npm error code ENOTEMPTY
 npm error syscall rmdir
-npm error path /Users/rj/.npm/_npx/87e4939a35b417b5/node_modules/@mew-protocol/capability-matcher/dist
+npm error path /Users/rj/.npm/_npx/87e4939a35b417b5/node_modules/@mew-protocol/mew/capability-matcher/dist
 npm error errno -66
-npm error ENOTEMPTY: directory not empty, rmdir '/Users/rj/.npm/_npx/87e4939a35b417b5/node_modules/@mew-protocol/capability-matcher/dist'
+npm error ENOTEMPTY: directory not empty, rmdir '/Users/rj/.npm/_npx/87e4939a35b417b5/node_modules/@mew-protocol/mew/capability-matcher/dist'
 ```
 
 Followed by:
@@ -20,7 +20,7 @@ sh: mew-agent: command not found
 
 ## Root Cause
 The issue occurs when:
-1. PM2 runs `npx @mew-protocol/agent` to start the coder-agent
+1. PM2 runs `npx @mew-protocol/mew/agent` to start the coder-agent
 2. NPX attempts to download and cache the package
 3. The cache operation fails with ENOTEMPTY error, likely due to concurrent access or incomplete previous installation
 4. The agent binary (`mew-agent`) is not properly installed/linked
@@ -42,8 +42,8 @@ mew space up
 
 ## Partial Fix Applied
 Updated the CLI templates (v0.1.2) to use `npx --yes` flag:
-- **Before**: `npx @mew-protocol/agent`
-- **After**: `npx --yes @mew-protocol/agent`
+- **Before**: `npx @mew-protocol/mew/agent`
+- **After**: `npx --yes @mew-protocol/mew/agent`
 
 This helps by:
 - Forcing npx to always download without prompting

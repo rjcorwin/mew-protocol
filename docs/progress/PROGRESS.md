@@ -78,19 +78,18 @@
 
 ```
 mew-protocol/
-├── cli/                    # CLI package (v0.2.0 published)
-│   ├── src/
-│   │   ├── commands/       # Command implementations
-│   │   └── utils/          # Including advanced-interactive-ui.js
-│   ├── templates/          # Space templates
-│   └── spec/
-│       └── draft/
-│           └── decisions/
-│               └── accepted/
-│                   └── 009-aud-approval-dialog-ux.md
-├── sdk/                    # SDK packages
-├── bridge/                 # Bridge implementation
-├── gateway/                # Gateway server
+├── packages/
+│   └── mew/                # Unified workspace (SDK + CLI + bridge)
+│       ├── src/
+│       │   ├── agent/      # @mew-protocol/mew/agent exports
+│       │   ├── bridge/     # @mew-protocol/mew/bridge exports
+│       │   ├── capability-matcher/
+│       │   ├── cli/        # CLI implementation
+│       │   ├── gateway/    # Gateway helpers and logging utilities
+│       │   └── types/      # Core protocol types
+│       └── templates/      # Bundled space templates
+├── spaces/                 # Local development spaces
+├── tests/                  # Scenario harnesses
 └── TODO.md                 # Task tracking
 
 ```

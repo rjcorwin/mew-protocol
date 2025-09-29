@@ -54,14 +54,14 @@ tests-deprecated/                        # legacy scenarios (frozen)
 
 1. **Setup**
    - `setup.sh` creates a scratch workspace directory (e.g. `.workspace/`).
-   - Executes `../../cli/bin/mew.js space init --template ./template --space-dir .workspace`.
-   - Runs `../../cli/bin/mew.js space up --space-dir .workspace [--port N]`.
+   - Executes `../../packages/mew/src/bin/mew.js space init --template ./template --space-dir .workspace`.
+   - Runs `../../packages/mew/src/bin/mew.js space up --space-dir .workspace [--port N]`.
 
 2. **Check**
    - Existing `check.sh`/`test.sh` operate against the running space.
 
 3. **Teardown**
-   - Executes `../../cli/bin/mew.js space down --space-dir .workspace`.
+   - Executes `../../packages/mew/src/bin/mew.js space down --space-dir .workspace`.
    - Deletes the scratch directory.
 
 All runtime files (`.workspace/.mew/**`) stay out of git.

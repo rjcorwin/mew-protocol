@@ -216,13 +216,13 @@ that behavior into the CLI and harnesses.
   commit so issues are diagnosable from logs.
 
 Local CLI path (stable wrapper):
-- The repository keeps `cli/bin/mew.js` as a stable path for manual testing under `spaces/`.
+- The repository keeps `packages/mew/src/bin/mew.js` as a stable path for manual testing under `spaces/`.
 - This wrapper invokes the current local CLI implementation and forwards to the built entry once
   the single package is in place. Example usage from a space directory:
   ```bash
-  ../../cli/bin/mew.js space init .
-  ../../cli/bin/mew.js space up
-  ../../cli/bin/mew.js space connect
+  ../../packages/mew/src/bin/mew.js space init .
+  ../../packages/mew/src/bin/mew.js space up
+  ../../packages/mew/src/bin/mew.js space connect
   ```
   As an alternative, after building the single package you may run:
   ```bash
@@ -244,7 +244,7 @@ Environment overrides (optional):
 - Spaces created under `spaces/` are for interactive local dev and always use the local link rule
   described above. The README should document:
   - Creating a new space under `spaces/` and running `mew space init`.
-  - Using the stable local CLI path `../../cli/bin/mew.js`.
+  - Using the stable local CLI path `../../packages/mew/src/bin/mew.js`.
   - That dependencies are linked to the local `packages/mew` automatically (no registry needed).
   - That no `npm link` or publish steps are required.
 
@@ -253,7 +253,7 @@ Environment overrides (optional):
 - Scenario harnesses create disposable workspaces (typically under
   `tests/scenario-*/.workspace`). The CLI, invoked from the repo, applies the same link rule so that
   scenarios exercise the current source.
-- Each scenario’s `setup.sh` continues to call the local CLI path (e.g., `../../cli/bin/mew.js …` or
+- Each scenario’s `setup.sh` continues to call the local CLI path (e.g., `../../packages/mew/src/bin/mew.js …` or
   the new consolidated `mew` binary). The dependency rewrite occurs in the generated workspace
   transparently.
 - Tests run with network access disabled; linking ensures no npm registry access is required.
@@ -279,7 +279,7 @@ the single‑package release process.
   - Combined: `npm --workspace packages/mew run build:all`.
 - Optional watch task for fast iteration: `npm --workspace packages/mew run dev`.
 - Run CLI from source (dev):
-  - With compat wrapper: `./cli/bin/mew.js …` (for existing scripts) → forwards to `packages/mew/dist/bin/mew.js`.
+  - With compat wrapper: `./packages/mew/src/bin/mew.js …` (for existing scripts) → forwards to `packages/mew/dist/bin/mew.js`.
   - Or direct: `node packages/mew/dist/bin/mew.js …`.
 - Lint/format: `npm run lint --workspaces`, `npm run format --workspaces`.
 
@@ -290,10 +290,10 @@ Manual “spaces” exist under `spaces/` for developer exploration:
 ```bash
 cd spaces && mkdir test-demo && cd test-demo
 # Init uses local link: to @mew-protocol/mew when run inside the repo
-../../cli/bin/mew.js space init .
-../../cli/bin/mew.js space up
+../../packages/mew/src/bin/mew.js space init .
+../../packages/mew/src/bin/mew.js space up
 # Interact
-../../cli/bin/mew.js space connect
+../../packages/mew/src/bin/mew.js space connect
 ```
 
 Key points:

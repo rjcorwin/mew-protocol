@@ -19,7 +19,7 @@ When developing MEW Protocol, you'll want to test with your local packages inste
    cd my-test-space
 
    # Initialize the space using the local CLI
-   ../../cli/bin/mew.js space init --template coder-agent .
+   ../../packages/mew/src/bin/mew.js space init --template coder-agent .
    ```
 
 3. **Set your OpenAI API key (optional, only for coder-agent):**
@@ -31,10 +31,10 @@ When developing MEW Protocol, you'll want to test with your local packages inste
    ```bash
    # From your test space directory
    cd tests/my-test-space
-   ../../cli/bin/mew.js space up
+   ../../packages/mew/src/bin/mew.js space up
 
    # Or if port 8080 is in use:
-   ../../cli/bin/mew.js space up --port 8090
+   ../../packages/mew/src/bin/mew.js space up --port 8090
    ```
 
 ### How It Works
@@ -53,7 +53,7 @@ When developing MEW Protocol, you'll want to test with your local packages inste
 cd tests
 mkdir test-feature-x
 cd test-feature-x
-../../cli/bin/mew.js space init --template coder-agent .
+../../packages/mew/src/bin/mew.js space init --template coder-agent .
 # Repeat for additional spaces as needed
 ```
 
@@ -61,7 +61,7 @@ cd test-feature-x
 ```bash
 # Stop a running space
 cd tests/my-test-space
-../../cli/bin/mew.js space down
+../../packages/mew/src/bin/mew.js space down
 
 # Remove a test space completely
 cd ../..
@@ -79,7 +79,7 @@ rm -rf tests/my-test-space
 The coder-agent template sets up:
 
 - **Gateway**: The MEW Protocol gateway for message routing
-- **Coder Agent**: An AI agent using @mew-protocol/agent with OpenAI
+- **Coder Agent**: An AI agent using @mew-protocol/mew/agent with OpenAI
 - **MCP Filesystem Bridge**: Bridges MCP filesystem tools to MEW Protocol
 - **Human participant**: For manual interaction and testing
 

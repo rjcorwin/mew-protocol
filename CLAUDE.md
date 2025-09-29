@@ -7,25 +7,27 @@
 
 ## Repository Structure
 ```
-sdk/typescript-sdk/    # Core packages
-  types/              # @mew-protocol/types - Core types
-  capability-matcher/ # Pattern matching
-  client/            # WebSocket client
-  participant/       # MCP participant
-  agent/            # AI agent
-  gateway/          # Gateway server
-bridge/             # MCP-MEW bridge
-cli/               # Command-line tool
-tests/             # Integration tests (scenario-*)
-spec/              # Protocol specs (v0.4=current, draft=next)
-docs/              # Guides in architecture/, guides/, bugs/, progress/
+packages/mew/       # Unified workspace (@mew-protocol/mew)
+  src/
+    types/              # Core protocol types
+    capability-matcher/ # Pattern matching utilities
+    client/             # WebSocket client SDK
+    participant/        # MCP participant runtime
+    agent/              # AI agent runtime
+    bridge/             # MCP bridge implementation
+    cli/                # CLI implementation
+    bin/                # CLI and shim entrypoints
+  templates/            # Bundled space templates
+tests/               # Integration tests (scenario-*)
+spec/                # Protocol specs (v0.4=current, draft=next)
+docs/                # Guides in architecture/, guides/, bugs/, progress/
 ```
 
 ## Package Dependencies
 ```
-types → capability-matcher → participant → agent
-     → client → participant
-     → gateway
+@mew-protocol/mew/types → capability-matcher → participant → agent
+                        → client → participant
+                        → bridge
 ```
 
 ## Common Commands
@@ -37,19 +39,19 @@ npm test            # Run tests
 ./tests/run-all-tests.sh  # All integration tests
 
 # Use local CLI for testing (not global mew)
-./cli/bin/mew.js space up
+./packages/mew/src/bin/mew.js space up
 ```
 
 ## Quick Testing Guide
 ```bash
 # Create test space (from repo root)
 cd tests && mkdir test-feature && cd test-feature
-../../cli/bin/mew.js space init --template coder-agent .
+../../packages/mew/src/bin/mew.js space init --template coder-agent .
 cd ../.. && npm install  # Link local packages
 
 # Start space
 cd tests/test-feature
-../../cli/bin/mew.js space up  # Default port 8080
+../../packages/mew/src/bin/mew.js space up  # Default port 8080
 
 # Send messages via HTTP API (replace test-feature with your folder name)
 curl -X POST 'http://localhost:8080/participants/human/messages?space=test-feature' \
@@ -67,12 +69,12 @@ tail -n 100 ~/.pm2/logs/gateway-out.log  # Direct file access
 curl -v -X POST ...  # Shows request/response headers
 
 # Interactive mode (better for development)
-../../cli/bin/mew.js space connect
+../../packages/mew/src/bin/mew.js space connect
 # Paste JSON directly to send protocol messages
 # Type normally for chat messages
 
 # Clean up
-../../cli/bin/mew.js space down
+../../packages/mew/src/bin/mew.js space down
 ```
 
 ## Development Workflow
@@ -82,7 +84,7 @@ curl -v -X POST ...  # Shows request/response headers
 4. Check TypeScript errors with `npm run lint`
 
 ## Key Files
-- Protocol types: `sdk/typescript-sdk/types/src/protocol.ts`
+- Protocol types: `packages/mew/src/types/protocol.ts`
 - Message flow: See spec Section 3
 - Test examples: `tests/scenario-*/`
 - TODOs: `docs/progress/TODO.md`
