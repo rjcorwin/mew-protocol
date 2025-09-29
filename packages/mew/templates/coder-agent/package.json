@@ -1,0 +1,16 @@
+{
+  "name": "mew-space-{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MEW Protocol coder agent workspace with MCP filesystem tools",
+  "dependencies": {
+    "@mew-protocol/mew": "^0.5.0",
+    "@modelcontextprotocol/server-filesystem": "^0.6.2",
+    "openai": "^5.20.1",
+    "js-yaml": "^4.1.0",
+    "ws": "^8.14.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

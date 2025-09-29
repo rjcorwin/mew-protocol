@@ -19,7 +19,7 @@ participants:
       - kind: reasoning/*
     auto_start: true
     command: "node"
-    args: ["../../sdk/typescript-sdk/agent/dist/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "ts-agent-token", "--id", "typescript-agent", "--no-sample-tools"]
+    args: ["../../packages/mew/dist/agent/index.js", "--gateway", "ws://localhost:${PORT}", "--space", "test-space", "--token", "ts-agent-token", "--id", "typescript-agent", "--no-sample-tools"]
     
   fulfiller-agent:
     tokens: ["fulfiller-token"]

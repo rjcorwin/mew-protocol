@@ -11,7 +11,7 @@ SPACE_NAME=${SPACE_NAME:-"scenario-10-multi-agent"}
 TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
 CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
-PARTICIPANT_DIST="${REPO_ROOT}/sdk/typescript-sdk/participant/dist/index.js"
+PARTICIPANT_DIST="${REPO_ROOT}/packages/mew/dist/participant/index.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'

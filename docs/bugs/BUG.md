@@ -47,7 +47,7 @@ npx pm2 logs coder-agent --lines 50 --nostream
 
 ## Test Environment
 - **Location**: `/tmp/mew-test-verify/`
-- **Template**: `coder-agent` from `/cli/templates/coder-agent/`
+- **Template**: `coder-agent` from `/packages/mew/templates/coder-agent/`
 - **Gateway**: Port 8090
 - **Package Version**: @mew-protocol/agent@0.3.0 (published to npm)
 
@@ -198,26 +198,26 @@ Add logging to trace where the loop breaks:
    - Tool registration
 
 ### Build Configuration
-3. `/sdk/typescript-sdk/agent/package.json`
+3. `/packages/mew/package.json`
    - Build scripts
    - Dependencies
    - Files included in package
 
-4. `/sdk/typescript-sdk/agent/tsconfig.json`
+4. `/packages/mew/tsconfig.json`
    - TypeScript compilation settings
    - Output configuration
 
 ### Capability System
-5. `/sdk/typescript-sdk/capability-matcher/`
+5. `/packages/mew/src/capability-matcher/`
    - How capabilities are evaluated
    - Pattern matching logic
 
 ### Template Configuration
-6. `/cli/templates/coder-agent/space.yaml`
+6. `/packages/mew/templates/coder-agent/space.yaml`
    - Agent capabilities configuration
    - Environment variables (MEW_AGENT_CONFIG)
 
-7. `/cli/templates/coder-agent/package.json`
+7. `/packages/mew/templates/coder-agent/package.json`
    - Dependencies and versions
 
 ## Immediate Workarounds
@@ -234,7 +234,7 @@ Uncomment lines 32-35 in template's space.yaml to give agent direct tool access:
 Change the agent command in space.yaml:
 ```yaml
 command: "node"
-args: ["/path/to/sdk/typescript-sdk/agent/dist/index.js", ...]
+args: ["/path/to/packages/mew/dist/agent/index.js", ...]
 ```
 
 ### Option 3: Add Auto-fulfiller

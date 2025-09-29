@@ -2,41 +2,46 @@
 
 ## Critical Docs (READ FIRST AND UPDATE AFTER COMPLETING WORK)
 - MEW Protocol: spec/draft/SPEC.md
-- SDK: sdk/spec/draft/SPEC.md
-- CLI: cli/spec/draft/SPEC.md
+- Unified package: packages/mew/spec/draft/SPEC.md
+- CLI reference: packages/mew/spec/draft
 
 ## Repository Structure
 ```
-sdk/typescript-sdk/    # Core packages
-  types/              # @mew-protocol/types - Core types
-  capability-matcher/ # Pattern matching
-  client/            # WebSocket client
-  participant/       # MCP participant
-  agent/            # AI agent
-  gateway/          # Gateway server
-bridge/             # MCP-MEW bridge
-cli/               # Command-line tool
-tests/             # Integration tests (scenario-*)
-spec/              # Protocol specs (v0.4=current, draft=next)
-docs/              # Guides in architecture/, guides/, bugs/, progress/
+packages/mew/         # Unified @mew-protocol/mew package
+  src/
+    types/
+    capability-matcher/
+    client/
+    participant/
+    agent/
+    bridge/
+    cli/
+    bin/
+    gateway/
+  templates/
+  config/
+  dist/
+tests/                # Integration tests (scenario-*)
+spec/                 # Protocol specs (v0.4=current, draft=next)
+docs/                 # Guides in architecture/, guides/, bugs/, progress/
 ```
 
 ## Package Dependencies
 ```
 types → capability-matcher → participant → agent
      → client → participant
-     → gateway
+     → bridge
 ```
 
 ## Common Commands
 ```bash
-npm install          # Setup
-npm run build        # Build all (uses TypeScript project references)
-npm run build:watch  # Dev mode
-npm test            # Run tests
-./tests/run-all-tests.sh  # All integration tests
+npm install                                    # Setup
+npm run build                                  # Build @mew-protocol/mew
+npm run build:watch -- --workspace @mew-protocol/mew
+npm test                                       # Run repo smoke tests
+./tests/run-all-tests.sh                       # All integration tests
 
-# Use local CLI for testing (not global mew)
+# Use local CLI wrapper for testing (not global mew)
 ./cli/bin/mew.js space up
 ```
 
@@ -82,7 +87,7 @@ curl -v -X POST ...  # Shows request/response headers
 4. Check TypeScript errors with `npm run lint`
 
 ## Key Files
-- Protocol types: `sdk/typescript-sdk/types/src/protocol.ts`
+- Protocol types: `packages/mew/src/types/protocol.ts`
 - Message flow: See spec Section 3
 - Test examples: `tests/scenario-*/`
 - TODOs: `docs/progress/TODO.md`

@@ -1,14 +1,10 @@
 #!/usr/bin/env node
 
-/**
- * MEW Protocol CLI - Minimal implementation for testing
- *
- * Commands:
- * - mew gateway start    - Start a gateway server
- * - mew client connect   - Connect to gateway with FIFO mode
- * - mew agent start      - Start a built-in agent
- * - mew token create     - Create a test token
- */
+const path = require('path');
+const fs = require('fs');
 
-require('../src/index.js');
+const sourceCli = path.join(__dirname, '../../packages/mew/src/cli/index.js');
+const distCli = path.join(__dirname, '../../packages/mew/dist/cli/index.js');
 
+const entry = fs.existsSync(distCli) ? distCli : sourceCli;
+require(entry);

@@ -31,9 +31,9 @@ pushd "${WORKSPACE_DIR}" >/dev/null
 node "${CLI_BIN}" init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 7 - MCP Bridge" > init.log 2>&1
 
 mkdir -p logs
-BRIDGE_DIST=${REPO_ROOT}/bridge/dist/mcp-bridge.js
+BRIDGE_DIST=${REPO_ROOT}/packages/mew/dist/bridge/index.js
 if [[ ! -f "${BRIDGE_DIST}" ]]; then
-  printf "%b\n" "${YELLOW}Building @mew-protocol/bridge (tsc)${NC}"
+  printf "%b\n" "${YELLOW}Building @mew-protocol/mew bridge module (tsc)${NC}"
   if ! (cd "${REPO_ROOT}" && npm run build > "${WORKSPACE_DIR}/logs/bridge-build.log" 2>&1); then
     printf "%b\n" "${YELLOW}Bridge build failed, printing log:${NC}"
     cat "${WORKSPACE_DIR}/logs/bridge-build.log"

@@ -1,0 +1,13 @@
+{
+  "name": "mew-space-{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dependencies for MEW note-taker space",
+  "dependencies": {
+    "@mew-protocol/mew": "^0.5.0",
+    "ws": "^8.14.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
