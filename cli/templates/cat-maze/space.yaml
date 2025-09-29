@@ -8,11 +8,7 @@ space:
 participants:
   human:
     capabilities:
-      - kind: "chat"
-      - kind: "mcp/request"
-        payload:
-          method: "tools/*"
-      - kind: "mcp/response"
+      - kind: "*"  # Full access so humans can use every capability, including reasoning cancel
 
   mew:
     type: local

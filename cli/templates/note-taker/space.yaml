@@ -7,8 +7,7 @@ participants:
   human:
     # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
-      - kind: "mcp/*"
-      - kind: "chat"
+      - kind: "*"  # Grant humans full capability set (chat, MCP, reasoning, streams, etc.)
 
   assistant:
     command: "node"
