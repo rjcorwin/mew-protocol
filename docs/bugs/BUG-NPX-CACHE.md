@@ -53,8 +53,8 @@ This helps by:
 **Note**: This won't fix already corrupted caches - users still need to clear them manually once.
 
 ## Files Changed
-- `/cli/templates/coder-agent/space.yaml` - Added `--yes` flag to npx commands
-- `/cli/package.json` - Bumped version to 0.1.2
+- `/packages/mew/templates/coder-agent/space.yaml` - Added `--yes` flag to npx commands
+- `/packages/mew/package.json` - Bumped version to 0.1.2
 
 ## Alternative Solutions to Consider
 1. **Bundle dependencies**: Include agent and bridge packages as dependencies of the CLI

@@ -43,7 +43,7 @@ tests/
 ├── templates/                          # shared base templates (optional)
 └── scenario-*/
     ├── template/                       # scenario-specific template
-    │   └── (files mirroring cli/templates/* structure)
+    │   └── (files mirroring packages/mew/templates/* structure)
     ├── setup.sh                        # initialises disposable workspace
     ├── check.sh / test.sh              # scenario assertions
     └── teardown.sh                     # shuts down & deletes workspace dir
@@ -83,7 +83,7 @@ tests/
 
 ## 6. Templates
 
-- Scenario templates mimic the layout of `cli/templates/*` (e.g. `package.json`,
+- Scenario templates mimic the layout of `packages/mew/templates/*` (e.g. `package.json`,
   `.mew/space.yaml`, supporting files). This allows `mew space init --template`
   to operate without special handling.
 - Templates follow the usual substitution tokens (`{{SPACE_NAME}}`, etc.).

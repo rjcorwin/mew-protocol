@@ -1,0 +1,140 @@
+# Coder Agent Space - Coding assistant with file system access
+space:
+  id: "{{SPACE_NAME}}"
+  name: "{{SPACE_NAME}}"
+  description: "Coding assistant that requires human approval for file modifications"
+  default_participant: human
+
+participants:
+  # Human participant with full capabilities (can approve proposals)
+  human:
+    # No tokens field - generated at runtime in .mew/tokens/
+    capabilities:
+      - kind: "*"  # Full capabilities including proposal approval
+
+  # Coder agent with limited capabilities - creates proposals for file modifications
+  mew:
+    type: local
+    command: "npx"
+    args: ["--yes", "-p", "@mew-protocol/mew", "mew-agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
+    auto_start: true
+    # No tokens field - generated at runtime in .mew/tokens/
+    capabilities:
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
+      - kind: "reasoning/*"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "mcp/proposal"
+      - kind: "mcp/response"
+      - kind: "mcp/request"
+        payload:
+          method: "!tools/call"
+      # Allow agent to discover tools from other participants
+      - kind: "mcp/request"
+        payload:
+          method: "tools/list"
+      # Uncomment for YOLO mode - gives agent direct tools/call capability:
+      # - kind: "mcp/request"
+      #   payload:
+      #     method: "tools/call"
+      # Allow direct calls to read-only operations without approval
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "list_allowed_directories"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "read_file"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "read_text_file"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "read_media_file"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "read_multiple_files"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "search_files"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "list_directory"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "list_directory_with_sizes"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "directory_tree"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/call"
+          params:
+            name: "get_file_info"
+    env:
+      # API configuration - these read from environment at runtime
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
+      OPENAI_MODEL: "{{AGENT_MODEL}}"
+      # Configure the agent with 100 max iterations for complex multi-step tasks
+      # and 1 hour timeout for proposals to allow human review time
+      # and 50 message conversation history for context across interactions
+      MEW_AGENT_CONFIG: '{"maxIterations": 100, "requestTimeout": 3600000, "conversationHistoryLength": 50, "reasoningEnabled": true, "systemPrompt": {{AGENT_PROMPT_JSON}}}'
+
+  # MCP Bridge for file system access - executes approved proposals
+  mcp-fs-bridge:
+    type: local
+    command: "npx"
+    args: ["--yes", "-p", "@mew-protocol/mew", "mew-bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./", "--mcp-cwd", "./"]
+    auto_start: true
+    # No tokens field - generated at runtime in .mew/tokens/
+    capabilities:
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "mcp/notification"
+
+  # Auto-fulfiller for proposals (disabled by default for manual testing)
+  auto-fulfiller:
+    type: local
+    command: "node"
+    args: ["./.mew/agents/auto-fulfiller.js"]
+    auto_start: false  # Disabled for manual testing
+    # No tokens field - generated at runtime in .mew/tokens/
+    capabilities:
+      - kind: "mcp/proposal"  # Can see proposals
+      - kind: "mcp/request"   # Can execute approved operations
+      - kind: "mcp/response"  # Can respond to requests
+      - kind: "chat"
+    env:
+      NODE_PATH: "./.mew/node_modules"
+      MEW_GATEWAY: "ws://localhost:${PORT}"
+      MEW_SPACE: "{{SPACE_NAME}}"
+      MEW_TOKEN: "${TOKEN}"  # Token will be loaded from .mew/tokens/auto-fulfiller.token
+      MEW_PARTICIPANT_ID: "auto-fulfiller"
+      AUTO_APPROVE: "false"  # Set to "true" to enable auto-approval
+      APPROVAL_DELAY: "2000"  # 2 second delay before auto-approval
+      TARGET_PARTICIPANTS: "mcp-fs-bridge"
+
+defaults:
+  capabilities:
+    - kind: "chat"  # Everyone can chat by default

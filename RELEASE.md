@@ -166,10 +166,10 @@ After SDK and bridge packages are published, update ALL CLI template dependencie
 #### Find All Templates
 ```bash
 # List all template directories
-ls cli/templates/
+ls packages/mew/templates/
 
 # Find all package.json files in templates
-find cli/templates -name "package.json" -type f
+find packages/mew/templates -name "package.json" -type f
 ```
 
 #### Update Template Dependencies
@@ -178,10 +178,10 @@ For each template that has MEW protocol dependencies, update the `package.json`:
 ```bash
 # Example process for each template:
 # 1. Check if template has MEW dependencies
-grep "@mew-protocol" cli/templates/TEMPLATE_NAME/package.json
+grep "@mew-protocol" packages/mew/templates/TEMPLATE_NAME/package.json
 
 # 2. If it does, update versions to match newly published packages
-# Edit cli/templates/TEMPLATE_NAME/package.json
+# Edit packages/mew/templates/TEMPLATE_NAME/package.json
 ```
 
 **Common MEW dependencies to update:**
@@ -198,20 +198,20 @@ grep "@mew-protocol" cli/templates/TEMPLATE_NAME/package.json
 ```
 
 #### Current Templates (as of this guide)
-- `cli/templates/coder-agent/` - Has MEW dependencies
-- `cli/templates/note-taker/` - Minimal dependencies
+- `packages/mew/templates/coder-agent/` - Has MEW dependencies
+- `packages/mew/templates/note-taker/` - Minimal dependencies
 - *(Future templates will be automatically covered by this process)*
 
 #### Verification
 ```bash
 # Verify all templates reference correct versions
-grep -r "@mew-protocol" cli/templates/*/package.json
+grep -r "@mew-protocol" packages/mew/templates/*/package.json
 ```
 
 #### Commit Template Updates
 ```bash
 # Add template changes
-git add cli/templates/*/package.json
+git add packages/mew/templates/*/package.json
 
 # Commit template updates
 git commit -m "Update CLI templates to use latest package versions
@@ -226,7 +226,7 @@ git push origin main
 ### Phase 6: CLI Package
 
 ```bash
-cd cli
+cd packages/mew
 npm publish --access public --otp=YOUR_OTP
 ```
 

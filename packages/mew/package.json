@@ -1,0 +1,119 @@
+{
+  "name": "@mew-protocol/mew",
+  "version": "0.5.0",
+  "description": "Unified MEW Protocol SDK, CLI, bridge, and tooling",
+  "license": "MIT",
+  "bin": {
+    "mew": "dist/bin/mew.js",
+    "mew-agent": "dist/bin/mew-agent.js",
+    "mew-bridge": "dist/bin/mew-bridge.js"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "require": "./dist/types/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "require": "./dist/client/index.js"
+    },
+    "./participant": {
+      "types": "./dist/participant/index.d.ts",
+      "require": "./dist/participant/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "require": "./dist/agent/index.js"
+    },
+    "./capability-matcher": {
+      "types": "./dist/capability-matcher/index.d.ts",
+      "require": "./dist/capability-matcher/index.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge/index.d.ts",
+      "require": "./dist/bridge/index.js"
+    },
+    "./gateway": "./dist/gateway/index.js",
+    "./cli": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "npm run clean && npm run build:ts && npm run build:assets",
+    "build:ts": "tsc -p tsconfig.json",
+    "build:assets": "node scripts/copy-assets.mjs",
+    "clean": "rimraf dist",
+    "test": "node tests/run-tests.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\" \"templates/**/*.{json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\" \"templates/**/*.{json,md,yaml,yml}\""
+  },
+  "keywords": [
+    "mew",
+    "protocol",
+    "multi-agent",
+    "cli",
+    "sdk",
+    "bridge",
+    "workspace"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjcorwin/mew-protocol.git",
+    "directory": "packages/mew"
+  },
+  "bugs": {
+    "url": "https://github.com/rjcorwin/mew-protocol/issues"
+  },
+  "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "debug": "^4.3.4",
+    "eventemitter3": "^5.0.1",
+    "express": "^4.18.2",
+    "ink": "^3.2.0",
+    "js-yaml": "^4.1.0",
+    "jsonpath-plus": "^8.0.0",
+    "lodash": "^4.17.21",
+    "micromatch": "^4.0.5",
+    "openai": "^5.20.1",
+    "pm2": "^6.0.10",
+    "react": "^18.2.0",
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/debug": "^4.1.12",
+    "@types/js-yaml": "^4.0.5",
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.5.0"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "config",
+    "examples",
+    "CHANGELOG.md",
+    "README.md",
+    "PROGRESS.md",
+    "spec"
+  ]
+}

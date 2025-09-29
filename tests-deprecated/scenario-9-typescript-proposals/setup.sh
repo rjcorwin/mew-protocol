@@ -26,7 +26,7 @@ cd "$TEST_DIR"
 
 # Build the TypeScript agent if needed
 echo "Building TypeScript agent..."
-cd ../../sdk/typescript-sdk/agent
+cd ../../packages/mew
 if [ ! -d "dist" ]; then
   npm install
   npm run build
