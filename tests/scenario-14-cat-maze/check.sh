@@ -64,7 +64,7 @@ fi
 printf "%b\n" "${BLUE}Verifying narrator move relays...${NC}"
 
 if node "${SCENARIO_DIR}/narrator-check.js" --server "${SERVER_PATH}" --narrator "${NARRATOR_PATH}" --log "${NARRATOR_LOG}"; then
-  printf "%b\n" "${GREEN}✓ Narrator relayed move results with walkway tiles${NC}"
+  printf "%b\n" "${GREEN}✓ Narrator relayed move results with 🟩 walkway tiles${NC}"
 else
   printf "%b\n" "${RED}✗ Narrator relay check failed${NC}"
   cat "${NARRATOR_LOG}" >&2 || true

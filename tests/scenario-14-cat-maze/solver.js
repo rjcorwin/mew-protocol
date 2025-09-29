@@ -47,8 +47,8 @@ function createLogger(logPath) {
   };
 }
 
-const WALL = '🟫';
-const WALKWAY = '◻️';
+const WALL = '⬛';
+const WALKWAY = '🟩';
 
 const graphemeSegmenter =
   typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
@@ -79,7 +79,7 @@ function findPath(board) {
       if (cell === '🐈') {
         start = { row, col };
         grid[row][col] = WALKWAY;
-      } else if (cell === '🏁') {
+      } else if (cell === '🏡') {
         goal = { row, col };
         grid[row][col] = WALKWAY;
       }
@@ -241,7 +241,7 @@ async function main() {
       if (!currentState) {
         const view = await callTool('view');
         if (!view.state?.board?.includes(WALKWAY)) {
-          throw new Error('View response missing walkway glyph ◻️');
+          throw new Error('View response missing walkway glyph 🟩');
         }
         currentState = view.state;
       }

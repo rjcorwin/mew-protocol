@@ -6,8 +6,8 @@ Guide a curious 🐈 through 10 handcrafted mazes using MCP tools. Humans can ca
 
 - 🎮 **Stateful MCP server** that tracks the current maze level, cat position, and total moves
 - 🧭 **Maze tools**: `view`, `up`, `down`, `left`, `right`, `restart`
-- 🟫 **Emoji walls** that align visually with the 🐈 for clean board snapshots
-- ◻️ **Walkable tiles** that keep pathing clear against the brown walls
+- ⬛ **Emoji walls** that align visually with the 🐈 for clean board snapshots
+- 🟩 **Walkable tiles** that keep pathing clear against the dark walls
 - 🗣️ **Narrator companion** that relays move results and drops fresh `view` snapshots in chat
 - 🤝 **Cooperative play** between human participants and the MEW agent
 - 🧩 10 levels that escalate in difficulty from straight corridors to winding labyrinths
@@ -30,14 +30,14 @@ Once the space is running you can:
 
 | Tool | Description |
 | --- | --- |
-| `view` | Show the current maze with the 🐈 and 🏁 positions plus progress stats |
+| `view` | Show the current maze with the 🐈 and 🏡 positions plus progress stats |
 | `up` | Attempt to move the cat one tile up |
 | `down` | Attempt to move the cat one tile down |
 | `left` | Attempt to move the cat one tile left |
 | `right` | Attempt to move the cat one tile right |
 | `restart` | Reset to level 1 and clear move counters |
 
-Invalid moves keep the cat in place and report the wall you bumped into. Reaching the 🏁 advances to the next level automatically.
+Invalid moves keep the cat in place and report the wall you bumped into. Reaching the 🏡 advances to the next level automatically.
 
 ## Agent Tips
 

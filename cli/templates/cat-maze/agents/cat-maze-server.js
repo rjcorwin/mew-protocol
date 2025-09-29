@@ -344,7 +344,7 @@ function buildBoardString() {
             return '🐈';
           }
           if (level.goal.row === rowIdx && level.goal.col === colIdx) {
-            return '🏁';
+            return '🏡';
           }
           return cell === WALL ? WALL : WALKWAY;
         })

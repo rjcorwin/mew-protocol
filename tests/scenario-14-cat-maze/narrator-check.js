@@ -8,8 +8,8 @@ const readline = require('readline');
 const { WebSocketServer } = require('ws');
 const fs = require('fs');
 
-const WALL = '🟫';
-const WALKWAY = '◻️';
+const WALL = '⬛';
+const WALKWAY = '🟩';
 
 const graphemeSegmenter =
   typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
@@ -105,7 +105,7 @@ function findPath(board) {
       if (cell === '🐈') {
         start = { row, col };
         grid[row][col] = WALKWAY;
-      } else if (cell === '🏁') {
+      } else if (cell === '🏡') {
         goal = { row, col };
         grid[row][col] = WALKWAY;
       }
@@ -246,7 +246,7 @@ async function main() {
 
   const initialView = await callServer('tools/call', { name: 'view', arguments: {} });
   if (!initialView?.state?.board?.includes(WALKWAY)) {
-    throw new Error('Initial view missing walkway glyph ◻️');
+    throw new Error('Initial view missing walkway glyph 🟩');
   }
 
   const path = findPath(initialView.state.board);
@@ -451,13 +451,13 @@ async function main() {
       logger.info('Move chat text', { text: moveChat.payload?.text || '' });
     }
     if (!moveChat.payload?.text?.includes(WALKWAY)) {
-      throw new Error(`Move chat for ${direction} missing walkway glyph ◻️`);
+      throw new Error(`Move chat for ${direction} missing walkway glyph 🟩`);
     }
 
     const viewRequestId = await nextViewRequest(timeoutMs);
     const viewChat = await waitForChat(viewRequestId, timeoutMs);
     if (!viewChat.payload?.text?.includes(WALKWAY)) {
-      throw new Error('View chat missing walkway glyph ◻️');
+      throw new Error('View chat missing walkway glyph 🟩');
     }
 
     return result;
