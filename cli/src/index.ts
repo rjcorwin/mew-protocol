@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
-const { program } = require('commander');
-const fs = require('fs');
-const path = require('path');
-const packageJson = require('../package.json');
+import fs from 'fs';
+import path from 'path';
+import { program } from 'commander';
 
-// Import commands
+import packageJson from '../package.json';
 const gatewayCommand = require('./commands/gateway');
 const clientCommand = require('./commands/client');
 const agentCommand = require('./commands/agent');
@@ -13,26 +12,21 @@ const tokenCommand = require('./commands/token');
 const spaceCommand = require('./commands/space');
 const InitCommand = require('./commands/init');
 
-// Check if space configuration exists
-function checkSpaceExists() {
-  // Check .mew/space.yaml first (preferred location)
+function checkSpaceExists(): boolean {
   if (fs.existsSync(path.join(process.cwd(), '.mew/space.yaml'))) {
     return true;
   }
-  // Check space.yaml in root (legacy/compatibility)
   if (fs.existsSync(path.join(process.cwd(), 'space.yaml'))) {
     return true;
   }
   return false;
 }
 
-// Setup CLI
 program
   .name('mew')
   .description('MEW Protocol CLI - Minimal implementation for testing')
-  .version(packageJson.version);
+  .version(packageJson.version ?? '0.0.0');
 
-// Add init command
 program
   .command('init [template]')
   .description('Initialize a new MEW space from templates')
@@ -43,20 +37,19 @@ program
   .option('--force', 'Overwrite existing space configuration')
   .option('--list-templates', 'Show available templates and exit')
   .option('--template-info <name>', 'Show details about a specific template')
-  .action(async (template, options) => {
+  .action(async (template: string | undefined, options: Record<string, any>) => {
     const initCommand = new InitCommand();
+    // eslint-disable-next-line no-param-reassign
     options.template = template;
     await initCommand.execute(options);
   });
 
-// Add other commands
 program.addCommand(gatewayCommand);
 program.addCommand(clientCommand);
 program.addCommand(agentCommand);
 program.addCommand(tokenCommand);
 program.addCommand(spaceCommand);
 
-// Add aliases for common space commands
 program
   .command('up')
   .description('Alias for "space up" - Start a space')
@@ -78,19 +71,17 @@ program
   .option('-d, --space-dir <path>', 'Space directory', '.')
   .action(spaceCommand.spaceDownAction);
 
-// Helper function to check if space is running
-function isSpaceRunning() {
+function isSpaceRunning(): boolean {
   const pidFile = path.join(process.cwd(), '.mew', 'pids.json');
   if (!fs.existsSync(pidFile)) {
     return false;
   }
 
   try {
-    const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
-    // Check if gateway process is still running
+    const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8')) as { gateway?: number };
     if (pids.gateway) {
       try {
-        process.kill(pids.gateway, 0); // Check if process exists
+        process.kill(pids.gateway, 0);
         return true;
       } catch {
         return false;
@@ -102,41 +93,39 @@ function isSpaceRunning() {
   return false;
 }
 
-// Default behavior when no command is provided
-if (process.argv.length === 2) {
-  // No arguments provided - intelligent default behavior
-  if (checkSpaceExists()) {
-    // Space exists - check if it's running
-    if (isSpaceRunning()) {
-      // Space is running - connect to it
-      console.log('Connecting to running space...');
-      process.argv.push('space', 'connect');
+async function main(): Promise<void> {
+  if (process.argv.length === 2) {
+    if (checkSpaceExists()) {
+      if (isSpaceRunning()) {
+        console.log('Connecting to running space...');
+        process.argv.push('space', 'connect');
+      } else {
+        console.log('Starting space and connecting interactively...');
+        process.argv.push('space', 'up', '-i');
+      }
     } else {
-      // Space exists but not running - start it interactively
-      console.log('Starting space and connecting interactively...');
-      process.argv.push('space', 'up', '-i');
-    }
-  } else {
-    // No space - run init, then connect
-    console.log('Welcome to MEW Protocol! Let\'s set up your space.');
-    const initCommand = new InitCommand();
-    initCommand.execute({}).then(() => {
+      console.log('Welcome to MEW Protocol! Let\'s set up your space.');
+      const initCommand = new InitCommand();
+      try {
+        await initCommand.execute({});
+      } catch (error) {
+        console.error('Error:', (error as Error).message);
+        process.exit(1);
+      }
+
       console.log('\nSpace initialized! Starting and connecting...');
-      // After init, start the space interactively by spawning a new process
       const { spawn } = require('child_process');
-      const child = spawn(process.argv[0], [process.argv[1], 'space', 'up', '-i'], {
-        stdio: 'inherit'
+      const child = spawn(process.argv[0], [process.argv[1]!, 'space', 'up', '-i'], {
+        stdio: 'inherit',
       });
-      child.on('exit', (code) => {
+      child.on('exit', (code: number | null) => {
         process.exit(code || 0);
       });
-    }).catch(error => {
-      console.error('Error:', error.message);
-      process.exit(1);
-    });
-    return; // Don't parse args since we're handling it
+      return;
+    }
   }
+
+  program.parse(process.argv);
 }
 
-// Parse arguments
-program.parse(process.argv);
+void main();

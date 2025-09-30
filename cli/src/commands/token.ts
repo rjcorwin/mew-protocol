@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { Command } = require('commander');
 
 const token = new Command('token').description('Token management');

@@ -5,13 +5,17 @@
   "bin": {
     "mew": "bin/mew.js"
   },
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "pretest": "npm run build",
     "test": "node tests/run-tests.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\" \"bin/**/*.js\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\" \"bin/**/*.js\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\" \"bin/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\" \"bin/**/*.js\""
   },
   "keywords": [
     "mew",
@@ -39,7 +43,7 @@
     "ws": "^8.18.0"
   },
   "files": [
-    "src",
+    "dist",
     "bin",
     "templates",
     "README.md"
@@ -58,10 +62,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.12",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
     "eslint": "^9.35.0",
     "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.6.2"
+    "prettier": "^3.6.2",
+    "typescript": "^5.5.0"
   }
 }
