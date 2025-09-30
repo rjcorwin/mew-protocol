@@ -66,38 +66,43 @@ See: REFACTOR-TEMPLATE-DEPS.md, ADR-TEMPLATE-DEPENDENCIES.md
 - [ ] TODO: Verify `mew up` works for each template (needs fixing space command first)
 - [ ] TODO: Verify agents can import from CLI's bundled deps (needs runtime test)
 
-#### Phase 4.5 - Fix Space Command for New Structure (BLOCKING)
-**Issue**: `mew space up` fails with "Failed to start gateway: undefined"
+#### Phase 4.5 - Document Global Install Requirement ✅
+**Complete** - REPO-SPEC.md and test infrastructure updated
 
-The space command was written for the old multi-package structure and needs updates:
+Templates no longer have package.json. All dependencies are bundled in CLI and accessed
+via mew subcommands. PM2 requires mew command in PATH.
 
-**Root Cause**:
-- PM2 is trying to run a `gateway` binary that doesn't exist as a standalone command
-- Should be using `mew gateway start` instead
+**Changes Made**:
+- [x] Updated REPO-SPEC.md to document global install requirement
+- [x] Updated dev workflow sections to consistently use global `mew`
+- [x] Updated tests/run-all-tests.sh to build and install globally before running scenarios
+- [x] Updated all 15 scenario setup.sh scripts to use `mew` instead of `node ${CLI_BIN}`
+- [x] Removed unused CLI_BIN variable from all scenarios
 
-**Files to Fix**:
-- `packages/mew/src/cli/commands/space.js` - PM2 start configurations (lines 603, 722, 764, 842)
-  - Line 603: Gateway start - uses `../../bin/mew.js` but needs `gateway start` args
-  - Line 722: Bridge start - similar issue
-  - Line 764: Participant start - generic participant command
-  - Line 842: Another gateway reference
+**Dev Workflow Now**:
+```bash
+npm run build
+npm install -g .
+mew space init .
+mew space up
+mew space connect
+```
+
+**Alternative (faster iteration)**:
+```bash
+npm link  # One-time
+npm run build  # After changes
+```
+
+#### Phase 4.6 - Fix Space Command for New Structure (NEXT)
+**Issue**: Need to test `mew space up` with global install
 
 **Tasks**:
-- [ ] Update gateway PM2 config to run `mew gateway start` with proper args
-- [ ] Verify bridge PM2 config works with `mew bridge start`
-- [ ] Test `mew space up` in a fresh space with API keys
-- [ ] Verify gateway logs to PM2 correctly
-- [ ] Verify all participants start correctly
-
-**Test Plan**:
-```bash
-cd spaces/kick
-../../cli/bin/mew.js space up
-# Should start gateway on port 8080/8081
-# Should start mew agent via `mew agent run`
-# Should start mcp-fs-bridge via `mew bridge start`
-# Gateway logs should appear in .mew/logs/gateway.log
-```
+- [ ] Build and install globally: `npm run build && npm install -g .`
+- [ ] Test `mew space up` in a fresh space
+- [ ] Verify gateway starts correctly
+- [ ] Verify all participants start via PM2
+- [ ] Check gateway logs in .mew/logs/gateway.log
 
 ### Phase 5 - Publish & Verify
 - [x] Test `npm pack` from packages/mew
