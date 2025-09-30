@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Simplified Input Component for debugging
  */

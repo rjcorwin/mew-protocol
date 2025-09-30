@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Command } from 'commander';
 import { WebSocketServer } from 'ws';
 import express from 'express';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Command } from 'commander';
 
 const bridge = new Command('bridge').description('MEW-MCP Bridge - Connect MCP servers to MEW spaces');

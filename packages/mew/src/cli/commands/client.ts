@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Command } from 'commander';
 import WebSocket from 'ws';
 import fs from 'fs';

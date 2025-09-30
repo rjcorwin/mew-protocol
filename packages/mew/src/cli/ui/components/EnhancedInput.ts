@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Enhanced Input Component for MEW CLI
  *

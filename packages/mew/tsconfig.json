@@ -6,7 +6,8 @@
     "composite": false,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "types": ["node"]
   },
   "include": [
     "src/**/*.ts"
@@ -15,8 +16,6 @@
     "node_modules",
     "dist",
     "**/*.test.ts",
-    "**/*.spec.ts",
-    "src/cli/**/*",
-    "src/bin/**/*"
+    "**/*.spec.ts"
   ]
 }

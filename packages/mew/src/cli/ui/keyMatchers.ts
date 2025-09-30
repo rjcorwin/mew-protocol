@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Key Matchers for Terminal Input
  *

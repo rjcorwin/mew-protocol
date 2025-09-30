@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Command } from 'commander';
 
 const token = new Command('token').description('Token management');

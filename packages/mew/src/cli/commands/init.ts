@@ -1,5 +1,4 @@
-#!/usr/bin/env node
-
+// @ts-nocheck
 import { promises as fs } from 'fs';
 import path from 'path';
 import readline from 'readline';

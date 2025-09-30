@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * MEW Protocol Banner
  *

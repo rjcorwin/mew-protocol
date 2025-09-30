@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Command } from 'commander';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
