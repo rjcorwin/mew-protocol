@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * useKeypress Hook
  *

@@ -18,7 +18,7 @@
  */
 
 const readline = require('readline');
-const TextBuffer = require('../src/ui/utils/text-buffer');
+const TextBuffer = require('../dist/ui/utils/text-buffer');
 
 // Create text buffer
 const buffer = new TextBuffer('Hello World!\nThis is a multi-line text buffer demo.\nTry editing this text.');

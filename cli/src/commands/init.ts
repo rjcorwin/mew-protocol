@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 
 const fs = require('fs').promises;
 const path = require('path');

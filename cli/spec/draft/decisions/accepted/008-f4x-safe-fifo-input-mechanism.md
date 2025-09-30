@@ -261,7 +261,7 @@ echo '{"kind":"chat"}' > ./messages/001.json  # File queue
 
 #### Phase 1: HTTP Endpoint (Immediate)
 ```javascript
-// cli/src/utils/message-input.js
+// cli/src/utils/message-input.ts
 const express = require('express');
 
 function setupHttpInput(port, messageHandler) {
@@ -306,7 +306,7 @@ function setupHttpInput(port, messageHandler) {
 
 #### Phase 2: Update CLI (Immediate)
 ```javascript
-// cli/src/commands/client.js
+// cli/src/commands/client.ts
 program
   .option('--http-port <port>', 'Enable HTTP input on port')
   .option('--http-bind <address>', 'Bind address (default: 127.0.0.1)')

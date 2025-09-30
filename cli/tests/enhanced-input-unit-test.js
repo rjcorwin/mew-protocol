@@ -6,10 +6,10 @@
  * Run with: node tests/enhanced-input-unit-test.js
  */
 
-const TextBuffer = require('../src/ui/utils/text-buffer');
-const { matchesKeyCombination } = require('../src/ui/hooks/useKeypress');
-const { matches, matchesAny, KeyPatterns } = require('../src/ui/keyMatchers');
-const { defaultKeyBindings, getBindingDisplay, validateBindings } = require('../src/config/keyBindings');
+const TextBuffer = require('../dist/ui/utils/text-buffer');
+const { matchesKeyCombination } = require('../dist/ui/hooks/useKeypress');
+const { matches, matchesAny, KeyPatterns } = require('../dist/ui/keyMatchers');
+const { defaultKeyBindings, getBindingDisplay, validateBindings } = require('../dist/config/keyBindings');
 
 let testsPassed = 0;
 let testsFailed = 0;

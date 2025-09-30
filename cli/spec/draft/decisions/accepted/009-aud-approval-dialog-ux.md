@@ -587,7 +587,7 @@ This phased approach delivers immediate value while building toward sophisticate
 
 ## References
 
-- Current implementation: `/cli/src/utils/advanced-interactive-ui.js`
+- Current implementation: `/cli/src/utils/advanced-interactive-ui.ts`
 - Related issue: TODO.md line "Better fulfill UX"
 - Similar patterns: VSCode extension approval, Docker Desktop permission dialogs
 - Terminal UI best practices: https://github.com/vadimdemedes/ink

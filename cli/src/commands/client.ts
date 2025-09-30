@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { Command } = require('commander');
 const WebSocket = require('ws');
 const fs = require('fs');

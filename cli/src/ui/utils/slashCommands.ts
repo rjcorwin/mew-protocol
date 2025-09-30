@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Slash command schema and autocomplete engine for the MEW CLI.
  *

@@ -36,14 +36,14 @@ Implemented Milestones 1 and 2 from ADRs 010 and 011 for enhanced terminal input
 **Objective:** Create the foundation for multi-line text editing with cursor management
 
 #### Files Created:
-- `/cli/src/ui/utils/text-buffer.js` - Core text buffer implementation (381 lines)
+- `/cli/src/ui/utils/text-buffer.ts` - Core text buffer implementation (381 lines)
   - Multi-line text management
   - Cursor position tracking
   - Word navigation logic
   - Text deletion operations (word, line-to-end, line-to-start)
   - Line wrapping for display
 
-- `/cli/src/ui/utils/textUtils.js` - Unicode and text utilities (285 lines)
+- `/cli/src/ui/utils/textUtils.ts` - Unicode and text utilities (285 lines)
   - Unicode character width calculation
   - Emoji detection and handling
   - CJK (Chinese, Japanese, Korean) wide character support
@@ -59,33 +59,33 @@ Implemented Milestones 1 and 2 from ADRs 010 and 011 for enhanced terminal input
 **Objective:** Integrate enhanced input with keyboard shortcuts into MEW CLI
 
 #### Files Created:
-- `/cli/src/ui/hooks/useKeypress.js` - Enhanced keyboard input hook (165 lines)
+- `/cli/src/ui/hooks/useKeypress.ts` - Enhanced keyboard input hook (165 lines)
   - Cross-platform key detection
   - Modifier key support (Ctrl, Alt/Option, Shift)
   - Special key handling (arrows, home/end, function keys)
 
-- `/cli/src/ui/keyMatchers.js` - Key pattern matching utilities (211 lines)
+- `/cli/src/ui/keyMatchers.ts` - Key pattern matching utilities (211 lines)
   - Pattern matching for key combinations
   - Platform-specific helpers (Mac vs Linux/Windows)
   - Common key patterns library
 
-- `/cli/src/config/keyBindings.js` - Configurable key bindings (235 lines)
+- `/cli/src/config/keyBindings.ts` - Configurable key bindings (235 lines)
   - Default key bindings for all operations
   - Human-readable key combination display
   - Conflict detection
   - Customization support
 
-- `/cli/src/ui/components/EnhancedInput.js` - Main input component (393 lines)
+- `/cli/src/ui/components/EnhancedInput.tsx` - Main input component (393 lines)
   - Integration of TextBuffer
   - Keyboard shortcut handling
   - History navigation
   - Autocomplete infrastructure (ready for implementation)
   - Multi-line mode support
 
-- `/cli/src/ui/components/SimpleInput.js` - Simplified input for debugging (32 lines)
+- `/cli/src/ui/components/SimpleInput.tsx` - Simplified input for debugging (32 lines)
 
 #### Files Modified:
-- `/cli/src/utils/advanced-interactive-ui.js`
+- `/cli/src/utils/advanced-interactive-ui.ts`
   - Integrated EnhancedInput component
   - Removed old InputComposer
   - Added command history state management

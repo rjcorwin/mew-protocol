@@ -14,6 +14,7 @@ sdk/typescript-sdk/*/.tsbuildinfo
 sdk/typescript-sdk/*/dist/
 bridge/.tsbuildinfo
 bridge/dist/
+cli/dist/
 build-temp/
 */build-temp/
 
