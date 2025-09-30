@@ -273,7 +273,7 @@ class MEWParticipant {
 The `canSend()` method uses the capability matcher to evaluate if a participant can send a specific message:
 - Accepts a partial envelope containing at least the `kind` field
 - Optionally includes `payload` for more specific capability matching  
-- Uses `@mew-protocol/capability-matcher` for pattern matching
+- Uses `@mew-protocol/mew/capability-matcher` for pattern matching
 - Supports negative patterns (e.g., `!tools/call`), wildcards, and complex payload patterns
 - Returns true if any capability matches the envelope
 
@@ -1136,10 +1136,10 @@ maxIterations: 10
 ### Package Dependencies
 ```json
 {
-  "@mew-protocol/types": "workspace:*",
-  "@mew-protocol/client": "workspace:*",
-  "@mew-protocol/participant": "workspace:*",
-  "@mew-protocol/agent": "workspace:*"
+  "@mew-protocol/mew/types": "workspace:*",
+  "@mew-protocol/mew/client": "workspace:*",
+  "@mew-protocol/mew/participant": "workspace:*",
+  "@mew-protocol/mew/agent": "workspace:*"
 }
 ```
 

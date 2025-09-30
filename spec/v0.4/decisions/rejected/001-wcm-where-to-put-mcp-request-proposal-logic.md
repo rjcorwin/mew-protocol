@@ -111,7 +111,7 @@ Keep request logic in MEWParticipant but enhance only the capability checking to
 **Implementation:**
 ```typescript
 // In MEWParticipant
-import { hasCapability } from '@mew-protocol/capability-matcher';
+import { hasCapability } from '@mew-protocol/mew/capability-matcher';
 
 canSend(kind: string, payload?: any): boolean {
   // Use advanced matcher if available, fall back to simple

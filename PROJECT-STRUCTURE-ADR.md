@@ -115,7 +115,7 @@ Pros:
 - Subpath exports retain modular import ergonomics for consumers.
 
 Cons:
-- Breaking import path change for existing users (`@mew-protocol/agent` → `@mew-protocol/mew/agent`).
+- Breaking import path change for existing users (`@mew-protocol/mew/agent` → `@mew-protocol/mew/agent`).
 - Larger single package; requires careful exports and externalization to keep install size reasonable.
 - Requires migration plan for existing dependent projects and templates.
 
@@ -212,7 +212,7 @@ Phase 2 — Update consumers and templates
 - Keep a local dev rewrite in the CLI so spaces in `tests/` and `spaces/` link to the aggregator workspace automatically.
 
 Phase 3 — Publish compatibility stubs
-- Publish thin `@mew-protocol/agent`, `@mew-protocol/client`, etc., that re-export from `@mew-protocol/mew/*` and emit console deprecation warnings. Mark them as deprecated on npm.
+- Publish thin `@mew-protocol/mew/agent`, `@mew-protocol/mew/client`, etc., that re-export from `@mew-protocol/mew/*` and emit console deprecation warnings. Mark them as deprecated on npm.
 - Maintain for 1–2 minor versions, then retire.
 
 Phase 4 — Decommission individual SDK packages (publish)

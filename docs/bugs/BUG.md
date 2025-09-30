@@ -1,7 +1,7 @@
 # Bug Report: Published Agent Package Not Writing Files
 
 ## Summary
-The published npm package `@mew-protocol/agent@0.3.0` used in the CLI template is not functioning correctly. While it emits reasoning messages, it fails to actually execute tool calls to write files, unlike the local development version used in demos.
+The published npm package `@mew-protocol/mew/agent@0.3.0` used in the CLI template is not functioning correctly. While it emits reasoning messages, it fails to actually execute tool calls to write files, unlike the local development version used in demos.
 
 ## Steps to Reproduce
 
@@ -49,7 +49,7 @@ npx pm2 logs coder-agent --lines 50 --nostream
 - **Location**: `/tmp/mew-test-verify/`
 - **Template**: `coder-agent` from `/cli/templates/coder-agent/`
 - **Gateway**: Port 8090
-- **Package Version**: @mew-protocol/agent@0.3.0 (published to npm)
+- **Package Version**: @mew-protocol/mew/agent@0.3.0 (published to npm)
 
 ## Expected Behavior (from demos/coder-agent)
 When asked to "create foo.txt with foo", the agent should:
@@ -144,7 +144,7 @@ configPath = actualConfigPath;
 
 | Aspect | Demo (Working) | Template (Broken) |
 |--------|---------------|-------------------|
-| Agent Binary | Local: `node ../../sdk/typescript-sdk/agent/dist/index.js` | NPM: `npx @mew-protocol/agent` |
+| Agent Binary | Local: `node ../../sdk/typescript-sdk/agent/dist/index.js` | NPM: `npx @mew-protocol/mew/agent` |
 | Version | Development (current source) | Published 0.3.0 |
 | YOLO Mode | Enabled (can call tools directly) | Disabled (must use proposals) |
 | File Writing | ✅ Works | ❌ Doesn't attempt |
@@ -155,7 +155,7 @@ configPath = actualConfigPath;
 ### 1. Compare Source vs Published
 ```bash
 # Check what's actually in the published package
-npm pack @mew-protocol/agent@0.3.0
+npm pack @mew-protocol/mew/agent@0.3.0
 tar -xzf mew-protocol-agent-0.3.0.tgz
 diff -r package/dist /Users/rj/Git/rjcorwin/mew-protocol/sdk/typescript-sdk/agent/dist
 ```
@@ -167,7 +167,7 @@ node /Users/rj/Git/rjcorwin/mew-protocol/sdk/typescript-sdk/agent/dist/index.js 
   --gateway ws://localhost:8090 --space test-verify --token test-token
 
 # Test with published version
-npx @mew-protocol/agent@0.3.0 \
+npx @mew-protocol/mew/agent@0.3.0 \
   --gateway ws://localhost:8090 --space test-verify --token test-token
 ```
 

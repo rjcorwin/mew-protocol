@@ -14,17 +14,14 @@ MEW Protocol is a monorepo using npm workspaces. The main packages are:
 
 ```
 mew-protocol/
-├── sdk/typescript-sdk/     # Core SDK packages
-│   ├── types/             # TypeScript type definitions
-│   ├── capability-matcher/ # Capability pattern matching
-│   ├── client/            # WebSocket client
-│   ├── participant/       # MCP participant base class
-│   ├── agent/             # Autonomous agent implementation
-│   └── gateway/           # Gateway server
-├── bridge/                # MCP-MEW Protocol bridge
-├── cli/                   # Command-line interface
-├── tests/                 # Test scenarios
-└── spaces/                # Example spaces
+├── packages/mew/          # Unified SDK + CLI package (@mew-protocol/mew)
+│   ├── src/              # TypeScript sources and CLI implementation
+│   ├── templates/        # Built-in space templates
+│   └── dist/             # Build output
+├── cli/bin/mew.js        # Stable wrapper that forwards to packages/mew
+├── scripts/              # Build utilities
+├── tests/                # Scenario harnesses
+└── spaces/               # Example development workspaces
 ```
 
 ## Initial Setup
@@ -38,36 +35,31 @@ cd mew-protocol
 
 ### 2. Install Dependencies and Build
 
-The project uses TypeScript project references for automatic dependency management and build ordering:
+The unified package is built through the workspace script:
 
 ```bash
 # Install all dependencies
 npm install
 
-# Build all TypeScript packages with automatic dependency ordering
+# Build the unified package
 npm run build
 ```
 
-The build system features:
-- **Automatic dependency ordering** - TypeScript determines the correct build order
-- **Incremental compilation** - Only changed packages are rebuilt
-- **Watch mode** - Use `npm run build:watch` for development
-
-If you need to clean and rebuild everything:
+The build copies CLI assets and compiles TypeScript to `packages/mew/dist`. To clean and rebuild:
 
 ```bash
-# Clean all build artifacts
+# Clean build artifacts
 npm run clean
 
-# Force rebuild all packages
-npm run build:force
+# Rebuild
+npm run build
 ```
 
 ### 3. Verify Installation
 
 ```bash
 # Check that the CLI is available
-npx mew --version
+./cli/bin/mew.js --version
 
 # Run tests to verify everything works
 npm test
@@ -80,21 +72,11 @@ npm test
 The project uses TypeScript project references for coordinated builds:
 
 ```bash
-# Build all packages (automatic dependency ordering)
+# Build the unified package
 npm run build
-
-# Watch mode for development (all packages)
-npm run build:watch
 
 # Clean and rebuild
-npm run clean
-npm run build
-
-# Force rebuild (ignores cache)
-npm run build:force
-
-# Build a specific package
-npm run build --workspace=@mew-protocol/participant
+npm run clean && npm run build
 ```
 
 ### Running Tests

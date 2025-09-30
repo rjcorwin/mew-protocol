@@ -4,7 +4,7 @@
   "private": true,
   "description": "Scenario 10 template for MEW integration tests (multi-agent coordination)",
   "dependencies": {
-    "@mew-protocol/participant": "^0.2.0",
+    "@mew-protocol/mew/participant": "^0.2.0",
     "ws": "^8.18.0"
   },
   "engines": {

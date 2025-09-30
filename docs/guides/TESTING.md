@@ -79,7 +79,7 @@ rm -rf tests/my-test-space
 The coder-agent template sets up:
 
 - **Gateway**: The MEW Protocol gateway for message routing
-- **Coder Agent**: An AI agent using @mew-protocol/agent with OpenAI
+- **Coder Agent**: An AI agent using @mew-protocol/mew/agent with OpenAI
 - **MCP Filesystem Bridge**: Bridges MCP filesystem tools to MEW Protocol
 - **Human participant**: For manual interaction and testing
 

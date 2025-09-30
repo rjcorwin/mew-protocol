@@ -1,70 +1,19 @@
 {
   "name": "mew-protocol",
-  "version": "0.3.0",
-  "description": "Multi-Entity Workspace Protocol - A protocol for transparent multi-agent coordination",
+  "version": "0.4.0",
   "private": true,
   "workspaces": [
-    "sdk/typescript-sdk/agent",
-    "sdk/typescript-sdk/client",
-    "sdk/typescript-sdk/participant",
-    "sdk/typescript-sdk/types",
-    "sdk/typescript-sdk/capability-matcher",
-    "bridge",
-    "cli"
+    "packages/mew"
   ],
   "scripts": {
+    "build": "npm run build --workspace=@mew-protocol/mew",
+    "clean": "npm run clean --workspace=@mew-protocol/mew",
+    "lint": "npm run lint --workspace=@mew-protocol/mew --if-present",
     "test": "./tests/run-all-tests.sh --no-llm",
     "test:all": "./tests/run-all-tests.sh",
-    "test:llm": "./tests/run-all-tests.sh",
-    "build": "tsc -b && npm run postbuild",
-    "postbuild": "chmod +x node_modules/.bin/mew-agent 2>/dev/null || true",
-    "build:force": "tsc -b --force && npm run postbuild",
-    "build:watch": "tsc -b --watch",
-    "clean": "tsc -b --clean",
-    "lint": "npm run lint --workspaces --if-present",
-    "format": "npm run format --workspaces --if-present"
-  },
-  "keywords": [
-    "mew",
-    "protocol",
-    "multi-agent",
-    "ai",
-    "coordination",
-    "mcp",
-    "model-context-protocol"
-  ],
-  "author": "MEW Protocol Working Group",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rjcorwin/mew-protocol.git"
-  },
-  "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
-  "bugs": {
-    "url": "https://github.com/rjcorwin/mew-protocol/issues"
+    "test:llm": "./tests/run-all-tests.sh"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "ink": "^3.2.0",
-    "ws": "^8.18.0",
-    "uuid": "^9.0.1",
-    "@types/uuid": "^9.0.8",
-    "js-yaml": "^4.1.0",
-    "commander": "^11.1.0",
-    "debug": "^4.3.4"
-  },
-  "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0",
-    "prettier": "^3.6.2",
-    "eslint": "^9.35.0",
-    "@typescript-eslint/parser": "^8.43.0",
-    "@typescript-eslint/eslint-plugin": "^8.43.0",
-    "@types/js-yaml": "^4.0.5",
-    "@types/ws": "^8.5.5",
-    "@types/debug": "^4.1.12"
   }
 }

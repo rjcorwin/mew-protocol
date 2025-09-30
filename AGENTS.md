@@ -8,7 +8,7 @@
 ## Repository Structure
 ```
 sdk/typescript-sdk/    # Core packages
-  types/              # @mew-protocol/types - Core types
+  types/              # @mew-protocol/mew/types - Core types
   capability-matcher/ # Pattern matching
   client/            # WebSocket client
   participant/       # MCP participant

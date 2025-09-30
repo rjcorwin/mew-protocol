@@ -11,7 +11,7 @@ This guide provides step-by-step instructions to migrate each package to use Typ
 
 ## Package-by-Package Migration
 
-### 1. @mew-protocol/types
+### 1. @mew-protocol/mew/types
 
 **Current tsconfig.json:**
 ```json
@@ -42,7 +42,7 @@ This guide provides step-by-step instructions to migrate each package to use Typ
 }
 ```
 
-### 2. @mew-protocol/capability-matcher
+### 2. @mew-protocol/mew/capability-matcher
 
 **Updated tsconfig.json:**
 ```json
@@ -61,7 +61,7 @@ This guide provides step-by-step instructions to migrate each package to use Typ
 }
 ```
 
-### 3. @mew-protocol/client
+### 3. @mew-protocol/mew/client
 
 Since this package uses the custom build script with multiple configs, we need a different approach:
 
@@ -87,7 +87,7 @@ Since this package uses the custom build script with multiple configs, we need a
 - `tsconfig.build.cjs.json`
 - `tsconfig.build.types.json`
 
-### 4. @mew-protocol/participant
+### 4. @mew-protocol/mew/participant
 
 **Updated tsconfig.json:**
 ```json
@@ -113,25 +113,25 @@ Since this package uses the custom build script with multiple configs, we need a
 // REMOVE THESE:
 "baseUrl": "./",
 "paths": {
-  "@mew-protocol/types": ["../types/src"],
-  "@mew-protocol/client": ["../client/src"],
+  "@mew-protocol/mew/types": ["../types/src"],
+  "@mew-protocol/mew/client": ["../client/src"],
   // ...
 }
 ```
 
-### 5. @mew-protocol/agent
+### 5. @mew-protocol/mew/agent
 
 **Current problematic configuration:**
 ```json
 {
   "baseUrl": "./",
   "paths": {
-    "@mew-protocol/client": ["../client/dist"],
-    "@mew-protocol/client/*": ["../client/dist/*"],
-    "@mew-protocol/participant": ["../participant/dist"],
-    "@mew-protocol/participant/*": ["../participant/dist/*"],
-    "@mew-protocol/types": ["../types/dist"],
-    "@mew-protocol/types/*": ["../types/dist/*"]
+    "@mew-protocol/mew/client": ["../client/dist"],
+    "@mew-protocol/mew/client/*": ["../client/dist/*"],
+    "@mew-protocol/mew/participant": ["../participant/dist"],
+    "@mew-protocol/mew/participant/*": ["../participant/dist/*"],
+    "@mew-protocol/mew/types": ["../types/dist"],
+    "@mew-protocol/mew/types/*": ["../types/dist/*"]
   }
 }
 ```
@@ -177,7 +177,7 @@ Similar to client, uses custom build script:
 }
 ```
 
-### 7. @mew-protocol/bridge
+### 7. @mew-protocol/mew/bridge
 
 **Updated tsconfig.json:**
 ```json
@@ -271,7 +271,7 @@ npm run build
 
 ## Troubleshooting
 
-### Error: "Cannot find module '@mew-protocol/types'"
+### Error: "Cannot find module '@mew-protocol/mew/types'"
 **Solution:**
 1. Ensure the package is listed in `references` in tsconfig.json
 2. Run `npm run build` at the root first

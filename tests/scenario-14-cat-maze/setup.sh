@@ -7,8 +7,8 @@ SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
 REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
 WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
-SERVER_PATH="${REPO_ROOT}/cli/templates/cat-maze/agents/cat-maze-server.js"
-NARRATOR_PATH="${REPO_ROOT}/cli/templates/cat-maze/agents/cat-maze-narrator.js"
+SERVER_PATH="${REPO_ROOT}/packages/mew/templates/cat-maze/agents/cat-maze-server.js"
+NARRATOR_PATH="${REPO_ROOT}/packages/mew/templates/cat-maze/agents/cat-maze-narrator.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'

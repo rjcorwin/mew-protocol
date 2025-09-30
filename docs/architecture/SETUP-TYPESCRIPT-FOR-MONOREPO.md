@@ -179,8 +179,8 @@ Delete all `paths` configurations from individual tsconfig.json files:
 ```json
 // REMOVE THIS from sdk/typescript-sdk/agent/tsconfig.json
 "paths": {
-  "@mew-protocol/client": ["../client/dist"],
-  "@mew-protocol/client/*": ["../client/dist/*"],
+  "@mew-protocol/mew/client": ["../client/dist"],
+  "@mew-protocol/mew/client/*": ["../client/dist/*"],
   // ... etc
 }
 ```
@@ -206,7 +206,7 @@ Delete all `paths` configurations from individual tsconfig.json files:
 
 ## Common Issues and Solutions
 
-### Issue: "Cannot find module '@mew-protocol/types'"
+### Issue: "Cannot find module '@mew-protocol/mew/types'"
 
 **Solution**: Ensure the package is listed in both:
 - `package.json` dependencies

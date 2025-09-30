@@ -6,36 +6,40 @@ This document provides a comprehensive guide to the MEW Protocol monorepo struct
 
 ```
 mew-protocol/
-├── sdk/                    # SDK packages (libraries)
-│   └── typescript-sdk/
-│       ├── types/          # @mew-protocol/types - Core types & interfaces
-│       ├── capability-matcher/  # @mew-protocol/capability-matcher - Pattern matching
-│       ├── client/         # @mew-protocol/client - WebSocket client
-│       ├── participant/    # @mew-protocol/participant - MCP participant
-│       ├── agent/          # @mew-protocol/agent - AI agent implementation
-│       └── gateway/        # @mew-protocol/gateway - Gateway server
-├── bridge/                 # @mew-protocol/bridge - MCP-MEW bridge
-├── cli/                    # @mew-protocol/cli - Command-line interface
-├── tests/                  # Test scenarios (not npm packages)
-│   └── scenario-*/         # Individual test scenarios
-├── spaces/                 # Development spaces (not npm packages)
-│   └── */                  # Individual spaces
-│       └── .mew/          # Runtime MEW configuration
-├── scripts/                # Build and utility scripts
-└── spec/                   # Protocol specifications
+├── packages/
+│   └── mew/                # Unified package published as @mew-protocol/mew
+│       ├── src/
+│       │   ├── types/                # Shared protocol types
+│       │   ├── client/               # WebSocket client SDK
+│       │   ├── participant/          # Participant helpers & tool registry
+│       │   ├── agent/                # TypeScript agent runtime & CLI
+│       │   ├── capability-matcher/   # Capability pattern matcher
+│       │   ├── bridge/               # MCP bridge implementation
+│       │   ├── cli/                  # MEW CLI implementation
+│       │   └── bin/                  # Entry points (mew, mew-agent, mew-bridge)
+│       ├── templates/       # Built-in space templates
+│       ├── dist/            # Build output (tsc + copied CLI assets)
+│       ├── package.json     # name: @mew-protocol/mew
+│       └── README.md
+├── cli/bin/mew.js           # Stable wrapper for local development
+├── scripts/                 # Build utilities (e.g., scripts/build-cli.js)
+├── tests/                   # Scenario test harnesses
+├── spaces/                  # Developer playground workspaces
+├── spec/                    # Protocol specifications and ADRs
+└── docs/                    # Architecture notes, guides, and progress trackers
 ```
 
 ## Package Categories
 
-### 1. Core SDK Libraries
-These are the foundational TypeScript packages that implement the MEW Protocol:
+### 1. Unified SDK Package
+All runtime libraries and tools now live inside the `@mew-protocol/mew` workspace. The package exposes subpath exports for each module:
 
-- **@mew-protocol/types**: Core type definitions, no dependencies
-- **@mew-protocol/capability-matcher**: Pattern matching for capabilities
-- **@mew-protocol/client**: Low-level WebSocket client
-- **@mew-protocol/participant**: MCP participant with tool/resource management
-- **@mew-protocol/agent**: Autonomous AI agent built on participant
-- **@mew-protocol/gateway**: WebSocket gateway server
+- `@mew-protocol/mew/types`
+- `@mew-protocol/mew/capability-matcher`
+- `@mew-protocol/mew/client`
+- `@mew-protocol/mew/participant`
+- `@mew-protocol/mew/agent`
+- `@mew-protocol/mew/bridge`
 
 **Dependency Graph:**
 ```
@@ -44,14 +48,12 @@ types
   ├── client
   │     └── participant (+ capability-matcher, types)
   │           └── agent
-  └── gateway (+ capability-matcher)
+  └── bridge (+ participant)
 ```
 
-### 2. Tool Packages
-Executable tools that use the SDK:
-
-- **@mew-protocol/bridge**: Bridge between MCP servers and MEW spaces
-- **@mew-protocol/cli**: Command-line interface for managing spaces
+### 2. CLI and Templates
+- `@mew-protocol/mew` ships the `mew` CLI plus `mew-agent` and `mew-bridge` shims in `src/bin/`.
+- Built-in templates (cat-maze, coder-agent, note-taker) consume the unified package and depend on a single version.
 
 ### 3. Development Spaces
 Located in `spaces/`, these are example/development environments:
@@ -96,24 +98,14 @@ Located in `tests/`, these validate protocol implementation:
   "name": "mew-protocol",
   "private": true,
   "workspaces": [
-    "sdk/typescript-sdk/types",
-    "sdk/typescript-sdk/capability-matcher",
-    "sdk/typescript-sdk/client",
-    "sdk/typescript-sdk/participant",
-    "sdk/typescript-sdk/agent",
-    "sdk/typescript-sdk/gateway",
-    "bridge",
-    "cli"
+    "packages/mew"
   ],
   "scripts": {
-    "build": "tsc -b",
-    "build:force": "tsc -b --force",
-    "clean": "tsc -b --clean",
-    "watch": "tsc -b --watch",
+    "build": "npm run build --workspace=@mew-protocol/mew",
+    "clean": "npm run clean --workspace=@mew-protocol/mew",
     "test": "./tests/run-all-tests.sh --no-llm",
     "test:all": "./tests/run-all-tests.sh",
-    "lint": "npm run lint --workspaces --if-present",
-    "format": "npm run format --workspaces --if-present"
+    "lint": "npm run lint --workspace=@mew-protocol/mew --if-present"
   }
 }
 ```
@@ -269,7 +261,7 @@ The release guide covers:
    npm update --workspaces
 
    # Update specific package
-   npm update @mew-protocol/types --workspace=@mew-protocol/agent
+   npm update @mew-protocol/mew/types --workspace=@mew-protocol/mew/agent
    ```
 
 ## Space Development
@@ -301,8 +293,8 @@ npm install express react
   "name": "my-mew-space",
   "private": true,
   "dependencies": {
-    "@mew-protocol/agent": "file:../../sdk/typescript-sdk/agent",
-    "@mew-protocol/client": "file:../../sdk/typescript-sdk/client",
+    "@mew-protocol/mew/agent": "file:../../sdk/typescript-sdk/agent",
+    "@mew-protocol/mew/client": "file:../../sdk/typescript-sdk/client",
     "express": "^4.18.0"
   }
 }
@@ -313,7 +305,7 @@ npm install express react
 ### Unit Tests
 Each package has its own tests:
 ```bash
-npm test --workspace=@mew-protocol/client
+npm test --workspace=@mew-protocol/mew/client
 ```
 
 ### Integration Tests
@@ -386,7 +378,7 @@ For CI/CD, cache these directories:
 
 ## Common Issues & Solutions
 
-### Issue: "Cannot find module '@mew-protocol/types'"
+### Issue: "Cannot find module '@mew-protocol/mew/types'"
 **Solution**: Ensure you've built the types package first or use `npm run build` at root.
 
 ### Issue: Types not updating during development
