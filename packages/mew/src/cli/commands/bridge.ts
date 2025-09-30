@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Command } from 'commander';
+import { MCPBridge } from '../../bridge/mcp-bridge.js';
 
 const bridge = new Command('bridge').description('MEW-MCP Bridge - Connect MCP servers to MEW spaces');
 
@@ -19,9 +20,6 @@ bridge
   .option('--max-reconnects <n>', 'Maximum reconnect attempts', '3')
   .option('--capabilities <json>', 'JSON encoded capabilities to advertise when joining')
   .action(async (options) => {
-    // Dynamic import of the bridge module to avoid loading it unless needed
-    const { MCPBridge } = await import('../../bridge/mcp-bridge.js');
-
     // Parse MCP args
     const mcpArgs = options.mcpArgs ? options.mcpArgs.split(',') : [];
 

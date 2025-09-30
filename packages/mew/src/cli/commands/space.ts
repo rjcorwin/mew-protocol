@@ -707,21 +707,11 @@ async function spaceUpAction(options) {
         }
 
         try {
-          // Find the bridge executable
-          const bridgePath = path.resolve(
-            __dirname,
-            '..',
-            '..',
-            '..',
-            'bridge',
-            'bin',
-            'mew-bridge.js',
-          );
-
+          // Use global mew command for bridge
           const bridgeApp = await startPM2Process({
             name: `mcp_bridge_${participantId}`,
-            script: bridgePath,
-            args: bridgeArgs,
+            script: 'mew',
+            args: ['bridge', 'start', ...bridgeArgs],
             cwd: spaceDir,
             autorestart: false,
             max_memory_restart: '200M',

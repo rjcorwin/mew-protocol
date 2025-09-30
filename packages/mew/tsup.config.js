@@ -3,8 +3,6 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     'bin/mew': 'src/cli/index.ts',
-    'bin/mew-agent': 'src/bin/mew-agent-shim.js',
-    'bin/mew-bridge': 'src/bin/mew-bridge-shim.js',
   },
   format: ['esm'],
   target: 'node22',

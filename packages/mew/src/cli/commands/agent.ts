@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { Command } from 'commander';
 import WebSocket from 'ws';
+import { MEWAgent } from '../../agent/index.js';
 
 const agent = new Command('agent').description('Agent management');
 
@@ -243,10 +244,6 @@ agent
   .option('-t, --token <token>', 'Authentication token')
   .action(async (options) => {
     try {
-      // Dynamic import to avoid bundling MEWAgent
-      // Use package subpath export which resolves correctly when bundled
-      const { MEWAgent } = await import('@mew-protocol/mew/agent');
-
       const agent = new MEWAgent({
         gateway: options.gateway,
         space: options.space,
