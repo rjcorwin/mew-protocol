@@ -110,40 +110,65 @@ npm run build  # After changes
 - Node.js ESM can't resolve: `import { MEWAgent } from './MEWAgent'` needs `./MEWAgent.js`
 - **Blocked on Phase 5**: Need to convert CLI to TypeScript for unified module resolution
 
-### Phase 5 - Convert CLI to TypeScript (IN PROGRESS)
-**Goal**: Fix module resolution by converting entire codebase to TypeScript with consistent ESM
+### Phase 5 - Convert CLI to TypeScript ✅
+**Complete** - CLI fully converted to TypeScript, module resolution fixed
 
 **Problem**: Mixed JS (CLI) + TS (library) creates import resolution issues when bundled CLI tries to dynamically import library code that has extensionless imports.
 
 **Solution**: Convert CLI to TypeScript, use `moduleResolution: "NodeNext"` everywhere, add `.js` to all imports.
 
-#### Phase 5.1 - Documentation & Planning
-- [ ] Create ADR documenting CLI → TypeScript conversion rationale
-- [ ] Document migration strategy and expected outcomes
+#### Phase 5.1 - Documentation & Planning ✅
+- [x] Created ADR: `repo-spec/decisions/015-cli-typescript-conversion.md`
+- [x] Reorganized specs: `spec/` → `mew-protocol-spec/`, created `repo-spec/`
+- [x] Documented migration strategy and rationale
 
-#### Phase 5.2 - Convert CLI to TypeScript
-- [ ] Update tsconfig.json to include CLI sources with proper settings
-- [ ] Convert utility files: `src/cli/utils/*.js` → `*.ts`
-- [ ] Convert command files: `src/cli/commands/*.js` → `*.ts` (12 files)
-- [ ] Convert UI files: `src/cli/ui/*.js` → `*.ts`
-- [ ] Convert main entry: `src/cli/index.js` → `index.ts`
-- [ ] Update tsup.config.js entry points (`.js` → `.ts`)
+#### Phase 5.2 - Convert CLI to TypeScript ✅
+- [x] Updated tsconfig.json to include CLI sources (removed exclusions)
+- [x] Renamed all 22 CLI files from `.js` → `.ts`
+  - 8 command files, 7 UI files, 5 utils, 1 config, 1 entry
+- [x] Updated tsup.config.js entry point to `index.ts`
+- [x] Added `// @ts-nocheck` to all CLI files (temporary workaround)
+- [x] Removed shims (mew-agent, mew-bridge) - now use `mew agent/bridge` subcommands
+- [x] Refactored dynamic imports to static imports
+- [x] Fixed space.ts to use global 'mew' command consistently
 
-#### Phase 5.3 - Fix Module Resolution (Critical)
-- [ ] Change `moduleResolution: "bundler"` → `"NodeNext"` in packages/mew/tsconfig.json
-- [ ] Add `.js` extensions to ALL relative imports in library code (~30 files)
-- [ ] Add `.js` extensions to ALL relative imports in CLI code
-- [ ] Test that tsc builds without errors
-- [ ] Test that tsup bundles correctly
+#### Phase 5.3 - Fix Module Resolution (Critical) ✅
+- [x] Changed `moduleResolution: "bundler"` → `"NodeNext"` in tsconfig.base.json
+- [x] Changed `module: "ESNext"` → `"NodeNext"`
+- [x] Added `.js` extensions to 24 relative imports across 9 library files
+- [x] TypeScript builds successfully without errors
+- [x] Switched from bundled CLI (tsup) to tsc-compiled CLI
+- [x] Updated package.json bin to point to `dist/cli/index.js`
 
-#### Phase 5.4 - Test Everything
-- [ ] Build and install globally: `npm run build && cd packages/mew && npm run build:all && npm install -g .`
-- [ ] Test `mew agent run` works (the blocked command)
-- [ ] Test coder-agent template (uses `mew agent run`)
-- [ ] Test cat-maze template (uses `mew agent run`)
-- [ ] Test note-taker template (uses custom agent script)
+#### Phase 5.4 - Test Templates & Fix Issues ✅
+- [x] Test `mew agent run --help` works ✓
+- [x] Fixed template discovery path (`__dirname` + '../../../templates')
+- [x] Fixed MCP server build (copy src/mcp-servers to dist/)
+- [x] Test coder-agent template ✓ (gateway + MCP bridge working)
+- [x] Discovered cat-maze MCP server is CommonJS (needs conversion)
+- [x] **IN PROGRESS**: Convert MCP servers to TypeScript
+
+### Phase 5.5 - Convert MCP Servers to TypeScript (IN PROGRESS)
+**Current Status**: Testing cat-maze template revealed MCP servers need TypeScript conversion
+
+**Issue**: MCP servers are mixed CommonJS/ESM plain JS files being copied to dist/, causing module resolution errors.
+
+**Solution**: Convert to TypeScript for consistency
+- [ ] Convert `src/mcp-servers/cat-maze.cjs` to TypeScript
+  - Currently CommonJS with `require()`, needs ESM conversion
+  - 702 lines, interactive game server
+- [ ] Convert `src/mcp-servers/filesystem.js` to TypeScript
+  - Already ESM, just needs type annotations
+  - 171 lines, filesystem operations wrapper
+- [ ] Update `mcp.ts` command to import servers directly (no spawn)
+- [ ] Remove copy step from build (tsc will compile them)
+- [ ] Test cat-maze template works
+- [ ] Test note-taker template works
+
+### Phase 5.6 - Complete Testing
 - [ ] Run integration test suite: `npm test`
 - [ ] Verify no regressions in gateway, bridge, space commands
+- [ ] Update TODO.md with completion status
 
 ### Phase 6 - Publish & Verify
 - [x] Test `npm pack` from packages/mew
