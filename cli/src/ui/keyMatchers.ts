@@ -9,13 +9,37 @@
  * @license MIT
  */
 
+import type { KeyBinding, KeyPattern } from '../config/keyBindings';
+
+export interface EnhancedKey {
+  name?: string;
+  input?: string;
+  ctrl?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+  meta?: boolean;
+  return?: boolean;
+  enter?: boolean;
+  escape?: boolean;
+  backspace?: boolean;
+  delete?: boolean;
+  tab?: boolean;
+  space?: boolean;
+  up?: boolean;
+  down?: boolean;
+  left?: boolean;
+  right?: boolean;
+  home?: boolean;
+  end?: boolean;
+  pageup?: boolean;
+  pagedown?: boolean;
+  [key: string]: unknown;
+}
+
 /**
  * Check if a key event matches a specific pattern
- * @param {Object} key - Enhanced key object from useKeypress
- * @param {Object} pattern - Pattern to match against
- * @returns {boolean}
  */
-function matches(key, pattern) {
+export function matches(key: EnhancedKey | null | undefined, pattern: KeyPattern | null | undefined): boolean {
   if (!key || !pattern) return false;
 
   // Check modifiers if specified
@@ -28,29 +52,29 @@ function matches(key, pattern) {
   if (pattern.key) {
     switch (pattern.key) {
       case 'enter':
-        return key.return;
+        return Boolean(key.return || key.enter);
       case 'escape':
-        return key.escape;
+        return Boolean(key.escape);
       case 'backspace':
-        return key.backspace;
+        return Boolean(key.backspace);
       case 'delete':
-        return key.delete;
+        return Boolean(key.delete);
       case 'tab':
-        return key.tab;
+        return Boolean(key.tab);
       case 'space':
-        return key.space;
+        return key.input === ' ' || Boolean(key.space);
       case 'up':
-        return key.up;
+        return Boolean(key.up);
       case 'down':
-        return key.down;
+        return Boolean(key.down);
       case 'left':
-        return key.left;
+        return Boolean(key.left);
       case 'right':
-        return key.right;
+        return Boolean(key.right);
       case 'home':
-        return key.home;
+        return Boolean(key.home);
       case 'end':
-        return key.end;
+        return Boolean(key.end);
       default:
         return key.name === pattern.key || key.input === pattern.key;
     }
@@ -59,28 +83,30 @@ function matches(key, pattern) {
   // Check for any printable character
   if (pattern.printable) {
     // Exclude special keys from being considered printable
-    return key.input &&
-           key.input !== '\r' &&
-           key.input !== '\n' &&
-           key.input !== '\x7F' &&  // DEL character (127)
-           key.input !== '\x1B' &&  // ESC character
-           !key.return &&
-           !key.enter &&
-           !key.backspace &&
-           !key.delete &&
-           !key.escape &&
-           !key.tab &&
-           !key.up &&
-           !key.down &&
-           !key.left &&
-           !key.right &&
-           !key.home &&
-           !key.end &&
-           !key.pageup &&
-           !key.pagedown &&
-           key.ctrl !== true &&
-           key.alt !== true &&
-           key.meta !== true;
+    return Boolean(
+      key.input &&
+        key.input !== '\r' &&
+        key.input !== '\n' &&
+        key.input !== '\x7F' && // DEL character (127)
+        key.input !== '\x1B' && // ESC character
+        !key.return &&
+        !key.enter &&
+        !key.backspace &&
+        !key.delete &&
+        !key.escape &&
+        !key.tab &&
+        !key.up &&
+        !key.down &&
+        !key.left &&
+        !key.right &&
+        !key.home &&
+        !key.end &&
+        !key.pageup &&
+        !key.pagedown &&
+        key.ctrl !== true &&
+        key.alt !== true &&
+        key.meta !== true,
+    );
   }
 
   return true; // Pattern matches if no specific requirements
@@ -89,7 +115,7 @@ function matches(key, pattern) {
 /**
  * Common key patterns for easy matching
  */
-const KeyPatterns = {
+export const KeyPatterns: Record<string, KeyBinding> = {
   // Text editing
   CHARACTER: { printable: true },
   BACKSPACE: { key: 'backspace' },
@@ -108,22 +134,22 @@ const KeyPatterns = {
 
   // Word navigation (cross-platform)
   WORD_LEFT: [
-    { alt: true, key: 'left' },  // Alt+Left (Linux/Windows)
-    { meta: true, key: 'left' }  // Option+Left (Mac)
+    { alt: true, key: 'left' }, // Alt+Left (Linux/Windows)
+    { meta: true, key: 'left' }, // Option+Left (Mac)
   ],
   WORD_RIGHT: [
     { alt: true, key: 'right' }, // Alt+Right (Linux/Windows)
-    { meta: true, key: 'right' } // Option+Right (Mac)
+    { meta: true, key: 'right' }, // Option+Right (Mac)
   ],
 
   // Line editing
   LINE_START: [
     { ctrl: true, key: 'a' },
-    { key: 'home' }
+    { key: 'home' },
   ],
   LINE_END: [
     { ctrl: true, key: 'e' },
-    { key: 'end' }
+    { key: 'end' },
   ],
 
   // Deletion
@@ -138,7 +164,7 @@ const KeyPatterns = {
   // Multi-line
   NEWLINE: [
     { shift: true, key: 'enter' },
-    { alt: true, key: 'enter' }
+    { alt: true, key: 'enter' },
   ],
 
   // Commands
@@ -163,30 +189,24 @@ const KeyPatterns = {
   NUMBER_7: { key: '7' },
   NUMBER_8: { key: '8' },
   NUMBER_9: { key: '9' },
-  NUMBER_0: { key: '0' }
+  NUMBER_0: { key: '0' },
 };
 
 /**
  * Check if key matches any pattern in a list
- * @param {Object} key - Enhanced key object
- * @param {Array|Object} patterns - Pattern or array of patterns
- * @returns {boolean}
  */
-function matchesAny(key, patterns) {
+export function matchesAny(key: EnhancedKey, patterns: KeyBinding): boolean {
   if (!Array.isArray(patterns)) {
     return matches(key, patterns);
   }
 
-  return patterns.some(pattern => matches(key, pattern));
+  return patterns.some((pattern) => matches(key, pattern));
 }
 
 /**
  * Get the command for a key event based on configured bindings
- * @param {Object} key - Enhanced key object
- * @param {Object} bindings - Key bindings configuration
- * @returns {string|null} - Command name or null if no match
  */
-function getCommand(key, bindings) {
+export function getCommand(key: EnhancedKey, bindings: Record<string, KeyBinding>): string | null {
   for (const [command, patterns] of Object.entries(bindings)) {
     if (matchesAny(key, patterns)) {
       return command;
@@ -198,32 +218,30 @@ function getCommand(key, bindings) {
 /**
  * Platform-specific key helpers
  */
-const Platform = {
+export const Platform = {
   isMac: process.platform === 'darwin',
   isWindows: process.platform === 'win32',
   isLinux: process.platform === 'linux',
 
   // Get the appropriate modifier key name for the platform
-  getModifierName() {
+  getModifierName(): string {
     return this.isMac ? 'Option' : 'Alt';
   },
 
   // Get the appropriate word navigation pattern
-  getWordNavigationPattern(direction) {
+  getWordNavigationPattern(direction: 'left' | 'right'): KeyPattern {
     const key = direction === 'left' ? 'left' : 'right';
     return this.isMac
-      ? { meta: true, key }  // Option+Arrow on Mac
-      : { alt: true, key };  // Alt+Arrow on Linux/Windows
-  }
+      ? { meta: true, key } // Option+Arrow on Mac
+      : { alt: true, key }; // Alt+Arrow on Linux/Windows
+  },
 };
 
 /**
  * Create a key binding configuration from user preferences
- * @param {Object} preferences - User preferences
- * @returns {Object} - Key bindings
  */
-function createBindings(preferences = {}) {
-  const defaults = {
+export function createBindings(preferences: Partial<Record<string, KeyBinding>> = {}): Record<string, KeyBinding> {
+  const defaults: Record<string, KeyBinding> = {
     // Text input
     INSERT_CHAR: KeyPatterns.CHARACTER,
     DELETE_BACKWARD: KeyPatterns.BACKSPACE,
@@ -255,17 +273,21 @@ function createBindings(preferences = {}) {
 
     // Autocomplete
     AUTOCOMPLETE: KeyPatterns.COMPLETE,
-    AUTOCOMPLETE_PREV: KeyPatterns.COMPLETE_PREV
+    AUTOCOMPLETE_PREV: KeyPatterns.COMPLETE_PREV,
   };
 
-  return { ...defaults, ...preferences };
+  const sanitized = Object.fromEntries(
+    Object.entries(preferences).filter(([, value]) => value !== undefined),
+  ) as Record<string, KeyBinding>;
+
+  return { ...defaults, ...sanitized };
 }
 
-module.exports = {
+export default {
   matches,
   matchesAny,
   getCommand,
   KeyPatterns,
   Platform,
-  createBindings
+  createBindings,
 };

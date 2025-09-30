@@ -14,8 +14,9 @@
 
 const React = require('react');
 const { render, Box, Text } = require('ink');
-const EnhancedInput = require('../src/ui/components/EnhancedInput');
-const { getHelpText } = require('../src/config/keyBindings');
+const EnhancedInputModule = require('../dist/ui/components/EnhancedInput');
+const EnhancedInput = EnhancedInputModule.default || EnhancedInputModule;
+const { getHelpText } = require('../dist/config/keyBindings');
 
 /**
  * Demo Application Component

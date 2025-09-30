@@ -10,5 +10,5 @@
  * - mew token create     - Create a test token
  */
 
-require('../src/index.js');
+require('../dist/index.js');
 
