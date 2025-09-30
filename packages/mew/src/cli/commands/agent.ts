@@ -244,11 +244,19 @@ agent
   .option('-t, --token <token>', 'Authentication token')
   .action(async (options) => {
     try {
+      // Read OpenAI config from environment variables
+      const apiKey = process.env.OPENAI_API_KEY;
+      const baseURL = process.env.OPENAI_BASE_URL;
+      const model = process.env.OPENAI_MODEL;
+
       const agent = new MEWAgent({
         gateway: options.gateway,
         space: options.space,
         participantId: options.id,
         token: options.token,
+        apiKey,
+        baseURL,
+        model,
       });
 
       await agent.connect();
