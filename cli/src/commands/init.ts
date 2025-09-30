@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
-const fs = require('fs').promises;
-const path = require('path');
-const readline = require('readline');
-const { execSync } = require('child_process');
-const crypto = require('crypto');
+// @ts-nocheck
+
+import fs from 'fs/promises';
+import path from 'path';
+import readline from 'readline';
+import { execSync } from 'child_process';
+import crypto from 'crypto';
 
 /**
  * MEW init command - Initialize a new MEW space from templates
@@ -319,7 +321,6 @@ class InitCommand {
 
     // Make agent files executable
     try {
-      const { execSync } = require('child_process');
       execSync(`chmod +x ${agentsDest}/*.js 2>/dev/null || true`);
     } catch {
       // Ignore errors on Windows
@@ -874,7 +875,7 @@ class InitCommand {
 }
 
 // Export for use in main CLI
-module.exports = InitCommand;
+export default InitCommand;
 
 // Run if called directly
 if (require.main === module) {

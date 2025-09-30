@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 /**
  * Advanced Interactive UI using Ink
  *
@@ -7,12 +9,12 @@
  * Based on Gemini CLI patterns and MEW Protocol v0.4 specification.
  */
 
-const React = require('react');
-const { render, Box, Text, Static, useInput, useApp, useFocus, useStdout } = require('ink');
-const { useState, useEffect, useRef, useMemo, useCallback } = React;
-const { v4: uuidv4 } = require('uuid');
-const EnhancedInput = require('../ui/components/EnhancedInput');
-const { slashCommandList, slashCommandGroups } = require('../ui/utils/slashCommands');
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { render, Box, Text, Static, useInput, useApp, useFocus, useStdout } from 'ink';
+import { v4 as uuidv4 } from 'uuid';
+
+import EnhancedInput from '../ui/components/EnhancedInput';
+import { slashCommandList, slashCommandGroups } from '../ui/utils/slashCommands';
 
 const DECORATIVE_SYSTEM_KINDS = new Set([
   'system/welcome',
@@ -2902,7 +2904,7 @@ function SidePanel({ participantId, myPendingAcknowledgements, participantStatus
 /**
  * Starts the advanced interactive UI
  */
-function startAdvancedInteractiveUI(ws, participantId, spaceId) {
+export function startAdvancedInteractiveUI(ws, participantId, spaceId) {
   const { rerender, unmount } = render(
     React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId })
   );
@@ -2916,7 +2918,4 @@ function startAdvancedInteractiveUI(ws, participantId, spaceId) {
   return { rerender, unmount };
 }
 
-module.exports = {
-  startAdvancedInteractiveUI,
-  AdvancedInteractiveUI,
-};
+export { AdvancedInteractiveUI };

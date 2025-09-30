@@ -13,7 +13,7 @@
  * Get the visual width of a string accounting for Unicode characters
  * This handles emoji, combining characters, and wide characters
  */
-function getStringWidth(str) {
+export function getStringWidth(str: string): number {
   if (!str || str.length === 0) return 0;
 
   let width = 0;
@@ -58,7 +58,7 @@ function getStringWidth(str) {
  * Get the character index at a visual position
  * This accounts for wide characters and combining marks
  */
-function getCharacterIndexAtPosition(str, targetPosition) {
+export function getCharacterIndexAtPosition(str: string, targetPosition: number): number {
   if (!str || targetPosition <= 0) return 0;
 
   let visualPosition = 0;
@@ -92,7 +92,7 @@ function getCharacterIndexAtPosition(str, targetPosition) {
 /**
  * Check if a character code represents a wide character
  */
-function isWideCharacter(code) {
+export function isWideCharacter(code: number): boolean {
   return (
     (code >= 0x1100 && code <= 0x115F) ||
     (code >= 0x2E80 && code <= 0x9FFF) ||
@@ -107,7 +107,7 @@ function isWideCharacter(code) {
 /**
  * Truncate a string to fit within a visual width
  */
-function truncateToWidth(str, maxWidth, ellipsis = '...') {
+export function truncateToWidth(str: string, maxWidth: number, ellipsis = '...'): string {
   if (!str || maxWidth <= 0) return '';
 
   const fullWidth = getStringWidth(str);
@@ -152,7 +152,7 @@ function truncateToWidth(str, maxWidth, ellipsis = '...') {
 /**
  * Find word boundaries in text
  */
-function findWordBoundaries(text, position) {
+export function findWordBoundaries(text: string, position: number): { start: number; end: number } {
   if (!text) return { start: 0, end: 0 };
 
   // Word characters pattern (letters, numbers, some punctuation)
@@ -177,7 +177,7 @@ function findWordBoundaries(text, position) {
 /**
  * Split text into lines with proper handling of line endings
  */
-function splitLines(text) {
+export function splitLines(text: string): string[] {
   if (!text) return [''];
 
   // Handle different line endings (CRLF, LF, CR)
@@ -192,7 +192,7 @@ function splitLines(text) {
 /**
  * Join lines with consistent line endings
  */
-function joinLines(lines, lineEnding = '\n') {
+export function joinLines(lines: string[], lineEnding = '\n'): string {
   if (!lines || lines.length === 0) return '';
   return lines.join(lineEnding);
 }
@@ -200,7 +200,7 @@ function joinLines(lines, lineEnding = '\n') {
 /**
  * Escape special characters for terminal display
  */
-function escapeForTerminal(text) {
+export function escapeForTerminal(text: string): string {
   if (!text) return '';
 
   // Escape ANSI control sequences and other special characters
@@ -216,7 +216,7 @@ function escapeForTerminal(text) {
 /**
  * Strip ANSI escape codes from text
  */
-function stripAnsi(text) {
+export function stripAnsi(text: string): string {
   if (!text) return '';
 
   // Remove ANSI escape sequences
@@ -227,7 +227,7 @@ function stripAnsi(text) {
  * Count grapheme clusters (user-perceived characters)
  * This is a simple implementation - for full support use a library like grapheme-splitter
  */
-function countGraphemes(text) {
+export function countGraphemes(text: string): number {
   if (!text) return 0;
 
   let count = 0;
@@ -249,7 +249,7 @@ function countGraphemes(text) {
 /**
  * Check if character at position is emoji
  */
-function isEmoji(text, position) {
+export function isEmoji(text: string, position: number): boolean {
   if (!text || position < 0 || position >= text.length) return false;
 
   const code = text.charCodeAt(position);
@@ -275,17 +275,3 @@ function isEmoji(text, position) {
   // Check basic emoji in BMP
   return (code >= 0x2600 && code <= 0x27BF);
 }
-
-module.exports = {
-  getStringWidth,
-  getCharacterIndexAtPosition,
-  isWideCharacter,
-  truncateToWidth,
-  findWordBoundaries,
-  splitLines,
-  joinLines,
-  escapeForTerminal,
-  stripAnsi,
-  countGraphemes,
-  isEmoji
-};

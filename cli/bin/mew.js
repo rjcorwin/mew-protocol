@@ -9,6 +9,13 @@
  * - mew agent start      - Start a built-in agent
  * - mew token create     - Create a test token
  */
-
-require('../src/index.js');
+try {
+  require('../dist/index.js');
+} catch (error) {
+  if (error && error.code === 'MODULE_NOT_FOUND') {
+    console.error('The MEW CLI has not been built yet. Run "npm run build --workspace @mew-protocol/cli" to compile.');
+    process.exit(1);
+  }
+  throw error;
+}
 

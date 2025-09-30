@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 /**
  * Slash command schema and autocomplete engine for the MEW CLI.
  *
@@ -5,7 +7,7 @@
  * while laying the groundwork for dynamic resolvers (participants, tools, etc.).
  */
 
-const NODE_TYPES = {
+export const NODE_TYPES = {
   LITERAL: 'literal',
   CHOICE: 'choice',
   PARAMETER: 'parameter'
@@ -230,7 +232,7 @@ function createTemplateOption(value, description) {
   };
 }
 
-function literal(value, meta = {}) {
+export function literal(value, meta = {}) {
   return {
     type: NODE_TYPES.LITERAL,
     value,
@@ -243,7 +245,7 @@ function literal(value, meta = {}) {
   };
 }
 
-function choice(name, options, meta = {}) {
+export function choice(name, options, meta = {}) {
   return {
     type: NODE_TYPES.CHOICE,
     name,
@@ -257,7 +259,7 @@ function choice(name, options, meta = {}) {
   };
 }
 
-function parameter(name, options = {}) {
+export function parameter(name, options = {}) {
   const normalizedOptions = Array.isArray(options.options)
     ? options.options.map((option, index) => normalizeOption(option, index))
     : null;
@@ -714,19 +716,19 @@ const commandDefinitions = [
   })
 ];
 
-const commandRegistry = commandDefinitions.map((command, index) => ({
+export const commandRegistry = commandDefinitions.map((command, index) => ({
   ...command,
   order: index
 }));
 
-const slashCommandList = commandRegistry.map((command) => ({
+export const slashCommandList = commandRegistry.map((command) => ({
   command: command.primary,
   usage: command.usage,
   description: command.description,
   category: command.category
 }));
 
-const slashCommandGroups = Array.from(new Set(commandRegistry.map(cmd => cmd.category)));
+export const slashCommandGroups = Array.from(new Set(commandRegistry.map(cmd => cmd.category)));
 
 function tokenize(text) {
   const tokens = [];
@@ -1129,7 +1131,7 @@ function normalizeRequest(input, limitOverride) {
   };
 }
 
-function getSlashCommandSuggestions(input, limitOverride) {
+export function getSlashCommandSuggestions(input, limitOverride) {
   const request = normalizeRequest(input, limitOverride);
   const text = request.text || '';
   const trimmed = text.trim();
@@ -1171,13 +1173,3 @@ function getSlashCommandSuggestions(input, limitOverride) {
   return suggestions.slice(0, request.limit);
 }
 
-module.exports = {
-  commandRegistry,
-  slashCommandList,
-  slashCommandGroups,
-  getSlashCommandSuggestions,
-  NODE_TYPES,
-  literal,
-  choice,
-  parameter
-};

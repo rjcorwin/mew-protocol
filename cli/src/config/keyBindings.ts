@@ -9,11 +9,31 @@
  * @license MIT
  */
 
+export interface KeyBindingPattern {
+  key?: string;
+  printable?: boolean;
+  ctrl?: boolean;
+  alt?: boolean;
+  meta?: boolean;
+  shift?: boolean;
+}
+
+export type KeyBindingEntry = KeyBindingPattern | KeyBindingPattern[];
+
+export type KeyBindings = Record<string, KeyBindingEntry>;
+
+export interface BindingConflictWarning {
+  type: 'conflict';
+  message: string;
+  commands: string[];
+  binding: KeyBindingPattern;
+}
+
 /**
  * Default key bindings for the MEW CLI
  * Each binding can be a single pattern or array of patterns
  */
-const defaultKeyBindings = {
+export const defaultKeyBindings: KeyBindings = {
   // Text editing
   INSERT_CHAR: { printable: true },
   DELETE_BACKWARD: { key: 'backspace' },
@@ -96,7 +116,7 @@ const defaultKeyBindings = {
 /**
  * Command descriptions for help text
  */
-const commandDescriptions = {
+export const commandDescriptions: Record<string, string> = {
   // Text editing
   INSERT_CHAR: 'Insert character',
   DELETE_BACKWARD: 'Delete character before cursor',
@@ -146,12 +166,12 @@ const commandDescriptions = {
  * @param {Object|Array} binding - Key binding pattern(s)
  * @returns {string} - Human-readable string
  */
-function getBindingDisplay(binding) {
+export function getBindingDisplay(binding: KeyBindingEntry): string {
   if (Array.isArray(binding)) {
     return binding.map(b => getBindingDisplay(b)).join(' or ');
   }
 
-  const parts = [];
+  const parts: string[] = [];
 
   if (binding.ctrl) parts.push('Ctrl');
   if (binding.alt) parts.push('Alt');
@@ -173,9 +193,9 @@ function getBindingDisplay(binding) {
  * @param {Object} bindings - Key bindings object
  * @returns {Array} - Array of help text lines
  */
-function getHelpText(bindings = defaultKeyBindings) {
-  const helpLines = [];
-  const categories = {
+export function getHelpText(bindings: KeyBindings = defaultKeyBindings): string[] {
+  const helpLines: string[] = [];
+  const categories: Record<string, string[]> = {
     'Text Editing': ['INSERT_CHAR', 'DELETE_BACKWARD', 'DELETE_FORWARD'],
     'Cursor Movement': [
       'MOVE_LEFT', 'MOVE_RIGHT', 'MOVE_UP', 'MOVE_DOWN',
@@ -192,8 +212,9 @@ function getHelpText(bindings = defaultKeyBindings) {
   for (const [category, commands] of Object.entries(categories)) {
     helpLines.push(`\n${category}:`);
     for (const command of commands) {
-      if (bindings[command] && commandDescriptions[command]) {
-        const binding = getBindingDisplay(bindings[command]);
+      const entry = bindings[command];
+      if (entry && commandDescriptions[command]) {
+        const binding = getBindingDisplay(entry);
         const description = commandDescriptions[command];
         helpLines.push(`  ${binding.padEnd(20)} - ${description}`);
       }
@@ -208,12 +229,16 @@ function getHelpText(bindings = defaultKeyBindings) {
  * @param {Object} customBindings - User's custom bindings
  * @returns {Object} - Merged bindings
  */
-function loadCustomBindings(customBindings = {}) {
-  // Merge custom bindings with defaults
-  return {
-    ...defaultKeyBindings,
-    ...customBindings
-  };
+export function loadCustomBindings(customBindings: Partial<KeyBindings> = {}): KeyBindings {
+  const merged: KeyBindings = { ...defaultKeyBindings };
+
+  for (const [command, binding] of Object.entries(customBindings)) {
+    if (binding) {
+      merged[command] = binding;
+    }
+  }
+
+  return merged;
 }
 
 /**
@@ -221,9 +246,9 @@ function loadCustomBindings(customBindings = {}) {
  * @param {Object} bindings - Key bindings to validate
  * @returns {Array} - Array of conflict warnings
  */
-function validateBindings(bindings) {
-  const warnings = [];
-  const usedCombinations = new Map();
+export function validateBindings(bindings: KeyBindings): BindingConflictWarning[] {
+  const warnings: BindingConflictWarning[] = [];
+  const usedCombinations = new Map<string, string>();
 
   for (const [command, binding] of Object.entries(bindings)) {
     const patterns = Array.isArray(binding) ? binding : [binding];
@@ -237,7 +262,7 @@ function validateBindings(bindings) {
         warnings.push({
           type: 'conflict',
           message: `Key binding conflict: ${getBindingDisplay(pattern)} is used by both ${command} and ${existingCommand}`,
-          commands: [command, existingCommand],
+          commands: [command, existingCommand ?? ''].filter(Boolean),
           binding: pattern
         });
       } else {
@@ -248,12 +273,3 @@ function validateBindings(bindings) {
 
   return warnings;
 }
-
-module.exports = {
-  defaultKeyBindings,
-  commandDescriptions,
-  getBindingDisplay,
-  getHelpText,
-  loadCustomBindings,
-  validateBindings
-};

@@ -1,12 +1,14 @@
-const { Command } = require('commander');
-const WebSocket = require('ws');
-const express = require('express');
-const http = require('http');
-const fs = require('fs');
-const yaml = require('js-yaml');
-const path = require('path');
-const { spawn } = require('child_process');
-const crypto = require('crypto');
+// @ts-nocheck
+
+import { Command } from 'commander';
+import WebSocket from 'ws';
+import express from 'express';
+import http from 'http';
+import fs from 'fs';
+import yaml from 'js-yaml';
+import path from 'path';
+import { spawn } from 'child_process';
+import crypto from 'crypto';
 
 const gateway = new Command('gateway').description('Gateway server management');
 
@@ -28,7 +30,6 @@ gateway
 
     // If we're running as a detached process, redirect console output to a log file
     if (process.env.GATEWAY_LOG_FILE) {
-      const fs = require('fs');
       const logStream = fs.createWriteStream(process.env.GATEWAY_LOG_FILE, { flags: 'a' });
       const originalLog = console.log;
       const originalError = console.error;
@@ -597,8 +598,6 @@ gateway
     
     // Auto-connect a participant that writes to output_log
     function autoConnectOutputLogParticipant(participantId, config) {
-      const fs = require('fs');
-      const path = require('path');
       
       // Resolve output log path
       const outputPath = path.resolve(process.cwd(), config.output_log);
@@ -1484,7 +1483,7 @@ gateway
     });
   });
 
-module.exports = gateway;
+export default gateway;
 
 function parseOptionalBoolean(value) {
   if (value === undefined || value === null) {

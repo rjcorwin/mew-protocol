@@ -1,7 +1,10 @@
-const { Command } = require('commander');
-const WebSocket = require('ws');
-const fs = require('fs');
-const readline = require('readline');
+// @ts-nocheck
+
+import { Command } from 'commander';
+import WebSocket from 'ws';
+import fs from 'fs';
+import readline from 'readline';
+import { spawn } from 'child_process';
 
 const client = new Command('client').description('Client connection management');
 
@@ -81,7 +84,6 @@ client
       console.log(`Reading from FIFO: ${options.fifoIn}`);
 
       // Use tail -F to read from FIFO continuously
-      const { spawn } = require('child_process');
       const tail = spawn('tail', ['-F', options.fifoIn]);
 
       const rl = readline.createInterface({
@@ -149,4 +151,4 @@ client
     });
   });
 
-module.exports = client;
+export default client;
