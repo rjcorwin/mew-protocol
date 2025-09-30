@@ -15,8 +15,8 @@ participants:
   # Coder agent with limited capabilities - creates proposals for file modifications
   mew:
     type: local
-    command: "npx"
-    args: ["--yes", "@mew-protocol/agent", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
+    command: "mew"
+    args: ["agent", "run", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
     auto_start: true
     # No tokens field - generated at runtime in .mew/tokens/
     capabilities:
@@ -104,8 +104,8 @@ participants:
   # MCP Bridge for file system access - executes approved proposals
   mcp-fs-bridge:
     type: local
-    command: "npx"
-    args: ["--yes", "@mew-protocol/bridge", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "mcp-fs-bridge", "--mcp-command", "npx", "--mcp-args", "@modelcontextprotocol/server-filesystem,./", "--mcp-cwd", "./"]
+    command: "mew"
+    args: ["bridge", "start", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "mcp-fs-bridge", "--mcp-command", "mew", "--mcp-args", "mcp,filesystem,./"]
     auto_start: true
     # No tokens field - generated at runtime in .mew/tokens/
     capabilities:

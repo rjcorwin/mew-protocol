@@ -19,6 +19,7 @@ import gatewayCommand from './commands/gateway.js';
 import clientCommand from './commands/client.js';
 import agentCommand from './commands/agent.js';
 import bridgeCommand from './commands/bridge.js';
+import mcpCommand from './commands/mcp.js';
 import tokenCommand from './commands/token.js';
 import spaceCommand, { spaceUpAction, spaceDownAction } from './commands/space.js';
 import InitCommand from './commands/init.js';
@@ -64,6 +65,7 @@ program.addCommand(gatewayCommand);
 program.addCommand(clientCommand);
 program.addCommand(agentCommand);
 program.addCommand(bridgeCommand);
+program.addCommand(mcpCommand);
 program.addCommand(tokenCommand);
 program.addCommand(spaceCommand);
 

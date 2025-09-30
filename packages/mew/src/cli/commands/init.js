@@ -77,22 +77,13 @@ class InitCommand {
       await this.processTemplateFiles(variables);
       console.log('✓ Processed template files with configuration');
 
-      // Prefer local workspace packages when running inside the monorepo
-      await this.useLocalWorkspacePackagesIfAvailable();
-
-      // NOW install dependencies after package.json has been processed
-      console.log('\nInstalling dependencies...');
-      const depsInstalled = await this.installDependencies();
-      if (depsInstalled !== false) {
-        console.log('✓ Dependencies installed');
-      }
+      // No npm install needed - templates use CLI's bundled dependencies
 
       // Check environment
       console.log('\nChecking environment...');
       this.checkEnvironment();
 
       console.log('✓ Created .mew/space.yaml');
-      console.log('✓ Configured isolated dependencies');
 
       // Create secure token storage
       await this.createTokenStorage();
@@ -103,8 +94,8 @@ class InitCommand {
       console.log('✓ Updated .gitignore');
 
       // Show completion message
-      console.log('\nReady! Your project root remains clean.');
-      console.log('MEW configuration and dependencies are isolated in .mew/');
+      console.log('\n✅ Space initialized successfully!');
+      console.log('MEW configuration is in .mew/');
       console.log('\nTry: mew');
 
     } catch (error) {
@@ -312,19 +303,13 @@ class InitCommand {
   async copyTemplateFiles(templatePath) {
     const mewDir = path.join(process.cwd(), '.mew');
 
-    // Copy package.json
-    const packageSrc = path.join(templatePath, 'package.json');
-    const packageDest = path.join(mewDir, 'package.json');
-    await fs.copyFile(packageSrc, packageDest);
-
-    // Copy agents directory
+    // Copy agents directory (if it exists)
     const agentsSrc = path.join(templatePath, 'agents');
     const agentsDest = path.join(mewDir, 'agents');
     await this.copyDirectory(agentsSrc, agentsDest);
 
     // Make agent files executable
     try {
-      const { execSync } = require('child_process');
       execSync(`chmod +x ${agentsDest}/*.js 2>/dev/null || true`);
     } catch {
       // Ignore errors on Windows
@@ -359,70 +344,6 @@ class InitCommand {
     }
   }
 
-  /**
-   * Install dependencies in .mew directory
-   * @returns {boolean} true if successful, false if failed
-   */
-  async installDependencies() {
-    const mewDir = path.join(process.cwd(), '.mew');
-
-    // Check if package.json exists
-    const packagePath = path.join(mewDir, 'package.json');
-    try {
-      await fs.access(packagePath);
-    } catch {
-      console.warn('⚠ No package.json found in .mew directory');
-      return false;
-    }
-
-    try {
-      // Show installing message
-      console.log('  Running npm install in .mew directory...');
-
-      const result = execSync('npm install --loglevel=error', {
-        cwd: mewDir,
-        stdio: 'pipe',
-        encoding: 'utf8',
-        timeout: 60000 // 60 second timeout
-      });
-
-      // If there's any output, it might be warnings
-      if (result) {
-        const lines = result.split('\n').filter(line => line.trim());
-        if (lines.length > 0) {
-          console.log('  npm output:', lines[0]);
-        }
-      }
-      return true; // Success
-    } catch (error) {
-      console.warn('⚠ Could not install dependencies automatically');
-
-      // Show more detailed error information
-      if (error.message) {
-        console.warn('  Error:', error.message);
-      }
-      if (error.stderr) {
-        const stderr = error.stderr.toString().trim();
-        if (stderr) {
-          const lines = stderr.split('\n');
-          console.warn('  Details:', lines[0]);
-          if (lines.length > 1) {
-            console.warn('  ', lines[1]);
-          }
-        }
-      }
-      if (error.stdout) {
-        const stdout = error.stdout.toString().trim();
-        if (stdout) {
-          console.warn('  Output:', stdout.split('\n')[0]);
-        }
-      }
-
-      console.warn('  Run "cd .mew && npm install" manually to complete setup');
-      console.warn('  This is usually due to network issues or npm registry problems');
-      return false; // Failed
-    }
-  }
 
   /**
    * Collect variable values from user or options
@@ -720,114 +641,8 @@ class InitCommand {
 
     await fs.writeFile(outputPath, content);
     await fs.unlink(templatePath); // Remove template file
-
-    // Process package.json to replace variables
-    const packagePath = path.join(mewDir, 'package.json');
-    try {
-      let packageContent = await fs.readFile(packagePath, 'utf8');
-
-      // Replace variables in package.json
-      for (const [key, value] of Object.entries(variables)) {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        packageContent = packageContent.replace(regex, value);
-      }
-
-      await fs.writeFile(packagePath, packageContent);
-    } catch (error) {
-      // Package.json might not exist or have variables
-      console.warn('Could not process package.json:', error.message);
-    }
   }
 
-  /**
-   * If we're running inside the MEW monorepo, rewrite MEW package deps to link to local workspaces
-   */
-  async useLocalWorkspacePackagesIfAvailable() {
-    const mewDir = path.join(process.cwd(), '.mew');
-    const packagePath = path.join(mewDir, 'package.json');
-
-    let packageJson;
-    try {
-      const content = await fs.readFile(packagePath, 'utf8');
-      packageJson = JSON.parse(content);
-    } catch {
-      return; // No package.json or invalid JSON
-    }
-
-    const repoRoot = await this.findMonorepoRoot();
-    if (!repoRoot) {
-      return; // Not inside the monorepo, keep npm versions
-    }
-
-    const localTargets = {
-      '@mew-protocol/agent': path.join(repoRoot, 'sdk/typescript-sdk/agent'),
-      '@mew-protocol/bridge': path.join(repoRoot, 'bridge'),
-      '@mew-protocol/client': path.join(repoRoot, 'sdk/typescript-sdk/client'),
-      '@mew-protocol/participant': path.join(repoRoot, 'sdk/typescript-sdk/participant'),
-      '@mew-protocol/types': path.join(repoRoot, 'sdk/typescript-sdk/types')
-    };
-
-    let changed = false;
-    for (const [dep, targetPath] of Object.entries(localTargets)) {
-      if (!packageJson.dependencies || !packageJson.dependencies[dep]) {
-        continue;
-      }
-
-      try {
-        await fs.access(targetPath);
-      } catch {
-        continue; // Local package not present
-      }
-
-      const relativePath = path.relative(mewDir, targetPath) || '.';
-      const normalized = relativePath.split(path.sep).join('/');
-      const linkSpec = `link:${normalized.startsWith('.') ? normalized : `./${normalized}`}`;
-
-      if (packageJson.dependencies[dep] !== linkSpec) {
-        packageJson.dependencies[dep] = linkSpec;
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      await fs.writeFile(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
-      console.log('  Using local MEW workspace packages');
-    }
-  }
-
-  /**
-   * Find the monorepo root (package.json named "mew-protocol" with MEW workspaces)
-   */
-  async findMonorepoRoot() {
-    let dir = process.cwd();
-    const root = path.parse(dir).root;
-
-    while (dir && dir !== root) {
-      const pkgPath = path.join(dir, 'package.json');
-      try {
-        const content = await fs.readFile(pkgPath, 'utf8');
-        const pkg = JSON.parse(content);
-
-        if (
-          pkg?.name === 'mew-protocol' &&
-          Array.isArray(pkg.workspaces) &&
-          pkg.workspaces.some((entry) => String(entry).includes('sdk/typescript-sdk/agent'))
-        ) {
-          return dir;
-        }
-      } catch {
-        // ignore
-      }
-
-      const parent = path.dirname(dir);
-      if (parent === dir) {
-        break;
-      }
-      dir = parent;
-    }
-
-    return null;
-  }
 
   /**
    * Create secure token storage directory
@@ -880,29 +695,3 @@ class InitCommand {
 
 // Export for use in main CLI
 export default InitCommand;
-
-// Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const command = new InitCommand();
-
-  // Parse command line arguments
-  const args = process.argv.slice(2);
-  const options = {
-    template: args.find(arg => !arg.startsWith('--')),
-    force: args.includes('--force'),
-    listTemplates: args.includes('--list-templates'),
-    templateInfo: args.includes('--template-info') ? args[args.indexOf('--template-info') + 1] : null,
-  };
-
-  // Parse named options
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--name' && args[i + 1]) {
-      options.spacename = args[i + 1];
-    }
-    if (args[i] === '--port' && args[i + 1]) {
-      options.port = args[i + 1];
-    }
-  }
-
-  command.execute(options);
-}

@@ -232,4 +232,39 @@ function handleFulfillerAgent(ws, message) {
   }
 }
 
+// Add run command for full MEWAgent
+agent
+  .command('run')
+  .description('Run a full MEWAgent with OpenAI/Claude integration')
+  .requiredOption('-g, --gateway <url>', 'WebSocket URL')
+  .requiredOption('-s, --space <space>', 'Space to join')
+  .requiredOption('--id <id>', 'Participant ID')
+  .option('-t, --token <token>', 'Authentication token')
+  .action(async (options) => {
+    try {
+      // Dynamic import to avoid bundling MEWAgent
+      const { MEWAgent } = await import('../../agent/MEWAgent.js');
+
+      const agent = new MEWAgent({
+        gateway: options.gateway,
+        space: options.space,
+        participantId: options.id,
+        token: options.token,
+      });
+
+      await agent.connect();
+      console.log(`MEWAgent ${options.id} connected to ${options.space}`);
+
+      // Keep process alive
+      process.on('SIGINT', async () => {
+        console.log('\nStopping agent...');
+        await agent.disconnect();
+        process.exit(0);
+      });
+    } catch (error) {
+      console.error('Failed to start agent:', error);
+      process.exit(1);
+    }
+  });
+
 export default agent;

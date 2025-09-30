@@ -6,8 +6,8 @@
  * Replace with actual @mew-protocol/agent when available
  */
 
-const WebSocket = require('ws');
-const readline = require('readline');
+import WebSocket from 'ws';
+import readline from 'readline';
 
 // Configuration from environment
 const gateway = process.env.MEW_GATEWAY || 'ws://localhost:8080';
