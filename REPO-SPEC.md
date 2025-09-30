@@ -225,80 +225,82 @@ Root `package.json` (sketch):
 
 ## Spaces and Tests: Local Dependency Strategy
 
-Both `spaces/` (developer sandboxes) and `tests/` (disposable scenario workspaces) must use the
-local source during development while requiring zero manual `npm link` steps. This design bakes
-that behavior into the CLI and harnesses.
+### Phase 4 Update: Global Install Required for PM2
+
+**Templates no longer have `package.json` or `node_modules`**. All dependencies (including MCP
+servers and agents) are now bundled in the CLI package itself and accessed via `mew` subcommands.
+
+Templates use PM2 to start participants with commands like:
+- `mew agent run --gateway ws://localhost:${PORT} ...`
+- `mew bridge start --mcp-command mew --mcp-args mcp,filesystem,...`
+
+**This requires the `mew` command to be available globally** when PM2 starts processes.
 
 ### Inside the Repo (Dev Mode)
 
-- Detection: CLI considers itself “inside the repo” if it finds the repo markers (e.g.,
-  `REPO-SPEC.md` and `packages/mew/package.json`) when resolving the current working directory or
-  a configured `--space` path.
-- Rewrite rule during `space init` and scenario setup:
-  - In the generated space `package.json`, set:
-    ```json
-    {
-      "dependencies": {
-        "@mew-protocol/mew": "link:../../packages/mew"
-      }
-    }
-    ```
-  - Rationale: `link:` creates a symlink to the local workspace ensuring changes are immediately
-    visible without publish. This also avoids copying like `file:` does.
-- Install step: CLI runs `npm install` inside the space after writing the dependency to realize the
-  link.
-- Provenance file: CLI writes `.mew/local-link.json` with the resolved absolute path and repo
-  commit so issues are diagnosable from logs.
+**Required setup before testing**:
+```bash
+# Build and install globally from local source
+npm run build
+npm install -g .
 
-Local CLI path (stable wrapper):
-- The repository keeps `cli/bin/mew.js` as a stable path for manual testing under `spaces/`.
-- This wrapper invokes the current local CLI implementation and forwards to the built entry once
-  the single package is in place. Example usage from a space directory:
-  ```bash
-  ../../cli/bin/mew.js space init .
-  ../../cli/bin/mew.js space up
-  ../../cli/bin/mew.js space connect
-  ```
-  As an alternative, after building the single package you may run:
-  ```bash
-  node ../../packages/mew/dist/bin/mew.js space init .
-  ```
+# Now use global mew command for everything
+cd tests/test-feature
+mew space init .
+mew space up
+mew space connect
+```
+
+**After code changes**:
+```bash
+npm run build
+npm install -g .  # Reinstall to pick up changes
+```
+
+**Alternative - npm link** (faster iteration):
+```bash
+npm link  # One-time setup
+# After code changes:
+npm run build  # Just rebuild, link is persistent
+```
 
 Environment overrides (optional):
-- `MEW_LOCAL_SDK_PATH`: if set, CLI uses `link:${MEW_LOCAL_SDK_PATH}` for `@mew-protocol/mew`.
-- `MEW_FORCE_PUBLISHED`: if set, disables linking and uses normal semver resolution even inside
-  the repo (useful for simulating end-user installs in dev).
+- `MEW_FORCE_PUBLISHED`: if set, uses published `@mew-protocol/mew` from registry instead of local.
 
 ### Outside the Repo (Published Mode)
 
-- CLI behaves as a normal consumer; templates depend on `@mew-protocol/mew` by semver.
-- No linking or rewrites occur.
+- CLI behaves as a normal consumer; templates use globally installed `mew` command.
+- Install: `npm install -g @mew-protocol/mew`
 
 ### spaces/README.md Integration
 
-- Spaces created under `spaces/` are for interactive local dev and always use the local link rule
-  described above. The README should document:
-  - Creating a new space under `spaces/` and running `mew space init`.
-  - Using the stable local CLI path `../../cli/bin/mew.js`.
-  - That dependencies are linked to the local `packages/mew` automatically (no registry needed).
-  - That no `npm link` or publish steps are required.
+- Spaces created under `spaces/` are for interactive local dev. The README should document:
+  - Building and installing globally: `npm run build && npm install -g .`
+  - Creating a new space: `cd spaces && mkdir test && cd test`
+  - Using global mew command: `mew space init .`, `mew space up`, `mew space connect`
 
 ### tests/README.md Integration
 
-- Scenario harnesses create disposable workspaces (typically under
-  `tests/scenario-*/.workspace`). The CLI, invoked from the repo, applies the same link rule so that
-  scenarios exercise the current source.
-- Each scenario’s `setup.sh` continues to call the local CLI path (e.g., `../../cli/bin/mew.js …` or
-  the new consolidated `mew` binary). The dependency rewrite occurs in the generated workspace
-  transparently.
-- Tests run with network access disabled; linking ensures no npm registry access is required.
+- Scenario harnesses create disposable workspaces under `tests/scenario-*/.workspace`.
+- Test runner (`tests/run-all-tests.sh`) installs globally once at the start.
+- All scenarios use global `mew` command (not local wrapper paths).
+- Example in setup.sh:
+  ```bash
+  # Use global mew for all commands
+  mew init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}"
+  mew space up --space-dir . --port "${TEST_PORT}" --detach
+  ```
+
+### Rationale
+
+- **Why global install?** PM2 spawns processes independently and needs `mew` in PATH.
+- **Why not local paths in templates?** Templates are shipped to users and can't have repo-relative paths.
+- **Why not bundle everything?** Phase 4 accomplished this - templates have no dependencies, everything is in the CLI package.
 
 ### Fallback Behavior and Robustness
 
-- If linking fails (e.g., path resolution or permissions), CLI falls back to
-  `file:../../packages/mew` and logs a warning, so dev is not blocked.
-- The presence of `.mew/local-link.json` helps diagnose whether a space is using linked or
-  published bits.
+- If global `mew` is not found, `space up` will fail with clear error from PM2.
+- The CLI can detect if running from repo and warn if global install is outdated.
 
 ## Operating Modes & Release Process
 
@@ -320,38 +322,45 @@ the single‑package release process.
 
 ### 2) Spaces Testing (Manual Integration)
 
-Manual “spaces” exist under `spaces/` for developer exploration:
+Manual "spaces" exist under `spaces/` for developer exploration:
 
 ```bash
+# First time: build and install globally
+npm run build
+npm install -g .
+
 cd spaces && mkdir test-demo && cd test-demo
-# Init uses local link: to @mew-protocol/mew when run inside the repo
-../../cli/bin/mew.js space init .
-../../cli/bin/mew.js space up
-# Interact
-../../cli/bin/mew.js space connect
+# Use global mew for all commands
+mew space init .
+mew space up
+mew space connect
 ```
 
 Key points:
-- The CLI writes `@mew-protocol/mew: link:../../packages/mew` into the space’s `package.json`.
-- `npm install` is run inside the space automatically.
-- Provenance written to `.mew/local-link.json` for diagnostics.
-- To simulate end‑user installs (no local link), export `MEW_FORCE_PUBLISHED=1` and re‑init.
+- Templates no longer have `package.json` - all dependencies bundled in CLI.
+- All commands use global `mew` (required for PM2 to find it in PATH).
+- After code changes: `npm run build && npm install -g .` to reinstall.
+- Alternative for faster iteration: `npm link` once, then just `npm run build` after changes.
 
 ### 3) Tests Testing (E2E Scenarios)
 
 E2E tests live under `tests/scenario-*` and create disposable workspaces under `.workspace/`:
 
 ```bash
-# Run all non‑LLM scenarios
+# First time: build and install globally
+npm run build
+npm install -g .
+
+# Run all non‑LLM scenarios (test runner installs globally automatically)
 npm run test
 
-# Or invoke a single scenario’s shell orchestrator
+# Or invoke a single scenario's shell orchestrator
 tests/scenario-14-cat-maze/test.sh
 ```
 
 Behavior:
-- Scenario setup calls the local CLI (compat wrapper path preserved) so the same linking rule applies.
-- No network/npm required during runs; local link ensures the test workspace uses current sources.
+- Test runner (`tests/run-all-tests.sh`) builds and installs globally before running scenarios.
+- All scenarios use global `mew` command consistently.
 - Logs and envelope history validate protocol flows; failures surface in scenario logs.
 
 ### 4) Release Process (Single Package)

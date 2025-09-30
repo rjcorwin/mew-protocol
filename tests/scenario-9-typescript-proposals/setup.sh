@@ -10,7 +10,6 @@ TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-9-typescript-proposals"}
 SPACE_NAME=${SPACE_NAME:-"scenario-9-typescript-proposals"}
 TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
-CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
 AGENT_DIST="${REPO_ROOT}/sdk/typescript-sdk/agent/dist/index.js"
 PARTICIPANT_DIST="${REPO_ROOT}/sdk/typescript-sdk/participant/dist/index.js"
 
@@ -39,12 +38,12 @@ cp -R "${SCENARIO_DIR}/template" "${WORKSPACE_DIR}/templates/${TEMPLATE_NAME}"
 
 pushd "${WORKSPACE_DIR}" >/dev/null
 
-node "${CLI_BIN}" init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 9 - Proposal Workflow" > init.log 2>&1
+mew init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 9 - Proposal Workflow" > init.log 2>&1
 
 mkdir -p logs
 : > logs/test-client-output.log
 
-MEW_REPO_ROOT="${REPO_ROOT}" node "${CLI_BIN}" space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
+mew space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
   printf "%b\n" "${YELLOW}space up failed, printing log:${NC}"
   cat logs/space-up.log
   exit 1

@@ -10,7 +10,6 @@ TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-1-basic"}
 SPACE_NAME=${SPACE_NAME:-"scenario-1-basic"}
 TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
-CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -31,13 +30,13 @@ cp -R "${SCENARIO_DIR}/template" "${template_dest}"
 
 # Initialise space from template
 pushd "${WORKSPACE_DIR}" >/dev/null
-node "${CLI_BIN}" init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 1 - Basic Message Flow" > init.log 2>&1
+mew init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 1 - Basic Message Flow" > init.log 2>&1
 
 # Create logs directory for participant outputs
 mkdir -p logs
 
 # Start the space in detached mode
-MEW_REPO_ROOT="${REPO_ROOT}" node "${CLI_BIN}" space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
+mew space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
   printf "%b\n" "${YELLOW}space up failed, printing log:${NC}"
   cat logs/space-up.log
   exit 1

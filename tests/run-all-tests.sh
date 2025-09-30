@@ -56,6 +56,19 @@ if [[ ${VERBOSE} == true ]]; then
 fi
 printf "\n"
 
+# Build and install globally for PM2 scenarios
+printf "%b\n" "${YELLOW}Building and installing mew globally...${NC}"
+if ! (cd "${REPO_ROOT}" && npm run build > /dev/null 2>&1); then
+  printf "%b\n" "${RED}❌ Build failed${NC}"
+  exit 1
+fi
+if ! (cd "${REPO_ROOT}" && npm install -g . > /dev/null 2>&1); then
+  printf "%b\n" "${RED}❌ Global install failed${NC}"
+  exit 1
+fi
+printf "%b\n" "${GREEN}✓ mew installed globally${NC}"
+printf "\n"
+
 declare -i TOTAL_PASS=0
 declare -i TOTAL_FAIL=0
 FAILED_TESTS=""

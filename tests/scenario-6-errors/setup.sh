@@ -10,7 +10,6 @@ TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-6-errors"}
 SPACE_NAME=${SPACE_NAME:-"scenario-6-errors"}
 TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
-CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -28,12 +27,12 @@ template_dest="${WORKSPACE_DIR}/templates/${TEMPLATE_NAME}"
 cp -R "${SCENARIO_DIR}/template" "${template_dest}"
 
 pushd "${WORKSPACE_DIR}" >/dev/null
-node "${CLI_BIN}" init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 6 - Error Handling" > init.log 2>&1
+mew init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 6 - Error Handling" > init.log 2>&1
 
 mkdir -p logs
 : > logs/test-client-output.log
 
-MEW_REPO_ROOT="${REPO_ROOT}" node "${CLI_BIN}" space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
+mew space up --space-dir . --port "${TEST_PORT}" --detach > logs/space-up.log 2>&1 || {
   printf "%b\n" "${YELLOW}space up failed, printing log:${NC}"
   cat logs/space-up.log
   exit 1
