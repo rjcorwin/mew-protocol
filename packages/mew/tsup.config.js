@@ -14,8 +14,8 @@ export default defineConfig({
   },
   minify: false,
   sourcemap: true,
-  // Don't bundle Node.js built-ins
-  external: [],
+  // Don't bundle dependencies - let Node.js resolve them from node_modules
+  noExternal: [],
   // Clean output directory before build
   clean: false, // Let tsc handle cleaning dist/
 });

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // @ts-nocheck
 import { program } from 'commander';
 import fs from 'fs';

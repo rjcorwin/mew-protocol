@@ -250,13 +250,5 @@ async function main(): Promise<void> {
   }
 }
 
-// Run if this is the main module
-if (require.main === module) {
-  main().catch((error) => {
-    console.error('Fatal error:', error);
-    process.exit(1);
-  });
-}
-
 // Export for use as a module
 export { MEWAgent, AgentConfig };

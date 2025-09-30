@@ -4,7 +4,7 @@
   "description": "MEW Protocol - Multi-Entity Workspace Protocol SDK and CLI",
   "type": "module",
   "bin": {
-    "mew": "dist/bin/mew.js"
+    "mew": "dist/cli/index.js"
   },
   "exports": {
     ".": "./dist/index.js",
