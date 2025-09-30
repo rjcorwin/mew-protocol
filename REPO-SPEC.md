@@ -30,20 +30,39 @@ Non-goals
 ```
 packages/mew/                 # Single published package
   package.json                # name: @mew-protocol/mew
+  tsconfig.json               # unified build config (no per-module configs)
   src/
     bin/
-      mew.js                  # main CLI with subcommands (JS first; TS later)
-      mew-agent.js            # shim → invokes `mew agent …`
-      mew-bridge.js           # shim → invokes `mew bridge …`
-    types/index.ts            # re-export
-    client/index.ts           # re-export
-    participant/index.ts
-    agent/index.ts
-    gateway/index.ts
-    capability-matcher/index.ts
-    bridge/index.ts
-  tsconfig.build.json         # emits dist/esm + .d.ts
-  tsup.config.ts              # multi-entry bundle for bins (optional, see Build)
+      mew.js                  # main CLI with subcommands (JS first)
+      mew-agent.js            # shim → invokes `mew agent …` (optional)
+      mew-bridge.js           # shim → invokes `mew bridge …` (optional)
+    cli/                      # CLI implementation (JS, no package.json)
+      commands/
+      ui/
+      utils/
+    types/                    # Library source (TS, no package.json)
+      index.ts
+      protocol.ts
+      mcp.ts
+    client/                   # Library source (TS, no package.json)
+      index.ts
+      MEWClient.ts
+      types.ts
+    participant/              # Library source (TS, no package.json)
+      index.ts
+      MEWParticipant.ts
+      capabilities.ts
+    agent/                    # Library source (TS, no package.json)
+      index.ts
+      MEWAgent.ts
+    capability-matcher/       # Library source (TS, no package.json)
+      index.ts
+      matcher.ts
+    bridge/                   # Library source (TS, no package.json)
+      index.ts
+      mcp-bridge.ts
+  templates/                  # CLI templates
+  dist/                       # Build output (gitignored)
 ```
 
 ## Repository Structure (Target)
@@ -79,10 +98,10 @@ Top-level layout after consolidation to a single published package:
 │     │  ├─ coder-agent/
 │     │  └─ note-taker/
 │     ├─ dist/                   # Build output (ESM + .d.ts, bin JS)
-│     ├─ tsconfig.build.json
-│     ├─ tsup.config.ts          # (optional) bin bundling config
+│     ├─ tsconfig.json           # unified build config
 │     ├─ CHANGELOG.md
-│     └─ README.md
+│     ├─ README.md
+│     └─ spec/                   # CLI specs
 ├─ spaces/                       # Manual dev spaces (uses local CLI + link:)
 ├─ tests/                        # Integration scenarios (scenario-*)
 ├─ spec/                         # Protocol specs and ADRs
@@ -361,20 +380,35 @@ Notes:
 
 ## Migration
 
-Phase 1 — Package add
-- Create `packages/mew` and wire the build (tsc + tsup).
-- Implement `mew` subcommand dispatcher.
-- Add optional shims for `mew-agent` and `mew-bridge`.
+Phase 1 — Package consolidation ✅ COMPLETED
+- Create `packages/mew` directory structure
+- Move SDK library modules, bridge, and CLI to packages/mew/src/
+- Move templates to packages/mew/templates/
+- Update root package.json workspaces
+- Create packages/mew/package.json
 
-Phase 2 — Template & docs
-- Switch templates to `@mew-protocol/mew`.
-- Update docs and quick starts.
+Phase 2 — Flatten and integrate ✅ COMPLETED
+- Flatten src/ structure (remove nested src/ in each module)
+- Remove per-module metadata files (package.json, tsconfig.json, etc.)
+- Create unified packages/mew/tsconfig.json
+- Move CLI metadata (CHANGELOG, README, spec) to packages/mew/
+- Create stable CLI wrapper at cli/bin/mew.js
+- Update templates to depend on `@mew-protocol/mew`
+- Clean up old directories
 
-Phase 3 — Publish & verify
-- `npm pack` verification.
-- Smoke tests on bins from tarball: `mew --version`, `mew space init`, `mew agent --help`, `mew bridge --help`.
+Phase 3 — Import paths and build system (IN PROGRESS)
+- Update all import paths in source code (relative imports within package)
+- Set up build system (tsc for libraries, bins)
+- Update test harnesses to use new paths
+- Wire bin shims if needed
 
-Phase 4 — (Optional) retire individual SDK packages
+Phase 4 — Publish & verify
+- Test `npm pack` from packages/mew
+- Smoke tests on bins from tarball: `mew --version`, `mew space init`
+- Update all documentation
+- First publish of @mew-protocol/mew
+
+Phase 5 — (Optional) retire individual SDK packages
 - Publish deprecation notes or compatibility stubs for a short window.
 
 ## Execution Plan & Order of Operations
