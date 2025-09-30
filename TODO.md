@@ -94,17 +94,58 @@ npm link  # One-time
 npm run build  # After changes
 ```
 
-#### Phase 4.6 - Fix Space Command for New Structure (NEXT)
-**Issue**: Need to test `mew space up` with global install
+#### Phase 4.6 - Fix Space Command for New Structure ✅
+**Complete** - Gateway starts, but agent command blocked on TS conversion
 
-**Tasks**:
-- [ ] Build and install globally: `npm run build && npm install -g .`
-- [ ] Test `mew space up` in a fresh space
-- [ ] Verify gateway starts correctly
-- [ ] Verify all participants start via PM2
-- [ ] Check gateway logs in .mew/logs/gateway.log
+**Changes Made**:
+- [x] Fixed WebSocketServer import in gateway.js (ESM bundling issue)
+- [x] Changed space.js to use 'mew' command directly (finds in PATH)
+- [x] Fixed root tsconfig.json references
+- [x] Tested: Gateway starts successfully via PM2
+- [x] Tested: mew space up/down works
 
-### Phase 5 - Publish & Verify
+**Remaining Issue**:
+- `mew agent run` fails: Dynamic import of `@mew-protocol/mew/agent` broken
+- Root cause: TypeScript emits imports without `.js` extensions
+- Node.js ESM can't resolve: `import { MEWAgent } from './MEWAgent'` needs `./MEWAgent.js`
+- **Blocked on Phase 5**: Need to convert CLI to TypeScript for unified module resolution
+
+### Phase 5 - Convert CLI to TypeScript (IN PROGRESS)
+**Goal**: Fix module resolution by converting entire codebase to TypeScript with consistent ESM
+
+**Problem**: Mixed JS (CLI) + TS (library) creates import resolution issues when bundled CLI tries to dynamically import library code that has extensionless imports.
+
+**Solution**: Convert CLI to TypeScript, use `moduleResolution: "NodeNext"` everywhere, add `.js` to all imports.
+
+#### Phase 5.1 - Documentation & Planning
+- [ ] Create ADR documenting CLI → TypeScript conversion rationale
+- [ ] Document migration strategy and expected outcomes
+
+#### Phase 5.2 - Convert CLI to TypeScript
+- [ ] Update tsconfig.json to include CLI sources with proper settings
+- [ ] Convert utility files: `src/cli/utils/*.js` → `*.ts`
+- [ ] Convert command files: `src/cli/commands/*.js` → `*.ts` (12 files)
+- [ ] Convert UI files: `src/cli/ui/*.js` → `*.ts`
+- [ ] Convert main entry: `src/cli/index.js` → `index.ts`
+- [ ] Update tsup.config.js entry points (`.js` → `.ts`)
+
+#### Phase 5.3 - Fix Module Resolution (Critical)
+- [ ] Change `moduleResolution: "bundler"` → `"NodeNext"` in packages/mew/tsconfig.json
+- [ ] Add `.js` extensions to ALL relative imports in library code (~30 files)
+- [ ] Add `.js` extensions to ALL relative imports in CLI code
+- [ ] Test that tsc builds without errors
+- [ ] Test that tsup bundles correctly
+
+#### Phase 5.4 - Test Everything
+- [ ] Build and install globally: `npm run build && cd packages/mew && npm run build:all && npm install -g .`
+- [ ] Test `mew agent run` works (the blocked command)
+- [ ] Test coder-agent template (uses `mew agent run`)
+- [ ] Test cat-maze template (uses `mew agent run`)
+- [ ] Test note-taker template (uses custom agent script)
+- [ ] Run integration test suite: `npm test`
+- [ ] Verify no regressions in gateway, bridge, space commands
+
+### Phase 6 - Publish & Verify
 - [x] Test `npm pack` from packages/mew
 - [x] Smoke test bins from tarball
 - [ ] Update all documentation
