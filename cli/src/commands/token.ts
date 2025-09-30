@@ -1,4 +1,4 @@
-const { Command } = require('commander');
+import { Command } from 'commander';
 
 const token = new Command('token').description('Token management');
 
@@ -15,7 +15,8 @@ token
     try {
       capabilities = JSON.parse(options.capabilities);
     } catch (error) {
-      console.error('Invalid capabilities JSON:', error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Invalid capabilities JSON:', message);
       process.exit(1);
     }
 
@@ -31,4 +32,4 @@ token
     console.log(token);
   });
 
-module.exports = token;
+export default token;

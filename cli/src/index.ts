@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 
-const { program } = require('commander');
-const fs = require('fs');
-const path = require('path');
-const packageJson = require('../package.json');
+import { program } from 'commander';
+import fs from 'fs';
+import path from 'path';
+import { spawn } from 'child_process';
 
-// Import commands
-const gatewayCommand = require('./commands/gateway');
-const clientCommand = require('./commands/client');
-const agentCommand = require('./commands/agent');
-const tokenCommand = require('./commands/token');
-const spaceCommand = require('./commands/space');
-const InitCommand = require('./commands/init');
+import packageJson from '../package.json';
+
+import gatewayCommand from './commands/gateway';
+import clientCommand from './commands/client';
+import agentCommand from './commands/agent';
+import tokenCommand from './commands/token';
+import spaceCommand, { spaceUpAction, spaceDownAction } from './commands/space';
+import InitCommand from './commands/init';
 
 // Check if space configuration exists
-function checkSpaceExists() {
+function checkSpaceExists(): boolean {
   // Check .mew/space.yaml first (preferred location)
   if (fs.existsSync(path.join(process.cwd(), '.mew/space.yaml'))) {
     return true;
@@ -27,10 +28,12 @@ function checkSpaceExists() {
 }
 
 // Setup CLI
+const packageVersion = (packageJson as { version?: string }).version ?? '0.0.0';
+
 program
   .name('mew')
   .description('MEW Protocol CLI - Minimal implementation for testing')
-  .version(packageJson.version);
+  .version(packageVersion);
 
 // Add init command
 program
@@ -43,10 +46,10 @@ program
   .option('--force', 'Overwrite existing space configuration')
   .option('--list-templates', 'Show available templates and exit')
   .option('--template-info <name>', 'Show details about a specific template')
-  .action(async (template, options) => {
+  .action(async (template: string | undefined, options: Record<string, unknown>) => {
     const initCommand = new InitCommand();
-    options.template = template;
-    await initCommand.execute(options);
+    const initOptions = { ...options, template } as Record<string, unknown>;
+    await initCommand.execute(initOptions);
   });
 
 // Add other commands
@@ -70,23 +73,23 @@ program
   .option('--debug', 'Use simple debug interface instead of advanced UI')
   .option('--simple', 'Alias for --debug')
   .option('--no-ui', 'Disable UI enhancements, use plain interface')
-  .action(spaceCommand.spaceUpAction);
+  .action(spaceUpAction);
 
 program
   .command('down')
   .description('Alias for "space down" - Stop a running space')
   .option('-d, --space-dir <path>', 'Space directory', '.')
-  .action(spaceCommand.spaceDownAction);
+  .action(spaceDownAction);
 
 // Helper function to check if space is running
-function isSpaceRunning() {
+function isSpaceRunning(): boolean {
   const pidFile = path.join(process.cwd(), '.mew', 'pids.json');
   if (!fs.existsSync(pidFile)) {
     return false;
   }
 
   try {
-    const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
+    const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8')) as { gateway?: number };
     // Check if gateway process is still running
     if (pids.gateway) {
       try {
@@ -103,6 +106,8 @@ function isSpaceRunning() {
 }
 
 // Default behavior when no command is provided
+let shouldParseArgs = true;
+
 if (process.argv.length === 2) {
   // No arguments provided - intelligent default behavior
   if (checkSpaceExists()) {
@@ -120,23 +125,23 @@ if (process.argv.length === 2) {
     // No space - run init, then connect
     console.log('Welcome to MEW Protocol! Let\'s set up your space.');
     const initCommand = new InitCommand();
-    initCommand.execute({}).then(() => {
+    void initCommand.execute({}).then(() => {
       console.log('\nSpace initialized! Starting and connecting...');
       // After init, start the space interactively by spawning a new process
-      const { spawn } = require('child_process');
       const child = spawn(process.argv[0], [process.argv[1], 'space', 'up', '-i'], {
         stdio: 'inherit'
       });
-      child.on('exit', (code) => {
+      child.on('exit', (code: number | null) => {
         process.exit(code || 0);
       });
     }).catch(error => {
       console.error('Error:', error.message);
       process.exit(1);
     });
-    return; // Don't parse args since we're handling it
+    shouldParseArgs = false;
   }
 }
 
-// Parse arguments
-program.parse(process.argv);
+if (shouldParseArgs) {
+  program.parse(process.argv);
+}

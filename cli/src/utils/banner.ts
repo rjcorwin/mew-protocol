@@ -5,7 +5,7 @@
  * when starting interactive mode.
  */
 
-const TAGLINES = [
+export const TAGLINES = [
   "Herding cats, elegantly",
   "Professional cat herding since 2025",
   "Your digital cat herder",
@@ -49,7 +49,7 @@ const TAGLINES = [
 /**
  * Get a random tagline
  */
-function getRandomTagline() {
+export function getRandomTagline(): string {
   return TAGLINES[Math.floor(Math.random() * TAGLINES.length)];
 }
 
@@ -63,7 +63,15 @@ function getRandomTagline() {
  * @param {boolean} options.color - Whether to use colors
  * @returns {string} The formatted banner
  */
-function generateBanner(options = {}) {
+export interface BannerOptions {
+  spaceId?: string;
+  spaceName?: string;
+  participantId?: string;
+  gateway?: string;
+  color?: boolean;
+}
+
+export function generateBanner(options: BannerOptions = {}): string {
   const tagline = getRandomTagline();
   const color = options.color !== false;
 
@@ -111,13 +119,6 @@ function generateBanner(options = {}) {
  * Print the banner to stdout
  * @param {Object} options - Banner configuration
  */
-function printBanner(options = {}) {
+export function printBanner(options: BannerOptions = {}): void {
   console.log(generateBanner(options));
 }
-
-module.exports = {
-  generateBanner,
-  printBanner,
-  getRandomTagline,
-  TAGLINES
-};

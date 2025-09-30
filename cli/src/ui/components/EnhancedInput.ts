@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 /**
  * Enhanced Input Component for MEW CLI
  *
@@ -9,16 +11,16 @@
  * @license MIT
  */
 
-const React = require('react');
-const { Box, Text } = require('ink');
-const { useState, useEffect, useCallback, useRef } = React;
-const TextBuffer = require('../utils/text-buffer');
-const { useKeypress } = require('../hooks/useKeypress');
-const { getCommand } = require('../keyMatchers');
-const { defaultKeyBindings } = require('../../config/keyBindings');
-const { getSlashCommandSuggestions } = require('../utils/slashCommands');
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Box, Text } from 'ink';
+
+import TextBuffer from '../utils/text-buffer';
+import { useKeypress } from '../hooks/useKeypress';
+import { getCommand } from '../keyMatchers';
+import { defaultKeyBindings } from '../../config/keyBindings';
+import { getSlashCommandSuggestions } from '../utils/slashCommands';
 // Helper function for debug logging
 const debugLog = (message) => {
   const logFile = path.join(process.cwd(), '.mew', 'debug.log');
@@ -647,4 +649,4 @@ function EnhancedInput({
   );
 }
 
-module.exports = EnhancedInput;
+export default EnhancedInput;

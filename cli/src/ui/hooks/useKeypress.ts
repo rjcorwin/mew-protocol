@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 /**
  * useKeypress Hook
  *
@@ -10,8 +12,41 @@
  * @license MIT
  */
 
-const { useInput } = require('ink');
-const { useCallback, useRef } = require('react');
+import fs from 'fs';
+import path from 'path';
+import { useInput } from 'ink';
+import { useCallback, useRef } from 'react';
+
+import type { EnhancedKey } from '../keyMatchers';
+
+export interface UseKeypressOptions {
+  isActive?: boolean;
+  preventDefault?: boolean;
+  captureNumbers?: boolean;
+  captureArrows?: boolean;
+}
+
+export interface InkKey {
+  name?: string;
+  sequence?: string;
+  ctrl?: boolean;
+  meta?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+  upArrow?: boolean;
+  downArrow?: boolean;
+  leftArrow?: boolean;
+  rightArrow?: boolean;
+  return?: boolean;
+  enter?: boolean;
+  backspace?: boolean;
+  delete?: boolean;
+  tab?: boolean;
+  escape?: boolean;
+  [key: string]: unknown;
+}
+
+export type KeyHandler = (key: EnhancedKey, input: string) => void;
 
 /**
  * Enhanced keypress hook with better key detection
@@ -19,7 +54,7 @@ const { useCallback, useRef } = require('react');
  * @param {Object} options - Configuration options
  * @returns {void}
  */
-function useKeypress(handler, options = {}) {
+export function useKeypress(handler: KeyHandler, options: UseKeypressOptions = {}): void {
   const {
     isActive = true,
     preventDefault = true,
@@ -30,13 +65,11 @@ function useKeypress(handler, options = {}) {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
 
-  const processKey = useCallback((input, key) => {
+  const processKey = useCallback((input: string, key: InkKey) => {
     if (!isActive) return;
 
     // Debug logging for raw key from Ink
     if (input === '\x7F' || key.sequence === '\x7F' || key.name === 'delete') {
-      const fs = require('fs');
-      const path = require('path');
       const logFile = path.join(process.cwd(), '.mew', 'debug.log');
       fs.appendFileSync(logFile, `\nRAW DELETE KEY FROM INK: ${JSON.stringify({ input, key })}\n`);
     }
@@ -50,7 +83,7 @@ function useKeypress(handler, options = {}) {
     }
 
     // Build enhanced key object
-    const enhancedKey = {
+    const enhancedKey: EnhancedKey & { sequence?: string; number?: number; isNumber?: boolean; raw: InkKey } = {
       // Basic key info
       input: input || '',
       name: resolvedName,
@@ -144,7 +177,7 @@ function useKeypress(handler, options = {}) {
  * @param {string} combination - Key combination string (e.g., 'ctrl+a', 'alt+left')
  * @returns {boolean}
  */
-function matchesKeyCombination(key, combination) {
+export function matchesKeyCombination(key: EnhancedKey | undefined, combination: string): boolean {
   if (!key || !combination) return false;
 
   const parts = combination.toLowerCase().split('+');
@@ -197,9 +230,9 @@ function matchesKeyCombination(key, combination) {
     case 'right':
       return key.right;
     case 'home':
-      return key.home;
+      return Boolean(key.home);
     case 'end':
-      return key.end;
+      return Boolean(key.end);
     case 'pageup':
       return key.pageup;
     case 'pagedown':
@@ -221,7 +254,3 @@ function matchesKeyCombination(key, combination) {
   }
 }
 
-module.exports = {
-  useKeypress,
-  matchesKeyCombination
-};

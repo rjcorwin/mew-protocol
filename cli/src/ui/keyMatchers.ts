@@ -9,13 +9,41 @@
  * @license MIT
  */
 
+// @ts-nocheck
+
+import type { KeyBindingEntry, KeyBindingPattern, KeyBindings } from '../config/keyBindings';
+
+export interface EnhancedKey {
+  input?: string;
+  name?: string;
+  ctrl?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+  meta?: boolean;
+  return?: boolean;
+  enter?: boolean;
+  backspace?: boolean;
+  delete?: boolean;
+  tab?: boolean;
+  escape?: boolean;
+  space?: boolean;
+  up?: boolean;
+  down?: boolean;
+  left?: boolean;
+  right?: boolean;
+  home?: boolean;
+  end?: boolean;
+  pageup?: boolean;
+  pagedown?: boolean;
+  [key: string]: unknown;
+}
+
+export type KeyPattern = KeyBindingPattern;
+
 /**
  * Check if a key event matches a specific pattern
- * @param {Object} key - Enhanced key object from useKeypress
- * @param {Object} pattern - Pattern to match against
- * @returns {boolean}
  */
-function matches(key, pattern) {
+export function matches(key: EnhancedKey | undefined, pattern: KeyBindingPattern | undefined): boolean {
   if (!key || !pattern) return false;
 
   // Check modifiers if specified
@@ -89,7 +117,7 @@ function matches(key, pattern) {
 /**
  * Common key patterns for easy matching
  */
-const KeyPatterns = {
+export const KeyPatterns: Record<string, KeyBindingEntry> = {
   // Text editing
   CHARACTER: { printable: true },
   BACKSPACE: { key: 'backspace' },
@@ -172,7 +200,7 @@ const KeyPatterns = {
  * @param {Array|Object} patterns - Pattern or array of patterns
  * @returns {boolean}
  */
-function matchesAny(key, patterns) {
+export function matchesAny(key: EnhancedKey | undefined, patterns: KeyBindingEntry): boolean {
   if (!Array.isArray(patterns)) {
     return matches(key, patterns);
   }
@@ -182,11 +210,8 @@ function matchesAny(key, patterns) {
 
 /**
  * Get the command for a key event based on configured bindings
- * @param {Object} key - Enhanced key object
- * @param {Object} bindings - Key bindings configuration
- * @returns {string|null} - Command name or null if no match
  */
-function getCommand(key, bindings) {
+export function getCommand(key: EnhancedKey | undefined, bindings: KeyBindings): string | null {
   for (const [command, patterns] of Object.entries(bindings)) {
     if (matchesAny(key, patterns)) {
       return command;
@@ -198,18 +223,18 @@ function getCommand(key, bindings) {
 /**
  * Platform-specific key helpers
  */
-const Platform = {
+export const Platform = {
   isMac: process.platform === 'darwin',
   isWindows: process.platform === 'win32',
   isLinux: process.platform === 'linux',
 
   // Get the appropriate modifier key name for the platform
-  getModifierName() {
+  getModifierName(): string {
     return this.isMac ? 'Option' : 'Alt';
   },
 
   // Get the appropriate word navigation pattern
-  getWordNavigationPattern(direction) {
+  getWordNavigationPattern(direction: 'left' | 'right'): KeyBindingPattern {
     const key = direction === 'left' ? 'left' : 'right';
     return this.isMac
       ? { meta: true, key }  // Option+Arrow on Mac
@@ -219,10 +244,8 @@ const Platform = {
 
 /**
  * Create a key binding configuration from user preferences
- * @param {Object} preferences - User preferences
- * @returns {Object} - Key bindings
  */
-function createBindings(preferences = {}) {
+export function createBindings(preferences: Partial<KeyBindings> = {}): KeyBindings {
   const defaults = {
     // Text input
     INSERT_CHAR: KeyPatterns.CHARACTER,
@@ -260,12 +283,3 @@ function createBindings(preferences = {}) {
 
   return { ...defaults, ...preferences };
 }
-
-module.exports = {
-  matches,
-  matchesAny,
-  getCommand,
-  KeyPatterns,
-  Platform,
-  createBindings
-};

@@ -2,11 +2,20 @@
  * Simplified Input Component for debugging
  */
 
-const React = require('react');
-const { Box, Text, useInput } = require('ink');
-const { useState } = React;
+import React, { useState } from 'react';
+import { Box, Text, useInput } from 'ink';
 
-function SimpleInput({ onSubmit, disabled = false, prompt = '> ' }) {
+export interface SimpleInputProps {
+  onSubmit: (value: string) => void;
+  disabled?: boolean;
+  prompt?: string;
+}
+
+export default function SimpleInput({
+  onSubmit,
+  disabled = false,
+  prompt = '> '
+}: SimpleInputProps): JSX.Element {
   const [value, setValue] = useState('');
 
   useInput((input, key) => {
@@ -30,5 +39,3 @@ function SimpleInput({ onSubmit, disabled = false, prompt = '> ' }) {
     React.createElement(Text, null, value || '_')
   );
 }
-
-module.exports = SimpleInput;

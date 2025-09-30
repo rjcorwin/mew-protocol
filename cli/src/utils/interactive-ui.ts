@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 /**
  * Interactive Terminal UI
  *
@@ -5,11 +7,11 @@
  * This is a protocol debugging tool with convenience features.
  */
 
-const readline = require('readline');
-const chalk = require('chalk');
-const { v4: uuidv4 } = require('uuid');
+import readline from 'readline';
+import chalk from 'chalk';
+import { v4 as uuidv4 } from 'uuid';
 
-class InteractiveUI {
+export default class InteractiveUI {
   constructor(ws, participantId, spaceId) {
     this.ws = ws;
     this.participantId = participantId;
@@ -447,5 +449,3 @@ class InteractiveUI {
     };
   }
 }
-
-module.exports = InteractiveUI;
