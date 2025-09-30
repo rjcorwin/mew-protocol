@@ -600,7 +600,7 @@ async function spaceUpAction(options) {
     try {
       const gatewayApp = await startPM2Process({
         name: `${spaceId}-gateway`,
-        script: path.join(__dirname, '../../bin/mew.js'),
+        script: 'mew',
         args: [
           'gateway',
           'start',
@@ -624,7 +624,7 @@ async function spaceUpAction(options) {
       pids.gateway = gatewayApp.pid || gatewayApp.pm2_env?.pm_id || 'unknown';
       console.log(`✓ Gateway started via PM2 (PID: ${pids.gateway})`);
     } catch (error) {
-      console.error(`Failed to start gateway: ${error.message}`);
+      console.error(`Failed to start gateway:`, error);
       disconnectPM2();
       process.exit(1);
     }

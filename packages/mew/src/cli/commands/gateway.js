@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import WebSocket from 'ws';
+import { WebSocketServer } from 'ws';
 import express from 'express';
 import http from 'http';
 import fs from 'fs';
@@ -302,7 +302,7 @@ gateway
     const server = http.createServer(app);
 
     // Create WebSocket server
-    const wss = new WebSocket.Server({ server });
+    const wss = new WebSocketServer({ server });
 
     // Track spaces and participants
     const spaces = new Map(); // spaceId -> { participants: Map(participantId -> ws), streamCounter: number, activeStreams: Map }

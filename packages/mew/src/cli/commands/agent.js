@@ -243,7 +243,8 @@ agent
   .action(async (options) => {
     try {
       // Dynamic import to avoid bundling MEWAgent
-      const { MEWAgent } = await import('../../agent/MEWAgent.js');
+      // Use package subpath export which resolves correctly when bundled
+      const { MEWAgent } = await import('@mew-protocol/mew/agent');
 
       const agent = new MEWAgent({
         gateway: options.gateway,
