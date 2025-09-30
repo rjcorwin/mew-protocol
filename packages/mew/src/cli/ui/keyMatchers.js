@@ -261,11 +261,4 @@ function createBindings(preferences = {}) {
   return { ...defaults, ...preferences };
 }
 
-module.exports = {
-  matches,
-  matchesAny,
-  getCommand,
-  KeyPatterns,
-  Platform,
-  createBindings
-};
+export { matches, matchesAny, getCommand, KeyPatterns, Platform, createBindings };

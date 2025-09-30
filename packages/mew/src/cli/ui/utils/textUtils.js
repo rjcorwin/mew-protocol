@@ -276,7 +276,7 @@ function isEmoji(text, position) {
   return (code >= 0x2600 && code <= 0x27BF);
 }
 
-module.exports = {
+export {
   getStringWidth,
   getCharacterIndexAtPosition,
   isWideCharacter,

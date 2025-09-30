@@ -1,7 +1,7 @@
-const { Command } = require('commander');
-const WebSocket = require('ws');
-const fs = require('fs');
-const readline = require('readline');
+import { Command } from 'commander';
+import WebSocket from 'ws';
+import fs from 'fs';
+import readline from 'readline';
 
 const client = new Command('client').description('Client connection management');
 
@@ -149,4 +149,4 @@ client
     });
   });
 
-module.exports = client;
+export default client;

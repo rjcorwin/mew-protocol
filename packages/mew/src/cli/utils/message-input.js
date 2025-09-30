@@ -7,8 +7,8 @@
  * - Future: Unix sockets, file queue
  */
 
-const express = require('express');
-const bodyParser = require('body-parser');
+import express from 'express';
+import bodyParser from 'body-parser';
 
 /**
  * Set up HTTP input server for receiving messages
@@ -212,7 +212,4 @@ class MessageInputManager {
   }
 }
 
-module.exports = {
-  setupHttpInput,
-  MessageInputManager
-};
+export { setupHttpInput, MessageInputManager };

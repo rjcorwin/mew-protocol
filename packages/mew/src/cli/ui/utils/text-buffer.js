@@ -414,4 +414,4 @@ class TextBuffer {
   }
 }
 
-module.exports = TextBuffer;
+export default TextBuffer;

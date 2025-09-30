@@ -5,8 +5,8 @@
  * Used by both `mew space up --interactive` and `mew space connect`.
  */
 
-const os = require('os');
-const readline = require('readline');
+import os from 'os';
+import readline from 'readline';
 
 /**
  * Resolves which participant to connect as based on priority rules
@@ -158,7 +158,4 @@ function getInteractiveOverrides(participantConfig) {
   return config;
 }
 
-module.exports = {
-  resolveParticipant,
-  getInteractiveOverrides,
-};
+export { resolveParticipant, getInteractiveOverrides };

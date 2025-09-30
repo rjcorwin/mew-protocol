@@ -1171,7 +1171,7 @@ function getSlashCommandSuggestions(input, limitOverride) {
   return suggestions.slice(0, request.limit);
 }
 
-module.exports = {
+export {
   commandRegistry,
   slashCommandList,
   slashCommandGroups,

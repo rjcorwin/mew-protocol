@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
-const fs = require('fs').promises;
-const path = require('path');
-const readline = require('readline');
-const { execSync } = require('child_process');
-const crypto = require('crypto');
+import { promises as fs } from 'fs';
+import path from 'path';
+import readline from 'readline';
+import { execSync } from 'child_process';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * MEW init command - Initialize a new MEW space from templates
@@ -874,10 +879,10 @@ class InitCommand {
 }
 
 // Export for use in main CLI
-module.exports = InitCommand;
+export default InitCommand;
 
 // Run if called directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const command = new InitCommand();
 
   // Parse command line arguments

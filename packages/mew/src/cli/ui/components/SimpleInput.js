@@ -2,9 +2,8 @@
  * Simplified Input Component for debugging
  */
 
-const React = require('react');
-const { Box, Text, useInput } = require('ink');
-const { useState } = React;
+import React, { useState } from 'react';
+import { Box, Text, useInput } from 'ink';
 
 function SimpleInput({ onSubmit, disabled = false, prompt = '> ' }) {
   const [value, setValue] = useState('');
@@ -31,4 +30,4 @@ function SimpleInput({ onSubmit, disabled = false, prompt = '> ' }) {
   );
 }
 
-module.exports = SimpleInput;
+export default SimpleInput;

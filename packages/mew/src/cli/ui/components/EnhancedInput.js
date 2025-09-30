@@ -9,16 +9,15 @@
  * @license MIT
  */
 
-const React = require('react');
-const { Box, Text } = require('ink');
-const { useState, useEffect, useCallback, useRef } = React;
-const TextBuffer = require('../utils/text-buffer');
-const { useKeypress } = require('../hooks/useKeypress');
-const { getCommand } = require('../keyMatchers');
-const { defaultKeyBindings } = require('../../config/keyBindings');
-const { getSlashCommandSuggestions } = require('../utils/slashCommands');
-const fs = require('fs');
-const path = require('path');
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Box, Text } from 'ink';
+import TextBuffer from '../utils/text-buffer.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { getCommand } from '../keyMatchers.js';
+import { defaultKeyBindings } from '../../config/keyBindings.js';
+import { getSlashCommandSuggestions } from '../utils/slashCommands.js';
+import fs from 'fs';
+import path from 'path';
 // Helper function for debug logging
 const debugLog = (message) => {
   const logFile = path.join(process.cwd(), '.mew', 'debug.log');
@@ -647,4 +646,4 @@ function EnhancedInput({
   );
 }
 
-module.exports = EnhancedInput;
+export default EnhancedInput;

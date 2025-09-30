@@ -249,7 +249,7 @@ function validateBindings(bindings) {
   return warnings;
 }
 
-module.exports = {
+export {
   defaultKeyBindings,
   commandDescriptions,
   getBindingDisplay,

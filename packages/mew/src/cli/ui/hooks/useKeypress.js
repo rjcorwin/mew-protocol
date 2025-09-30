@@ -10,8 +10,10 @@
  * @license MIT
  */
 
-const { useInput } = require('ink');
-const { useCallback, useRef } = require('react');
+import { useInput } from 'ink';
+import { useCallback, useRef } from 'react';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Enhanced keypress hook with better key detection
@@ -35,8 +37,6 @@ function useKeypress(handler, options = {}) {
 
     // Debug logging for raw key from Ink
     if (input === '\x7F' || key.sequence === '\x7F' || key.name === 'delete') {
-      const fs = require('fs');
-      const path = require('path');
       const logFile = path.join(process.cwd(), '.mew', 'debug.log');
       fs.appendFileSync(logFile, `\nRAW DELETE KEY FROM INK: ${JSON.stringify({ input, key })}\n`);
     }
@@ -221,7 +221,4 @@ function matchesKeyCombination(key, combination) {
   }
 }
 
-module.exports = {
-  useKeypress,
-  matchesKeyCombination
-};
+export { useKeypress, matchesKeyCombination };

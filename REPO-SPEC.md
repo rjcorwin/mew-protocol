@@ -145,6 +145,22 @@ Notes:
 
 ## Build Strategy
 
+### TypeScript Configuration
+
+The package uses **`"moduleResolution": "bundler"`** with ESM output:
+
+- **Module settings**: `"module": "ESNext"`, `"moduleResolution": "bundler"`, `"type": "module"`
+- **Rationale**: Pragmatic approach used by real-world ESM libraries (e.g., @langchain/core)
+- **Benefits**:
+  - No `.js` extension required in relative imports (developer-friendly)
+  - Still produces valid ESM output
+  - Compatible with modern bundlers and Node.js ESM
+- **Alternative considered**: `"moduleResolution": "NodeNext"` requires explicit `.js` extensions in all imports, adding friction without clear benefit for this use case
+
+See `tsconfig.base.json` for the canonical settings.
+
+### Build Patterns
+
 Two viable patterns; choose one to keep things simple:
 
 1) Multi-entry bundle for bins, plain ESM for libraries (recommended MVP)
@@ -397,10 +413,13 @@ Phase 2 — Flatten and integrate ✅ COMPLETED
 - Clean up old directories
 
 Phase 3 — Import paths and build system (IN PROGRESS)
-- Update all import paths in source code (relative imports within package)
-- Set up build system (tsc for libraries, bins)
-- Update test harnesses to use new paths
-- Wire bin shims if needed
+- ✅ Update all import paths in source code (relative imports within package)
+- ✅ Switch to `moduleResolution: "bundler"` for pragmatic ESM support
+- ✅ Set up TypeScript build (tsc for libraries)
+- ✅ Convert CLI from CommonJS to ESM (all 19 files converted)
+- ✅ Set up bin bundling (tsup for CLI binaries)
+- 🔄 Update test harnesses to use new paths
+- Wire bin shims (mew-agent, mew-bridge)
 
 Phase 4 — Publish & verify
 - Test `npm pack` from packages/mew

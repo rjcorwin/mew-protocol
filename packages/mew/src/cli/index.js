@@ -1,17 +1,26 @@
-#!/usr/bin/env node
+import { program } from 'commander';
+import fs from 'fs';
+import path from 'path';
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { spawn } from 'child_process';
 
-const { program } = require('commander');
-const fs = require('fs');
-const path = require('path');
-const packageJson = require('../package.json');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Import package.json for version - resolve from dist/bin/ to root
+const require = createRequire(import.meta.url);
+const packageJsonPath = path.resolve(__dirname, '../../package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
 // Import commands
-const gatewayCommand = require('./commands/gateway');
-const clientCommand = require('./commands/client');
-const agentCommand = require('./commands/agent');
-const tokenCommand = require('./commands/token');
-const spaceCommand = require('./commands/space');
-const InitCommand = require('./commands/init');
+import gatewayCommand from './commands/gateway.js';
+import clientCommand from './commands/client.js';
+import agentCommand from './commands/agent.js';
+import tokenCommand from './commands/token.js';
+import spaceCommand, { spaceUpAction, spaceDownAction } from './commands/space.js';
+import InitCommand from './commands/init.js';
 
 // Check if space configuration exists
 function checkSpaceExists() {
@@ -70,13 +79,13 @@ program
   .option('--debug', 'Use simple debug interface instead of advanced UI')
   .option('--simple', 'Alias for --debug')
   .option('--no-ui', 'Disable UI enhancements, use plain interface')
-  .action(spaceCommand.spaceUpAction);
+  .action(spaceUpAction);
 
 program
   .command('down')
   .description('Alias for "space down" - Stop a running space')
   .option('-d, --space-dir <path>', 'Space directory', '.')
-  .action(spaceCommand.spaceDownAction);
+  .action(spaceDownAction);
 
 // Helper function to check if space is running
 function isSpaceRunning() {
@@ -103,6 +112,7 @@ function isSpaceRunning() {
 }
 
 // Default behavior when no command is provided
+let shouldParse = true;
 if (process.argv.length === 2) {
   // No arguments provided - intelligent default behavior
   if (checkSpaceExists()) {
@@ -123,7 +133,6 @@ if (process.argv.length === 2) {
     initCommand.execute({}).then(() => {
       console.log('\nSpace initialized! Starting and connecting...');
       // After init, start the space interactively by spawning a new process
-      const { spawn } = require('child_process');
       const child = spawn(process.argv[0], [process.argv[1], 'space', 'up', '-i'], {
         stdio: 'inherit'
       });
@@ -134,9 +143,12 @@ if (process.argv.length === 2) {
       console.error('Error:', error.message);
       process.exit(1);
     });
-    return; // Don't parse args since we're handling it
+    // Don't parse args since we're handling it async
+    shouldParse = false;
   }
 }
 
 // Parse arguments
-program.parse(process.argv);
+if (shouldParse) {
+  program.parse(process.argv);
+}

@@ -1,5 +1,5 @@
-const { Command } = require('commander');
-const WebSocket = require('ws');
+import { Command } from 'commander';
+import WebSocket from 'ws';
 
 const agent = new Command('agent').description('Agent management');
 
@@ -232,4 +232,4 @@ function handleFulfillerAgent(ws, message) {
   }
 }
 
-module.exports = agent;
+export default agent;

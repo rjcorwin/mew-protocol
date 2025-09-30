@@ -22,9 +22,13 @@
 
 ### Phase 3 - Build System & Fixes (IN PROGRESS)
 - [x] Get builds to work
-- [ ] Set up build system (tsc for libraries, consider tsup for bins)
-- [ ] Test build with `npm run build`
+- [x] Switch to `moduleResolution: "bundler"` for pragmatic ESM support
+- [x] Set up TypeScript build (tsc for libraries)
+- [x] Convert CLI from CommonJS to ESM (all 19 files converted)
+- [x] Set up bin bundling (tsup for CLI binaries)
+- [x] Test build with `npm run build:all`
 - [ ] Update test harnesses to use new paths
+- [ ] Wire bin shims (mew-agent, mew-bridge)
 
 ### Phase 4 - Publish & Verify
 - [ ] Test `npm pack` from packages/mew

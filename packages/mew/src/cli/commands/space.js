@@ -1,12 +1,26 @@
-const { Command } = require('commander');
-const fs = require('fs');
-const path = require('path');
-const yaml = require('js-yaml');
-const { spawn, execSync } = require('child_process');
-const net = require('net');
-const http = require('http');
-const pm2 = require('pm2');
-const crypto = require('crypto');
+import { Command } from 'commander';
+import fs from 'fs';
+import path from 'path';
+import yaml from 'js-yaml';
+import { spawn, execSync } from 'child_process';
+import net from 'net';
+import http from 'http';
+import pm2 from 'pm2';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import WebSocket from 'ws';
+import readline from 'readline';
+import {
+  resolveParticipant,
+  getInteractiveOverrides,
+} from '../utils/participant-resolver.js';
+import { printBanner } from '../utils/banner.js';
+import * as interactiveUI from '../utils/interactive-ui.js';
+import * as advancedInteractiveUI from '../utils/advanced-interactive-ui.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 function findMonorepoRoot(startDir) {
   let dir = startDir;
@@ -865,24 +879,14 @@ async function spaceUpAction(options) {
     if (options.interactive) {
       console.log('\nConnecting interactively...\n');
 
-      // Import required modules for interactive connection
-      const WebSocket = require('ws');
-      const {
-        resolveParticipant,
-        getInteractiveOverrides,
-      } = require('../utils/participant-resolver');
-      const { printBanner } = require('../utils/banner');
-
       // Determine UI mode
       const useDebugUI = options.debug || options.simple || options.noUi;
-      
-      // Import appropriate UI module
-      const InteractiveUI = useDebugUI ? 
-        require('../utils/interactive-ui') : 
-        null;
-      const { startAdvancedInteractiveUI } = useDebugUI ? 
-        { startAdvancedInteractiveUI: null } : 
-        require('../utils/advanced-interactive-ui');
+
+      // Select appropriate UI module
+      const InteractiveUI = useDebugUI ? interactiveUI : null;
+      const startAdvancedInteractiveUI = useDebugUI
+        ? null
+        : advancedInteractiveUI.startAdvancedInteractiveUI;
 
       try {
         // Resolve participant
@@ -1353,7 +1357,6 @@ space
       console.log('Warning: This will clean artifacts while space is active.');
       console.log('Use "mew space down" first, or use --force to proceed anyway.');
 
-      const readline = require('readline');
       const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -1374,7 +1377,6 @@ space
     if (cleanMew && !options.force) {
       console.log('This will remove ALL space artifacts including configuration.');
 
-      const readline = require('readline');
       const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -1524,24 +1526,14 @@ space
     console.log(`Space: ${pids.spaceName} (${spaceId})`);
     console.log(`Gateway: ${gatewayUrl}`);
 
-    // Import required modules
-    const WebSocket = require('ws');
-    const {
-      resolveParticipant,
-      getInteractiveOverrides,
-    } = require('../utils/participant-resolver');
-    const { printBanner } = require('../utils/banner');
-
     // Determine UI mode
     const useDebugUI = options.debug || options.simple || options.noUi;
-    
-    // Import appropriate UI module
-    const InteractiveUI = useDebugUI ? 
-      require('../utils/interactive-ui') : 
-      null;
-    const { startAdvancedInteractiveUI } = useDebugUI ? 
-      { startAdvancedInteractiveUI: null } : 
-      require('../utils/advanced-interactive-ui');
+
+    // Select appropriate UI module
+    const InteractiveUI = useDebugUI ? interactiveUI : null;
+    const startAdvancedInteractiveUI = useDebugUI
+      ? null
+      : advancedInteractiveUI.startAdvancedInteractiveUI;
 
     try {
       // Resolve participant
@@ -1616,6 +1608,5 @@ space
   });
 
 // Export both the command and the action handlers
-module.exports = space;
-module.exports.spaceUpAction = spaceUpAction;
-module.exports.spaceDownAction = spaceDownAction;
+export default space;
+export { spaceUpAction, spaceDownAction };

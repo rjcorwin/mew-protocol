@@ -1,4 +1,4 @@
-const { Command } = require('commander');
+import { Command } from 'commander';
 
 const token = new Command('token').description('Token management');
 
@@ -31,4 +31,4 @@ token
     console.log(token);
   });
 
-module.exports = token;
+export default token;

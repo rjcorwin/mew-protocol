@@ -115,9 +115,4 @@ function printBanner(options = {}) {
   console.log(generateBanner(options));
 }
 
-module.exports = {
-  generateBanner,
-  printBanner,
-  getRandomTagline,
-  TAGLINES
-};
+export { generateBanner, printBanner, getRandomTagline, TAGLINES };

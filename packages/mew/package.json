@@ -20,7 +20,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "build:bin": "echo 'TODO: Add tsup/rollup for bin bundling'",
+    "build:bin": "tsup",
     "build:all": "npm run build && npm run build:bin",
     "dev": "tsc --watch",
     "test": "echo 'Tests run from root'",
