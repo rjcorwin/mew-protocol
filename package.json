@@ -4,13 +4,7 @@
   "description": "Multi-Entity Workspace Protocol - A protocol for transparent multi-agent coordination",
   "private": true,
   "workspaces": [
-    "sdk/typescript-sdk/agent",
-    "sdk/typescript-sdk/client",
-    "sdk/typescript-sdk/participant",
-    "sdk/typescript-sdk/types",
-    "sdk/typescript-sdk/capability-matcher",
-    "bridge",
-    "cli"
+    "packages/mew"
   ],
   "scripts": {
     "test": "./tests/run-all-tests.sh --no-llm",
