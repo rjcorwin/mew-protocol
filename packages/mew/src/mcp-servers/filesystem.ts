@@ -3,7 +3,7 @@
 /**
  * Filesystem MCP Server Wrapper
  *
- * Wraps @modelcontextprotocol/server-filesystem to provide filesystem operations
+ * Wraps @modelcontextprotocol/sdk to provide filesystem operations
  * via the Model Context Protocol.
  */
 
@@ -93,7 +93,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     // Resolve the path relative to the allowed directory
-    const requestedPath = path.resolve(absolutePath, args.path || '.');
+    const requestedPath = path.resolve(absolutePath, (args as { path?: string }).path || '.');
 
     // Security check: ensure the path is within the allowed directory
     if (!requestedPath.startsWith(absolutePath)) {
@@ -114,12 +114,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'write_file': {
-        await fs.writeFile(requestedPath, args.content, 'utf-8');
+        const { content } = args as { path: string; content: string };
+        await fs.writeFile(requestedPath, content, 'utf-8');
         return {
           content: [
             {
               type: 'text',
-              text: `Successfully wrote to ${args.path}`,
+              text: `Successfully wrote to ${(args as { path: string }).path}`,
             },
           ],
         };
@@ -144,11 +145,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [
         {
           type: 'text',
-          text: `Error: ${error.message}`,
+          text: `Error: ${message}`,
         },
       ],
       isError: true,
@@ -157,7 +159,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // Start the server
-async function main() {
+async function main(): Promise<void> {
   console.error(`Filesystem MCP server starting on: ${absolutePath}`);
 
   const transport = new StdioServerTransport();

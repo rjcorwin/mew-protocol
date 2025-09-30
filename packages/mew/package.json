@@ -17,7 +17,7 @@
     "./bridge": "./dist/bridge/index.js"
   },
   "scripts": {
-    "build": "tsc && cp -r src/mcp-servers dist/",
+    "build": "tsc",
     "build:bin": "tsup",
     "build:all": "npm run build && npm run build:bin",
     "dev": "tsc --watch",

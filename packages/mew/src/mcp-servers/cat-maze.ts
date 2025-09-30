@@ -1,11 +1,81 @@
 #!/usr/bin/env node
 
-const readline = require('readline');
+/**
+ * Cat Maze MCP Server
+ *
+ * A stateful MCP server implementing an interactive maze game.
+ * The cat emoji navigates through 10 progressively harder mazes.
+ */
+
+import * as readline from 'readline';
 
 const WALL = '⬛';
 const WALKWAY = '🟩';
 
-const LEVEL_DEFINITIONS = [
+interface LevelDefinition {
+  name: string;
+  hint: string;
+  layout: string[];
+}
+
+interface Position {
+  row: number;
+  col: number;
+}
+
+interface Level {
+  name: string;
+  hint: string;
+  grid: string[][];
+  start: Position;
+  goal: Position;
+  width: number;
+  height: number;
+}
+
+interface GameState {
+  levelIndex: number;
+  cat: Position;
+  movesThisLevel: number;
+  totalMoves: number;
+  runsCompleted: number;
+}
+
+interface DirectionInfo {
+  delta: [number, number];
+  label: string;
+  emoji: string;
+}
+
+interface StateSummary {
+  level: number;
+  levelName: string;
+  totalLevels: number;
+  movesThisLevel: number;
+  totalMoves: number;
+  runsCompleted: number;
+  cat: Position;
+  goal: Position;
+  width: number;
+  height: number;
+  board?: string;
+}
+
+interface ToolResult {
+  content: Array<{ type: string; text: string }>;
+  state: StateSummary;
+}
+
+interface MCPRequest {
+  id?: number | string;
+  method: string;
+  params?: {
+    name?: string;
+    arguments?: Record<string, unknown>;
+  };
+}
+
+const LEVEL_DEFINITIONS: LevelDefinition[] = [
   {
     name: 'Kitten Steps',
     hint: 'A gentle warm-up corridor with just a short turn.',
@@ -241,18 +311,18 @@ const TOOL_DEFINITIONS = [
   },
 ];
 
-const DIRECTIONS = {
+const DIRECTIONS: Record<string, DirectionInfo> = {
   up: { delta: [-1, 0], label: 'north', emoji: '⬆️' },
   down: { delta: [1, 0], label: 'south', emoji: '⬇️' },
   left: { delta: [0, -1], label: 'west', emoji: '⬅️' },
   right: { delta: [0, 1], label: 'east', emoji: '➡️' },
 };
 
-function buildLevels(definitions) {
+function buildLevels(definitions: LevelDefinition[]): Level[] {
   return definitions.map((def) => {
     const grid = def.layout.map((row) => Array.from(row));
-    let start = null;
-    let goal = null;
+    let start: Position | null = null;
+    let goal: Position | null = null;
 
     for (let row = 0; row < grid.length; row++) {
       for (let col = 0; col < grid[row].length; col++) {
@@ -289,7 +359,7 @@ function buildLevels(definitions) {
 
 const levels = buildLevels(LEVEL_DEFINITIONS);
 
-const state = {
+const state: GameState = {
   levelIndex: 0,
   cat: { ...levels[0].start },
   movesThisLevel: 0,
@@ -297,13 +367,13 @@ const state = {
   runsCompleted: 0,
 };
 
-function resetToLevel(index) {
+function resetToLevel(index: number): void {
   state.levelIndex = index;
   state.cat = { ...levels[index].start };
   state.movesThisLevel = 0;
 }
 
-function restartAdventure() {
+function restartAdventure(): ToolResult {
   resetToLevel(0);
   state.totalMoves = 0;
   const board = buildBoardString();
@@ -334,7 +404,7 @@ function restartAdventure() {
   };
 }
 
-function buildBoardString() {
+function buildBoardString(): string {
   const level = levels[state.levelIndex];
   return level.grid
     .map((row, rowIdx) =>
@@ -353,7 +423,7 @@ function buildBoardString() {
     .join('\n');
 }
 
-function buildStateSummary(extra = {}) {
+function buildStateSummary(extra: Partial<StateSummary> = {}): StateSummary {
   const level = levels[state.levelIndex];
   return {
     level: state.levelIndex + 1,
@@ -376,8 +446,14 @@ function sendMoveNotification({
   board,
   state: summary,
   ...extra
-}) {
-  const payload = {
+}: {
+  direction: string;
+  status: string;
+  board: string;
+  state: StateSummary;
+  [key: string]: unknown;
+}): void {
+  const payload: Record<string, unknown> = {
     category: 'cat-maze/move',
     direction,
     status,
@@ -395,7 +471,7 @@ function sendMoveNotification({
   sendNotification('notifications/message', payload);
 }
 
-function formatView() {
+function formatView(): ToolResult {
   const level = levels[state.levelIndex];
   const board = buildBoardString();
   const lines = [
@@ -418,7 +494,7 @@ function formatView() {
   };
 }
 
-function attemptMove(directionName) {
+function attemptMove(directionName: string): ToolResult {
   const info = DIRECTIONS[directionName];
   if (!info) {
     return {
@@ -488,7 +564,7 @@ function attemptMove(directionName) {
     sendMoveNotification({
       direction: directionName,
       status: 'moved',
-      board: moveSummary.board,
+      board: moveSummary.board!,
       state: moveSummary,
       directionLabel: info.label,
       emoji: info.emoji,
@@ -524,7 +600,7 @@ function attemptMove(directionName) {
     sendMoveNotification({
       direction: directionName,
       status: 'level-complete',
-      board: nextSummary.board,
+      board: nextSummary.board!,
       state: nextSummary,
       previousBoard,
       completedLevel: completedLevelNumber,
@@ -558,7 +634,7 @@ function attemptMove(directionName) {
   sendMoveNotification({
     direction: directionName,
     status: 'adventure-complete',
-    board: restartSummary.board,
+    board: restartSummary.board!,
     state: restartSummary,
     previousBoard,
     completedLevel: completedLevelNumber,
@@ -569,7 +645,7 @@ function attemptMove(directionName) {
   return response;
 }
 
-function handleToolsCall(request) {
+function handleToolsCall(request: MCPRequest): ToolResult {
   const name = request.params?.name;
   const toolName = typeof name === 'string' ? name : undefined;
 
@@ -592,7 +668,7 @@ function handleToolsCall(request) {
   }
 }
 
-function handleRequest(request) {
+function handleRequest(request: MCPRequest): void {
   const { id, method } = request;
 
   try {
@@ -610,38 +686,41 @@ function handleRequest(request) {
           },
         },
       };
-      sendResponse(id, result);
+      sendResponse(id!, result);
       return;
     }
 
     if (method === 'tools/list') {
-      sendResponse(id, { tools: TOOL_DEFINITIONS });
+      sendResponse(id!, { tools: TOOL_DEFINITIONS });
       return;
     }
 
     if (method === 'tools/call') {
       const result = handleToolsCall(request);
-      sendResponse(id, result);
+      sendResponse(id!, result);
       return;
     }
 
     if (method === 'shutdown') {
-      sendResponse(id, {});
+      sendResponse(id!, {});
       process.exit(0);
       return;
     }
 
     throw { code: -32601, message: `Unknown method: ${method}` };
-  } catch (error) {
-    if (error && typeof error.code === 'number') {
-      sendError(id, error.code, error.message);
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && typeof (error as { code: unknown }).code === 'number') {
+      sendError(id!, (error as { code: number }).code, (error as { message?: string }).message || 'Error');
     } else {
-      sendError(id, -32603, error?.message || 'Internal error');
+      const message = error && typeof error === 'object' && 'message' in error
+        ? String((error as { message: unknown }).message)
+        : 'Internal error';
+      sendError(id!, -32603, message);
     }
   }
 }
 
-function sendResponse(id, result) {
+function sendResponse(id: number | string, result: unknown): void {
   const message = {
     jsonrpc: '2.0',
     id,
@@ -650,7 +729,7 @@ function sendResponse(id, result) {
   process.stdout.write(JSON.stringify(message) + '\n');
 }
 
-function sendError(id, code, message) {
+function sendError(id: number | string, code: number, message: string): void {
   const error = {
     jsonrpc: '2.0',
     id,
@@ -662,7 +741,7 @@ function sendError(id, code, message) {
   process.stdout.write(JSON.stringify(error) + '\n');
 }
 
-function sendNotification(method, params) {
+function sendNotification(method: string, params: unknown): void {
   const message = {
     jsonrpc: '2.0',
     method,
@@ -677,16 +756,17 @@ const rl = readline.createInterface({
   terminal: false,
 });
 
-rl.on('line', (line) => {
+rl.on('line', (line: string) => {
   const trimmed = line.trim();
   if (!trimmed) {
     return;
   }
-  let message;
+  let message: MCPRequest;
   try {
     message = JSON.parse(trimmed);
   } catch (error) {
-    process.stderr.write(`Failed to parse MCP request: ${error.message}\n`);
+    const errMsg = error instanceof Error ? error.message : 'Unknown error';
+    process.stderr.write(`Failed to parse MCP request: ${errMsg}\n`);
     return;
   }
 

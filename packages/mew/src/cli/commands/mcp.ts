@@ -13,8 +13,8 @@ mcp
   .command('filesystem <path>')
   .description('Run MCP filesystem server')
   .action(async (path) => {
-    // Dynamically import the filesystem server
-    const serverPath = resolve(__dirname, '../../mcp-servers/filesystem.js');
+    // __dirname is dist/cli/commands, mcp-servers are at dist/mcp-servers (3 levels up)
+    const serverPath = resolve(__dirname, '../../../mcp-servers/filesystem.js');
 
     const child = spawn('node', [serverPath, path], {
       stdio: 'inherit',
@@ -39,8 +39,8 @@ mcp
   .command('cat-maze')
   .description('Run MCP cat-maze game server')
   .action(async () => {
-    // Dynamically import the cat-maze server
-    const serverPath = resolve(__dirname, '../../mcp-servers/cat-maze.js');
+    // __dirname is dist/cli/commands, mcp-servers are at dist/mcp-servers (3 levels up)
+    const serverPath = resolve(__dirname, '../../../mcp-servers/cat-maze.js');
 
     const child = spawn('node', [serverPath], {
       stdio: 'inherit',

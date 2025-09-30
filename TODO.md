@@ -148,22 +148,24 @@ npm run build  # After changes
 - [x] Discovered cat-maze MCP server is CommonJS (needs conversion)
 - [x] **IN PROGRESS**: Convert MCP servers to TypeScript
 
-### Phase 5.5 - Convert MCP Servers to TypeScript (IN PROGRESS)
-**Current Status**: Testing cat-maze template revealed MCP servers need TypeScript conversion
+### Phase 5.5 - Convert MCP Servers to TypeScript ✅
+**Complete** - MCP servers converted to TypeScript, compile cleanly
 
-**Issue**: MCP servers are mixed CommonJS/ESM plain JS files being copied to dist/, causing module resolution errors.
+**Issue**: MCP servers were mixed CommonJS/ESM plain JS files being copied to dist/, causing module resolution errors.
 
-**Solution**: Convert to TypeScript for consistency
-- [ ] Convert `src/mcp-servers/cat-maze.cjs` to TypeScript
-  - Currently CommonJS with `require()`, needs ESM conversion
-  - 702 lines, interactive game server
-- [ ] Convert `src/mcp-servers/filesystem.js` to TypeScript
-  - Already ESM, just needs type annotations
-  - 171 lines, filesystem operations wrapper
-- [ ] Update `mcp.ts` command to import servers directly (no spawn)
-- [ ] Remove copy step from build (tsc will compile them)
-- [ ] Test cat-maze template works
-- [ ] Test note-taker template works
+**Solution**: Convert to TypeScript, remove copy step, let tsc compile them
+- [x] Convert `src/mcp-servers/cat-maze.cjs` to TypeScript
+  - Converted 702 lines from CommonJS to ESM with full type annotations
+  - All readline, state management, and MCP protocol properly typed
+- [x] Convert `src/mcp-servers/filesystem.js` to TypeScript
+  - Converted 171 lines to TypeScript with type safety
+  - MCP SDK types properly integrated
+- [x] Update `mcp.ts` command to reference .js extensions (cat-maze.cjs → cat-maze.js)
+- [x] Remove `cp -r src/mcp-servers dist/` from build script
+- [x] Remove old cat-maze.cjs and filesystem.js source files
+- [x] Test MCP servers work: Both initialize and respond correctly
+  - cat-maze.js: ✓ Returns proper MCP initialize response
+  - filesystem.js: ✓ Returns proper MCP initialize response
 
 ### Phase 5.6 - Complete Testing
 - [ ] Run integration test suite: `npm test`
