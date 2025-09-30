@@ -1,4 +1,4 @@
-import { MEWClient, ClientOptions } from '@mew-protocol/client';
+import { MEWClient, ClientOptions } from '../client/index.js';
 import WebSocket from 'ws';
 import {
   Envelope,
@@ -13,8 +13,8 @@ import {
   ParticipantRestartPayload,
   ParticipantShutdownPayload,
   StreamRequestPayload,
-} from '@mew-protocol/types';
-import { PatternMatcher } from '@mew-protocol/capability-matcher';
+} from '../types/index.js';
+import { PatternMatcher } from '../capability-matcher/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const PROTOCOL_VERSION = 'mew/v0.4';

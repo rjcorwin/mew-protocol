@@ -1,5 +1,5 @@
-import { ConnectionOptions, Envelope } from '@mew-protocol/client';
-import { Capability } from '@mew-protocol/types';
+import { ConnectionOptions, Envelope } from '../client/index.js';
+import { Capability } from '../types/index.js';
 
 export interface Tool {
   name: string;

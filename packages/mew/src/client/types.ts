@@ -12,9 +12,9 @@ import type {
   CapabilityGrantPayload,
   CapabilityRevokePayload,
   CapabilityGrantAckPayload,
-} from '@mew-protocol/types';
+} from '../types/index.js';
 
-// Re-export commonly used types from the shared types package (relative path for monorepo dev)
+// Re-export commonly used types from the shared types package
 export type {
   Envelope,
   PartialEnvelope,
@@ -37,8 +37,8 @@ export type {
   JsonRpcRequest,
   JsonRpcResponse,
   JsonRpcNotification,
-} from '@mew-protocol/types';
-export { PROTOCOL_VERSION, MCP_VERSION, MessageKinds } from '@mew-protocol/types';
+} from '../types/index.js';
+export { PROTOCOL_VERSION, MCP_VERSION, MessageKinds } from '../types/index.js';
 
 // ============================================================================
 // Client-Specific Types

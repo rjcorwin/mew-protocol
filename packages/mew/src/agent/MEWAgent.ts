@@ -1,10 +1,10 @@
-import { MEWParticipant, ParticipantOptions, Tool, Resource } from '@mew-protocol/participant';
+import { MEWParticipant, ParticipantOptions, Tool, Resource } from '../participant/index.js';
 import {
   Envelope,
   ParticipantRestartPayload,
   ParticipantCompactPayload,
   ParticipantCompactDonePayload,
-} from '@mew-protocol/types';
+} from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 

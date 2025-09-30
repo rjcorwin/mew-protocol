@@ -1,5 +1,5 @@
-import { Capability, Envelope } from '@mew-protocol/types';
-import { PatternMatcher } from '@mew-protocol/capability-matcher';
+import { Capability, Envelope } from '../types/index.js';
+import { PatternMatcher } from '../capability-matcher/index.js';
 
 // Create a global pattern matcher instance
 const matcher = new PatternMatcher();

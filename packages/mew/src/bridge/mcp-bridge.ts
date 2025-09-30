@@ -1,7 +1,7 @@
 import Debug from 'debug';
-import { MEWParticipant } from '@mew-protocol/participant';
-import type { Capability } from '@mew-protocol/types';
-import { MCPClient, MCPServerConfig } from './mcp-client';
+import { MEWParticipant } from '../participant/index.js';
+import type { Capability } from '../types/index.js';
+import { MCPClient, MCPServerConfig } from './mcp-client.js';
 
 const debug = Debug('mew:bridge');
 

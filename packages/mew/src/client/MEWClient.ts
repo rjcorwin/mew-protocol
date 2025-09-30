@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import WebSocket, { RawData as WebSocketData } from 'ws';
-import { Envelope, Capability } from '@mew-protocol/types';
+import { Envelope, Capability } from '../types/index.js';
 
 const PROTOCOL_VERSION = 'mew/v0.4';
 
