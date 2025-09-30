@@ -104,7 +104,14 @@ Top-level layout after consolidation to a single published package:
 │     └─ spec/                   # CLI specs
 ├─ spaces/                       # Manual dev spaces (uses local CLI + link:)
 ├─ tests/                        # Integration scenarios (scenario-*)
-├─ spec/                         # Protocol specs and ADRs
+├─ mew-protocol-spec/            # MEW Protocol specification (separate from implementation)
+│  ├─ draft/                     # Draft protocol spec
+│  ├─ v0.4/                      # Current stable protocol version
+│  └─ README.md                  # Protocol overview
+├─ repo-spec/                    # Repository structure specification
+│  ├─ REPO-SPEC.md               # This file - describes repo organization
+│  └─ decisions/                 # Architecture Decision Records for implementation
+│     └─ 015-cli-typescript-conversion.md
 ├─ docs/                         # Architecture, guides, progress
 ├─ .github/                      # CI workflows
 ├─ package.json                  # private workspace root (workspaces: ["packages/mew"])
@@ -118,6 +125,10 @@ Notes:
 - CLI code lives under `packages/mew/src/cli/` and `packages/mew/src/bin/`.
 - Library modules live under `packages/mew/src/{types,client,participant,agent,gateway,capability-matcher,bridge}` and are exposed via subpath exports.
 - Templates ship from `packages/mew/templates/`.
+- **Spec organization**:
+  - `mew-protocol-spec/`: MEW Protocol specification (versioned, independent of implementation)
+  - `repo-spec/`: Repository structure and implementation ADRs
+  - `packages/mew/spec/`: CLI package versioned specifications
 
 ## Package.json (sketch)
 
