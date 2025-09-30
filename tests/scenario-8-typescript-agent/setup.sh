@@ -11,7 +11,7 @@ SPACE_NAME=${SPACE_NAME:-"scenario-8-typescript-agent"}
 TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
 CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
-AGENT_DIST="${REPO_ROOT}/sdk/typescript-sdk/agent/dist/index.js"
+AGENT_DIST="${REPO_ROOT}/packages/mew/dist/agent/index.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -23,7 +23,7 @@ printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
 printf "%b\n" "${BLUE}Using port ${TEST_PORT}${NC}"
 
 if [[ ! -f "${AGENT_DIST}" ]]; then
-  printf "%b\n" "${YELLOW}Building @mew-protocol/agent (tsc)${NC}"
+  printf "%b\n" "${YELLOW}Building @mew-protocol/mew/agent (tsc)${NC}"
   if ! (cd "${REPO_ROOT}" && npm run build > "${SCENARIO_DIR}/agent-build.log" 2>&1); then
     printf "%b\n" "${YELLOW}Agent build failed, printing log:${NC}"
     cat "${SCENARIO_DIR}/agent-build.log"

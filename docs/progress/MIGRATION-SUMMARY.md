@@ -24,13 +24,13 @@ All packages now:
 - Removed all path mappings pointing to `dist/` folders
 
 #### Updated Packages:
-- ✅ `@mew-protocol/types` - Base package, no references
-- ✅ `@mew-protocol/capability-matcher` - References types
-- ✅ `@mew-protocol/client` - References types
-- ✅ `@mew-protocol/participant` - References types, client, capability-matcher
-- ✅ `@mew-protocol/agent` - References types, client, participant (removed problematic path mappings)
+- ✅ `@mew-protocol/mew/types` - Base package, no references
+- ✅ `@mew-protocol/mew/capability-matcher` - References types
+- ✅ `@mew-protocol/mew/client` - References types
+- ✅ `@mew-protocol/mew/participant` - References types, client, capability-matcher
+- ✅ `@mew-protocol/mew/agent` - References types, client, participant (removed problematic path mappings)
 - ✅ `@mew-protocol/gateway` - References types, capability-matcher
-- ✅ `@mew-protocol/bridge` - References types, participant
+- ✅ `@mew-protocol/mew/bridge` - References types, participant
 
 ### 4. Build System Changes
 

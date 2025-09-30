@@ -1,0 +1,94 @@
+{
+  "name": "@mew-protocol/mew",
+  "version": "0.4.0",
+  "description": "Unified MEW Protocol SDK, CLI, and bridge",
+  "private": false,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/types/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./participant": {
+      "types": "./dist/participant/index.d.ts",
+      "default": "./dist/participant/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "default": "./dist/agent/index.js"
+    },
+    "./capability-matcher": {
+      "types": "./dist/capability-matcher/index.d.ts",
+      "default": "./dist/capability-matcher/index.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge/index.d.ts",
+      "default": "./dist/bridge/index.js"
+    },
+    "./cli": "./dist/cli/index.js"
+  },
+  "bin": {
+    "mew": "dist/bin/mew.js",
+    "mew-agent": "dist/bin/mew-agent.js",
+    "mew-bridge": "dist/bin/mew-bridge.js"
+  },
+  "scripts": {
+    "build": "npm run clean && npm run build:ts && npm run build:cli",
+    "build:ts": "tsc -p tsconfig.build.json",
+    "build:cli": "node ../../scripts/build-cli.js",
+    "clean": "rm -rf dist tsconfig.build.tsbuildinfo",
+    "lint": "eslint .",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "keywords": [
+    "mew",
+    "protocol",
+    "multi-agent",
+    "cli",
+    "sdk"
+  ],
+  "files": [
+    "dist",
+    "templates",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "debug": "^4.3.4",
+    "express": "^4.18.2",
+    "ink": "^3.2.0",
+    "js-yaml": "^4.1.0",
+    "jsonpath-plus": "^8.0.0",
+    "micromatch": "^4.0.5",
+    "openai": "^5.20.1",
+    "pm2": "^6.0.10",
+    "react": "^18.2.0",
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.12",
+    "@types/js-yaml": "^4.0.5",
+    "@types/node": "^20.11.30",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.10",
+    "eslint": "^9.35.0",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -17,7 +17,7 @@
 ## Fast Follow
 
 * [ ] Restore `sdk/typescript-sdk/agent` composite/project-references build for monorepo development; see note in `docs/releases/RELEASE-PLAN-v0.4.md:445`.
-* [ ] Add CI smoke test that runs the published agent binary (`npx @mew-protocol/agent`) post-publish; reference `docs/releases/RELEASE-PLAN-v0.4.md:319`.
+* [ ] Add CI smoke test that runs the published agent binary (`npx @mew-protocol/mew/agent`) post-publish; reference `docs/releases/RELEASE-PLAN-v0.4.md:319`.
 * [ ] After approval dialog, the input box is in the wrong location with lots of whitespace below it, not on the bottom.
 * [ ] mew command, after initial init process, should connect not stop
 * [ ] running mew in a space that is up should just connect
