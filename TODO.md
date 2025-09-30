@@ -63,8 +63,41 @@ See: REFACTOR-TEMPLATE-DEPS.md, ADR-TEMPLATE-DEPENDENCIES.md
 - [x] Tested cat-maze template: Instant init, no node_modules created
 - [x] Tested note-taker template: Instant init, no node_modules created
 - [x] Verified `mew mcp list` command works
-- [ ] TODO: Verify `mew up` works for each template (needs API keys)
+- [ ] TODO: Verify `mew up` works for each template (needs fixing space command first)
 - [ ] TODO: Verify agents can import from CLI's bundled deps (needs runtime test)
+
+#### Phase 4.5 - Fix Space Command for New Structure (BLOCKING)
+**Issue**: `mew space up` fails with "Failed to start gateway: undefined"
+
+The space command was written for the old multi-package structure and needs updates:
+
+**Root Cause**:
+- PM2 is trying to run a `gateway` binary that doesn't exist as a standalone command
+- Should be using `mew gateway start` instead
+
+**Files to Fix**:
+- `packages/mew/src/cli/commands/space.js` - PM2 start configurations (lines 603, 722, 764, 842)
+  - Line 603: Gateway start - uses `../../bin/mew.js` but needs `gateway start` args
+  - Line 722: Bridge start - similar issue
+  - Line 764: Participant start - generic participant command
+  - Line 842: Another gateway reference
+
+**Tasks**:
+- [ ] Update gateway PM2 config to run `mew gateway start` with proper args
+- [ ] Verify bridge PM2 config works with `mew bridge start`
+- [ ] Test `mew space up` in a fresh space with API keys
+- [ ] Verify gateway logs to PM2 correctly
+- [ ] Verify all participants start correctly
+
+**Test Plan**:
+```bash
+cd spaces/kick
+../../cli/bin/mew.js space up
+# Should start gateway on port 8080/8081
+# Should start mew agent via `mew agent run`
+# Should start mcp-fs-bridge via `mew bridge start`
+# Gateway logs should appear in .mew/logs/gateway.log
+```
 
 ### Phase 5 - Publish & Verify
 - [x] Test `npm pack` from packages/mew
