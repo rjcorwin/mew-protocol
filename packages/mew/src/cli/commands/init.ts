@@ -16,7 +16,8 @@ const __dirname = dirname(__filename);
 
 class InitCommand {
   constructor() {
-    this.templatesDir = path.join(__dirname, '../../templates');
+    // __dirname is dist/cli/commands, templates are at package root (3 levels up)
+    this.templatesDir = path.join(__dirname, '../../../templates');
     this.userTemplatesDir = path.join(process.env.HOME, '.mew/templates');
     this.localTemplatesDir = path.join(process.cwd(), 'templates');
   }
