@@ -1,4 +1,4 @@
-import { hasCapability, Participant, Message } from '../index';
+import { hasCapability, Participant, Message } from '../index.js';
 
 /**
  * Example Gateway implementation using capability-matcher

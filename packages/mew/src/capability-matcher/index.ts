@@ -1,8 +1,8 @@
-import { PatternMatcher } from './matcher';
-import { Participant, Message, CapabilityPattern, MatchOptions } from './types';
+import { PatternMatcher } from './matcher.js';
+import { Participant, Message, CapabilityPattern, MatchOptions } from './types.js';
 
-export * from './types';
-export { PatternMatcher } from './matcher';
+export * from './types.js';
+export { PatternMatcher } from './matcher.js';
 
 // Global matcher instance with caching
 const globalMatcher = new PatternMatcher();

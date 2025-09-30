@@ -7,10 +7,10 @@
  */
 
 // Export all protocol types
-export * from './protocol';
+export * from './protocol.js';
 
 // Export all MCP types
-export * from './mcp';
+export * from './mcp.js';
 
 // Re-export commonly used types at top level for convenience
 export type {
@@ -65,7 +65,7 @@ export type {
   // Reasoning
   ReasoningCancelPayload,
 
-} from './protocol';
+} from './protocol.js';
 
 // Re-export MCP types for convenience
 export type {
@@ -81,15 +81,15 @@ export type {
   ToolExecutionResult,
   ResourceContent,
   ProgressParams,
-} from './mcp';
+} from './mcp.js';
 
 // Export constants
-export { 
-  PROTOCOL_VERSION, 
+export {
+  PROTOCOL_VERSION,
   MCP_VERSION,
   MessageKinds,
-} from './protocol';
+} from './protocol.js';
 
 export {
   MCPMethods,
-} from './mcp';
+} from './mcp.js';

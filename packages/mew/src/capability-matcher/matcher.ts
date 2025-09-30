@@ -1,6 +1,6 @@
 import micromatch from 'micromatch';
 import { JSONPath } from 'jsonpath-plus';
-import { CapabilityPattern, Message, PayloadPattern, PayloadValue } from './types';
+import { CapabilityPattern, Message, PayloadPattern, PayloadValue } from './types.js';
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
   if (typeof value !== 'object' || value === null) {

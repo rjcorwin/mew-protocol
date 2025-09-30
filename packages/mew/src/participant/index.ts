@@ -1,10 +1,10 @@
-export { MEWParticipant } from './MEWParticipant';
-export { ToolRegistry } from './mcp/tools';
-export { 
-  matchesCapability, 
-  canSend, 
-  filterCapabilities 
-} from './capabilities';
+export { MEWParticipant } from './MEWParticipant.js';
+export { ToolRegistry } from './mcp/tools.js';
+export {
+  matchesCapability,
+  canSend,
+  filterCapabilities
+} from './capabilities.js';
 
 export type {
   Tool,
@@ -15,4 +15,4 @@ export type {
   MCPResponse,
   ProposalHandler,
   RequestHandler
-} from './types';
+} from './types.js';

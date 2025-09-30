@@ -1,4 +1,4 @@
-import { Tool, MCPResponse } from '../types';
+import { Tool, MCPResponse } from '../types.js';
 
 export class ToolRegistry {
   private tools = new Map<string, Tool>();

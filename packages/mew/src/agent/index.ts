@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { MEWAgent, AgentConfig } from './MEWAgent';
+import { MEWAgent, AgentConfig } from './MEWAgent.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';

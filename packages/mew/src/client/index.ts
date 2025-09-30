@@ -5,7 +5,7 @@
  */
 
 // Main MEW client export
-export { MEWClient, ClientOptions } from './MEWClient';
+export { MEWClient, ClientOptions } from './MEWClient.js';
 
 // Type exports
-export * from './types';
+export * from './types.js';
