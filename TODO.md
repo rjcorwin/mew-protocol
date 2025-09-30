@@ -20,15 +20,16 @@
 - [x] Clean up old directories (sdk/, cli/)
 - [x] Update all import paths to use relative paths within package
 
-### Phase 3 - Build System & Fixes (IN PROGRESS)
+### Phase 3 - Build System & Fixes ✅
 - [x] Get builds to work
 - [x] Switch to `moduleResolution: "bundler"` for pragmatic ESM support
 - [x] Set up TypeScript build (tsc for libraries)
-- [x] Convert CLI from CommonJS to ESM (all 19 files converted)
+- [x] Convert CLI from CommonJS to ESM (all 20 files converted)
+- [x] Add bridge command to CLI (mew bridge start)
 - [x] Set up bin bundling (tsup for CLI binaries)
 - [x] Test build with `npm run build:all`
-- [ ] Update test harnesses to use new paths
-- [ ] Wire bin shims (mew-agent, mew-bridge)
+- [x] Update test harnesses to use new paths (CLI wrapper → dist/bin/mew.js)
+- [x] Wire bin shims (mew-agent, mew-bridge)
 
 ### Phase 4 - Publish & Verify
 - [ ] Test `npm pack` from packages/mew

@@ -19,8 +19,8 @@ import { spawn } from 'node:child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Path to the consolidated package's CLI implementation
-const cliPath = resolve(__dirname, '../../packages/mew/src/bin/mew.js');
+// Path to the consolidated package's built CLI binary
+const cliPath = resolve(__dirname, '../../packages/mew/dist/bin/mew.js');
 
 // Forward all arguments to the real CLI
 const child = spawn('node', [cliPath, ...process.argv.slice(2)], {

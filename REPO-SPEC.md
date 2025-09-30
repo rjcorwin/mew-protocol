@@ -412,14 +412,15 @@ Phase 2 — Flatten and integrate ✅ COMPLETED
 - Update templates to depend on `@mew-protocol/mew`
 - Clean up old directories
 
-Phase 3 — Import paths and build system (IN PROGRESS)
+Phase 3 — Import paths and build system ✅ COMPLETED
 - ✅ Update all import paths in source code (relative imports within package)
 - ✅ Switch to `moduleResolution: "bundler"` for pragmatic ESM support
 - ✅ Set up TypeScript build (tsc for libraries)
-- ✅ Convert CLI from CommonJS to ESM (all 19 files converted)
+- ✅ Convert CLI from CommonJS to ESM (all 20 files converted)
+- ✅ Add bridge command to CLI (mew bridge start)
 - ✅ Set up bin bundling (tsup for CLI binaries)
-- 🔄 Update test harnesses to use new paths
-- Wire bin shims (mew-agent, mew-bridge)
+- ✅ Update test harnesses to use new paths (CLI wrapper forwards to dist/bin/mew.js)
+- ✅ Wire bin shims (mew-agent, mew-bridge)
 
 Phase 4 — Publish & verify
 - Test `npm pack` from packages/mew
