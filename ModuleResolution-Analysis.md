@@ -1,5 +1,22 @@
 # Module Resolution Strategy - Deep Analysis
 
+## ⚠️ UPDATE: Decision Changed to Option B (Bundler)
+
+**Original recommendation was NodeNext, but research showed this was wrong.**
+
+After examining real-world libraries:
+- ✅ **@langchain/core**: Uses `"bundler"` with `"type": "module"`
+- ❌ **@anthropic-ai/sdk**: Uses CommonJS (not ESM), so not comparable
+- ✅ Most modern ESM libraries use `"bundler"` resolution
+
+**Final decision: Use `"moduleResolution": "bundler"` (implemented)**
+
+Original analysis below for context...
+
+---
+
+# Module Resolution Strategy - Deep Analysis
+
 ## Current Configuration
 
 ```json
