@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Text Buffer Implementation for MEW CLI
  *

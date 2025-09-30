@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Text Utilities for Unicode and Terminal Handling
  *

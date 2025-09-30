@@ -7,7 +7,7 @@
 ## Context
 
 The advanced interactive CLI currently exposes slash commands through a static array that only supports fuzzy matching on the
-full command string.【F:cli/src/ui/utils/slashCommands.js†L5-L88】【F:cli/src/ui/utils/slashCommands.js†L128-L164】 Once the user
+full command string.【F:cli/src/ui/utils/slashCommands.ts†L5-L88】【F:cli/src/ui/utils/slashCommands.ts†L128-L164】 Once the user
 accepts a suggestion, the CLI inserts the command template verbatim and leaves the operator to fill in every argument manually.
 This approach breaks down for the new class of envelope-driven commands the CLI must support:
 

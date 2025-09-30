@@ -6,7 +6,7 @@
 
 const React = require('react');
 const { render, Box, Text } = require('ink');
-const EnhancedInput = require('../src/ui/components/EnhancedInput');
+const EnhancedInput = require('../dist/ui/components/EnhancedInput');
 
 function DebugUI() {
   const [messages, setMessages] = React.useState([]);

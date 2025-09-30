@@ -6,8 +6,8 @@
  * Run with: node tests/text-buffer.test.js
  */
 
-const TextBuffer = require('../src/ui/utils/text-buffer');
-const textUtils = require('../src/ui/utils/textUtils');
+const TextBuffer = require('../dist/ui/utils/text-buffer');
+const textUtils = require('../dist/ui/utils/textUtils');
 
 let testsPassed = 0;
 let testsFailed = 0;

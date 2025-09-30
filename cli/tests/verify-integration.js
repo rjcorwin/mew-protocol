@@ -49,57 +49,57 @@ console.log('=== Enhanced Input Integration Verification ===\n');
 // Check all component files exist
 test('Text buffer exists', () => {
   assertFileExists(
-    path.join(__dirname, '../src/ui/utils/text-buffer.js'),
+    path.join(__dirname, '../dist/ui/utils/text-buffer.js'),
     'text-buffer.js'
   );
 });
 
 test('Text utilities exist', () => {
   assertFileExists(
-    path.join(__dirname, '../src/ui/utils/textUtils.js'),
+    path.join(__dirname, '../dist/ui/utils/textUtils.js'),
     'textUtils.js'
   );
 });
 
 test('useKeypress hook exists', () => {
   assertFileExists(
-    path.join(__dirname, '../src/ui/hooks/useKeypress.js'),
+    path.join(__dirname, '../dist/ui/hooks/useKeypress.js'),
     'useKeypress.js'
   );
 });
 
 test('keyMatchers exists', () => {
   assertFileExists(
-    path.join(__dirname, '../src/ui/keyMatchers.js'),
+    path.join(__dirname, '../dist/ui/keyMatchers.js'),
     'keyMatchers.js'
   );
 });
 
 test('keyBindings config exists', () => {
   assertFileExists(
-    path.join(__dirname, '../src/config/keyBindings.js'),
+    path.join(__dirname, '../dist/config/keyBindings.js'),
     'keyBindings.js'
   );
 });
 
 test('EnhancedInput component exists', () => {
   assertFileExists(
-    path.join(__dirname, '../src/ui/components/EnhancedInput.js'),
+    path.join(__dirname, '../dist/ui/components/EnhancedInput.js'),
     'EnhancedInput.js'
   );
 });
 
 // Check modules can be loaded
 test('TextBuffer can be imported', () => {
-  assertExports('../src/ui/utils/text-buffer');
+  assertExports('../dist/ui/utils/text-buffer');
 });
 
 test('EnhancedInput can be imported', () => {
-  assertExports('../src/ui/components/EnhancedInput');
+  assertExports('../dist/ui/components/EnhancedInput');
 });
 
 test('useKeypress exports functions', () => {
-  const module = require('../src/ui/hooks/useKeypress');
+  const module = require('../dist/ui/hooks/useKeypress');
   if (!module.useKeypress || !module.matchesKeyCombination) {
     throw new Error('Missing expected exports');
   }
@@ -108,7 +108,7 @@ test('useKeypress exports functions', () => {
 // Check integration with advanced-interactive-ui.js
 test('advanced-interactive-ui imports EnhancedInput', () => {
   assertFileContains(
-    path.join(__dirname, '../src/utils/advanced-interactive-ui.js'),
+    path.join(__dirname, '../dist/utils/advanced-interactive-ui.js'),
     "require('../ui/components/EnhancedInput')",
     'EnhancedInput import'
   );
@@ -116,7 +116,7 @@ test('advanced-interactive-ui imports EnhancedInput', () => {
 
 test('advanced-interactive-ui uses EnhancedInput', () => {
   assertFileContains(
-    path.join(__dirname, '../src/utils/advanced-interactive-ui.js'),
+    path.join(__dirname, '../dist/utils/advanced-interactive-ui.js'),
     'React.createElement(EnhancedInput',
     'EnhancedInput usage'
   );
@@ -124,7 +124,7 @@ test('advanced-interactive-ui uses EnhancedInput', () => {
 
 test('Old InputComposer is removed', () => {
   const content = fs.readFileSync(
-    path.join(__dirname, '../src/utils/advanced-interactive-ui.js'),
+    path.join(__dirname, '../dist/utils/advanced-interactive-ui.js'),
     'utf8'
   );
   // Check that the old function definition is gone
@@ -135,7 +135,7 @@ test('Old InputComposer is removed', () => {
 
 test('EnhancedInput has approval dialog compatibility', () => {
   assertFileContains(
-    path.join(__dirname, '../src/utils/advanced-interactive-ui.js'),
+    path.join(__dirname, '../dist/utils/advanced-interactive-ui.js'),
     'disabled: pendingOperation !== null',
     'Dialog compatibility'
   );
@@ -143,7 +143,7 @@ test('EnhancedInput has approval dialog compatibility', () => {
 
 // Test component functionality
 test('TextBuffer supports multi-line', () => {
-  const TextBuffer = require('../src/ui/utils/text-buffer');
+  const TextBuffer = require('../dist/ui/utils/text-buffer');
   const buffer = new TextBuffer('Line1\nLine2');
   if (buffer.lines.length !== 2) {
     throw new Error('Multi-line not working');
@@ -151,7 +151,7 @@ test('TextBuffer supports multi-line', () => {
 });
 
 test('TextBuffer supports word navigation', () => {
-  const TextBuffer = require('../src/ui/utils/text-buffer');
+  const TextBuffer = require('../dist/ui/utils/text-buffer');
   const buffer = new TextBuffer('Hello World');
   buffer.cursorColumn = 0;
   buffer.move('wordRight');
@@ -161,7 +161,7 @@ test('TextBuffer supports word navigation', () => {
 });
 
 test('Key bindings include all shortcuts', () => {
-  const { defaultKeyBindings } = require('../src/config/keyBindings');
+  const { defaultKeyBindings } = require('../dist/config/keyBindings');
   const required = [
     'MOVE_WORD_LEFT',
     'MOVE_WORD_RIGHT',

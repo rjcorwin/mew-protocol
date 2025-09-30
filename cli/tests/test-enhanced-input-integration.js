@@ -12,7 +12,7 @@
 
 const React = require('react');
 const { render, Box, Text } = require('ink');
-const EnhancedInput = require('../src/ui/components/EnhancedInput');
+const EnhancedInput = require('../dist/ui/components/EnhancedInput');
 
 // Mock WebSocket for testing
 class MockWebSocket {

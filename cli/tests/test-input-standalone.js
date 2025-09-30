@@ -4,7 +4,7 @@
  * Standalone test of input rendering
  */
 
-const TextBuffer = require('../src/ui/utils/text-buffer');
+const TextBuffer = require('../dist/ui/utils/text-buffer');
 
 // Test the buffer directly
 console.log('=== TextBuffer Direct Test ===');
@@ -59,7 +59,7 @@ console.log('\n✅ TextBuffer is working correctly');
 
 // Now test if the key bindings configuration loads
 console.log('\n=== Key Bindings Test ===');
-const { defaultKeyBindings } = require('../src/config/keyBindings');
+const { defaultKeyBindings } = require('../dist/config/keyBindings');
 console.log('Key bindings loaded:', Object.keys(defaultKeyBindings).length, 'bindings');
 console.log('Sample bindings:', Object.keys(defaultKeyBindings).slice(0, 5));
 
