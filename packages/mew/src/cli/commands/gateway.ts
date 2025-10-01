@@ -135,13 +135,21 @@ gateway
       }
       
       const token = authHeader.substring(7);
-      
-      // Verify token matches participant
-      const expectedToken = participantTokens.get(participantId);
+
+      // Verify token matches participant (check both runtime and config tokens)
+      const expectedToken = participantTokens.get(participantId) || tokenMap.get(participantId);
       if (!expectedToken || expectedToken !== token) {
         return res.status(403).json({ error: 'Invalid token for participant' });
       }
-      
+
+      // Ensure participant has capabilities loaded from config
+      if (!participantCapabilities.has(participantId) && spaceConfig?.participants?.[participantId]) {
+        const capabilities = ensureBaselineCapabilities(
+          spaceConfig.participants[participantId].capabilities || []
+        );
+        participantCapabilities.set(participantId, capabilities);
+      }
+
       // Use configured space ID as default, or fallback to query param
       const actualSpaceName = spaceName === 'default' && spaceConfig?.space?.id 
         ? spaceConfig.space.id 

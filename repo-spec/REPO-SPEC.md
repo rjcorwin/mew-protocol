@@ -13,6 +13,7 @@ Outcome:
 - One install, one version, one publish.
 - Templates depend only on `@mew-protocol/mew`.
 - Keeps modular imports via subpath exports.
+- No workspace configuration needed (single package).
 
 ## Goals / Non-goals
 
@@ -114,14 +115,15 @@ Top-level layout after consolidation to a single published package:
 │     └─ 015-cli-typescript-conversion.md
 ├─ docs/                         # Architecture, guides, progress
 ├─ .github/                      # CI workflows
-├─ package.json                  # private workspace root (workspaces: ["packages/mew"])
-├─ tsconfig.base.json            # shared TS settings (if/when TS used)
+├─ package.json                  # private root with repo-level scripts
+├─ tsconfig.base.json            # shared TS settings
 ├─ RELEASE.md                    # release guide (updated for single package)
 └─ README.md
 ```
 
 Notes:
-- Only `packages/mew` is published to npm. The root remains `private: true` and manages the workspace.
+- Only `packages/mew` is published to npm. The root remains `private: true` with repo-level scripts.
+- No workspace configuration needed (single package eliminates hoisting complexity).
 - CLI code lives under `packages/mew/src/cli/` and `packages/mew/src/bin/`.
 - Library modules live under `packages/mew/src/{types,client,participant,agent,gateway,capability-matcher,bridge}` and are exposed via subpath exports.
 - Templates ship from `packages/mew/templates/`.
@@ -201,20 +203,7 @@ Two viable patterns; choose one to keep things simple:
     }
   }
   ```
-- CLI continues to rewrite dependencies to workspace during local dev/tests.
-
-### Workspaces
-
-Root `package.json` (sketch):
-
-```json
-{
-  "private": true,
-  "workspaces": [
-    "packages/mew"
-  ]
-}
-```
+- CLI continues to rewrite dependencies during local dev/tests.
 
 ### Entry Points
 
@@ -322,14 +311,13 @@ the single‑package release process.
 
 - Edit code in `packages/mew/src/**`.
 - Build locally:
-  - Libraries: `npm --workspace packages/mew run build` (tsc → `dist/` with `.d.ts`).
-  - Binaries: `npm --workspace packages/mew run build:bin` (tsup/rollup → `dist/bin/*`).
-  - Combined: `npm --workspace packages/mew run build:all`.
-- Optional watch task for fast iteration: `npm --workspace packages/mew run dev`.
+  - From root: `npm run build` (uses TypeScript project references)
+  - From package: `cd packages/mew && npm run build:all`
+- Optional watch task for fast iteration: `cd packages/mew && npm run dev`.
 - Run CLI from source (dev):
   - With compat wrapper: `./cli/bin/mew.js …` (for existing scripts) → forwards to `packages/mew/dist/bin/mew.js`.
   - Or direct: `node packages/mew/dist/bin/mew.js …`.
-- Lint/format: `npm run lint --workspaces`, `npm run format --workspaces`.
+- Lint/format: `npm run lint`, `npm run format` (delegates to packages/mew).
 
 ### 2) Spaces Testing (Manual Integration)
 
