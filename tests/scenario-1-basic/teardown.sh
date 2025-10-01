@@ -4,9 +4,8 @@
 set -euo pipefail
 
 SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
-REPO_ROOT=${REPO_ROOT:-"$(cd "${SCENARIO_DIR}/../.." && pwd)"}
 WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
-CLI_BIN="${REPO_ROOT}/cli/bin/mew.js"
+LIB_DIR="${SCENARIO_DIR}/../lib"
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
 
 YELLOW='\033[1;33m'
@@ -16,13 +15,19 @@ NC='\033[0m'
 printf "%b\n" "${YELLOW}=== Scenario 1 Teardown ===${NC}"
 
 if [[ -d "${WORKSPACE_DIR}" ]]; then
+  if [[ -f "${LIB_DIR}/mew-cli.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "${LIB_DIR}/mew-cli.sh"
+    ensure_mew_cli || true
+  fi
+
   if [[ -f "${ENV_FILE}" ]]; then
     # shellcheck disable=SC1090
     source "${ENV_FILE}"
   fi
 
-  if [[ -f "${CLI_BIN}" ]]; then
-    node "${CLI_BIN}" space down --space-dir "${WORKSPACE_DIR}" >/dev/null 2>&1 || true
+  if command -v mew >/dev/null 2>&1; then
+    mew space down --space-dir "${WORKSPACE_DIR}" >/dev/null 2>&1 || true
   fi
 
   rm -rf "${WORKSPACE_DIR}"
