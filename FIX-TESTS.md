@@ -534,18 +534,22 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
   - Updated teardown.sh
   - All other files were already correct
   - Note: 2 test failures appear to be functional issues, not refactor issues
-- [ ] scenario-8-typescript-agent - Not yet updated
-- [x] **scenario-9-typescript-proposals** - ⚠️ REFACTOR COMPLETE (test timeout during checks)
+- [x] **scenario-8-typescript-agent** - ⚠️ REFACTOR COMPLETE (test timeout, see FIX.md)
+  - Updated teardown.sh, setup.sh SDK path, space.yaml agent path
+  - Removed package.json
+- [x] **scenario-9-typescript-proposals** - ⚠️ REFACTOR COMPLETE (test timeout, see FIX.md)
+  - Updated teardown.sh, setup.sh SDK paths, space.yaml agent path
+  - Removed package.json
+- [x] **scenario-10-multi-agent** - ⚠️ REFACTOR COMPLETE (5/7 tests, see FIX.md)
+  - Updated teardown.sh, setup.sh SDK path
+- [x] **scenario-11-chat-controls** - ✅ COMPLETED & PASSING (10/10 tests)
   - Updated teardown.sh
-  - Updated setup.sh SDK paths
-  - Updated space.yaml agent path
-  - Removed package.json (old @mew-protocol/agent dependency)
-  - Note: Test times out during checks - may be functional issue
-- [ ] scenario-10-multi-agent - Not yet updated
-- [ ] scenario-11-chat-controls - Not yet updated
-- [ ] scenario-12-stream-controls - Not yet updated
-- [ ] scenario-13-participant-controls - Not yet updated
-- [ ] scenario-14-cat-maze - Not yet updated
+- [x] **scenario-12-stream-controls** - ✅ COMPLETED & PASSING (6/6 tests)
+  - Updated teardown.sh
+- [x] **scenario-13-participant-controls** - ✅ COMPLETED & PASSING (14/14 tests)
+  - Updated teardown.sh
+- [x] **scenario-14-cat-maze** - ⚠️ REFACTOR COMPLETE (ESM/CJS issue, see FIX.md)
+  - Updated check.sh, setup.sh template paths
 
 ### Discoveries During Updates
 
@@ -562,7 +566,7 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
 
 ---
 
-**Document Status**: In Progress - Scenarios 1-7, 8-grant, 9 Complete (9/15)
+**Document Status**: ✅ COMPLETE - All 15 Scenarios Refactored
 **Last Updated**: 2025-10-01
 **Author**: Claude Code
 **Related**: REPO-SPEC.md, TEST.md, TESTING-CODER-AGENT.md, TEST-SCENARIO-UPDATE-INSTRUCTIONS.md
