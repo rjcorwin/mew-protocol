@@ -1239,6 +1239,27 @@ export class MEWParticipant extends MEWClient {
       return;
     }
 
+    // Validate payload exists
+    if (!envelope.payload || typeof envelope.payload !== 'object') {
+      const errorResponse: Envelope = {
+        protocol: PROTOCOL_VERSION,
+        id: uuidv4(),
+        ts: new Date().toISOString(),
+        from: this.options.participant_id!,
+        to: [envelope.from],
+        correlation_id: [envelope.id],
+        kind: 'mcp/response',
+        payload: {
+          error: {
+            code: -32600,
+            message: 'Invalid Request: mcp/request envelope must include a payload with method and params'
+          }
+        }
+      };
+      this.send(errorResponse);
+      return;
+    }
+
     const { method, params } = envelope.payload;
     let result: any;
     let error: any;
