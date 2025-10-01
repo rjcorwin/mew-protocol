@@ -262,6 +262,104 @@ gateway
         });
       }
 
+      // Handle capability/grant messages before broadcasting
+      if (envelope.kind === 'capability/grant') {
+        const recipient = envelope.payload?.recipient;
+        const grantCapabilities = envelope.payload?.capabilities || [];
+        const grantId = envelope.id || `grant-${Date.now()}`;
+
+        if (recipient && grantCapabilities.length > 0) {
+          // Resolve logical participant name to actual runtime client ID
+          let recipientWs = null;
+          let recipientClientId = null;
+
+          // Find recipient by matching token (logical name -> token -> runtime client ID)
+          const recipientToken = tokenMap.get(recipient);
+          if (recipientToken) {
+            for (const [pid, ws] of space.participants) {
+              const pToken = participantTokens.get(pid);
+              if (pToken === recipientToken) {
+                recipientWs = ws;
+                recipientClientId = pid;
+                break;
+              }
+            }
+          }
+
+          // Store capabilities under runtime client ID
+          if (recipientClientId) {
+            // Initialize runtime capabilities for recipient if needed
+            if (!runtimeCapabilities.has(recipientClientId)) {
+              runtimeCapabilities.set(recipientClientId, new Map());
+            }
+
+            // Store the granted capabilities under runtime client ID
+            const recipientCaps = runtimeCapabilities.get(recipientClientId);
+            recipientCaps.set(grantId, grantCapabilities);
+
+            console.log(
+              `[HTTP] Granted capabilities to ${recipient} (${recipientClientId}): ${JSON.stringify(grantCapabilities)}`,
+            );
+            console.log(
+              `[HTTP] Runtime capabilities for ${recipientClientId}:`,
+              Array.from(recipientCaps.entries()),
+            );
+
+            // Send updated welcome message to recipient
+            if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
+              const staticCapabilities = participantCapabilities.get(recipientClientId) || [];
+              const runtimeCaps = runtimeCapabilities.get(recipientClientId);
+              const dynamicCapabilities = runtimeCaps ? Array.from(runtimeCaps.values()).flat() : [];
+              const updatedCapabilities = [...staticCapabilities, ...dynamicCapabilities];
+
+              const updatedWelcomeMessage = {
+                protocol: 'mew/v0.4',
+                id: `welcome-update-${Date.now()}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                to: [recipientClientId],
+                kind: 'system/welcome',
+                payload: {
+                  you: {
+                    id: recipientClientId,
+                    capabilities: updatedCapabilities,
+                  },
+                  participants: Array.from(space.participants.keys())
+                    .filter((pid) => pid !== recipientClientId)
+                    .map((pid) => {
+                      const otherStatic = participantCapabilities.get(pid) || [];
+                      const otherRuntime = runtimeCapabilities.get(pid);
+                      const otherDynamic = otherRuntime ? Array.from(otherRuntime.values()).flat() : [];
+                      return {
+                        id: pid,
+                        capabilities: [...otherStatic, ...otherDynamic],
+                      };
+                    }),
+                },
+              };
+              recipientWs.send(JSON.stringify(updatedWelcomeMessage));
+              logEnvelopeEvent({
+                event: 'delivered',
+                id: updatedWelcomeMessage.id,
+                envelope: updatedWelcomeMessage,
+                participant: recipientClientId,
+                space_id: actualSpaceName,
+                direction: 'outbound',
+                transport: 'websocket',
+                metadata: {
+                  type: 'system/welcome',
+                  reason: 'capability_grant_update',
+                  source_participant: participantId,
+                },
+              });
+              console.log(`[HTTP] Sent updated welcome message to ${recipient} (${recipientClientId}) with ${updatedCapabilities.length} total capabilities`);
+            }
+          } else {
+            console.error(`[HTTP] Failed to resolve logical name ${recipient} to runtime client ID`);
+          }
+        }
+      }
+
       // Broadcast message to space
       const envelopeStr = JSON.stringify(envelope);
       for (const [pid, ws] of space.participants) {
@@ -1047,23 +1145,6 @@ gateway
             const grantId = message.id || `grant-${Date.now()}`;
 
             if (recipient && grantCapabilities.length > 0) {
-              // Initialize runtime capabilities for recipient if needed
-              if (!runtimeCapabilities.has(recipient)) {
-                runtimeCapabilities.set(recipient, new Map());
-              }
-
-              // Store the granted capabilities
-              const recipientCaps = runtimeCapabilities.get(recipient);
-              recipientCaps.set(grantId, grantCapabilities);
-
-              console.log(
-                `Granted capabilities to ${recipient}: ${JSON.stringify(grantCapabilities)}`,
-              );
-              console.log(
-                `Runtime capabilities for ${recipient}:`,
-                Array.from(recipientCaps.entries()),
-              );
-
               // Send acknowledgment to recipient
               // Resolve logical participant name to actual runtime client ID
               const space = spaces.get(spaceId);
@@ -1083,12 +1164,34 @@ gateway
                 }
               }
 
+              // Now that we have the runtime client ID, store capabilities under it
+              if (recipientClientId) {
+                // Initialize runtime capabilities for recipient if needed
+                if (!runtimeCapabilities.has(recipientClientId)) {
+                  runtimeCapabilities.set(recipientClientId, new Map());
+                }
+
+                // Store the granted capabilities under runtime client ID
+                const recipientCaps = runtimeCapabilities.get(recipientClientId);
+                recipientCaps.set(grantId, grantCapabilities);
+
+                console.log(
+                  `Granted capabilities to ${recipient} (${recipientClientId}): ${JSON.stringify(grantCapabilities)}`,
+                );
+                console.log(
+                  `Runtime capabilities for ${recipientClientId}:`,
+                  Array.from(recipientCaps.entries()),
+                );
+              } else {
+                console.error(`Failed to resolve logical name ${recipient} to runtime client ID`);
+              }
+
               if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
                   // Send updated welcome message with new capabilities
                   // This allows the participant to update their internal capability tracking
-                  // Get both static capabilities (keyed by runtime client ID) and runtime capabilities (keyed by logical name)
+                  // Get both static capabilities and runtime capabilities (both keyed by runtime client ID)
                   const staticCapabilities = participantCapabilities.get(recipientClientId) || [];
-                const runtimeCaps = runtimeCapabilities.get(recipient);
+                const runtimeCaps = runtimeCapabilities.get(recipientClientId);
                 const dynamicCapabilities = runtimeCaps ? Array.from(runtimeCaps.values()).flat() : [];
 
                 // Combine static and dynamic capabilities
