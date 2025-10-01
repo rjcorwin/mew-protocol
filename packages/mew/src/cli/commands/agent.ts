@@ -252,7 +252,7 @@ agent
       const agent = new MEWAgent({
         gateway: options.gateway,
         space: options.space,
-        participantId: options.id,
+        participant_id: options.id,
         token: options.token,
         apiKey,
         baseURL,

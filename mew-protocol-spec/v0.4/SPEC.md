@@ -580,6 +580,27 @@ Allows participants with appropriate capabilities to grant capabilities to other
 - Gateway SHOULD add granted capabilities to recipient's capability set
 - Multiple grants are cumulative
 
+**Capability Update Flow:**
+
+When the gateway processes a `capability/grant`:
+
+1. **Validate**: Check sender has `capability/grant` permission
+2. **Store**: Add granted capabilities to recipient's runtime capability set
+3. **Notify**: Send updated `system/welcome` to recipient with combined static + runtime capabilities
+4. **Acknowledge**: Recipient sends `capability/grant-ack` after updating capabilities
+
+**Important**: The gateway MUST resolve logical participant names to actual participant IDs when sending the updated welcome. If the recipient's participant ID differs from their logical name (e.g., "mew" vs "client-123"), the gateway must maintain a mapping (see Section 3.6.4).
+
+**Example Flow**:
+
+```
+1. Human → Gateway: capability/grant (to: ["mew"])
+2. Gateway: Validates, stores capabilities for "mew"
+3. Gateway → Agent: system/welcome (to: ["client-123"], with new capabilities)
+4. Agent: Updates participantInfo.capabilities
+5. Agent → Gateway: capability/grant-ack (correlation_id: ["grant-789"])
+```
+
 #### 3.6.2 Revoke Capabilities (kind = "capability/revoke")
 
 Revokes previously granted capabilities:
@@ -638,7 +659,41 @@ Recipients acknowledge capability grants:
 }
 ```
 
-#### 3.6.4 Invite Participant (kind = "space/invite")
+#### 3.6.4 Participant ID Resolution
+
+Gateways MUST maintain a mapping between logical participant names (from configuration) and runtime participant IDs (from WebSocket connections):
+
+- **Logical names** are defined in space configuration (e.g., "mew", "orchestrator")
+- **Runtime IDs** are assigned during connection (e.g., "client-1234567-abc")
+- Messages addressed to logical names must be resolved to runtime IDs for delivery
+
+When processing `capability/grant`, `capability/revoke`, or other messages that reference participants by name, the gateway MUST:
+
+1. Resolve the logical name to the actual runtime participant ID
+2. Use the runtime ID to locate the participant's WebSocket connection
+3. Deliver messages using the runtime ID
+
+**Implementation Strategy:**
+
+Gateways can maintain this mapping by:
+- Creating a map of `logicalName → runtimeClientID` when participants join
+- Looking up tokens: `logicalName → token` (from config) and `runtimeClientID → token` (from connection)
+- Matching tokens to resolve logical names to runtime IDs
+
+**Example:**
+
+```
+Space config defines: "mew" with token "abc123"
+Agent connects with: participant_id = "client-1759310701273-q9i1e5jkg", token = "abc123"
+Gateway stores: "mew" → "client-1759310701273-q9i1e5jkg"
+
+When processing capability/grant with recipient="mew":
+1. Look up logical name "mew" → token "abc123"
+2. Find runtime participant with token "abc123" → "client-1759310701273-q9i1e5jkg"
+3. Send system/welcome to "client-1759310701273-q9i1e5jkg"
+```
+
+#### 3.6.5 Invite Participant (kind = "space/invite")
 
 Invites new participants to the space:
 
@@ -668,7 +723,7 @@ Invites new participants to the space:
 
 **Note:** This message is broadcast within the space to inform existing participants. If `email` is provided, the gateway SHOULD send an invitation email with connection details. Additional notification methods (webhook, token generation, etc.) are gateway implementation-specific.
 
-#### 3.6.5 Remove Participant (kind = "space/kick")
+#### 3.6.6 Remove Participant (kind = "space/kick")
 
 Removes participants from the space:
 
@@ -685,7 +740,7 @@ Removes participants from the space:
 }
 ```
 
-#### 3.6.6 Delegation Security
+#### 3.6.7 Delegation Security
 
 - Only participants with `capability/grant` capability can grant capabilities
 - Participants cannot grant capabilities they don't possess

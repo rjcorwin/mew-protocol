@@ -1065,13 +1065,29 @@ gateway
               );
 
               // Send acknowledgment to recipient
+              // Resolve logical participant name to actual runtime client ID
               const space = spaces.get(spaceId);
-              const recipientWs = space?.participants.get(recipient);
-                if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
+              let recipientWs = null;
+              let recipientClientId = null;
+
+              // Find recipient by matching token (logical name -> token -> runtime client ID)
+              const recipientToken = tokenMap.get(recipient);
+              if (recipientToken) {
+                for (const [pid, ws] of space.participants) {
+                  const pToken = participantTokens.get(pid);
+                  if (pToken === recipientToken) {
+                    recipientWs = ws;
+                    recipientClientId = pid;
+                    break;
+                  }
+                }
+              }
+
+              if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
                   // Send updated welcome message with new capabilities
                   // This allows the participant to update their internal capability tracking
-                  // Get both static capabilities and runtime capabilities
-                  const staticCapabilities = participantCapabilities.get(recipient) || [];
+                  // Get both static capabilities (keyed by runtime client ID) and runtime capabilities (keyed by logical name)
+                  const staticCapabilities = participantCapabilities.get(recipientClientId) || [];
                 const runtimeCaps = runtimeCapabilities.get(recipient);
                 const dynamicCapabilities = runtimeCaps ? Array.from(runtimeCaps.values()).flat() : [];
 
@@ -1083,15 +1099,15 @@ gateway
                   id: `welcome-update-${Date.now()}`,
                   ts: new Date().toISOString(),
                   from: 'system:gateway',
-                  to: [recipient],
+                  to: [recipientClientId],
                   kind: 'system/welcome',
                   payload: {
                     you: {
-                      id: recipient,
+                      id: recipientClientId,
                       capabilities: updatedCapabilities,
                     },
                     participants: Array.from(space.participants.keys())
-                      .filter((pid) => pid !== recipient)
+                      .filter((pid) => pid !== recipientClientId)
                       .map((pid) => {
                         // Also include runtime capabilities for other participants
                         const otherStatic = participantCapabilities.get(pid) || [];

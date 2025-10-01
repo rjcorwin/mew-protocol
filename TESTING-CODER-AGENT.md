@@ -389,17 +389,32 @@ curl -X POST 'http://localhost:8080/participants/human/messages?space=coder' \
 
 This grants the MEW agent permission to call the `write_file` tool directly.
 
-### Verify Grant Acknowledgment
+**Note:** The gateway resolves the logical participant name "mew" to the actual runtime client ID (e.g., "client-1759310701273-q9i1e5jkg") when delivering the updated capabilities. This allows you to use human-readable names in messages while the gateway handles the ID mapping behind the scenes.
 
-Check the envelope logs:
+### Verify Grant Flow
+
+Check the envelope logs to see the complete capability grant flow:
 
 ```bash
-tail -n 5 .mew/logs/envelope-history.jsonl
+tail -n 10 .mew/logs/envelope-history.jsonl
 ```
 
 You should see:
-- `"kind": "capability/grant"` - Your grant message
-- `"kind": "capability/grant-ack"` - MEW acknowledging the grant (optional, depending on implementation)
+1. `"kind": "capability/grant"` - Your grant message (to: ["mew"])
+2. `"kind": "system/welcome"` - Gateway sending updated capabilities to the agent (to: ["client-..."])
+3. `"kind": "capability/grant-ack"` - MEW acknowledging the grant
+
+**Important:** The `system/welcome` message will have:
+- `"to": ["client-..."]` - The runtime client ID, not "mew"
+- `"payload.you.capabilities"` - Now includes the new write_file capability
+
+You can verify the agent received the updated capabilities by checking the welcome message:
+
+```bash
+grep '"kind":"system/welcome"' .mew/logs/envelope-history.jsonl | tail -1 | jq '.envelope.payload.you.capabilities | length'
+```
+
+This should show an increased capability count compared to the initial welcome.
 
 ### Ask MEW to Write baz.txt
 

@@ -1118,6 +1118,28 @@ export class MEWParticipant extends MEWClient {
         } else if (envelope.kind === 'participant/shutdown') {
           await this.handleParticipantShutdownMessage(envelope);
           return;
+        } else if (envelope.kind === 'capability/grant') {
+          // Handle capability grant directly (defense-in-depth, gateway also sends updated welcome)
+          const grantedCaps = envelope.payload?.capabilities || [];
+          if (grantedCaps.length > 0 && this.participantInfo) {
+            const previousCount = this.participantInfo.capabilities?.length || 0;
+            this.participantInfo.capabilities = [
+              ...(this.participantInfo.capabilities || []),
+              ...grantedCaps
+            ];
+            console.log(`[MEWParticipant "${this.options.participant_id}"] Granted ${grantedCaps.length} new capabilities (${previousCount} -> ${this.participantInfo.capabilities.length})`);
+
+            // Send acknowledgment
+            await this.send({
+              protocol: PROTOCOL_VERSION,
+              id: `ack-${Date.now()}`,
+              ts: new Date().toISOString(),
+              from: this.options.participant_id!,
+              correlation_id: [envelope.id],
+              kind: 'capability/grant-ack',
+              payload: { status: 'accepted' }
+            });
+          }
         }
       }
 
