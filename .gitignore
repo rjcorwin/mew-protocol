@@ -83,6 +83,9 @@ spaces/*/
 # Optional stylelint cache
 .stylelintcache
 
+# Test cache artifacts
+tests/.cache/
+
 # Temporary files
 tmp/
 temp/

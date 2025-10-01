@@ -20,6 +20,11 @@ printf "%b\n" "${YELLOW}=== Scenario 3 Setup ===${NC}"
 printf "%b\n" "${BLUE}Workspace: ${WORKSPACE_DIR}${NC}"
 printf "%b\n" "${BLUE}Using port ${TEST_PORT}${NC}"
 
+if ! command -v mew >/dev/null 2>&1; then
+  printf "%b\n" "${YELLOW}mew CLI not found on PATH. Run via test.sh to ensure linking.${NC}" >&2
+  exit 1
+fi
+
 rm -rf "${WORKSPACE_DIR}"
 mkdir -p "${WORKSPACE_DIR}/templates"
 

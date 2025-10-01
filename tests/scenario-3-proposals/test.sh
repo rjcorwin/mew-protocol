@@ -11,6 +11,11 @@ export TEMPLATE_NAME="${TEMPLATE_NAME:-scenario-3-proposals}"
 export SPACE_NAME="${SPACE_NAME:-scenario-3-proposals}"
 export TEST_PORT="${TEST_PORT:-$((8000 + RANDOM % 1000))}"
 
+LIB_DIR="${SCENARIO_DIR}/../lib"
+# shellcheck disable=SC1091
+source "${LIB_DIR}/mew-cli.sh"
+ensure_mew_cli
+
 cleanup() {
   "${SCENARIO_DIR}/teardown.sh" || true
 }
