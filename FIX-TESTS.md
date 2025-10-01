@@ -514,7 +514,9 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
 - [x] **scenario-2-mcp** - ✅ COMPLETED & PASSING (8/8 tests)
   - Updated teardown.sh
   - All other files were already correct
-- [ ] scenario-3-proposals - Not yet updated
+- [x] **scenario-3-proposals** - ✅ COMPLETED & PASSING (6/6 tests)
+  - Updated teardown.sh
+  - All other files were already correct
 - [ ] scenario-4-capabilities - Not yet updated
 - [ ] scenario-5-reasoning - Not yet updated
 - [ ] scenario-6-errors - Not yet updated
@@ -543,7 +545,7 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
 
 ---
 
-**Document Status**: In Progress - Scenario 1 Complete
+**Document Status**: In Progress - Scenarios 1-3 Complete (3/15)
 **Last Updated**: 2025-10-01
 **Author**: Claude Code
 **Related**: REPO-SPEC.md, TEST.md, TESTING-CODER-AGENT.md, TEST-SCENARIO-UPDATE-INSTRUCTIONS.md

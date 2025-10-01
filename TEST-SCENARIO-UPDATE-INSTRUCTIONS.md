@@ -473,6 +473,24 @@ pm2 delete scenario-X-*
 
 **Notes**: Tests MCP tool execution workflow with calculator agent providing basic arithmetic operations.
 
+### Scenario 3 (Proposals) - COMPLETED ✅
+
+**Status**: Fully updated and passing all tests
+
+**Changes made**:
+- Updated teardown.sh to use global `mew` command
+- All other files were already correct
+
+**Test Results**: 6/6 tests passing
+- Gateway health endpoint ✓
+- Proposer log exists ✓
+- Fulfiller log exists ✓
+- Proposal 1 fulfilled with result 15 ✓
+- Proposal 2 fulfilled with result 56 ✓
+- Invalid proposal error surfaced ✓
+
+**Notes**: Tests MCP proposal/fulfillment workflow with calculator agent and dedicated fulfiller agent.
+
 ### Scenarios 8 & 9 (TypeScript Agent)
 
 **Extra considerations**:
