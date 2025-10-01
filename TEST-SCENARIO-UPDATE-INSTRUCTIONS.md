@@ -453,6 +453,26 @@ pm2 delete scenario-X-*
 - Large message handling ✓
 - Rapid message handling ✓
 
+### Scenario 2 (MCP) - COMPLETED ✅
+
+**Status**: Fully updated and passing all tests
+
+**Changes made**:
+- Updated teardown.sh to use global `mew` command
+- All other files were already correct
+
+**Test Results**: 8/8 tests passing
+- Gateway health endpoint ✓
+- Client output log exists ✓
+- List available tools ✓
+- Call add tool (5 + 3) ✓
+- Call multiply tool (7 × 9) ✓
+- Call evaluate tool (20 ÷ 4) ✓
+- Handle division by zero ✓
+- Invalid tool name error ✓
+
+**Notes**: Tests MCP tool execution workflow with calculator agent providing basic arithmetic operations.
+
 ### Scenarios 8 & 9 (TypeScript Agent)
 
 **Extra considerations**:

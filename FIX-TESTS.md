@@ -511,7 +511,9 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
   - Updated teardown.sh
   - Fixed CLI bug: removed `require()` calls in gateway.ts
   - All other files were already correct
-- [ ] scenario-2-mcp - Not yet updated
+- [x] **scenario-2-mcp** - ✅ COMPLETED & PASSING (8/8 tests)
+  - Updated teardown.sh
+  - All other files were already correct
 - [ ] scenario-3-proposals - Not yet updated
 - [ ] scenario-4-capabilities - Not yet updated
 - [ ] scenario-5-reasoning - Not yet updated
