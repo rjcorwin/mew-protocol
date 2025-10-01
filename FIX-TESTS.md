@@ -523,8 +523,13 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
 - [x] **scenario-5-reasoning** - ✅ COMPLETED & PASSING (7/7 tests)
   - Updated teardown.sh
   - All other files were already correct
-- [ ] scenario-6-errors - Not yet updated
-- [ ] scenario-7-mcp-bridge - Not yet updated
+- [x] **scenario-6-errors** - ✅ COMPLETED & PASSING (21/21 tests)
+  - Updated teardown.sh
+  - All other files were already correct
+- [x] **scenario-7-mcp-bridge** - ✅ COMPLETED & PASSING (6/6 tests)
+  - Updated teardown.sh
+  - Updated setup.sh bridge path reference
+  - Kept package.json (external MCP server dependency)
 - [ ] scenario-8-grant - Not yet updated
 - [ ] scenario-8-typescript-agent - Not yet updated
 - [ ] scenario-9-typescript-proposals - Not yet updated
@@ -549,7 +554,7 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
 
 ---
 
-**Document Status**: In Progress - Scenarios 1-5 Complete (5/15)
+**Document Status**: In Progress - Scenarios 1-7 Complete (7/15)
 **Last Updated**: 2025-10-01
 **Author**: Claude Code
 **Related**: REPO-SPEC.md, TEST.md, TESTING-CODER-AGENT.md, TEST-SCENARIO-UPDATE-INSTRUCTIONS.md

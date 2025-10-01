@@ -532,6 +532,59 @@ pm2 delete scenario-X-*
 
 **Notes**: Tests reasoning message flow with context preservation across reasoning/start, reasoning/thought, and reasoning/conclusion messages.
 
+### Scenario 6 (Errors) - COMPLETED ✅
+
+**Status**: Fully updated and passing all tests
+
+**Changes made**:
+- Updated teardown.sh to use global `mew` command
+- All other files were already correct
+- Package.json has no dependencies (kept as-is)
+
+**Test Results**: 21/21 tests passing
+- Gateway health endpoint ✓
+- Output log exists ✓
+- Invalid JSON rejected with 400 ✓
+- Gateway alive after invalid JSON ✓
+- Missing kind rejected with 400 ✓
+- Gateway alive after missing kind ✓
+- Ghost participant rejected with 403 ✓
+- Gateway alive after ghost participant ✓
+- Large message accepted with 200 ✓
+- Large message logged and delivered ✓
+- Gateway alive after large message ✓
+- All rapid messages accepted ✓
+- Burst messages reflected in gateway logs ✓
+- Gateway alive after rapid burst ✓
+- Empty message rejected with 400 ✓
+- Gateway alive after empty message ✓
+- Malformed JSON rejected with 400 ✓
+- Gateway alive after malformed JSON ✓
+- Special characters accepted with 200 ✓
+- Special character message logged ✓
+- Gateway alive after special characters ✓
+
+**Notes**: Comprehensive error handling and edge case testing. Validates gateway resilience under various failure conditions.
+
+### Scenario 7 (MCP Bridge) - COMPLETED ✅
+
+**Status**: Fully updated and passing all tests
+
+**Changes made**:
+- Updated teardown.sh to use global `mew` command
+- Updated setup.sh bridge path from `bridge/dist/mcp-bridge.js` to `packages/mew/dist/bridge/index.js`
+- Kept package.json (has external `@modelcontextprotocol/server-filesystem` dependency)
+
+**Test Results**: 6/6 tests passing
+- Gateway health endpoint ✓
+- Output log exists ✓
+- Test files directory populated ✓
+- List tools returns filesystem methods ✓
+- Read file returns contents ✓
+- Directory listing includes expected files ✓
+
+**Notes**: Tests MCP bridge integration with external filesystem server. Creates test files during setup in .workspace/test-files/. This scenario demonstrates bridging external MCP servers into MEW spaces.
+
 ### Scenarios 8 & 9 (TypeScript Agent)
 
 **Extra considerations**:
