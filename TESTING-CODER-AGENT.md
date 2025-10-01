@@ -211,7 +211,7 @@ Proposals have a **5-minute timeout**. Let's verify this works correctly by wait
 # Note the proposal creation timestamp and ID
 grep '"kind":"mcp/proposal"' .mew/logs/envelope-history.jsonl | tail -1 | jq -r '.timestamp + " - Proposal ID: " + .envelope.id'
 
-# In another terminal, monitor agent logs for timeout (this will run in background for 5+ minutes)
+# Monitor agent logs for timeout (this will run in background for 5+ minutes)
 ( sleep 305 && echo "" && echo "=== Checking for timeout ===" && tail -30 logs/mew.log | grep -E "(not fulfilled|PROPOSAL_TIMEOUT)" ) &
 
 # Note: You can continue working in this terminal while the background job waits
@@ -231,9 +231,9 @@ tail -30 logs/mew.log | grep -A5 "not fulfilled"
 
 You should see the timeout error followed by the PROPOSAL_TIMEOUT observation.
 
-## Step 6: Test Proposal Queuing and Fulfillment
+## Step 6: Fulfill a Fresh Proposal
 
-The MEW agent created a proposal because it doesn't have permission to call `write_file` directly. To fulfill the proposal, you need to send an `mcp/request` with the same payload contents and reference the proposal via `correlation_id`.
+The first proposal timed out in Step 5. Now let's create a fresh proposal and fulfill it to test the fulfillment flow.
 
 **How Proposal Fulfillment Works** (from MEW Protocol Spec Section 3.2.1):
 1. Agent sends `mcp/proposal` with the operation it wants to perform
@@ -243,9 +243,9 @@ The MEW agent created a proposal because it doesn't have permission to call `wri
 5. The target (mcp-fs-bridge) responds to you
 6. The agent observes the response via broadcast and traces it back through correlation_id
 
-### Create a Second Proposal (Test Queuing)
+### Create a Fresh Proposal
 
-Before fulfilling the first proposal, let's test that multiple proposals can exist simultaneously. Ask MEW to write bar.txt again:
+Ask MEW to write bar.txt again:
 
 ```bash
 curl -X POST 'http://localhost:8080/participants/human/messages?space=coder' \
@@ -264,20 +264,17 @@ curl -X POST 'http://localhost:8080/participants/human/messages?space=coder' \
   }'
 ```
 
-The agent will create a **second proposal** for the same operation. This tests that:
-- The proposal tracking system can handle multiple pending proposals
-- Each proposal has a unique ID
-- You can fulfill them independently
+The agent will create a **fresh proposal** for the same operation.
 
-### Find the First Proposal
+### Find the Fresh Proposal
 
-Now let's fulfill the **first proposal** (not the second one). Check the envelope logs:
+Check the envelope logs for the most recent write_file proposal:
 
 ```bash
-grep '"kind":"mcp/proposal"' .mew/logs/envelope-history.jsonl | jq -r 'select(.envelope.payload.params.arguments.path == "bar.txt") | .envelope.id + " - " + .timestamp' | head -1
+grep '"kind":"mcp/proposal"' .mew/logs/envelope-history.jsonl | jq -r 'select(.envelope.payload.params.name == "write_file") | .envelope.id + " - " + .timestamp' | tail -1
 ```
 
-This shows the **first** proposal's ID and timestamp. Copy the ID - you'll need it for `correlation_id`.
+This shows the **fresh** proposal's ID and timestamp. Copy the proposal ID (the UUID before the dash) - you'll need to replace `PROPOSAL_ID_HERE` with it in the next step.
 
 ### Fulfill the Proposal
 
@@ -323,12 +320,10 @@ cat bar.txt
 You should see: `bar`
 
 Check the envelope logs for:
-- `"kind": "mcp/request"` - Your approval request (with correlation_id to first proposal)
+- `"kind": "mcp/request"` - Your approval request (with correlation_id to the fresh proposal)
 - `"kind": "mcp/response"` - File system bridge confirming the write
 
-**Important**: Only the **first proposal** was fulfilled. The **second proposal** is still pending. You can verify this by checking that:
-- bar.txt was created (one fulfillment executed)
-- The second proposal ID still has no corresponding fulfillment in the logs
+The fresh proposal has been fulfilled and the file created successfully!
 
 ### Ask MEW to Read bar.txt
 
