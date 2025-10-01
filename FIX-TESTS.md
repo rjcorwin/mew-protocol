@@ -517,8 +517,12 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
 - [x] **scenario-3-proposals** - ✅ COMPLETED & PASSING (6/6 tests)
   - Updated teardown.sh
   - All other files were already correct
-- [ ] scenario-4-capabilities - Not yet updated
-- [ ] scenario-5-reasoning - Not yet updated
+- [x] **scenario-4-capabilities** - ✅ COMPLETED & PASSING (9/9 tests)
+  - Updated teardown.sh
+  - All other files were already correct
+- [x] **scenario-5-reasoning** - ✅ COMPLETED & PASSING (7/7 tests)
+  - Updated teardown.sh
+  - All other files were already correct
 - [ ] scenario-6-errors - Not yet updated
 - [ ] scenario-7-mcp-bridge - Not yet updated
 - [ ] scenario-8-grant - Not yet updated
@@ -545,7 +549,7 @@ Track progress updating each scenario following TEST-SCENARIO-UPDATE-INSTRUCTION
 
 ---
 
-**Document Status**: In Progress - Scenarios 1-3 Complete (3/15)
+**Document Status**: In Progress - Scenarios 1-5 Complete (5/15)
 **Last Updated**: 2025-10-01
 **Author**: Claude Code
 **Related**: REPO-SPEC.md, TEST.md, TESTING-CODER-AGENT.md, TEST-SCENARIO-UPDATE-INSTRUCTIONS.md

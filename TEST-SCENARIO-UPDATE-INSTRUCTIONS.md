@@ -491,6 +491,47 @@ pm2 delete scenario-X-*
 
 **Notes**: Tests MCP proposal/fulfillment workflow with calculator agent and dedicated fulfiller agent.
 
+### Scenario 4 (Capabilities) - COMPLETED ✅
+
+**Status**: Fully updated and passing all tests
+
+**Changes made**:
+- Updated teardown.sh to use global `mew` command
+- All other files were already correct
+
+**Test Results**: 9/9 tests passing
+- Gateway health endpoint ✓
+- Coordinator log exists ✓
+- Limited agent log exists ✓
+- HTTP rejection of system/register ✓
+- system/register triggers system/error ✓
+- system/register rejection message ✓
+- tools/list response captured ✓
+- tools/call add succeeded ✓
+- revoke notification delivered ✓
+
+**Notes**: Tests capability management (grant/revoke). 2 tests intentionally skipped (capability granting and enforcement not yet implemented).
+
+### Scenario 5 (Reasoning) - COMPLETED ✅
+
+**Status**: Fully updated and passing all tests
+
+**Changes made**:
+- Updated teardown.sh to use global `mew` command
+- All other files were already correct
+- No package.json in template (perfect!)
+
+**Test Results**: 7/7 tests passing
+- Gateway health endpoint ✓
+- Research agent log exists ✓
+- Context preserved across messages ✓
+- Reasoning start recorded ✓
+- Reasoning thoughts recorded ✓
+- Reasoning conclusion recorded ✓
+- Final explanation emitted ✓
+
+**Notes**: Tests reasoning message flow with context preservation across reasoning/start, reasoning/thought, and reasoning/conclusion messages.
+
 ### Scenarios 8 & 9 (TypeScript Agent)
 
 **Extra considerations**:
