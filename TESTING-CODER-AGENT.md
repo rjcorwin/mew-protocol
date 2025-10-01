@@ -466,72 +466,6 @@ You should see: `baz`
 
 This demonstrates **progressive trust** - the agent started with restricted capabilities (proposal-only), and after demonstrating safe behavior, was granted direct write access.
 
-## Step 8: Test with Auto-Fulfiller (Optional)
-
-The auto-fulfiller agent can automatically approve proposals for automated workflows.
-
-### Enable Auto-Fulfiller
-
-Edit `.mew/space.yaml` and change:
-
-```yaml
-auto-fulfiller:
-  auto_start: false  # Change to true
-```
-
-Then restart the space:
-
-```bash
-mew space down
-mew space up
-```
-
-Verify auto-fulfiller is running:
-
-```bash
-pm2 list | grep auto-fulfiller
-```
-
-### Test Auto-Approval
-
-Send another write request:
-
-```bash
-curl -X POST 'http://localhost:8080/participants/human/messages?space=coder' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_TOKEN_HERE' \
-  -d '{
-    "protocol": "mew/v0.4",
-    "id": "msg-auto-test",
-    "from": "human",
-    "to": ["mew"],
-    "kind": "chat",
-    "payload": {
-      "text": "Create a file called goodbye.txt with \"Goodbye!\"",
-      "format": "plain"
-    }
-  }'
-```
-
-Watch the envelope logs:
-
-```bash
-tail -f .mew/logs/envelope-history.jsonl
-```
-
-You should see:
-- `"kind": "mcp/proposal"` - MEW proposes the write
-- **Auto-fulfiller automatically approves** (2 second delay by default)
-- `"kind": "mcp/request"` - Auto-approved request to mcp-fs-bridge
-- `"kind": "mcp/response"` - File successfully written
-- `"kind": "chat"` - MEW confirms completion
-
-Verify the file was created:
-
-```bash
-cat goodbye.txt
-```
-
 ## Step 8: Understanding Capabilities
 
 The coder agent template demonstrates MEW Protocol's capability system:
@@ -552,11 +486,6 @@ The coder agent template demonstrates MEW Protocol's capability system:
 - ✅ Full capabilities (wildcard `*`)
 - ✅ Send any message type
 - ✅ Approve proposals by sending mcp/request with correlation_id
-
-### Auto-Fulfiller Can:
-- ✅ Monitor proposals (`mcp/proposal`)
-- ✅ Approve them by sending `mcp/request` to mcp-fs-bridge
-- ✅ Send chat messages to notify participants
 
 ## Step 9: Clean Up
 
@@ -580,15 +509,15 @@ pm2 list
 ✅ Agent created proposal for write operation
 ✅ Manual approval of proposal succeeded
 ✅ File was created after approval
-✅ (Optional) Auto-fulfiller automatically approved proposals
-✅ Capability restrictions enforced (agent cannot write directly)
+✅ Capability grant system working (agent uses direct calls after grant)
+✅ Progressive trust demonstrated (proposal → capability grant → direct call)
 
 ## Key Takeaways
 
 1. **Capability-Based Security**: The MEW Protocol enforces fine-grained permissions at the gateway level
 2. **Human-in-the-Loop**: Write operations require explicit approval, preventing unwanted modifications
 3. **Proposal Pattern**: Agents can propose operations that require elevated privileges
-4. **Flexible Workflows**: Auto-fulfiller can be enabled for automated approval in trusted environments
+4. **Progressive Trust**: Capabilities can be granted dynamically to agents that demonstrate safe behavior
 5. **Transparent Reasoning**: The agent's thought process is visible through reasoning envelopes
 
 This template demonstrates how MEW Protocol enables safe AI-powered coding assistants with controlled file system access!
