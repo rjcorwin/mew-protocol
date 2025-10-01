@@ -704,9 +704,8 @@ gateway
     
     // Auto-connect a participant that writes to output_log
     function autoConnectOutputLogParticipant(participantId, config) {
-      const fs = require('fs');
-      const path = require('path');
-      
+      // Note: fs and path are imported at the top of the file
+
       // Resolve output log path
       const outputPath = path.resolve(process.cwd(), config.output_log);
       const outputDir = path.dirname(outputPath);
