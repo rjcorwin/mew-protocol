@@ -116,7 +116,7 @@ export class MEWParticipant extends MEWClient {
     super(options);
     this.options = {
       ...this.options,
-      requestTimeout: options.requestTimeout ?? 30000,
+      requestTimeout: options.requestTimeout ?? 300000,
     } as ParticipantOptions;
     this.setupLifecycle();
   }
@@ -153,7 +153,7 @@ export class MEWParticipant extends MEWClient {
   ): Promise<any> {
     const id = uuidv4();
     const to = Array.isArray(target) ? target : [target];
-    const timeout = timeoutMs || (this.options as ParticipantOptions).requestTimeout || 30000;
+    const timeout = timeoutMs ?? (this.options as ParticipantOptions).requestTimeout!;
 
     return new Promise((resolve, reject) => {
       // Check if we can send direct request

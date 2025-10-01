@@ -56,7 +56,7 @@ export interface AgentConfig extends ParticipantOptions {
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
   conversationHistoryLength?: number;  // Number of previous messages to include in context (default: 0 = only current)
   contextTokenLimit?: number;          // Soft limit before automatic compaction/status updates
-  
+
   // Chat response configuration
   chatResponse?: {
     respondToQuestions?: boolean;    // Respond to questions (default: true)
@@ -214,7 +214,7 @@ export class MEWAgent extends MEWParticipant {
       }
     });
   }
-  
+
   /**
    * Override discoverTools to announce what we find
    */
@@ -311,7 +311,7 @@ export class MEWAgent extends MEWParticipant {
       if (envelope.kind === 'system/presence' || envelope.kind === 'system/welcome') {
         this.log('debug', `Received ${envelope.kind} from: ${envelope.from}`);
       }
-      
+
       // Track presence for other participants
       if (envelope.kind === 'system/presence') {
         const { event, participant } = envelope.payload;
@@ -319,16 +319,16 @@ export class MEWAgent extends MEWParticipant {
           this.otherParticipants.delete(participant.id);
         }
       }
-      
+
       // Handle chat messages (autoRespond check is inside handleChat)
-      if (envelope.kind === 'chat' && 
-          envelope.from !== this.options.participant_id) {
+      if (envelope.kind === 'chat' &&
+        envelope.from !== this.options.participant_id) {
         await this.handleChat(envelope);
       }
-      
+
       // Handle proposals that need our attention
-      if (envelope.kind === 'mcp/proposal' && 
-          envelope.from !== this.options.participant_id) {
+      if (envelope.kind === 'mcp/proposal' &&
+        envelope.from !== this.options.participant_id) {
         await this.handleProposal(envelope);
       }
     });
@@ -401,7 +401,7 @@ export class MEWAgent extends MEWParticipant {
 
     this.recordContextUsage({ tokens: this.estimateTokens(text), messages: 1 });
     this.ensureContextHeadroom();
-    
+
     // Check if we should respond to this message
     const shouldRespond = await this.shouldRespondToChat(envelope);
 
@@ -585,7 +585,7 @@ export class MEWAgent extends MEWParticipant {
       void this.handleChat(nextMessage);
     }
   }
-  
+
   /**
    * Determine if agent should respond to a chat message
    */
@@ -624,18 +624,18 @@ export class MEWAgent extends MEWParticipant {
       contextWindow: 10,
       ...this.config.chatResponse
     };
-    
+
     // Priority 1: Check if directly addressed
     if (chatConfig.respondToDirect && envelope.to?.includes(this.options.participant_id!)) {
       this.log('debug', 'Responding to directly addressed message');
       return true;
     }
-    
+
     // Priority 2: Check if mentioned by name/ID
     const { text } = envelope.payload;
     const myId = this.options.participant_id!;
     const myName = this.config.name || myId;
-    
+
     if (chatConfig.respondToMentions) {
       const mentionPatterns = [
         new RegExp(`@${myId}\\b`, 'i'),
@@ -643,28 +643,28 @@ export class MEWAgent extends MEWParticipant {
         new RegExp(`\\b${myId}\\b`, 'i'),
         new RegExp(`\\b${myName}\\b`, 'i')
       ];
-      
+
       if (mentionPatterns.some(pattern => pattern.test(text))) {
         this.log('debug', 'Responding to message with mention');
         return true;
       }
     }
-    
+
     // Priority 3: Use LLM classification for relevance
     // We now guarantee OpenAI is initialized in constructor
     if (!this.openai) {
       throw new Error('OpenAI client not initialized - this should never happen!');
     }
-    
+
     // Perform LLM classification
     try {
       const classification = await this.classifyChat(text);
-      
+
       if (classification.shouldRespond && classification.confidence >= chatConfig.confidenceThreshold) {
         this.log('debug', `Responding based on LLM classification (confidence: ${classification.confidence}, reason: ${classification.reason})`);
         return true;
       }
-      
+
       this.log('debug', `Not responding based on LLM classification (confidence: ${classification.confidence}, reason: ${classification.reason})`);
       return false;
     } catch (error) {
@@ -676,19 +676,19 @@ export class MEWAgent extends MEWParticipant {
       return false;
     }
   }
-  
+
   /**
    * Use LLM to classify whether to respond to a chat message
    */
-  private async classifyChat(text: string): Promise<{shouldRespond: boolean; confidence: number; reason: string}> {
+  private async classifyChat(text: string): Promise<{ shouldRespond: boolean; confidence: number; reason: string }> {
     // We now guarantee OpenAI is initialized in constructor
     if (!this.openai) {
       throw new Error('OpenAI client not initialized - this should never happen!');
     }
-    
+
     const allTools = this.getAvailableTools();
     const tools = allTools.map(t => `${t.participantId}/${t.name}`);
-    
+
     const classificationPrompt = this.config.prompts?.classify || `
 You are an AI agent with the following tools: ${JSON.stringify(tools)}
 
@@ -706,7 +706,7 @@ Return a JSON object:
   "confidence": number (0-1),
   "reason": string
 }`;
-    
+
     const response = await this.openai.chat.completions.create({
       model: this.config.model!,
       messages: [
@@ -715,7 +715,7 @@ Return a JSON object:
       ],
       response_format: { type: 'json_object' }
     });
-    
+
     const content = response.choices[0].message.content || '{}';
     return JSON.parse(content);
   }
@@ -725,10 +725,10 @@ Return a JSON object:
    */
   private async handleProposal(envelope: Envelope): Promise<void> {
     const proposal = envelope.payload;
-    
+
     // Check if we can fulfill this proposal
-    if (this.canSend({ kind: 'mcp/request', payload: proposal }) && 
-        this.isSafeOperation(proposal)) {
+    if (this.canSend({ kind: 'mcp/request', payload: proposal }) &&
+      this.isSafeOperation(proposal)) {
       await this.fulfillProposal(envelope);
     }
   }
@@ -758,12 +758,12 @@ Return a JSON object:
       if (thought.action === 'tool' && !thought.actionInput?.toolCallId) {
         thought.actionInput.toolCallId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       }
-      
+
       thoughts.push(thought);
-      
+
       this.log('debug', `Thought action: ${thought.action}, reasoning: ${thought.reasoning}`);
       await this.emitReasoning('reasoning/thought', thought);
-      
+
       // Track reasoning in conversation history
       this.conversationHistory.push({
         role: 'assistant',
@@ -800,10 +800,10 @@ Return a JSON object:
       try {
         const observation = await this.act(thought.action, thought.actionInput);
         this.log('debug', `Observation: ${observation}`);
-        
+
         // Store the observation for the next iteration
         thought.observation = observation;
-        
+
         // Track observation in conversation history
         this.conversationHistory.push({
           role: 'system',
@@ -820,10 +820,10 @@ Return a JSON object:
         // This allows for multi-step workflows
       } catch (error) {
         this.log('error', `Error in act phase: ${error}`);
-        
+
         // Store error as observation so the LLM can decide how to handle it
         thought.observation = `Error: ${error}`;
-        
+
         // Track error in conversation history
         this.conversationHistory.push({
           role: 'system',
@@ -1062,12 +1062,12 @@ Return a JSON object:
 
     // Build messages - always use native format (scratchpad deprecated)
     const messages = this.buildNativeFormatMessages(input, previousThoughts);
-    
+
     // Add guidance about proposal timeouts if we've encountered them
-    const hasProposalTimeout = previousThoughts.some(t => 
+    const hasProposalTimeout = previousThoughts.some(t =>
       t.observation && t.observation.includes('PROPOSAL_TIMEOUT')
     );
-    
+
     if (hasProposalTimeout) {
       const guidanceMessage = {
         role: 'system',
@@ -1075,14 +1075,14 @@ Return a JSON object:
       };
       messages.splice(1, 0, guidanceMessage); // Insert after system prompt
     }
-    
+
     // Add conversation history if configured
     if (this.config.conversationHistoryLength && this.config.conversationHistoryLength > 0) {
       // Insert historical messages after system prompt but before current request
       const historyToInclude = this.conversationHistory.slice(-this.config.conversationHistoryLength);
       messages.splice(1, 0, ...historyToInclude);
     }
-    
+
     // Add warning to system prompt if no tools available
     if (tools.length === 0 && messages.length > 0 && messages[0].role === 'system') {
       messages[0].content += '\n\nIMPORTANT: No tools are currently available. You can only respond with text. If the user asks you to perform actions that would require tools, explain that you are waiting for tool-providing participants to join the workspace and cannot perform the requested action yet.';
@@ -1130,7 +1130,7 @@ Return a JSON object:
       // Note: Participant IDs must not contain underscores for this to work correctly
       const toolName = toolCall.function.name.replace('_', '/'); // e.g., 'weather-service_get_weather' -> 'weather-service/get_weather'
       const args = JSON.parse(toolCall.function.arguments);
-      
+
       return {
         reasoning: message.content || `Using tool ${toolName}`,
         action: 'tool',
@@ -1141,7 +1141,7 @@ Return a JSON object:
         }
       };
     }
-    
+
     // No tool needed, just respond
     return {
       reasoning: message.content || 'Responding directly',
@@ -1246,7 +1246,7 @@ Return a JSON object:
   }
 
 
-  
+
   /**
    * Act phase (ReAct: Act)
    */
@@ -1282,7 +1282,7 @@ Return a JSON object:
   protected prepareLLMTools(): LLMTool[] {
     const tools: LLMTool[] = [];
     const allTools = this.getAvailableTools();
-    
+
     // Format all tools for LLM consumption
     for (const tool of allTools) {
       tools.push({
@@ -1291,7 +1291,7 @@ Return a JSON object:
         parameters: tool.inputSchema
       });
     }
-    
+
     return tools;
   }
 
@@ -1332,31 +1332,31 @@ Return a JSON object:
         throw new Error(`Tool ${toolName} not found`);
       }
     }
-    
+
     // For remote tools, use mcpRequest which handles capability routing automatically
     // It will use direct request if we have mcp/request capability for tools/call,
     // or create a proposal if we only have mcp/proposal capability
     try {
       this.log('debug', `Calling tool ${toolName} on ${participantId} with args: ${JSON.stringify(args)}`);
-      
+
       const result = await this.mcpRequest([participantId], {
         method: 'tools/call',
         params: {
           name: toolName,
           arguments: args
         }
-      }, 30000); // 30 second timeout for proposals
-      
+      });
+
       this.log('debug', `Tool call result: ${JSON.stringify(result)}`);
       return result;
     } catch (error) {
       this.log('error', `Failed to execute tool ${namespacedTool}: ${error}`);
-      
+
       // If it's a proposal that wasn't fulfilled, provide helpful feedback
       if (error instanceof Error && error.message.includes('Proposal') && error.message.includes('not fulfilled')) {
         return `PROPOSAL_TIMEOUT: I proposed using the ${toolName} tool, but it requires human approval. The proposal is waiting for fulfillment. I should try a different approach or explain what I need approval for.`;
       }
-      
+
       throw error;
     }
   }
@@ -1407,7 +1407,7 @@ Return a JSON object:
   private isSafeOperation(proposal: any): boolean {
     // Implement safety checks
     const { method } = proposal;
-    
+
     // Only auto-approve read operations
     const safeOperations = ['tools/list', 'resources/list', 'resources/read'];
     return safeOperations.includes(method);
@@ -1423,13 +1423,13 @@ Return a JSON object:
       // Find target that can handle this
       // For now, just try first available participant with the tool
       const targetId = Array.from(this.otherParticipants.keys())[0];
-      
+
       if (targetId) {
         const result = await this.mcpRequest([targetId], {
           method,
           params
         });
-        
+
         // Send response with correlation to proposal
         const response: Envelope = {
           protocol: PROTOCOL_VERSION,
@@ -1441,7 +1441,7 @@ Return a JSON object:
           kind: 'mcp/response',
           payload: { result }
         };
-        
+
         this.send(response);
       }
     } catch (error) {
@@ -1456,7 +1456,7 @@ Return a JSON object:
     const levels = ['debug', 'info', 'warn', 'error'];
     const configLevel = levels.indexOf(this.config.logLevel || 'info');
     const msgLevel = levels.indexOf(level);
-    
+
     if (msgLevel >= configLevel) {
       console.log(`[${level.toUpperCase()}] [${this.config.name || 'MEWAgent'}] ${message}`);
     }
