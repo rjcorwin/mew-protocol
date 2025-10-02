@@ -106,25 +106,29 @@ mew-protocol/
 │   ├── protocol/
 │   │   ├── v0.4/                    # Current stable
 │   │   │   ├── SPEC.md
-│   │   │   └── decisions/
+│   │   │   ├── accepted/            # Accepted decisions
+│   │   │   ├── proposed/            # Proposed decisions
+│   │   │   └── rejected/            # Rejected decisions
 │   │   └── draft/                   # Next version
 │   │       ├── SPEC.md
-│   │       └── decisions/
+│   │       ├── accepted/
+│   │       ├── proposed/
+│   │       └── rejected/
 │   ├── cli/                          # Merged from specs-to-merge/cli-spec
-│   │   ├── v0.1.0/                  # Latest CLI spec
-│   │   │   ├── SPEC.md
-│   │   │   └── decisions/
-│   │   └── draft/
-│   │       ├── SPEC.md
-│   │       └── decisions/
+│   │   ├── SPEC.md                  # Current CLI spec (living document)
+│   │   ├── accepted/
+│   │   ├── proposed/
+│   │   └── rejected/
 │   ├── sdk/                          # Merged from specs-to-merge/sdk-spec
-│   │   └── draft/
-│   │       ├── SPEC.md
-│   │       └── decisions/
+│   │   ├── SPEC.md
+│   │   ├── accepted/
+│   │   ├── proposed/
+│   │   └── rejected/
 │   ├── bridge/                       # Moved from src/bridge/spec
-│   │   └── draft/
-│   │       ├── SPEC.md
-│   │       └── decisions/
+│   │   ├── SPEC.md
+│   │   ├── accepted/
+│   │   ├── proposed/
+│   │   └── rejected/
 │   └── archive/                      # OLD: Historical specs
 │       ├── protocol/v0.0/
 │       ├── protocol/v0.1/
@@ -171,8 +175,9 @@ mew-protocol/
 ## Specifications
 - [Protocol Spec](../spec/protocol/v0.4/SPEC.md) - Current stable (v0.4)
 - [Protocol Draft](../spec/protocol/draft/SPEC.md) - Next version
-- [CLI Spec](../spec/cli/v0.1.0/SPEC.md) - Command-line interface
-- [SDK Spec](../spec/sdk/draft/SPEC.md) - TypeScript SDK
+- [CLI Spec](../spec/cli/SPEC.md) - Command-line interface
+- [SDK Spec](../spec/sdk/SPEC.md) - TypeScript SDK
+- [Bridge Spec](../spec/bridge/SPEC.md) - MCP-MEW bridge
 
 ## Architecture
 - [System Architecture](architecture.md) - How MEW works (post-restructure)
@@ -273,22 +278,38 @@ Type "help the cat get home" to see MEW in action!
 
 **Merge specs-to-merge/** into **spec/**:
 
-1. **CLI Spec**:
+1. **CLI Spec** (flatten - no versions, just living document):
    ```bash
-   mv specs-to-merge/cli-spec/v0.1.0/ spec/cli/v0.1.0/
-   mv specs-to-merge/cli-spec/draft/ spec/cli/draft/
-   # Archive old versions
+   # Merge latest CLI spec content into single SPEC.md
+   mkdir -p spec/cli
+   cp specs-to-merge/cli-spec/draft/SPEC.md spec/cli/SPEC.md
+   # Flatten decisions - remove intermediate decisions/ folder
+   mkdir -p spec/cli/{accepted,proposed,rejected}
+   cp -r specs-to-merge/cli-spec/draft/decisions/accepted/* spec/cli/accepted/ 2>/dev/null || true
+   cp -r specs-to-merge/cli-spec/draft/decisions/proposed/* spec/cli/proposed/ 2>/dev/null || true
+   # Archive old CLI versions
+   mkdir -p spec/archive/cli
    mv specs-to-merge/cli-spec/v0.0.0/ spec/archive/cli/v0.0.0/
+   mv specs-to-merge/cli-spec/v0.1.0/ spec/archive/cli/v0.1.0/
    ```
 
-2. **SDK Spec**:
+2. **SDK Spec** (flatten - no versions):
    ```bash
-   mv specs-to-merge/sdk-spec/draft/ spec/sdk/draft/
+   mkdir -p spec/sdk
+   cp specs-to-merge/sdk-spec/draft/SPEC.md spec/sdk/SPEC.md
+   # Flatten decisions
+   mkdir -p spec/sdk/{accepted,proposed,rejected}
+   cp -r specs-to-merge/sdk-spec/draft/decisions/accepted/* spec/sdk/accepted/ 2>/dev/null || true
+   cp -r specs-to-merge/sdk-spec/draft/decisions/proposed/* spec/sdk/proposed/ 2>/dev/null || true
    ```
 
-3. **Bridge Spec**:
+3. **Bridge Spec** (flatten - no versions):
    ```bash
-   mv src/bridge/spec/draft/ spec/bridge/draft/
+   mkdir -p spec/bridge
+   cp src/bridge/spec/draft/SPEC.md spec/bridge/SPEC.md
+   # Flatten decisions
+   mkdir -p spec/bridge/{accepted,proposed,rejected}
+   cp -r src/bridge/spec/draft/decisions/proposed/* spec/bridge/proposed/ 2>/dev/null || true
    ```
 
 4. **Archive Old Protocol Specs**:
@@ -300,10 +321,27 @@ Type "help the cat get home" to see MEW in action!
    mv protocol-spec/v0.3/ spec/archive/protocol/
    ```
 
-5. **Reorganize Current Specs**:
+5. **Reorganize Current Protocol Specs** (flatten decisions):
    ```bash
    mv protocol-spec/ spec/protocol/
    # Now spec/protocol contains: v0.4/, draft/, README.md, CHANGELOG.md
+
+   # Flatten v0.4 decisions
+   cd spec/protocol/v0.4/
+   mkdir -p accepted proposed rejected
+   mv decisions/accepted/* accepted/ 2>/dev/null || true
+   mv decisions/proposed/* proposed/ 2>/dev/null || true
+   mv decisions/rejected/* rejected/ 2>/dev/null || true
+   rmdir decisions/accepted decisions/proposed decisions/rejected decisions 2>/dev/null || true
+
+   # Flatten draft decisions
+   cd ../draft/
+   mkdir -p accepted proposed rejected
+   mv decisions/accepted/* accepted/ 2>/dev/null || true
+   mv decisions/proposed/* proposed/ 2>/dev/null || true
+   mv decisions/rejected/* rejected/ 2>/dev/null || true
+   rmdir decisions/accepted decisions/proposed decisions/rejected decisions 2>/dev/null || true
+   cd ../../..
    ```
 
 **Create spec/README.md**:
@@ -314,24 +352,37 @@ Type "help the cat get home" to see MEW in action!
 
 ### Protocol (Core)
 - **[v0.4](protocol/v0.4/SPEC.md)** - Current stable release
+  - [Accepted Decisions](protocol/v0.4/accepted/)
+  - [Proposed Decisions](protocol/v0.4/proposed/)
 - **[Draft](protocol/draft/SPEC.md)** - Next version under development
+  - [Accepted Decisions](protocol/draft/accepted/)
+  - [Proposed Decisions](protocol/draft/proposed/)
 
 ### CLI (Command-Line Interface)
-- **[v0.1.0](cli/v0.1.0/SPEC.md)** - Current CLI spec
-- **[Draft](cli/draft/SPEC.md)** - CLI enhancements
+- **[SPEC.md](cli/SPEC.md)** - Living specification
+  - [Accepted Decisions](cli/accepted/)
+  - [Proposed Decisions](cli/proposed/)
 
 ### SDK (TypeScript)
-- **[Draft](sdk/draft/SPEC.md)** - SDK architecture and patterns
+- **[SPEC.md](sdk/SPEC.md)** - SDK architecture and patterns
+  - [Accepted Decisions](sdk/accepted/)
+  - [Proposed Decisions](sdk/proposed/)
 
 ### Bridge (MCP Integration)
-- **[Draft](bridge/draft/SPEC.md)** - MCP-MEW bridge specification
+- **[SPEC.md](bridge/SPEC.md)** - MCP-MEW bridge specification
+  - [Accepted Decisions](bridge/accepted/)
+  - [Proposed Decisions](bridge/proposed/)
 
 ## Specification Development
 
-See [spec/protocol/README.md](protocol/README.md) for:
-- How to propose changes (ADRs)
-- Version progression (draft → stable)
-- Writing guidelines
+### Making Changes
+1. Create a decision document in the appropriate `proposed/` directory
+2. Discuss and refine in PR review
+3. Once accepted, move to `accepted/` directory
+4. Update the SPEC.md to incorporate the change
+
+### Decision Document Format
+See [protocol/README.md](protocol/README.md) for ADR template and guidelines.
 
 ## Archive
 
@@ -489,10 +540,15 @@ These files stay but need internal path updates:
 
 ### Week 3: Specifications
 - [ ] Reorganize protocol specs: `protocol-spec/` → `spec/protocol/`
-- [ ] Merge CLI spec: `specs-to-merge/cli-spec/` → `spec/cli/`
-- [ ] Merge SDK spec: `specs-to-merge/sdk-spec/` → `spec/sdk/`
-- [ ] Move bridge spec: `src/bridge/spec/` → `spec/bridge/`
+- [ ] Flatten protocol decisions: `v0.4/decisions/accepted/` → `v0.4/accepted/`
+- [ ] Merge CLI spec: `specs-to-merge/cli-spec/` → `spec/cli/SPEC.md` (no versions)
+- [ ] Flatten CLI decisions: Remove intermediate `decisions/` folder
+- [ ] Merge SDK spec: `specs-to-merge/sdk-spec/` → `spec/sdk/SPEC.md` (no versions)
+- [ ] Flatten SDK decisions: Remove intermediate `decisions/` folder
+- [ ] Move bridge spec: `src/bridge/spec/` → `spec/bridge/SPEC.md` (no versions)
+- [ ] Flatten bridge decisions: Remove intermediate `decisions/` folder
 - [ ] Archive old protocol versions → `spec/archive/protocol/`
+- [ ] Archive old CLI versions → `spec/archive/cli/`
 - [ ] Create `spec/README.md` (navigation)
 
 ### Week 4: Archive & Cleanup
@@ -524,8 +580,9 @@ These files stay but need internal path updates:
 
 ### Breaking Changes
 1. **Spec paths change**: `spec/v0.4/` → `spec/protocol/v0.4/`
-2. **CLI spec**: Now at `spec/cli/` (was in `specs-to-merge/`)
-3. **Guides moved**: `docs/guides/DEVELOPMENT.md` → `docs/development.md`
+2. **CLI/SDK/Bridge specs**: Now living documents at `spec/cli/SPEC.md`, `spec/sdk/SPEC.md`, `spec/bridge/SPEC.md` (no versioned folders)
+3. **Decision folders flattened**: `spec/*/decisions/accepted/` → `spec/*/accepted/` (removes intermediate `decisions/` folder)
+4. **Guides moved**: `docs/guides/DEVELOPMENT.md` → `docs/development.md`
 
 ### Backward Compatibility
 - Keep `protocol-spec/` symlink → `spec/protocol/` for 1 release cycle
@@ -535,6 +592,8 @@ These files stay but need internal path updates:
 ### Documentation Debt Resolved
 - ✅ Single testing guide (not 3)
 - ✅ All specs in one place (`spec/`)
+- ✅ Flattened decision folders (no intermediate `decisions/` layer)
+- ✅ CLI/SDK/Bridge as living documents (not versioned - simpler)
 - ✅ Clear entry point (`docs/README.md`)
 - ✅ No references to old monorepo structure
 - ✅ Archived completed work (not mixed with active docs)
