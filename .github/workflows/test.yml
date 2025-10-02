@@ -40,6 +40,9 @@ jobs:
     - name: Install package dependencies
       run: cd packages/mew && npm ci
 
+    - name: Install PM2 globally
+      run: npm install -g pm2
+
     - name: Run unit tests
       run: cd packages/mew && npm test
       env:
