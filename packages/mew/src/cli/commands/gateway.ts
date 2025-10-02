@@ -1107,6 +1107,7 @@ gateway
                 transport: 'websocket',
               },
             );
+
             if (!canGrant) {
               const errorMessage = {
                 protocol: 'mew/v0.4',
@@ -1144,14 +1145,28 @@ gateway
             const grantId = message.id || `grant-${Date.now()}`;
 
             if (recipient && grantCapabilities.length > 0) {
-              // Send acknowledgment to recipient
               // Resolve logical participant name to actual runtime client ID
               const space = spaces.get(spaceId);
               let recipientWs = null;
               let recipientClientId = null;
 
-              // Find recipient by matching token (logical name -> token -> runtime client ID)
-              const recipientToken = tokenMap.get(recipient);
+              // Find recipient by matching token
+              // First check space config tokens field (for spaces using config-based tokens)
+              // This handles the case where participants join with literal tokens from space.yaml
+              let recipientToken = null;
+              if (spaceConfig?.participants[recipient]?.tokens) {
+                const configTokens = spaceConfig.participants[recipient].tokens;
+                if (configTokens && configTokens.length > 0) {
+                  recipientToken = configTokens[0]; // Use first token from config
+                }
+              }
+
+              // If not found in config, try tokenMap (secure storage tokens)
+              // This handles the case where tokens are stored in .mew/tokens/ files
+              if (!recipientToken) {
+                recipientToken = tokenMap.get(recipient);
+              }
+
               if (recipientToken) {
                 for (const [pid, ws] of space.participants) {
                   const pToken = participantTokens.get(pid);
@@ -1161,6 +1176,10 @@ gateway
                     break;
                   }
                 }
+              }
+
+              if (!recipientClientId) {
+                console.error(`Failed to resolve logical name ${recipient} to runtime client ID`);
               }
 
               // Now that we have the runtime client ID, store capabilities under it
