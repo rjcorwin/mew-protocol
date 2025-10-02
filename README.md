@@ -51,14 +51,14 @@ The **proposal mechanism** ensures humans stay in control. New agents start with
 
 **v0.4** - Released 2025-09-26 🎉
 
-MEW Protocol is in experimental phase (v0.x) with breaking changes allowed between versions. See [spec/v0.4/SPEC.md](/spec/v0.4/SPEC.md) for the current specification.
+MEW Protocol is in experimental phase (v0.x) with breaking changes allowed between versions. See [spec/protocol/v0.4/SPEC.md](spec/protocol/v0.4/SPEC.md) for the current specification.
 
 ## 🚀 Quick Start
 
 ### Install
 
 ```bash
-npm install -g @mew-protocol/cli
+npm install -g @mew-protocol/mew
 ```
 
 ### Create & Launch a Workspace
@@ -87,12 +87,20 @@ That's it! MEW guides you through setting up your workspace with:
 - ✅ Proposal/approval flow for safe operations
 - 🎓 Progressive trust as patterns prove safe
 
-## 📚 Learn More
+## 📚 Documentation
 
-- 📋 [Current Specification (v0.4)](/spec/v0.4/SPEC.md)
-- 📝 [Draft Specification (next version)](/spec/draft/SPEC.md)
-- 🏗️ [Architecture Decision Records](/spec/v0.4/decisions/)
-- 📜 [Changelog](/CHANGELOG.md)
+See [docs/README.md](docs/README.md) for complete documentation including:
+- 🚀 Getting Started Guide
+- 🧪 Testing Guide
+- 🏗️ Architecture Overview
+- 🤝 Contributing Guidelines
+
+## 📋 Specifications
+
+- [Current Specification (v0.4)](spec/protocol/v0.4/SPEC.md)
+- [Draft Specification (next version)](spec/protocol/draft/SPEC.md)
+- [Architecture Decision Records](spec/protocol/v0.4/accepted/)
+- [Changelog](CHANGELOG.md)
 
 ## 🐈 Why "MEW"?
 
