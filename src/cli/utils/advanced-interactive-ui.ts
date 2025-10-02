@@ -833,7 +833,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       addMessage({
         kind: 'system/info',
         from: 'system',
-        payload: { text: `✅ Capability grant acknowledged by ${message.from}` }
+        payload: { text: `◆ Capability grant acknowledged by ${message.from}` }
       }, false);
     }
 
@@ -848,7 +848,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         addMessage({
           kind: 'system/info',
           from: 'system',
-          payload: { text: `📋 Your capabilities have been updated (${capabilities.length} total)` }
+          payload: { text: `◇ Your capabilities have been updated (${capabilities.length} total)` }
         }, false);
       }
     }
@@ -861,7 +861,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         addMessage({
           kind: 'system/error',
           from: 'system',
-          payload: { text: `❌ Cannot grant capabilities: You lack the 'capability/grant' permission` }
+          payload: { text: `╳ Cannot grant capabilities: You lack the 'capability/grant' permission` }
         }, false);
       }
     }
@@ -1874,13 +1874,22 @@ function MessageDisplay({ item, verbose, useColor }) {
   const participant = sent ? 'you' : message.from || 'system';
   const kind = message.kind || 'unknown';
 
-  // Add context indicator
-  const contextPrefix = message.context ? '  └─ ' : '';
+  // Add context indicator - diamond bullet for nested messages
+  const contextPrefix = message.context ? '  ◇ ' : '';
+
+  // Determine if we should show a separator before this message
+  // Show separator for major transitions: before chat, after reasoning/conclusion, stream boundaries
+  const showSeparator = !message.context && (
+    kind === 'chat' ||
+    kind === 'reasoning/start' ||
+    kind === 'stream/close' ||
+    kind === 'mcp/request' && participant !== 'you'
+  );
 
   if (verbose) {
     return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
       React.createElement(Text, { color: "gray" },
-        `${contextPrefix}[${time}] ${direction} ${participant} ${kind}`
+        `${contextPrefix}⟨${time}⟩ ${direction} ${participant} ${kind}`
       ),
       React.createElement(Text, null, JSON.stringify(message, null, 2))
     );
@@ -1889,8 +1898,9 @@ function MessageDisplay({ item, verbose, useColor }) {
   let headerColor = useColor ? getColorForKind(kind) : 'white';
 
   return React.createElement(Box, { flexDirection: "column", marginBottom: kind === 'reasoning/thought' ? 2 : 1 },
+    showSeparator && React.createElement(Text, { color: "magenta", dimColor: true }, '  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔'),
     React.createElement(Text, { color: headerColor },
-      `${contextPrefix}[${time}] ${direction} ${participant} ${kind}`
+      `${contextPrefix}⟨${time}⟩ ${direction} ${participant} ${kind}`
     ),
     message.payload && React.createElement(ReasoningDisplay, {
       payload: message.payload,
@@ -1909,15 +1919,17 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
   // Special formatting for reasoning/thought messages
   if (kind === 'reasoning/thought' && payload.reasoning) {
     return React.createElement(Box, { flexDirection: "column" },
-      React.createElement(Text, { color: "blue" }, `${contextPrefix}└─ reasoning/thought`),
+      React.createElement(Text, { color: "cyan" }, `${contextPrefix}◇ reasoning/thought`),
       React.createElement(Text, {
-        color: "blackBright",
+        color: "cyan",
+        dimColor: true,
         marginLeft: 6,
         marginTop: 1,
         wrap: "wrap"
       }, payload.reasoning),
       payload.action && React.createElement(Text, {
-        color: "gray",
+        color: "magenta",
+        dimColor: true,
         marginLeft: 6,
         marginTop: 1
       }, `→ action: ${payload.action}`)
@@ -1927,7 +1939,7 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
   if (kind === 'system/help' && Array.isArray(payload.lines)) {
     const sectionTitles = new Set(['Available Commands', 'Chat Queue', 'Participant Controls', 'Streams']);
     const basePrefix = contextPrefix || '';
-    const firstLinePrefix = `${basePrefix}└─ `;
+    const firstLinePrefix = `${basePrefix}◇ `;
     const baseSpaces = basePrefix.replace(/[^\s]/g, ' ');
     const subsequentPrefix = `${baseSpaces}   `;
     return React.createElement(Box, { flexDirection: "column" },
@@ -1948,15 +1960,15 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
   // Special formatting for chat messages
   if (kind === 'chat') {
     return React.createElement(Text, {
-      color: "white",
+      color: "cyan",
       wrap: "wrap"
-    }, `${contextPrefix}└─ ${preview}`);
+    }, `${contextPrefix}◇ ${preview}`);
   }
 
   // Default single-line display for other message types
   return React.createElement(Text, {
-    color: "blackBright"
-  }, `${contextPrefix}└─ ${preview}`);
+    color: "gray"
+  }, `${contextPrefix}◇ ${preview}`);
 }
 
 /**
@@ -2139,18 +2151,18 @@ function ReasoningStatus({ reasoning }) {
   },
     React.createElement(Box, { flexDirection: "column", height: "100%" },
       React.createElement(Box, { width: "100%" },
-        React.createElement(Text, { color: "cyan", bold: true }, spinnerChars[spinnerIndex] + " "),
-        React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`),
-        React.createElement(Text, { color: "gray", marginLeft: 4 }, `  ${elapsedTime}s  `),
-        reasoning.tokenCount || reasoning.thoughtCount > 0 ? React.createElement(Text, { color: "gray", marginLeft: 3 },
+        React.createElement(Text, { color: "magenta", bold: true }, spinnerChars[spinnerIndex] + " "),
+        React.createElement(Text, { color: "cyan", bold: true }, `${reasoning.from} is thinking`),
+        React.createElement(Text, { color: "magenta", dimColor: true, marginLeft: 4 }, `  ${elapsedTime}s  `),
+        reasoning.tokenCount || reasoning.thoughtCount > 0 ? React.createElement(Text, { color: "cyan", dimColor: true, marginLeft: 3 },
           reasoning.tokenCount ? `${reasoning.tokenCount} tokens` : `${reasoning.thoughtCount} thoughts`
         ) : null
       ),
       React.createElement(Box, { height: 1 },  // Fixed height for action line
-        React.createElement(Text, { color: "gray" }, reasoning.action || ' ')  // Use space instead of empty string
+        React.createElement(Text, { color: "magenta", dimColor: true }, reasoning.action || ' ')  // Use space instead of empty string
       ),
       React.createElement(Box, { marginTop: 0, height: maxLines },  // Fixed height for text preview - always rendered
-        React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" },
+        React.createElement(Text, { color: "cyan", dimColor: true, italic: true, wrap: "wrap" },
           textPreview || ' '  // Use space to avoid empty string error
         )
       ),
@@ -2158,17 +2170,17 @@ function ReasoningStatus({ reasoning }) {
         React.createElement(Text, { color: "cyan" }, `Tokens: ${tokenSummary.summary}`)
       ) : null,
       tokenSummary?.deltas ? React.createElement(Box, { marginTop: 0 },
-        React.createElement(Text, { color: "cyan" }, `Δ ${tokenSummary.deltas}`)
+        React.createElement(Text, { color: "magenta" }, `Δ ${tokenSummary.deltas}`)
       ) : null,
       tokenSummary?.details ? React.createElement(Box, { marginTop: 0 },
-        React.createElement(Text, { color: "gray" }, tokenSummary.details)
+        React.createElement(Text, { color: "cyan", dimColor: true }, tokenSummary.details)
       ) : null,
       tokenSummary && tokenUpdatedAgo ? React.createElement(Box, { marginTop: 0 },
-        React.createElement(Text, { color: "gray" }, `Updated ${tokenUpdatedAgo}`)
+        React.createElement(Text, { color: "cyan", dimColor: true }, `Updated ${tokenUpdatedAgo}`)
       ) : null,
       React.createElement(Box, { marginTop: 0, flexGrow: 1 }),  // Spacer to push cancel hint to bottom
       React.createElement(Box, null,
-        React.createElement(Text, { color: "gray" }, 'Use /cancel to interrupt reasoning.')
+        React.createElement(Text, { color: "magenta", dimColor: true }, 'Use /cancel to interrupt reasoning.')
       )
     )
   );
@@ -2221,26 +2233,26 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId
 
   return React.createElement(Box, { justifyContent: "space-between", paddingX: 1 },
     React.createElement(Text, null,
-      "🐱 | ",
+      React.createElement(Text, { color: "magenta", bold: true }, "◆ "),
       React.createElement(Text, { color: statusColor }, status),
-      " | ",
+      React.createElement(Text, { color: "magenta", dimColor: true }, " ◇ "),
       React.createElement(Text, { color: "cyan" }, spaceId),
-      " | ",
-      React.createElement(Text, { color: "blue" }, participantId),
+      React.createElement(Text, { color: "magenta", dimColor: true }, " ◇ "),
+      React.createElement(Text, { color: "magenta" }, participantId),
       extrasText
     ),
-    React.createElement(Text, { color: "gray" }, "Ctrl+C to exit")
+    React.createElement(Text, { color: "cyan", dimColor: true }, "Ctrl+C to exit")
   );
 }
 
 // Helper functions
 function getColorForKind(kind) {
   if (kind.startsWith('system/error')) return 'red';
-  if (kind.startsWith('system/')) return 'blackBright';
-  if (kind.startsWith('mcp/')) return 'blackBright';
-  if (kind.startsWith('reasoning/')) return 'blue';  // Reasoning headers in blue
-  if (kind === 'chat') return 'white';  // Clean white for chat messages
-  return 'blackBright';
+  if (kind.startsWith('system/')) return 'gray';
+  if (kind.startsWith('mcp/')) return 'magenta';
+  if (kind.startsWith('reasoning/')) return 'cyan';  // Reasoning in neon cyan
+  if (kind === 'chat') return 'cyan';  // Chat messages in cyan
+  return 'gray';
 }
 
 function getPayloadPreview(payload, kind) {
@@ -2317,17 +2329,17 @@ function getPayloadPreview(payload, kind) {
   if (kind === 'reasoning/start') {
     if (payload.message) {
       const message = payload.message;
-      return `🧠 Starting: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
+      return `◇ Starting: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
     }
-    return '🧠 Started reasoning session';
+    return '◇ Started reasoning session';
   }
 
   if (kind === 'reasoning/conclusion') {
     if (payload.message) {
       const message = payload.message;
-      return `✅ Concluded: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
+      return `◆ Concluded: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
     }
-    return '✅ Reasoning session complete';
+    return '◆ Reasoning session complete';
   }
 
   if (typeof payload === 'string') {

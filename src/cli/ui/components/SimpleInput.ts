@@ -23,11 +23,12 @@ function SimpleInput({ onSubmit, disabled = false, prompt = '> ' }) {
   }, { isActive: !disabled });
 
   return React.createElement(Box, {
-    borderStyle: 'single',
+    borderStyle: 'round',
+    borderColor: 'magenta',
     paddingX: 1
   },
-    React.createElement(Text, { color: 'green' }, prompt),
-    React.createElement(Text, null, value || '_')
+    React.createElement(Text, { color: 'magenta', bold: true }, prompt),
+    React.createElement(Text, { color: 'cyan' }, value || '_')
   );
 }
 
