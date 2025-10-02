@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { MCPxClient } from '../src/MCPxClient';
+import { MEWClient } from '../MEWClient.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -10,7 +10,7 @@ const execAsync = promisify(exec);
  * This test requires the gateway to be running
  */
 describe.skip('Gateway Integration', () => {
-  let client: MCPxClient;
+  let client: MEWClient;
 
   beforeAll(async () => {
     // Note: Gateway must be started manually before running this test
@@ -34,9 +34,9 @@ describe.skip('Gateway Integration', () => {
 
     const { token } = await response.json();
 
-    client = new MCPxClient({
+    client = new MEWClient({
       gateway: 'ws://localhost:3000',
-      topic: 'test-topic',
+      space: 'test-topic',
       token,
     });
   });
@@ -99,9 +99,9 @@ describe.skip('Gateway Integration', () => {
 
     const { token } = await response.json();
 
-    const client2 = new MCPxClient({
+    const client2 = new MEWClient({
       gateway: 'ws://localhost:3000',
-      topic: 'test-topic',
+      space: 'test-topic',
       token,
     });
 

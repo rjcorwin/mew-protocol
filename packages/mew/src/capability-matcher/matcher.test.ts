@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import { PatternMatcher } from './matcher';
 import { hasCapability, findMatchingCapabilities } from './index';
 import { Participant, Message, CapabilityPattern } from './types';

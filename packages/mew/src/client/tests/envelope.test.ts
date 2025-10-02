@@ -5,8 +5,8 @@ import {
   JsonRpcRequest,
   JsonRpcResponse,
   JsonRpcNotification,
-} from '../src/types';
-import { MEWClient } from '../src/MEWClient';
+} from '../types.js';
+import { MEWClient } from '../MEWClient.js';
 import WebSocket from 'ws';
 
 describe('Envelope Creation and Validation', () => {
