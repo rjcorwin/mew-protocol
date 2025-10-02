@@ -62,7 +62,7 @@ if ! (cd "${REPO_ROOT}" && npm run build > /dev/null 2>&1); then
   printf "%b\n" "${RED}❌ Build failed${NC}"
   exit 1
 fi
-if ! (cd "${REPO_ROOT}" && npm install -g . > /dev/null 2>&1); then
+if ! (cd "${REPO_ROOT}/packages/mew" && npm install -g . > /dev/null 2>&1); then
   printf "%b\n" "${RED}❌ Global install failed${NC}"
   exit 1
 fi
