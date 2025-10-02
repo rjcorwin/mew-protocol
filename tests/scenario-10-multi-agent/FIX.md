@@ -1,36 +1,37 @@
-# Scenario 10-multi-agent - Partial Test Failures
+# Scenario 10-multi-agent - RESOLVED
 
 ## Status
-⚠️ Refactor complete, 5/7 tests passing
+✅ Fixed and passing
 
-## Refactor Changes Completed
-- ✅ Updated teardown.sh to use global `mew` command
-- ✅ Updated setup.sh SDK path: `sdk/typescript-sdk/participant/dist/index.js` → `packages/mew/dist/participant/index.js`
-- ✅ space.yaml was already correct (local agents)
-- ✅ No package.json needed
+## Issue
+Partial test failures (5/7 tests passing) - calculator agent failed to start due to module resolution error.
+
+## Root Cause
+Same as scenario-9: calculator-participant.js used `require('@mew-protocol/participant')` which doesn't exist after repository consolidation.
+
+## Solution
+Updated the require path in `template/agents/calculator-participant.js`:
+
+```javascript
+// Before:
+const { MEWParticipant } = require('@mew-protocol/participant');
+
+// After:
+const { MEWParticipant } = require('../../../../../packages/mew/dist/participant/index.js');
+```
 
 ## Test Results
-- Gateway health endpoint ✓
-- Coordinator connected ✓
-- Worker connected ✓
-- Coordinator logged delegation ✓
-- Worker forwarded request ✓
-- **Chat response includes result ✗**
-- **tools/list proxied ✗**
+All 7 tests now pass:
+- ✓ Gateway health endpoint
+- ✓ Coordinator connected
+- ✓ Worker connected
+- ✓ Chat response includes result (4 + 6 = 10)
+- ✓ Coordinator logged delegation
+- ✓ Worker forwarded request
+- ✓ tools/list proxied
 
-## Issues
-1. **Chat response missing result**: Coordinator delegates calculation to worker, worker forwards to calculator, but chat response doesn't include the result
-2. **tools/list not proxied**: Worker should proxy tools/list request but it's not working
+## Files Changed
+- `tests/scenario-10-multi-agent/template/agents/calculator-participant.js` - Updated MEWParticipant require path
 
-## Likely Cause
-Multi-agent coordination logic may have issues with:
-- Response routing back through coordinator → worker → calculator chain
-- MCP request proxying between agents
-
-## Next Steps
-1. Debug coordinator-agent response handling
-2. Check worker-agent MCP request forwarding
-3. Verify message correlation IDs through the chain
-
-## Note
-The refactor changes are complete and correct. The 2 test failures appear to be functional issues with multi-agent coordination, not related to the repository restructuring.
+## Notes
+The coordinator and worker agents use raw WebSocket connections and didn't need updates. Only the calculator participant uses the MEWParticipant SDK.

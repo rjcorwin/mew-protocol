@@ -3,7 +3,7 @@
  * Calculator participant reused for scenario 10.
  */
 
-const { MEWParticipant } = require('@mew-protocol/participant');
+const { MEWParticipant } = require('../../../../../packages/mew/dist/participant/index.js');
 
 const args = process.argv.slice(2);
 const options = {
