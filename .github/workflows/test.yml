@@ -37,10 +37,11 @@ jobs:
     - name: Build packages
       run: npm run build
 
-    - name: Run tests (without LLM scenarios)
+    - name: Run tests
       run: npm test -- --no-llm --verbose
       env:
-        # Scenarios 8, 9, 10 require OPENAI_API_KEY and are skipped with --no-llm flag
+        # All scenarios now use mockLLM mode and run without external API keys
+        # The --no-llm flag skips any scenarios with a 'requires-llm' marker file
         CI: true
 
     - name: Upload test results
