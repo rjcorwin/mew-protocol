@@ -252,3 +252,12 @@ async function main(): Promise<void> {
 
 // Export for use as a module
 export { MEWAgent, AgentConfig };
+
+// Run main if executed directly (not imported as a module)
+// Check if this is the main module (CommonJS style check for ESM compatibility)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}

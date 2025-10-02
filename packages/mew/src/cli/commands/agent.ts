@@ -249,7 +249,8 @@ agent
       const baseURL = process.env.OPENAI_BASE_URL;
       const model = process.env.OPENAI_MODEL;
 
-      const agent = new MEWAgent({
+      // Build base agent config
+      let agentConfig = {
         gateway: options.gateway,
         space: options.space,
         participant_id: options.id,
@@ -257,9 +258,22 @@ agent
         apiKey,
         baseURL,
         model,
-      });
+      };
 
-      await agent.connect();
+      // Apply MEW_AGENT_CONFIG from environment if present
+      if (process.env.MEW_AGENT_CONFIG) {
+        try {
+          const envConfig = JSON.parse(process.env.MEW_AGENT_CONFIG);
+          agentConfig = { ...agentConfig, ...envConfig };
+          console.log('Applied configuration from MEW_AGENT_CONFIG');
+        } catch (error: any) {
+          console.error('Failed to parse MEW_AGENT_CONFIG:', error.message);
+        }
+      }
+
+      const agent = new MEWAgent(agentConfig);
+
+      await agent.start();
       console.log(`MEWAgent ${options.id} connected to ${options.space}`);
 
       // Keep process alive
