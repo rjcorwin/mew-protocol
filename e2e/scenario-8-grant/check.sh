@@ -237,7 +237,7 @@ print(json.dumps(message))
 PY
   )
 
-  if node "${SCENARIO_DIR}/send_ws_messages.js" \
+  if node "${SCENARIO_DIR}/send_ws_messages.cjs" \
     "ws://localhost:${TEST_PORT}/ws?space=${SPACE_NAME}" \
     "test-token" \
     "test-client" \

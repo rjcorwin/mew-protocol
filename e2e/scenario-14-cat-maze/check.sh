@@ -51,7 +51,7 @@ fi
 
 printf "%b\n" "${BLUE}Running solver against cat maze server...${NC}"
 
-if node "${SCENARIO_DIR}/solver.js" --server "${SERVER_PATH}" --log "${SOLVER_LOG}"; then
+if node "${SCENARIO_DIR}/solver.cjs" --server "${SERVER_PATH}" --log "${SOLVER_LOG}"; then
   printf "%b\n" "${GREEN}✓ Cat maze run completed successfully${NC}"
 else
   printf "%b\n" "${RED}✗ Cat maze run failed${NC}"
@@ -63,7 +63,7 @@ fi
 
 printf "%b\n" "${BLUE}Verifying narrator move relays...${NC}"
 
-if node "${SCENARIO_DIR}/narrator-check.js" --server "${SERVER_PATH}" --narrator "${NARRATOR_PATH}" --log "${NARRATOR_LOG}"; then
+if node "${SCENARIO_DIR}/narrator-check.cjs" --server "${SERVER_PATH}" --narrator "${NARRATOR_PATH}" --log "${NARRATOR_LOG}"; then
   printf "%b\n" "${GREEN}✓ Narrator relayed move results with 🟩 walkway tiles${NC}"
 else
   printf "%b\n" "${RED}✗ Narrator relay check failed${NC}"
