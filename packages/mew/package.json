@@ -98,6 +98,6 @@
     "url": "https://github.com/rjcorwin/mew-protocol/issues"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   }
 }
