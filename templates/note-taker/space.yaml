@@ -11,7 +11,7 @@ participants:
 
   assistant:
     command: "node"
-    args: ["./.mew/agents/assistant.js"]
+    args: ["./.mew/agents/assistant.cjs"]
     auto_start: true
     # No tokens field - generated at runtime in .mew/tokens/
     env:

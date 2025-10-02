@@ -40,7 +40,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "./.mew/agents/calculator-participant.js"
+      - "./.mew/agents/calculator-participant.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"

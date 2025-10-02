@@ -10,7 +10,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "./.mew/agents/calculator-agent.js"
+      - "./.mew/agents/calculator-agent.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
@@ -28,7 +28,7 @@ participants:
     output_log: "./logs/fulfiller.log"
     command: "node"
     args:
-      - "./.mew/agents/fulfiller-agent.js"
+      - "./.mew/agents/fulfiller-agent.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"

@@ -10,7 +10,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "./.mew/agents/coordinator-agent.js"
+      - "./.mew/agents/coordinator-agent.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
@@ -31,7 +31,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "./.mew/agents/worker-agent.js"
+      - "./.mew/agents/worker-agent.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
@@ -53,7 +53,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "./.mew/agents/calculator-participant.js"
+      - "./.mew/agents/calculator-participant.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"

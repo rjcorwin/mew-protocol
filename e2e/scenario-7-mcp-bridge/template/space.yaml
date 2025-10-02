@@ -14,7 +14,7 @@ participants:
     mcp_server:
       command: "node"
       args:
-        - "./.mew/agents/filesystem-mcp.js"
+        - "./.mew/agents/filesystem-mcp.cjs"
         - "./test-files"
     bridge_config:
       init_timeout: 30000

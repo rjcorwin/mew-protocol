@@ -10,7 +10,7 @@ participants:
     auto_start: true
     command: "node"
     args: [
-      "./.mew/agents/echo-agent.js",
+      "./.mew/agents/echo-agent.cjs",
       "--gateway", "ws://localhost:${PORT}",
       "--space", "{{SPACE_NAME}}",
       "--token", "echo-token"

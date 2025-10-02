@@ -10,7 +10,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "./.mew/agents/control-agent.js"
+      - "./.mew/agents/control-agent.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"

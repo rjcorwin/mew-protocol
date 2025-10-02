@@ -117,7 +117,7 @@ participants:
   auto-fulfiller:
     type: local
     command: "node"
-    args: ["./.mew/agents/auto-fulfiller.js"]
+    args: ["./.mew/agents/auto-fulfiller.cjs"]
     auto_start: false  # Disabled for manual testing
     # No tokens field - generated at runtime in .mew/tokens/
     capabilities:

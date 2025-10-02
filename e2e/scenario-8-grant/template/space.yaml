@@ -10,7 +10,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "./.mew/agents/grant-agent.js"
+      - "./.mew/agents/grant-agent.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
@@ -35,7 +35,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "./.mew/agents/grant-file-server.js"
+      - "./.mew/agents/grant-file-server.cjs"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"
