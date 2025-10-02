@@ -525,56 +525,150 @@ These files stay but need internal path updates:
 
 ## Implementation Plan
 
-### Week 1: Foundation
-- [ ] Create `docs/README.md` (documentation hub)
-- [ ] Create `CONTRIBUTING.md`
-- [ ] Create `docs/getting-started.md`
-- [ ] Create `docs/architecture.md` (current state)
-- [ ] Create `docs/troubleshooting.md`
+This reorganization follows an incremental approach with clear deliverables at each phase. Each phase can be completed independently, allowing us to pause and validate before continuing.
 
-### Week 2: Consolidation
-- [ ] Merge → `docs/development.md` (DEVELOPMENT.md + AGENTS.md sections)
-- [ ] Merge → `docs/testing.md` (TEST.md + TESTING.md + e2e/README.md)
-- [ ] Merge → `docs/templates.md` (TESTING-CAT-MAZE + TESTING-CODER-AGENT)
-- [ ] Move → `docs/releasing.md` (from RELEASE.md)
+### Phase 1: Quick Wins (1-2 days)
+**Goal**: Immediate improvements for users/contributors - high impact, low risk
 
-### Week 3: Specifications
-- [ ] Reorganize protocol specs: `protocol-spec/` → `spec/protocol/`
-- [ ] Flatten protocol decisions: `v0.4/decisions/accepted/` → `v0.4/accepted/`
-- [ ] Merge CLI spec: `specs-to-merge/cli-spec/` → `spec/cli/SPEC.md` (no versions)
-- [ ] Flatten CLI decisions: Remove intermediate `decisions/` folder
-- [ ] Merge SDK spec: `specs-to-merge/sdk-spec/` → `spec/sdk/SPEC.md` (no versions)
-- [ ] Flatten SDK decisions: Remove intermediate `decisions/` folder
-- [ ] Move bridge spec: `src/bridge/spec/` → `spec/bridge/SPEC.md` (no versions)
-- [ ] Flatten bridge decisions: Remove intermediate `decisions/` folder
-- [ ] Archive old protocol versions → `spec/archive/protocol/`
-- [ ] Archive old CLI versions → `spec/archive/cli/`
-- [ ] Create `spec/README.md` (navigation)
+- [ ] Create `docs/README.md` - central documentation hub
+- [ ] Create `CONTRIBUTING.md` - clear entry point for contributors
+- [ ] Update `README.md`:
+  - Fix broken spec links (`/spec/v0.4/` → `/spec/protocol/v0.4/`)
+  - Add "Documentation" section pointing to `docs/README.md`
+  - Remove monorepo/workspace references
+- [ ] Create `docs/troubleshooting.md` - consolidate from `docs/bugs/`
 
-### Week 4: Archive & Cleanup
-- [ ] Create `archive/` directory
-- [ ] Archive completed TODOs → `archive/completed-todos.md`
-- [ ] Archive completed ADRs → `archive/migrations/`
-- [ ] Archive FIX.md files → `archive/known-issues.md`
-- [ ] Archive old architecture docs → `archive/migrations/`
-- [ ] Delete obsolete files (see Phase 3.1)
+**Deliverable**: Users can navigate documentation much faster
+**Checkpoint**: Verify navigation from README → any doc topic in < 30 seconds
 
-### Week 5: Updates & Verification
-- [ ] Update `README.md` (paths, links, structure)
-- [ ] Update `AGENTS.md` (repository structure, paths)
-- [ ] Update `CHANGELOG.md` (document reorganization)
-- [ ] Update `e2e/README.md` (single package references)
-- [ ] Create `templates/README.md`
-- [ ] Update all template READMEs (paths, commands)
-- [ ] Update spec READMEs for new structure
+### Phase 2: Consolidate Guides (2-3 days)
+**Goal**: Single source of truth for development/testing - eliminate duplication
 
-### Week 6: Validation
-- [ ] Verify all internal links work
-- [ ] Check for broken references to old paths
-- [ ] Validate all code examples still work
-- [ ] Run spell check on all docs
-- [ ] Get feedback from team/community
-- [ ] Make final adjustments
+- [ ] Create `docs/testing.md`:
+  - Merge content from `TEST.md`, `docs/guides/TESTING.md`, and relevant `e2e/README.md` sections
+  - Update all paths for single-package structure
+  - Remove PM2 instruction duplication
+  - **Delete** `TEST.md` after merge
+  - **Delete** `docs/guides/TESTING.md` after merge
+- [ ] Create `docs/templates.md`:
+  - Merge `TESTING-CAT-MAZE.md` and `TESTING-CODER-AGENT.md`
+  - Create unified guide with subsections per template
+  - **Delete** `TESTING-CAT-MAZE.md` after merge
+  - **Delete** `TESTING-CODER-AGENT.md` after merge
+- [ ] Update `docs/development.md`:
+  - Merge relevant sections from `AGENTS.md`
+  - Remove all `packages/mew`, monorepo references
+  - Update build commands for single package
+  - Keep `AGENTS.md` at root (but update it in Phase 5)
+- [ ] Move `RELEASE.md` → `docs/releasing.md`
+  - Update paths for single-package structure
+- [ ] Create `templates/README.md` - overview of available templates
+
+**Deliverable**: Zero duplicate testing/template documentation
+**Checkpoint**: Verify all testing workflows documented in one place
+
+### Phase 3: Spec Reorganization (4-5 days)
+**Goal**: Unified spec/ structure - one spec at a time for safety
+
+#### 3.1 Protocol Spec (Day 1)
+- [ ] Move `protocol-spec/` → `spec/protocol/`
+- [ ] Flatten v0.4 decisions: `v0.4/decisions/accepted/` → `v0.4/accepted/`
+- [ ] Flatten draft decisions: `draft/decisions/accepted/` → `draft/accepted/`
+- [ ] Archive old versions: `v0.0/`, `v0.1/`, `v0.2/`, `v0.3/` → `spec/archive/protocol/`
+- [ ] Update links in `README.md`
+- [ ] Test: Verify protocol spec accessible and decision docs readable
+
+#### 3.2 CLI Spec (Day 2)
+- [ ] Create `spec/cli/SPEC.md` from `specs-to-merge/cli-spec/draft/SPEC.md`
+- [ ] Flatten decisions: `draft/decisions/accepted/` → `cli/accepted/`
+- [ ] Archive old versions: `v0.0.0/`, `v0.1.0/` → `spec/archive/cli/`
+- [ ] Test: Verify CLI spec accessible and decision docs readable
+
+#### 3.3 SDK Spec (Day 3)
+- [ ] Create `spec/sdk/SPEC.md` from `specs-to-merge/sdk-spec/draft/SPEC.md`
+- [ ] Flatten decisions: `draft/decisions/accepted/` → `sdk/accepted/`
+- [ ] Test: Verify SDK spec accessible
+
+#### 3.4 Bridge Spec (Day 4)
+- [ ] Create `spec/bridge/SPEC.md` from `src/bridge/spec/draft/SPEC.md`
+- [ ] Flatten decisions: `draft/decisions/proposed/` → `bridge/proposed/`
+- [ ] Test: Verify Bridge spec accessible
+
+#### 3.5 Spec Navigation (Day 5)
+- [ ] Create `spec/README.md` - unified navigation for all specs
+- [ ] Update `docs/README.md` - fix spec links
+- [ ] **Delete** `specs-to-merge/` directory
+- [ ] **Delete** `src/bridge/spec/` directory
+- [ ] Test: Verify all spec links work from docs/README.md
+
+**Deliverable**: All specs in `spec/`, each independently verified
+**Checkpoint**: Can navigate from any spec to any decision document
+
+### Phase 4: Archive & Cleanup (1-2 days)
+**Goal**: Remove cruft, preserve history
+
+- [ ] Create `archive/` directory structure
+- [ ] Create `archive/completed-todos.md`:
+  - Consolidate `TODO.md`, `e2e/TODO.md`, `src/agent/TODO.md`
+  - **Delete** source TODO files after consolidation
+- [ ] Create `archive/migrations/monorepo-to-single.md`:
+  - Move content from `ADR.md`
+  - **Delete** `ADR.md` after move
+- [ ] Create `archive/migrations/` for old architecture docs:
+  - Move `docs/architecture/MONOREPO-ARCHITECTURE.md`
+  - Move `docs/architecture/MIGRATION-TO-PROJECT-REFERENCES.md`
+  - Move `docs/architecture/SETUP-TYPESCRIPT-FOR-MONOREPO.md`
+  - **Delete** `docs/architecture/` directory after move
+- [ ] Create `archive/known-issues.md`:
+  - Extract resolved issues from `docs/bugs/`
+  - Consolidate `e2e/scenario-*/FIX.md` files (5 files)
+  - **Delete** source files after consolidation
+- [ ] **Delete** obsolete files:
+  - `src/cli/agents/README.md` (empty stub)
+  - `docs/guides/INTEGRATION-PLAN.md` (completed work)
+  - `docs/protocol-flow-comparison.md` (orphaned)
+  - `docs/bugs/` directory (if empty after extraction)
+
+**Deliverable**: Clean repo, all history preserved in archive/
+**Checkpoint**: No TODO/FIX files in active codebase
+
+### Phase 5: Polish & Verification (2-3 days)
+**Goal**: Everything works and is discoverable
+
+- [ ] Update `AGENTS.md`:
+  - Fix "Repository Structure" section for single package
+  - Update "Critical Docs" paths
+  - Update "Common Commands" for global `mew`
+  - Fix all path references
+- [ ] Update `e2e/README.md`:
+  - Remove monorepo, `packages/mew` references
+  - Update build/install instructions
+  - Keep excellent scenario descriptions
+- [ ] Update `CHANGELOG.md`:
+  - Document reorganization with migration guide
+  - List all breaking path changes
+- [ ] Create `docs/getting-started.md` - distilled quick start
+- [ ] Create `docs/architecture.md` - current single-package architecture
+- [ ] Verify all internal links:
+  - Run link checker on all .md files
+  - Fix broken references
+- [ ] Test all code examples:
+  - Verify commands in guides still work
+  - Update any outdated examples
+- [ ] Get feedback from AI agents:
+  - Test navigation using AGENTS.md
+  - Verify discoverability
+
+**Deliverable**: Production-ready documentation
+**Checkpoint**: All success metrics met (see below)
+
+### Total Timeline: ~2-3 weeks of focused work
+
+Each phase has clear start/end points and can be completed independently. This allows for:
+- **Early value**: Phase 1 helps users immediately
+- **Safety**: One spec at a time in Phase 3
+- **Flexibility**: Can pause after any phase
+- **Validation**: Clear checkpoints prevent regressions
 
 ## Migration Considerations
 
