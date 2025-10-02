@@ -3,7 +3,6 @@
 ## For Users
 - [Getting Started](getting-started.md) - Install and run MEW in 5 minutes
 - [Templates Guide](templates.md) - Cat-maze, coder-agent, note-taker walkthroughs
-- [Troubleshooting](troubleshooting.md) - Common issues and solutions
 
 ## For Contributors
 - [Development Guide](development.md) - Build, test, and iterate
@@ -20,4 +19,4 @@
 
 ## Architecture
 - [System Architecture](architecture.md) - How MEW works (post-restructure)
-- [Migration History](migration/) - Past refactorings
+- [Migration History](../archive/migrations/) - Past refactorings

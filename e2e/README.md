@@ -179,7 +179,7 @@ Several scenarios use **mock LLM implementations** to enable predictable, determ
 
 ### Individual Scenarios
 ```bash
-cd tests/scenario-1-basic
+cd e2e/scenario-1-basic
 ./setup.sh      # Creates .workspace with MEW space
 ./check.sh      # Runs scenario tests
 ./teardown.sh   # Cleans up .workspace
@@ -187,7 +187,7 @@ cd tests/scenario-1-basic
 
 ### All Scenarios
 ```bash
-./tests/run-all-tests.sh
+./e2e/run-all-tests.sh
 ```
 
 ### Test Environment
@@ -224,7 +224,7 @@ All scenarios leverage the **dual-log architecture** introduced in CLI v0.5.0:
 
 ### Test Helper Functions
 ```bash
-# Shared utilities in tests/lib/gateway-logs.sh
+# Shared utilities in e2e/lib/gateway-logs.sh
 wait_for_envelope()           # Wait for envelope to appear in logs
 wait_for_delivery()           # Wait for delivery to specific participant
 wait_for_capability_grant()   # Wait for capability decision
@@ -250,4 +250,4 @@ assert_capability_granted()   # Assert capability was granted
 5. Consider mock implementations for deterministic testing
 6. Update this README with scenario description
 
-For more details on the testing architecture, see [tests/spec/draft/SPEC.md](spec/draft/SPEC.md).
+For more details on the testing architecture, see [e2e/spec/draft/SPEC.md](spec/draft/SPEC.md).
