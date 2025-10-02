@@ -37,7 +37,12 @@ jobs:
     - name: Build packages
       run: npm run build
 
-    - name: Run tests
+    - name: Run unit tests
+      run: cd packages/mew && npm test
+      env:
+        CI: true
+
+    - name: Run integration tests
       run: npm test -- --no-llm --verbose
       env:
         # All scenarios now use mockLLM mode and run without external API keys

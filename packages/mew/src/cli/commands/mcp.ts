@@ -13,10 +13,8 @@ mcp
   .command('filesystem <path>')
   .description('Run MCP filesystem server')
   .action(async (path) => {
-    // __dirname is dist/cli/commands, mcp-servers are at dist/mcp-servers (2 levels up to dist/)
-    const serverPath = resolve(__dirname, '../../mcp-servers/filesystem.js');
-
-    const child = spawn('node', [serverPath, path], {
+    // Use the official @modelcontextprotocol/server-filesystem package
+    const child = spawn('npx', ['-y', '@modelcontextprotocol/server-filesystem', path], {
       stdio: 'inherit',
       cwd: process.cwd()
     });
