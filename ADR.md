@@ -1,8 +1,9 @@
 # ADR: Restructure packages/mew Location
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-10-02
 **Decision Makers:** MEW Protocol Team
+**Implemented:** [Pending]
 
 ## Context
 
@@ -239,7 +240,202 @@ If approved, migration would involve:
 
 ## Decision
 
-**[PENDING]** - Awaiting team review
+**ACCEPTED: Option 2 - Move to Root**
+
+We will flatten the repository structure by moving `packages/mew/` contents to the root level. This simplifies the project structure to match its reality as a single-package project.
+
+## Implementation Plan
+
+### Phase 1: Preparation
+
+1. **Backup current state**
+   - Create a backup branch: `git checkout -b backup-before-flatten`
+   - Tag the current commit: `git tag pre-flatten-structure`
+
+2. **Review open PRs/branches**
+   - Document any open pull requests that will need rebasing
+   - Notify contributors of upcoming breaking change
+
+### Phase 2: File Movements
+
+3. **Move source code**
+   ```bash
+   # Move src directory to root
+   mv packages/mew/src ./src
+
+   # Move configuration files
+   mv packages/mew/package.json ./package.json.new
+   mv packages/mew/tsconfig.json ./tsconfig.json.new
+   mv packages/mew/vitest.config.ts ./vitest.config.ts
+   mv packages/mew/.eslintrc.json ./.eslintrc.json  # if exists
+   mv packages/mew/.prettierrc ./.prettierrc  # if exists
+
+   # Move templates if they exist
+   mv packages/mew/templates ./templates
+
+   # Move spec files (if in packages/mew)
+   # (Currently spec is already at root, so skip this)
+   ```
+
+4. **Merge package.json files**
+   - Merge `packages/mew/package.json` into root `package.json`
+   - Keep dependencies from packages/mew/package.json
+   - Remove project references/workspaces config from root
+   - Update bin path from `dist/cli/index.js` to match new structure
+   - Update exports to point to root-level dist/
+
+5. **Rename tests directory**
+   ```bash
+   mv tests e2e
+   ```
+
+6. **Clean up old structure**
+   ```bash
+   rm -rf packages/
+   ```
+
+### Phase 3: Configuration Updates
+
+7. **Update tsconfig.json**
+   - Remove project references
+   - Simplify to single project configuration
+   - Update include/exclude paths
+   - Ensure outDir points to `./dist`
+
+8. **Update GitHub Actions CI** (`.github/workflows/test.yml`)
+   - Remove `cd packages/mew` commands
+   - Update test commands:
+     ```yaml
+     - name: Run unit tests
+       run: npm test
+       env:
+         CI: true
+
+     - name: Run integration tests
+       run: npm run test:e2e -- --no-llm --verbose
+       env:
+         CI: true
+     ```
+
+9. **Update root package.json scripts**
+   ```json
+   {
+     "scripts": {
+       "test": "vitest run",
+       "test:watch": "vitest",
+       "test:ui": "vitest --ui",
+       "test:coverage": "vitest run --coverage",
+       "test:e2e": "./e2e/run-all-tests.sh",
+       "build": "tsc",
+       "build:watch": "tsc --watch",
+       "clean": "rm -rf dist",
+       "lint": "eslint .",
+       "lint:fix": "eslint . --fix",
+       "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
+       "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\""
+     }
+   }
+   ```
+
+10. **Update e2e test scripts**
+    - Update `e2e/run-all-tests.sh`:
+      ```bash
+      # Change from:
+      if ! (cd "${REPO_ROOT}/packages/mew" && npm install -g . > /dev/null 2>&1); then
+
+      # To:
+      if ! (cd "${REPO_ROOT}" && npm install -g . > /dev/null 2>&1); then
+      ```
+    - Update scenario setup scripts if they reference `packages/mew`
+
+### Phase 4: Import Path Updates
+
+11. **Check for absolute imports**
+    ```bash
+    # Search for any hardcoded references to packages/mew
+    grep -r "packages/mew" src/ e2e/ || echo "None found"
+    grep -r "@mew-protocol/mew" src/ || echo "None found"
+    ```
+
+12. **Update any hardcoded paths**
+    - Most imports should be relative and won't need changes
+    - Update any absolute paths found
+
+### Phase 5: Documentation Updates
+
+13. **Update README.md**
+    - Update directory structure diagrams
+    - Update build/test instructions
+    - Update contribution guide
+
+14. **Update CONTRIBUTING.md** (if exists)
+    - Update project structure section
+    - Update testing instructions
+
+15. **Create CHANGELOG entry**
+    ```markdown
+    ## [Unreleased]
+
+    ### Changed
+    - **BREAKING**: Restructured repository from monorepo to single-package layout
+      - Moved `packages/mew/src/` → `src/`
+      - Moved `packages/mew/package.json` → root `package.json`
+      - Renamed `tests/` → `e2e/` for clarity
+      - Simplified TypeScript configuration
+      - Updated CI workflows
+      - Contributors with open PRs will need to rebase
+    ```
+
+### Phase 6: Validation
+
+16. **Build and test locally**
+    ```bash
+    npm install
+    npm run build
+    npm test
+    npm run test:e2e -- --no-llm
+    npm install -g .
+    mew --version
+    mew --help
+    ```
+
+17. **Test end-to-end scenarios**
+    - Run full e2e test suite
+    - Test CLI installation globally
+    - Test gateway startup
+    - Test agent creation
+
+18. **Verify CI passes**
+    - Push to a test branch
+    - Ensure GitHub Actions passes on both Node 22 and 23
+
+### Phase 7: Deployment
+
+19. **Merge and communicate**
+    - Create pull request with clear breaking change notice
+    - Update all documentation
+    - Notify contributors
+    - Merge to main branch
+
+20. **Post-migration cleanup**
+    - Update any external documentation
+    - Update package registry metadata if needed
+    - Remove backup branch after confirming everything works
+
+## Rollback Plan
+
+If issues arise during migration:
+
+1. **Immediate rollback:**
+   ```bash
+   git reset --hard pre-flatten-structure
+   git push --force origin main  # Only if absolutely necessary
+   ```
+
+2. **Issues found after merge:**
+   - Keep the `backup-before-flatten` branch for reference
+   - Can cherry-pick specific fixes while reverting structure
+   - Tag is available: `git checkout pre-flatten-structure`
 
 ## Consequences
 
