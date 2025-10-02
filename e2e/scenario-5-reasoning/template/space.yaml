@@ -1,0 +1,38 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 5 - Reasoning with Context"
+  description: "Test reasoning messages and MCP context preservation"
+
+participants:
+  calculator-agent:
+    type: local
+    tokens: ["calculator-token"]
+    auto_start: true
+    command: "node"
+    args:
+      - "./.mew/agents/calculator-agent.cjs"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "calculator-token"
+    capabilities:
+      - kind: "mcp/response"
+      - kind: "system/*"
+
+  research-agent:
+    tokens: ["research-token"]
+    capabilities:
+      - kind: "reasoning/*"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "chat"
+      - kind: "system/*"
+    output_log: "./logs/research-agent-output.log"
+    auto_connect: true
+
+defaults:
+  capabilities:
+    - kind: "chat"

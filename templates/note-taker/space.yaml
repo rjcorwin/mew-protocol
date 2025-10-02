@@ -1,0 +1,32 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "{{SPACE_NAME}}"
+  description: "Note-taking and organization workspace"
+
+participants:
+  human:
+    # No tokens field - generated at runtime in .mew/tokens/
+    capabilities:
+      - kind: "*"  # Grant humans full capability set (chat, MCP, reasoning, streams, etc.)
+
+  assistant:
+    command: "node"
+    args: ["./.mew/agents/assistant.cjs"]
+    auto_start: true
+    # No tokens field - generated at runtime in .mew/tokens/
+    env:
+      NODE_PATH: "./.mew/node_modules"
+      MEW_GATEWAY: "ws://localhost:8080"
+      MEW_SPACE: "{{SPACE_NAME}}"
+      MEW_TOKEN: "${TOKEN}"  # Token will be loaded from .mew/tokens/assistant.token
+      MEW_PARTICIPANT_ID: "assistant"
+      # API configuration - API key reads from environment at runtime
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
+      AGENT_MODEL: "{{AGENT_MODEL}}"
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"
+    capabilities:
+      - kind: "mcp/request"
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"

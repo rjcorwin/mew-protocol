@@ -1,0 +1,49 @@
+# Cat Maze Cooperative Space
+space:
+  id: "{{SPACE_NAME}}"
+  name: "{{SPACE_NAME}}"
+  description: "Guide the 🐈 through 10 MCP maze levels to reach the goal!"
+  default_participant: human
+
+participants:
+  human:
+    capabilities:
+      - kind: "*"  # Full access so humans can use every capability, including reasoning cancel
+
+  mew:
+    type: local
+    command: "mew"
+    args: ["agent", "run", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--id", "mew"]
+    auto_start: true
+    capabilities:
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
+      - kind: "reasoning/*"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+    env:
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
+      OPENAI_MODEL: "{{AGENT_MODEL}}"
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"
+      MEW_AGENT_CONFIG: '{"maxIterations": 80, "requestTimeout": 600000, "reasoningEnabled": true, "conversationHistoryLength": 25}'
+
+  cat-maze:
+    type: local
+    command: "mew"
+    args: ["bridge", "start", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "cat-maze", "--mcp-command", "mew", "--mcp-args", "mcp,cat-maze"]
+    auto_start: true
+    capabilities:
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "mcp/notification"
+
+defaults:
+  capabilities:
+    - kind: "chat"

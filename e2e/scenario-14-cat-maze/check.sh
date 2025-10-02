@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Scenario 14 checks - drive the cat maze MCP server through all levels
+
+set -euo pipefail
+
+SCENARIO_DIR=${SCENARIO_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}
+WORKSPACE_DIR=${WORKSPACE_DIR:-"${SCENARIO_DIR}/.workspace"}
+ENV_FILE="${WORKSPACE_DIR}/workspace.env"
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "workspace.env not found at ${ENV_FILE}. Run setup.sh first." >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+printf "%b\n" "${YELLOW}=== Scenario 14 Checks ===${NC}"
+printf "%b\n" "${BLUE}Using cat maze server: ${SERVER_PATH}${NC}"
+
+if [[ -z "${SOLVER_LOG:-}" ]]; then
+  echo "SOLVER_LOG not set" >&2
+  exit 1
+fi
+
+if [[ -z "${NARRATOR_PATH:-}" ]]; then
+  echo "NARRATOR_PATH not set" >&2
+  exit 1
+fi
+
+if [[ -z "${NARRATOR_LOG:-}" ]]; then
+  echo "NARRATOR_LOG not set" >&2
+  exit 1
+fi
+
+printf "%b\n" "${BLUE}Verifying CLI template discovery...${NC}"
+if mew init --list-templates | grep -q "cat-maze"; then
+  printf "%b\n" "${GREEN}✓ cat-maze template advertised by mew init${NC}"
+else
+  printf "%b\n" "${RED}✗ cat-maze template missing from mew init --list-templates${NC}"
+  exit 1
+fi
+
+: > "${SOLVER_LOG}"
+
+printf "%b\n" "${BLUE}Running solver against cat maze server...${NC}"
+
+if node "${SCENARIO_DIR}/solver.cjs" --server "${SERVER_PATH}" --log "${SOLVER_LOG}"; then
+  printf "%b\n" "${GREEN}✓ Cat maze run completed successfully${NC}"
+else
+  printf "%b\n" "${RED}✗ Cat maze run failed${NC}"
+  cat "${SOLVER_LOG}" >&2 || true
+  exit 1
+fi
+
+: > "${NARRATOR_LOG}"
+
+printf "%b\n" "${BLUE}Verifying narrator move relays...${NC}"
+
+if node "${SCENARIO_DIR}/narrator-check.cjs" --server "${SERVER_PATH}" --narrator "${NARRATOR_PATH}" --log "${NARRATOR_LOG}"; then
+  printf "%b\n" "${GREEN}✓ Narrator relayed move results with 🟩 walkway tiles${NC}"
+else
+  printf "%b\n" "${RED}✗ Narrator relay check failed${NC}"
+  cat "${NARRATOR_LOG}" >&2 || true
+  exit 1
+fi

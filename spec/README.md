@@ -1,59 +1,102 @@
-# MCPx Protocol Specifications
+# MEW Protocol Specifications
 
-This directory contains the protocol specifications for MCPx (MCP Extension Protocol), which extends the Model Context Protocol for multi-agent coordination.
+This directory contains all MEW Protocol specifications organized by component.
 
-## Structure
+## Active Specifications
 
+### Protocol (Core)
+- **[v0.4](protocol/v0.4/SPEC.md)** - Current stable release
+  - [Accepted Decisions](protocol/v0.4/accepted/)
+  - [Rejected Decisions](protocol/v0.4/rejected/)
+- **[Draft](protocol/draft/SPEC.md)** - Next version under development
+  - [Accepted Decisions](protocol/draft/accepted/)
+  - [Proposed Decisions](protocol/draft/proposed/)
+  - [Rejected Decisions](protocol/draft/rejected/)
+
+### CLI (Command-Line Interface)
+- **[SPEC.md](cli/SPEC.md)** - Living specification
+  - [Accepted Decisions](cli/accepted/)
+  - [Proposed Decisions](cli/proposed/)
+  - [Rejected Decisions](cli/rejected/)
+
+### SDK (TypeScript)
+- **[SPEC.md](sdk/SPEC.md)** - SDK architecture and patterns
+  - [Accepted Decisions](sdk/accepted/)
+  - [Proposed Decisions](sdk/proposed/)
+  - [Rejected Decisions](sdk/rejected/)
+
+### Bridge (MCP Integration)
+- **[SPEC.md](bridge/SPEC.md)** - MCP-MEW bridge specification
+  - [Accepted Decisions](bridge/accepted/)
+  - [Proposed Decisions](bridge/proposed/)
+  - [Rejected Decisions](bridge/rejected/)
+
+## Specification Development
+
+### Making Changes
+
+1. Create a decision document in the appropriate `proposed/` directory
+2. Discuss and refine in PR review
+3. Once accepted, move to `accepted/` directory
+4. Update the SPEC.md to incorporate the change
+
+### Decision Document Format
+
+Decision documents follow the Architecture Decision Record (ADR) format:
+
+```markdown
+# [Number]. [Title]
+
+**Status**: Proposed | Accepted | Rejected
+**Date**: YYYY-MM-DD
+
+## Context
+What is the issue we're facing?
+
+## Decision
+What are we doing about it?
+
+## Consequences
+What becomes easier or more difficult as a result?
+
+## Alternatives Considered
+What other options did we evaluate?
 ```
-protocol-spec/
-├── README.md        # This file
-└── v0/             # Version 0 of the protocol
-    ├── SPEC.md     # Main protocol specification
-    ├── PATTERNS.md # Common implementation patterns
-    ├── ARCHITECTURE.md # System architecture
-    └── decisions/  # Protocol design decisions
-        └── decision-1.md
-```
 
-## Contents
+### Versioning Strategy
 
-### v0/
-The initial version of the MCPx protocol specification:
+- **Protocol**: Uses semantic versioning (v0.4, v0.5, etc.)
+  - Breaking changes allowed in v0.x minor versions
+  - `v0.4/` is current stable
+  - `draft/` is next version under development
 
-- **[SPEC.md](v0/SPEC.md)** - The complete MCPx v0 protocol specification defining envelope format, messaging patterns, and gateway API
-- **[PATTERNS.md](v0/PATTERNS.md)** - Common implementation patterns and best practices for MCPx
-- **[ARCHITECTURE.md](v0/ARCHITECTURE.md)** - System architecture and implementation details
-- **[decisions/](v0/decisions/)** - Architecture decision records documenting protocol design choices
+- **CLI, SDK, Bridge**: Living documents (no versions)
+  - Single `SPEC.md` evolves over time
+  - Decisions track the evolution
+  - Breaking changes documented in decisions
 
-## Overview
+## Archive
 
-MCPx extends the Model Context Protocol (MCP) to enable multiple participants (humans, agents, robots) to coordinate in shared topics. It provides:
+Historical protocol specifications preserved in [archive/](archive/) for reference:
+- [v0.0](archive/protocol/v0.0/) - Initial specification
+- [v0.1](archive/protocol/v0.1/) - First iteration
+- [v0.2](archive/protocol/v0.2/) - Second iteration
+- [v0.3](archive/protocol/v0.3/) - Third iteration
 
-- **Topic-based rooms**: Named spaces where participants interact
-- **Envelope protocol**: Message wrapping for routing and correlation
-- **Peer-to-peer MCP**: All participants act as MCP servers
-- **Real-time gateway**: WebSocket-based messaging with presence
-- **Unified participation**: Humans, agents, and robots as equal peers
+Historical CLI versions:
+- [v0.0.0](archive/cli/v0.0.0/) - Initial CLI spec
+- [v0.1.0](archive/cli/v0.1.0/) - First CLI iteration
 
-## Key Concepts
+## Navigation
 
-- **Topics**: Named rooms (e.g., `room:alpha`) where participants collaborate
-- **Participants**: Any client that joins a topic and exposes MCP tools
-- **Envelopes**: JSON wrappers containing MCP messages with routing metadata
-- **Visibility**: All messages in a topic are visible to all participants (no privacy at protocol layer)
+- **For Users**: Start with [Protocol v0.4](protocol/v0.4/SPEC.md) to understand MEW Protocol
+- **For CLI Users**: See [CLI Spec](cli/SPEC.md) for command-line interface details
+- **For Developers**: Check [SDK Spec](sdk/SPEC.md) for TypeScript SDK patterns
+- **For MCP Integration**: Review [Bridge Spec](bridge/SPEC.md) for MCP-MEW bridge
 
-## Version History
+## Related Documentation
 
-- **v0** (Current) - Initial specification focusing on MCP tools, WebSocket transport, and core envelope format
-
-## Related Specifications
-
-- **SDK Specification**: See [`../sdk-spec/`](../sdk-spec/) for MCPx SDK architecture and client libraries
-- **MCP Specification**: See [`../../modelcontextprotocol/`](../../modelcontextprotocol/) for the base Model Context Protocol
-
-## Quick Links
-
-- [Protocol Specification](v0/SPEC.md) - Main MCPx v0 specification
-- [Implementation Patterns](v0/PATTERNS.md) - Common patterns and examples
-- [System Architecture](v0/ARCHITECTURE.md) - Architecture overview
-- [SDK Architecture](../sdk-spec/mcpx-sdk-architecture.md) - Client and agent libraries
+- [Main Documentation Hub](../docs/README.md)
+- [Development Guide](../docs/development.md)
+- [Testing Guide](../docs/testing.md)
+- [Contributing Guidelines](../CONTRIBUTING.md)

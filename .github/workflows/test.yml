@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [22.x, 23.x]
 
     steps:
     - uses: actions/checkout@v4
@@ -25,11 +25,11 @@ jobs:
 
     - name: Make scripts executable
       run: |
-        chmod +x ./tests/run-all-tests.sh
-        chmod +x ./tests/scenario-*/test.sh
-        chmod +x ./tests/scenario-*/setup.sh
-        chmod +x ./tests/scenario-*/teardown.sh
-        chmod +x ./tests/scenario-*/check.sh
+        chmod +x ./e2e/run-all-tests.sh
+        chmod +x ./e2e/scenario-*/test.sh
+        chmod +x ./e2e/scenario-*/setup.sh
+        chmod +x ./e2e/scenario-*/teardown.sh
+        chmod +x ./e2e/scenario-*/check.sh
 
     - name: Install dependencies
       run: npm ci --ignore-scripts
@@ -37,10 +37,19 @@ jobs:
     - name: Build packages
       run: npm run build
 
-    - name: Run tests (without LLM scenarios)
-      run: npm test -- --no-llm --verbose
+    - name: Install PM2 globally
+      run: npm install -g pm2
+
+    - name: Run unit tests
+      run: npm test
       env:
-        # Scenarios 8, 9, 10 require OPENAI_API_KEY and are skipped with --no-llm flag
+        CI: true
+
+    - name: Run integration tests
+      run: npm run test:e2e -- --no-llm --verbose
+      env:
+        # All scenarios now use mockLLM mode and run without external API keys
+        # The --no-llm flag skips any scenarios with a 'requires-llm' marker file
         CI: true
 
     - name: Upload test results

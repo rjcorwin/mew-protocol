@@ -1,0 +1,39 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 13 - Participant Lifecycle Controls"
+  description: "Validate participant clear, restart, and shutdown envelopes"
+
+participants:
+  control-agent:
+    type: local
+    tokens: ["control-token"]
+    auto_start: true
+    command: "node"
+    args:
+      - "./.mew/agents/control-agent.cjs"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "control-token"
+      - "--log"
+      - "./logs/control-agent.log"
+    capabilities:
+      - kind: "chat"
+      - kind: "participant/status"
+      - kind: "participant/*"
+      - kind: "system/*"
+
+  test-client:
+    tokens: ["test-token"]
+    capabilities:
+      - kind: "participant/*"
+      - kind: "chat"
+      - kind: "system/*"
+    output_log: "./logs/test-client-output.log"
+    auto_connect: true
+
+defaults:
+  capabilities:
+    - kind: "chat"

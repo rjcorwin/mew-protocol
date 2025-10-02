@@ -1,11 +1,18 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./sdk/typescript-sdk/types" },
-    { "path": "./sdk/typescript-sdk/capability-matcher" },
-    { "path": "./sdk/typescript-sdk/client" },
-    { "path": "./sdk/typescript-sdk/participant" },
-    { "path": "./sdk/typescript-sdk/agent" },
-    { "path": "./bridge" }
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": false,
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }

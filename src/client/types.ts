@@ -1,0 +1,126 @@
+/**
+ * Client-specific types for MEW SDK
+ */
+
+import type {
+  Envelope,
+  Participant,
+  Capability,
+  Proposal,
+  SystemWelcomePayload,
+  ChatPayload,
+  CapabilityGrantPayload,
+  CapabilityRevokePayload,
+  CapabilityGrantAckPayload,
+} from '../types/index.js';
+
+// Re-export commonly used types from the shared types package
+export type {
+  Envelope,
+  PartialEnvelope,
+  Participant,
+  Capability,
+  CapabilityGrant,
+  Proposal,
+  SystemWelcomePayload,
+  SystemErrorPayload,
+  PresencePayload,
+  ChatPayload,
+  MewProposalPayload,
+  MewProposalAcceptPayload,
+  MewProposalRejectPayload,
+  MewCapabilityGrantPayload,
+  MewCapabilityRevokePayload,
+  CapabilityGrantPayload,
+  CapabilityRevokePayload,
+  CapabilityGrantAckPayload,
+  JsonRpcRequest,
+  JsonRpcResponse,
+  JsonRpcNotification,
+} from '../types/index.js';
+export { PROTOCOL_VERSION, MCP_VERSION, MessageKinds } from '../types/index.js';
+
+// ============================================================================
+// Client-Specific Types
+// ============================================================================
+
+/**
+ * Connection options for MEWClient
+ */
+export interface ConnectionOptions {
+  gateway: string;
+  space: string;
+  token: string;
+  participant_id?: string;
+  capabilities?: Capability[];
+  reconnect?: boolean;
+  reconnectDelay?: number;
+  maxReconnectDelay?: number;
+  heartbeatInterval?: number;
+  requestTimeout?: number;
+}
+
+/**
+ * Pending request tracking
+ */
+export interface PendingRequest {
+  envelope: Envelope;
+  resolve: (value: any) => void;
+  reject: (error: any) => void;
+  timestamp: number;
+  timeout?: NodeJS.Timeout;
+}
+
+/**
+ * Pending proposal tracking
+ */
+export interface PendingProposal {
+  proposal: Proposal;
+  resolve: (envelope: Envelope) => void;
+  reject: (reason: string) => void;
+  timestamp: number;
+  timeout?: NodeJS.Timeout;
+}
+
+/**
+ * Client event map for type-safe event handling
+ */
+export type ClientEventMap = {
+  welcome: (data: SystemWelcomePayload) => void;
+  message: (envelope: Envelope) => void;
+  chat: (message: ChatPayload, from: string) => void;
+  proposal: (proposal: Proposal, from: string) => void;
+  'proposal-accept': (data: {
+    correlation_id: string;
+    accepted_by: string;
+    envelope: Envelope;
+  }) => void;
+  'proposal-reject': (data: {
+    correlation_id: string;
+    rejected_by: string;
+    reason?: string;
+  }) => void;
+  'capability-grant': (grant: CapabilityGrantPayload & { from: string }) => void;
+  'capability-grant-ack': (ack: CapabilityGrantAckPayload & { from: string }) => void;
+  'capability-revoke': (data: CapabilityRevokePayload & { from: string }) => void;
+  'participant-joined': (participant: Participant) => void;
+  'participant-left': (participant: Participant) => void;
+  error: (error: Error) => void;
+  reconnected: () => void;
+  connected: () => void;
+  disconnected: () => void;
+};
+
+/**
+ * REST API types
+ */
+export interface SpaceInfo {
+  name: string;
+  participants: number;
+  created: string;
+}
+
+export interface HistoryOptions {
+  limit?: number;
+  before?: string;
+}
