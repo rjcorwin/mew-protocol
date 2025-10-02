@@ -635,6 +635,29 @@ async function spaceUpAction(options) {
     const gatewayReady = await waitForGateway(selectedPort);
     if (!gatewayReady) {
       console.error('Gateway failed to become ready. Check logs/gateway.log for details.');
+
+      // Print gateway logs for debugging
+      try {
+        const fs = await import('fs/promises');
+        const gatewayLog = await fs.readFile(gatewayLogPath, 'utf-8');
+        console.error('\n=== Gateway Log ===');
+        console.error(gatewayLog);
+        console.error('=== End Gateway Log ===\n');
+      } catch (err) {
+        console.error('Could not read gateway log:', err.message);
+      }
+
+      // Also print error log if available
+      try {
+        const fs = await import('fs/promises');
+        const gatewayErrorLog = await fs.readFile(path.join(logsDir, 'gateway-error.log'), 'utf-8');
+        console.error('\n=== Gateway Error Log ===');
+        console.error(gatewayErrorLog);
+        console.error('=== End Gateway Error Log ===\n');
+      } catch (err) {
+        console.error('Could not read gateway error log:', err.message);
+      }
+
       await deletePM2Process(`${spaceId}-gateway`);
       disconnectPM2();
       process.exit(1);
