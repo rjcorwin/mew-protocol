@@ -1556,6 +1556,23 @@ gateway
 
     const autoStartEnabled = options.autoStart !== false;
 
+    // Add error handler for server
+    server.on('error', (error) => {
+      console.error('Server error:', error);
+      process.exit(1);
+    });
+
+    // Add error handler for unhandled rejections
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    });
+
+    // Add error handler for uncaught exceptions
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught Exception:', error);
+      process.exit(1);
+    });
+
     // Start server
     server.listen(port, () => {
       console.log(`Gateway listening on port ${port}`);
