@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * Calculator participant reused for scenario 10.
+ * Scenario 9 calculator participant implemented via the MEW TypeScript participant SDK.
+ * Exposes simple math tools that can be called when proposals are fulfilled.
  */
 
-const { MEWParticipant } = require('../../../../../packages/mew/dist/participant/index.js');
+const { MEWParticipant } = require('../../../../../dist/participant/index.js');
 
 const args = process.argv.slice(2);
 const options = {
   gateway: 'ws://localhost:8080',
-  space: 'scenario-10-multi-agent',
+  space: 'scenario-9-typescript-proposals',
   token: 'calculator-token',
   participant_id: 'calculator-agent'
 };
@@ -50,8 +51,8 @@ class CalculatorParticipant extends MEWParticipant {
       inputSchema: {
         type: 'object',
         properties: {
-          a: { type: 'number' },
-          b: { type: 'number' }
+          a: { type: 'number', description: 'First addend' },
+          b: { type: 'number', description: 'Second addend' }
         },
         required: ['a', 'b']
       },
@@ -74,7 +75,7 @@ class CalculatorParticipant extends MEWParticipant {
 
     this.registerTool({
       name: 'evaluate',
-      description: 'Evaluate a mathematical expression',
+      description: 'Evaluate a JavaScript expression',
       inputSchema: {
         type: 'object',
         properties: {
@@ -84,13 +85,14 @@ class CalculatorParticipant extends MEWParticipant {
       },
       execute: async ({ expression }) => {
         // eslint-disable-next-line no-new-func
-        return Function('"use strict"; return (' + expression + ')')();
+        const result = Function('"use strict"; return (' + expression + ')')();
+        return result;
       }
     });
   }
 
   async onReady() {
-    console.log('Calculator participant ready for requests');
+    console.log('Calculator participant ready with add/multiply/evaluate tools');
   }
 }
 

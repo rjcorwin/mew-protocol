@@ -25,11 +25,11 @@ jobs:
 
     - name: Make scripts executable
       run: |
-        chmod +x ./tests/run-all-tests.sh
-        chmod +x ./tests/scenario-*/test.sh
-        chmod +x ./tests/scenario-*/setup.sh
-        chmod +x ./tests/scenario-*/teardown.sh
-        chmod +x ./tests/scenario-*/check.sh
+        chmod +x ./e2e/run-all-tests.sh
+        chmod +x ./e2e/scenario-*/test.sh
+        chmod +x ./e2e/scenario-*/setup.sh
+        chmod +x ./e2e/scenario-*/teardown.sh
+        chmod +x ./e2e/scenario-*/check.sh
 
     - name: Install dependencies
       run: npm ci --ignore-scripts
@@ -37,19 +37,16 @@ jobs:
     - name: Build packages
       run: npm run build
 
-    - name: Install package dependencies
-      run: cd packages/mew && npm ci
-
     - name: Install PM2 globally
       run: npm install -g pm2
 
     - name: Run unit tests
-      run: cd packages/mew && npm test
+      run: npm test
       env:
         CI: true
 
     - name: Run integration tests
-      run: npm test -- --no-llm --verbose
+      run: npm run test:e2e -- --no-llm --verbose
       env:
         # All scenarios now use mockLLM mode and run without external API keys
         # The --no-llm flag skips any scenarios with a 'requires-llm' marker file

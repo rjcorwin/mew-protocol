@@ -10,7 +10,7 @@ participants:
     auto_start: true
     command: "node"
     args:
-      - "../../../packages/mew/dist/agent/index.js"
+      - "../../../dist/agent/index.js"
       - "--gateway"
       - "ws://localhost:${PORT}"
       - "--space"

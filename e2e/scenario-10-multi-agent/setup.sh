@@ -10,7 +10,7 @@ TEMPLATE_NAME=${TEMPLATE_NAME:-"scenario-10-multi-agent"}
 SPACE_NAME=${SPACE_NAME:-"scenario-10-multi-agent"}
 TEST_PORT=${TEST_PORT:-$((8000 + RANDOM % 1000))}
 ENV_FILE="${WORKSPACE_DIR}/workspace.env"
-PARTICIPANT_DIST="${REPO_ROOT}/packages/mew/dist/participant/index.js"
+PARTICIPANT_DIST="${REPO_ROOT}/dist/participant/index.js"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'

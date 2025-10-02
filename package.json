@@ -1,19 +1,41 @@
 {
-  "name": "mew-protocol",
-  "version": "0.3.0",
-  "description": "Multi-Entity Workspace Protocol - A protocol for transparent multi-agent coordination",
-  "private": true,
+  "name": "@mew-protocol/mew",
+  "version": "0.5.0",
+  "description": "MEW Protocol - Multi-Entity Workspace Protocol SDK and CLI",
+  "type": "module",
+  "bin": {
+    "mew": "dist/cli/index.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/types/index.js",
+    "./client": "./dist/client/index.js",
+    "./participant": "./dist/participant/index.js",
+    "./agent": "./dist/agent/index.js",
+    "./gateway": "./dist/gateway/index.js",
+    "./capability-matcher": "./dist/capability-matcher/index.js",
+    "./bridge": "./dist/bridge/index.js"
+  },
   "scripts": {
-    "test": "./tests/run-all-tests.sh --no-llm",
-    "test:all": "./tests/run-all-tests.sh",
-    "test:llm": "./tests/run-all-tests.sh",
-    "build": "tsc -b && npm run postbuild",
-    "postbuild": "chmod +x node_modules/.bin/mew-agent 2>/dev/null || true",
-    "build:force": "tsc -b --force && npm run postbuild",
-    "build:watch": "tsc -b --watch",
-    "clean": "tsc -b --clean",
-    "lint": "cd packages/mew && npm run lint",
-    "format": "cd packages/mew && npm run format"
+    "build": "tsc && chmod +x dist/cli/index.js",
+    "build:bin": "tsup",
+    "build:all": "npm run build && npm run build:bin",
+    "build:watch": "tsc --watch",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "./e2e/run-all-tests.sh --no-llm",
+    "test:e2e:all": "./e2e/run-all-tests.sh",
+    "test:e2e:llm": "./e2e/run-all-tests.sh",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "rm -rf dist && rm -f *.tsbuildinfo",
+    "prepublishOnly": "npm run clean && npm run build:all"
   },
   "keywords": [
     "mew",
@@ -22,10 +44,54 @@
     "ai",
     "coordination",
     "mcp",
-    "model-context-protocol"
+    "model-context-protocol",
+    "cli",
+    "gateway",
+    "client",
+    "agent",
+    "typescript"
   ],
   "author": "MEW Protocol Working Group",
   "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "^0.6.2",
+    "@types/uuid": "^10.0.0",
+    "body-parser": "^1.20.2",
+    "chalk": "^4.1.2",
+    "commander": "^11.0.0",
+    "eventemitter3": "^5.0.1",
+    "express": "^4.18.2",
+    "ink": "^3.2.0",
+    "js-yaml": "^4.1.0",
+    "jsonpath-plus": "^10.3.0",
+    "openai": "^5.20.1",
+    "pm2": "^6.0.10",
+    "react": "^18.2.0",
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/js-yaml": "^4.0.5",
+    "@types/node": "^20.14.0",
+    "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "@vitest/ui": "^2.0.0",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/rjcorwin/mew-protocol.git"
@@ -36,26 +102,5 @@
   },
   "engines": {
     "node": ">=22.0.0"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "ink": "^3.2.0",
-    "ws": "^8.18.0",
-    "uuid": "^9.0.1",
-    "@types/uuid": "^9.0.8",
-    "js-yaml": "^4.1.0",
-    "commander": "^11.1.0",
-    "debug": "^4.3.4"
-  },
-  "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0",
-    "prettier": "^3.6.2",
-    "eslint": "^9.35.0",
-    "@typescript-eslint/parser": "^8.43.0",
-    "@typescript-eslint/eslint-plugin": "^8.43.0",
-    "@types/js-yaml": "^4.0.5",
-    "@types/ws": "^8.5.5",
-    "@types/debug": "^4.1.12"
   }
 }
