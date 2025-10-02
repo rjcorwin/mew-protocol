@@ -1,50 +1,35 @@
-# Scenario 14-cat-maze - ESM/CJS Module Issue
+# Scenario 14-cat-maze - RESOLVED
 
 ## Status
-⚠️ Refactor complete, test fails due to module type mismatch
-
-## Refactor Changes Completed
-- ✅ Updated check.sh to use global `mew` command
-- ✅ Updated setup.sh template paths:
-  - `cli/templates/cat-maze/agents/cat-maze-server.js` → `packages/mew/templates/cat-maze/agents/cat-maze-server.js`
-  - `cli/templates/cat-maze/agents/cat-maze-narrator.js` → `packages/mew/templates/cat-maze/agents/cat-maze-narrator.js`
-- ✅ teardown.sh was already correct (no CLI references)
+✅ Fixed and passing
 
 ## Issue
-**ReferenceError: require is not defined in ES module scope**
+ReferenceError: require is not defined in ES module scope
 
-The cat-maze template agent files (cat-maze-server.js, cat-maze-narrator.js) are CommonJS files using `require()`, but because they're now located in `packages/mew/templates/` and `packages/mew/package.json` has `"type": "module"`, Node treats `.js` files as ESM modules.
-
-## Error Message
-```
-ReferenceError: require is not defined in ES module scope, you can use import instead
-This file is being treated as an ES module because it has a '.js' file extension and
-'/Users/rj/Git/rjcorwin/mew-protocol/packages/mew/package.json' contains "type": "module".
-To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
-```
+The cat-maze template agent files used CommonJS (`require()`) but were treated as ESM modules because they're located in `packages/mew/templates/` which inherits `"type": "module"` from the parent package.json.
 
 ## Root Cause
-During the repository consolidation, templates moved from `cli/templates/` (which had no package.json) to `packages/mew/templates/` (which inherits the parent's `"type": "module"` setting).
+During repository consolidation, templates moved from `cli/templates/` (no package.json) to `packages/mew/templates/` (inherits parent's `"type": "module"`). Node.js treats `.js` files in this directory as ESM, causing the require() calls to fail.
 
-## Solutions (Pick One)
-
-### Option 1: Rename template agents to .cjs
-Rename all CommonJS template files to use `.cjs` extension:
+## Solution
+Renamed CommonJS template files to use `.cjs` extension:
 - `cat-maze-server.js` → `cat-maze-server.cjs`
 - `cat-maze-narrator.js` → `cat-maze-narrator.cjs`
-- Update references in space.yaml templates
 
-### Option 2: Convert template agents to ESM
-Convert the template agents from CommonJS to ESM:
-- Replace `require()` with `import`
-- Replace `module.exports` with `export`
+Updated test setup.sh to reference the new filenames.
 
-### Option 3: Add package.json to templates directory
-Add a `packages/mew/templates/package.json` with `{"type": "commonjs"}` to override the parent setting.
+## Test Results
+All tests now pass:
+- ✓ cat-maze template advertised by mew init
+- ✓ Cat maze run completed successfully
+- ✓ Narrator relayed move results with walkway tiles
 
-## Recommendation
-**Option 1** (rename to .cjs) is the quickest fix and maintains backward compatibility. The template agents are simple scripts that don't need ESM features.
+## Files Changed
+- `packages/mew/templates/cat-maze/agents/cat-maze-server.js` → `.cjs`
+- `packages/mew/templates/cat-maze/agents/cat-maze-narrator.js` → `.cjs`
+- `tests/scenario-14-cat-maze/setup.sh` - Updated file paths
 
-## Next Steps
-1. Choose and implement one of the solutions above
-2. Re-run the test to verify it passes
+## Notes
+The `.cjs` extension explicitly tells Node.js to treat these files as CommonJS modules regardless of the parent package.json settings. This is the quickest fix and maintains backward compatibility.
+
+The built MCP server at `src/mcp-servers/cat-maze.ts` is separate and unaffected by this change.
