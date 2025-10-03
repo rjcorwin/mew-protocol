@@ -4,6 +4,7 @@ space:
   name: "{{SPACE_NAME}}"
   description: "Guide the 🐈 through 10 MCP maze levels to reach the goal!"
   default_participant: human
+  ui_theme: "{{UI_THEME}}"
 
 participants:
   human:

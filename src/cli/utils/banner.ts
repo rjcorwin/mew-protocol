@@ -62,30 +62,32 @@ function getRandomTagline() {
  * @param {string} options.participantId - Current participant ID
  * @param {string} options.gateway - Gateway URL
  * @param {boolean} options.color - Whether to use colors
+ * @param {Object} options.theme - Theme object with ansi colors
  * @returns {string} The formatted banner
  */
 function generateBanner(options = {}) {
   const tagline = getRandomTagline();
   const color = options.color !== false;
 
-  // Neon colors - Hyper Light Drifter inspired
-  const cyan = color ? '\x1b[96m' : '';
-  const magenta = color ? '\x1b[95m' : '';
-  const pink = color ? '\x1b[38;5;213m' : '';
-  const purple = color ? '\x1b[38;5;141m' : '';
-  const blue = color ? '\x1b[38;5;117m' : '';
-  const reset = color ? '\x1b[0m' : '';
-  const bold = color ? '\x1b[1m' : '';
-  const dim = color ? '\x1b[2m' : '';
+  // Use theme colors if provided, otherwise fall back to HLD colors
+  const theme = options.theme;
+  const cyan = color ? (theme?.ansi?.cyan || '\x1b[96m') : '';
+  const magenta = color ? (theme?.ansi?.magenta || '\x1b[95m') : '';
+  const pink = color ? (theme?.ansi?.pink || '\x1b[38;5;213m') : '';
+  const purple = color ? (theme?.ansi?.purple || '\x1b[38;5;141m') : '';
+  const blue = color ? (theme?.ansi?.blue || '\x1b[38;5;117m') : '';
+  const reset = color ? (theme?.ansi?.reset || '\x1b[0m') : '';
+  const bold = color ? (theme?.ansi?.bright || '\x1b[1m') : '';
+  const dim = color ? (theme?.ansi?.dim || '\x1b[2m') : '';
 
   const banner = `
     ${dim}▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄${reset}
-    ${bold}${magenta}◢◣${reset}       ${bold}${cyan}███╗   ███╗███████╗██╗    ██╗${reset}     ${bold}${magenta}◢◣${reset}
+    ${bold}${magenta}◢◣${reset}        ${bold}${cyan}███╗   ███╗███████╗██╗    ██╗${reset}     ${bold}${magenta}◢◣${reset}
    ${bold}${pink}◢███◣${reset}      ${bold}${cyan}████╗ ████║██╔════╝██║    ██║${reset}    ${bold}${pink}◢███◣${reset}
   ${bold}${cyan}◢█████◣${reset}     ${bold}${cyan}██╔████╔██║█████╗  ██║ █╗ ██║${reset}   ${bold}${cyan}◢█████◣${reset}
  ${bold}${cyan}◢███${purple}◆${cyan}███◣${reset}    ${bold}${cyan}██║╚██╔╝██║██╔══╝  ██║███╗██║${reset}  ${bold}${cyan}◢███${purple}◆${cyan}███◣${reset}
 ${bold}${blue}◢█████████◣${reset}   ${bold}${cyan}██║ ╚═╝ ██║███████╗╚███╔███╔╝${reset} ${bold}${blue}◢█████████◣${reset}
-    ${cyan}/ᐠ｡ꞈ｡ᐟ\\${reset}    ${bold}${cyan}╚═╝     ╚═╝╚══════╝ ╚══╝╚══╝${reset}     ${cyan}/ᐠ｡ꞈ｡ᐟ\\${reset}
+   ${cyan}/ᐠ｡ꞈ｡ᐟ\\${reset}    ${bold}${cyan}╚═╝     ╚═╝╚══════╝ ╚══╝╚══╝${reset}     ${cyan}/ᐠ｡ꞈ｡ᐟ\\${reset}
     ${dim}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${reset}
 
     ${bold}${magenta}◆${reset} ${cyan}Multi-Entity Workspace Protocol${reset} ${dim}v0.4${reset} ${bold}${magenta}◆${reset}

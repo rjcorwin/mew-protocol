@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-function SimpleInput({ onSubmit, disabled = false, prompt = '> ' }) {
+function SimpleInput({ onSubmit, disabled = false, prompt = '> ', theme = null }) {
   const [value, setValue] = useState('');
 
   useInput((input, key) => {
@@ -22,13 +22,17 @@ function SimpleInput({ onSubmit, disabled = false, prompt = '> ' }) {
     }
   }, { isActive: !disabled });
 
+  const borderColor = theme?.colors?.border || 'magenta';
+  const promptColor = theme?.colors?.promptText || 'magenta';
+  const inputColor = theme?.colors?.inputText || 'white';
+
   return React.createElement(Box, {
     borderStyle: 'round',
-    borderColor: 'magenta',
+    borderColor: borderColor,
     paddingX: 1
   },
-    React.createElement(Text, { color: 'magenta', bold: true }, prompt),
-    React.createElement(Text, { color: 'cyan' }, value || '_')
+    React.createElement(Text, { color: promptColor, bold: true }, prompt),
+    React.createElement(Text, { color: inputColor }, value || '_')
   );
 }
 

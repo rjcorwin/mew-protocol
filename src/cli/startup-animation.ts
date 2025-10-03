@@ -16,52 +16,52 @@ const colors = {
 const frames = [
   // Frame 1: Crystal forming
   `
-${colors.dim}        ▄▄${colors.reset}
-${colors.dim}       ▄██${colors.reset}
-${colors.cyan}      ▄███${colors.reset}
-${colors.cyan}     ▄████${colors.reset}
-${colors.bright}${colors.cyan}    ▄█████${colors.reset}
+                    ${colors.dim}        ▄▄${colors.reset}
+                    ${colors.dim}       ▄██${colors.reset}
+                    ${colors.cyan}      ▄███${colors.reset}
+                    ${colors.cyan}     ▄████${colors.reset}
+                    ${colors.bright}${colors.cyan}    ▄█████${colors.reset}
 `,
   // Frame 2: Crystal glowing
   `
-${colors.magenta}        ◢◣${colors.reset}
-${colors.magenta}       ◢███◣${colors.reset}
-${colors.pink}      ◢█████◣${colors.reset}
-${colors.cyan}     ◢███████◣${colors.reset}
-${colors.bright}${colors.cyan}    ◢█████████◣${colors.reset}
+                    ${colors.magenta}        ◢◣${colors.reset}
+                    ${colors.magenta}       ◢███◣${colors.reset}
+                    ${colors.pink}      ◢█████◣${colors.reset}
+                    ${colors.cyan}     ◢███████◣${colors.reset}
+                    ${colors.bright}${colors.cyan}    ◢█████████◣${colors.reset}
 `,
   // Frame 3: Full crystal with energy
   `
-${colors.bright}${colors.magenta}        ◢◣${colors.reset}
-${colors.bright}${colors.magenta}       ◢███◣${colors.reset}
-${colors.bright}${colors.pink}      ◢█████◣${colors.reset}
-${colors.bright}${colors.cyan}     ◢███${colors.purple}◆${colors.cyan}███◣${colors.reset}
-${colors.bright}${colors.blue}    ◢█████████◣${colors.reset}
+                    ${colors.bright}${colors.magenta}        ◢◣${colors.reset}
+                    ${colors.bright}${colors.magenta}       ◢███◣${colors.reset}
+                    ${colors.bright}${colors.pink}      ◢█████◣${colors.reset}
+                    ${colors.bright}${colors.cyan}     ◢███${colors.purple}◆${colors.cyan}███◣${colors.reset}
+                    ${colors.bright}${colors.blue}    ◢█████████◣${colors.reset}
 `,
   // Frame 4: Energy burst
   `
-${colors.bright}${colors.magenta}    ◇   ◢◣   ◇${colors.reset}
-${colors.bright}${colors.pink}       ◢███◣${colors.reset}
-${colors.bright}${colors.cyan}  ◇   ◢█████◣   ◇${colors.reset}
-${colors.bright}${colors.cyan}     ◢███${colors.purple}◆${colors.cyan}███◣${colors.reset}
-${colors.bright}${colors.blue}    ◢█████████◣${colors.reset}
+                    ${colors.bright}${colors.magenta}    ◇   ◢◣   ◇${colors.reset}
+                    ${colors.bright}${colors.pink}       ◢███◣${colors.reset}
+                    ${colors.bright}${colors.cyan}  ◇   ◢█████◣   ◇${colors.reset}
+                    ${colors.bright}${colors.cyan}     ◢███${colors.purple}◆${colors.cyan}███◣${colors.reset}
+                    ${colors.bright}${colors.blue}    ◢█████████◣${colors.reset}
 `,
   // Frame 5: Settled with cat
   `
-${colors.dim}        ◢◣${colors.reset}
-${colors.magenta}       ◢███◣${colors.reset}
-${colors.pink}      ◢█████◣${colors.reset}
-${colors.cyan}     ◢███${colors.purple}◆${colors.cyan}███◣${colors.reset}
-${colors.bright}${colors.blue}    ◢█████████◣${colors.reset}
-${colors.cyan}      /ᐠ｡ꞈ｡ᐟ\\${colors.reset}
+                    ${colors.dim}        ◢◣${colors.reset}
+                    ${colors.magenta}       ◢███◣${colors.reset}
+                    ${colors.pink}      ◢█████◣${colors.reset}
+                    ${colors.cyan}     ◢███${colors.purple}◆${colors.cyan}███◣${colors.reset}
+                    ${colors.bright}${colors.blue}    ◢█████████◣${colors.reset}
+                    ${colors.cyan}      /ᐠ｡ꞈ｡ᐟ\\${colors.reset}
 `,
 ];
 
 // Text to display after animation
 const welcomeText = `
-${colors.bright}${colors.cyan}╔═══════════════════════════════════════╗${colors.reset}
-${colors.bright}${colors.cyan}║${colors.reset} ${colors.bright}${colors.magenta}MEW${colors.reset} ${colors.cyan}Protocol${colors.reset} ${colors.dim}- Multi-Entity Workspace${colors.reset} ${colors.bright}${colors.cyan}║${colors.reset}
-${colors.bright}${colors.cyan}╚═══════════════════════════════════════╝${colors.reset}
+          ${colors.bright}${colors.cyan}╔═══════════════════════════════════════╗${colors.reset}
+          ${colors.bright}${colors.cyan}║${colors.reset} ${colors.bright}${colors.magenta}MEW${colors.reset} ${colors.cyan}Protocol${colors.reset} ${colors.dim}- Multi-Entity Workspace${colors.reset} ${colors.bright}${colors.cyan}║${colors.reset}
+          ${colors.bright}${colors.cyan}╚═══════════════════════════════════════╝${colors.reset}
 `;
 
 function sleep(ms: number): Promise<void> {

@@ -69,9 +69,15 @@ class InitCommand {
       await this.copyTemplateFiles(template.path);
       console.log('✓ Copied template files to .mew/');
 
+      // Select UI theme
+      console.log('\nChoosing UI theme...');
+      const theme = await this.selectTheme(options.theme);
+      console.log(`✓ Selected theme: ${theme}`);
+
       // Collect variable values BEFORE processing templates
       console.log('\nConfiguring your space...');
       const variables = await this.collectVariables(templateMeta, options);
+      variables.UI_THEME = theme;
 
       // Process template files with variable substitution (including package.json)
       await this.processTemplateFiles(variables);
@@ -264,6 +270,138 @@ class InitCommand {
 
     // Interactive selection
     return await this.promptTemplateSelection(templates);
+  }
+
+  /**
+   * Select a UI theme interactively or from options
+   */
+  async selectTheme(themeName) {
+    const themes = [
+      { name: 'hld', description: 'Hyper Light Drifter - Neon pixel art (magenta/cyan)' },
+      { name: 'fallout', description: 'Fallout - Classic green terminal' },
+      { name: 'starfield', description: 'Starfield - Blue/yellow/orange space' },
+      { name: 'cyberpunk', description: 'Cyberpunk - Blue and yellow neon' }
+    ];
+
+    // If theme specified, use it
+    if (themeName) {
+      const theme = themes.find(t => t.name === themeName);
+      if (!theme) {
+        console.error(`Theme '${themeName}' not found`);
+        console.log('Available themes: hld, fallout, starfield, cyberpunk');
+        process.exit(1);
+      }
+      return theme.name;
+    }
+
+    // Non-interactive mode - use default theme
+    if (!process.stdin.isTTY) {
+      return 'hld';
+    }
+
+    // Interactive selection
+    return await this.promptThemeSelection(themes);
+  }
+
+  /**
+   * Interactive theme selection with arrow keys
+   */
+  async promptThemeSelection(themes) {
+    return new Promise((resolve) => {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+
+      let selectedIndex = 0;
+
+      // Function to render the menu
+      const renderMenu = () => {
+        console.log('\n? Choose a UI theme:');
+        for (let i = 0; i < themes.length; i++) {
+          const t = themes[i];
+          const indicator = i === selectedIndex ? '❯' : ' ';
+          console.log(`${indicator} ${t.name} - ${t.description}`);
+        }
+        console.log('\n(Use arrow keys to move, Enter to select)');
+      };
+
+      // Initial render
+      renderMenu();
+
+      // Enable raw mode for arrow key detection
+      if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(true);
+      }
+      process.stdin.resume();
+
+      // Handle key presses
+      const keyHandler = (key) => {
+        if (key) {
+          const keyStr = key.toString();
+
+          // Handle Ctrl+C
+          if (keyStr === '\u0003') {
+            process.exit(0);
+          }
+
+          // Handle arrow keys
+          if (keyStr === '\u001b[A') { // Up arrow
+            selectedIndex = Math.max(0, selectedIndex - 1);
+            // Clear previous output and re-render
+            process.stdout.write('\u001b[' + (themes.length + 3) + 'A');
+            process.stdout.write('\u001b[0J');
+            renderMenu();
+          } else if (keyStr === '\u001b[B') { // Down arrow
+            selectedIndex = Math.min(themes.length - 1, selectedIndex + 1);
+            // Clear previous output and re-render
+            process.stdout.write('\u001b[' + (themes.length + 3) + 'A');
+            process.stdout.write('\u001b[0J');
+            renderMenu();
+          } else if (keyStr === '\r' || keyStr === '\n') { // Enter key
+            // Clean up
+            process.stdin.removeListener('data', keyHandler);
+            if (process.stdin.setRawMode) {
+              process.stdin.setRawMode(false);
+            }
+            process.stdin.pause();
+            rl.close();
+
+            console.log('');
+            resolve(themes[selectedIndex].name);
+          } else if (keyStr >= '1' && keyStr <= '4') {
+            // Number key selection
+            const num = parseInt(keyStr) - 1;
+            if (num < themes.length) {
+              selectedIndex = num;
+
+              // Clean up
+              process.stdin.removeListener('data', keyHandler);
+              if (process.stdin.setRawMode) {
+                process.stdin.setRawMode(false);
+              }
+              process.stdin.pause();
+              rl.close();
+
+              // Clear and show final selection
+              process.stdout.write('\u001b[' + (themes.length + 3) + 'A');
+              process.stdout.write('\u001b[0J');
+              console.log('\n? Choose a UI theme:');
+              for (let i = 0; i < themes.length; i++) {
+                const t = themes[i];
+                const indicator = i === selectedIndex ? '❯' : ' ';
+                console.log(`${indicator} ${t.name} - ${t.description}`);
+              }
+              console.log('');
+
+              resolve(themes[selectedIndex].name);
+            }
+          }
+        }
+      };
+
+      process.stdin.on('data', keyHandler);
+    });
   }
 
   /**

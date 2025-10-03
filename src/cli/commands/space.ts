@@ -19,6 +19,7 @@ import {
 import { printBanner } from '../utils/banner.js';
 import * as interactiveUI from '../utils/interactive-ui.js';
 import * as advancedInteractiveUI from '../utils/advanced-interactive-ui.js';
+import { getTheme } from '../themes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -938,6 +939,10 @@ async function spaceUpAction(options) {
 
           ws.send(JSON.stringify(joinMessage));
 
+          // Get theme for UI
+          const themeName = config.space?.ui_theme || 'hld';
+          const theme = getTheme(themeName);
+
           // Display banner before starting UI
           if (!useDebugUI) {
             printBanner({
@@ -945,7 +950,8 @@ async function spaceUpAction(options) {
               spaceId: spaceId,
               participantId: participant.id,
               gateway: `ws://localhost:${selectedPort}`,
-              color: process.env.NO_COLOR !== '1'
+              color: process.env.NO_COLOR !== '1',
+              theme: theme
             });
           }
 
@@ -954,7 +960,7 @@ async function spaceUpAction(options) {
             const ui = new InteractiveUI(ws, participant.id, spaceId);
             ui.start();
           } else {
-            startAdvancedInteractiveUI(ws, participant.id, spaceId);
+            startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName);
           }
         });
 
@@ -1585,6 +1591,10 @@ space
 
         ws.send(JSON.stringify(joinMessage));
 
+        // Get theme for UI
+        const themeName = config.space?.ui_theme || 'hld';
+        const theme = getTheme(themeName);
+
         // Display banner before starting UI
         if (!useDebugUI) {
           printBanner({
@@ -1592,7 +1602,8 @@ space
             spaceId: spaceId,
             participantId: participant.id,
             gateway: gatewayUrl,
-            color: process.env.NO_COLOR !== '1'
+            color: process.env.NO_COLOR !== '1',
+            theme: theme
           });
         }
 
@@ -1601,7 +1612,7 @@ space
           const ui = new InteractiveUI(ws, participant.id, spaceId);
           ui.start();
         } else {
-          startAdvancedInteractiveUI(ws, participant.id, spaceId);
+          startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName);
         }
       });
 

@@ -53,7 +53,8 @@ function EnhancedInput({
   keyBindings = defaultKeyBindings,
   showCursor = true,
   prompt = '> ',
-  slashContext = null
+  slashContext = null,
+  theme = null
 }) {
   // Text buffer for managing input
   const bufferRef = useRef(new TextBuffer());
@@ -559,14 +560,18 @@ function EnhancedInput({
     const cursor = buffer.getCursorPosition();
     const lines = buffer.lines;
 
+    const promptColor = theme?.colors?.promptText || 'magenta';
+    const inputColor = theme?.colors?.inputText || 'white';
+    const multilineColor = theme?.colors?.multilineIndicator || 'magenta';
+
     if (multiline) {
       // Multi-line rendering
       return React.createElement(Box, { flexDirection: 'column' },
         lines.map((line, lineIndex) =>
           React.createElement(Box, { key: lineIndex },
-            lineIndex === 0 && React.createElement(Text, { color: 'magenta', bold: true }, prompt),
-            lineIndex > 0 && React.createElement(Text, { color: 'magenta', dimColor: true }, '◆ '),
-            React.createElement(Text, { color: 'cyan' },
+            lineIndex === 0 && React.createElement(Text, { color: promptColor, bold: true }, prompt),
+            lineIndex > 0 && React.createElement(Text, { color: multilineColor, dimColor: true }, '◆ '),
+            React.createElement(Text, { color: inputColor },
               renderLineWithCursor(line, lineIndex === cursor.line ? cursor.column : -1, lineIndex === 0)
             )
           )
@@ -576,8 +581,8 @@ function EnhancedInput({
       // Single-line rendering
       const line = lines[0] || '';
       return React.createElement(Box, null,
-        React.createElement(Text, { color: 'magenta', bold: true }, prompt),
-        React.createElement(Text, { color: 'cyan' },
+        React.createElement(Text, { color: promptColor, bold: true }, prompt),
+        React.createElement(Text, { color: inputColor },
           renderLineWithCursor(line, cursor.column, true)
         )
       );
@@ -616,21 +621,28 @@ function EnhancedInput({
   const renderSuggestions = () => {
     if (!isAutocompleting || suggestions.length === 0) return null;
 
+    const dividerColor = theme?.colors?.suggestionDivider || 'magenta';
+    const selectedColor = theme?.colors?.suggestionSelected || 'magenta';
+    const unselectedColor = theme?.colors?.suggestionUnselected || 'cyan';
+    const descColor = theme?.colors?.suggestionDescription || 'cyan';
+
     return React.createElement(Box, { flexDirection: 'column', marginTop: 1 },
-      React.createElement(Text, { color: 'magenta', dimColor: true }, '    ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔'),
+      React.createElement(Text, { color: dividerColor, dimColor: true }, '    ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔'),
       suggestions.slice(0, 8).map((suggestion, index) =>
         React.createElement(Box, { key: suggestion.id || `${suggestion.label}-${index}` },
           React.createElement(Text, {
-            color: index === selectedSuggestion ? 'magenta' : 'cyan',
+            color: index === selectedSuggestion ? selectedColor : unselectedColor,
             bold: index === selectedSuggestion
           },
             `    ${index === selectedSuggestion ? '◆' : '◇'} ${suggestion.label}`
           ),
-          suggestion.description && React.createElement(Text, { color: 'cyan', dimColor: true }, ` — ${suggestion.description}`)
+          suggestion.description && React.createElement(Text, { color: descColor, dimColor: true }, ` — ${suggestion.description}`)
         )
       )
     );
   };
+
+  const borderColor = theme?.colors?.border || 'magenta';
 
   return React.createElement(Box, {
     flexDirection: 'column',
@@ -638,7 +650,7 @@ function EnhancedInput({
   },
     React.createElement(Box, {
       borderStyle: 'round',
-      borderColor: disabled ? 'gray' : 'magenta',
+      borderColor: disabled ? 'gray' : borderColor,
       paddingX: 1,
       flexDirection: 'column',
       minHeight: multiline ? 5 : 1  // Show at least 5 lines in multiline mode
