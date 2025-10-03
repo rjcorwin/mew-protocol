@@ -1882,12 +1882,12 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
     second: '2-digit',
   });
 
-  const direction = sent ? '→' : '←';
   const participant = sent ? 'you' : message.from || 'system';
   const kind = message.kind || 'unknown';
 
   // Add context indicator - diamond bullet for nested messages
-  const contextPrefix = message.context ? '  ◇ ' : '';
+  // Currently disabled to keep all headers at the same level
+  const contextPrefix = '';
 
   // Chat messages get special treatment: filled diamonds and separators
   const isChat = kind === 'chat' && !message.context;
@@ -1899,7 +1899,7 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
   if (verbose) {
     return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
       React.createElement(Text, { color: "gray" },
-        `${contextPrefix}⟨${time}⟩ ${direction} ${participant} ${kind}`
+        `${contextPrefix}${participant} → ${kind}` // (${time})
       ),
       React.createElement(Text, null, JSON.stringify(message, null, 2))
     );
@@ -1907,11 +1907,11 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
 
   let headerColor = useColor ? getColorForKind(kind, theme) : 'white';
 
-  // Use filled diamond for chat messages
-  const chatPrefix = isChat ? '◆ ' : '';
+  // Envelope marker: filled diamond for chat, hollow diamond for others
+  const envelopePrefix = isChat ? '◆ ' : '◇ ';
 
   // For payload, use spacing without the diamond indicator (header already has it)
-  const payloadIndent = message.context ? '     ' : '';
+  const payloadIndent = '';
 
   // For chat messages, add visual separation with full-width top and bottom borders
   if (isChat) {
@@ -1921,7 +1921,7 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
     },
       React.createElement(Text, { color: separatorColor, dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
       React.createElement(Text, { color: headerColor },
-        `${contextPrefix}${chatPrefix}⟨${time}⟩ ${direction} ${participant}`
+        `${contextPrefix}${envelopePrefix}${participant} →` // (${time})
       ),
       message.payload && React.createElement(ReasoningDisplay, {
         payload: message.payload,
@@ -1938,7 +1938,7 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
   // Non-chat messages use simple layout
   return React.createElement(Box, { flexDirection: "column", marginBottom: kind === 'reasoning/thought' ? 2 : 1 },
     React.createElement(Text, { color: headerColor },
-      `${contextPrefix}${chatPrefix}⟨${time}⟩ ${direction} ${participant}${isChat ? '' : ' ' + kind}`
+      `${contextPrefix}${envelopePrefix}${participant} → ${kind}` // (${time})
     ),
     message.payload && React.createElement(ReasoningDisplay, {
       payload: message.payload,
