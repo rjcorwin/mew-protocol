@@ -12,6 +12,7 @@ export interface Theme {
     promptText: string;
     inputText: string;
     border: string;
+    inputBorder: string;
     multilineIndicator: string;
 
     // Autocomplete
@@ -79,6 +80,7 @@ export const hldTheme: Theme = {
     promptText: 'magenta',
     inputText: 'white',
     border: 'magenta',
+    inputBorder: 'cyan',
     multilineIndicator: 'magenta',
 
     suggestionSelected: 'magenta',
@@ -140,6 +142,7 @@ export const falloutTheme: Theme = {
     promptText: 'green',
     inputText: 'green',
     border: 'green',
+    inputBorder: 'greenBright',
     multilineIndicator: 'green',
 
     suggestionSelected: 'greenBright',
@@ -202,6 +205,7 @@ export const starfieldTheme: Theme = {
     promptText: 'blue',
     inputText: 'white',
     border: 'blue',
+    inputBorder: 'yellow',
     multilineIndicator: 'blue',
 
     suggestionSelected: 'yellow',
@@ -263,6 +267,7 @@ export const cyberpunkTheme: Theme = {
     promptText: 'blue',
     inputText: 'white',
     border: 'blue',
+    inputBorder: 'yellow',
     multilineIndicator: 'blue',
 
     suggestionSelected: 'yellow',
