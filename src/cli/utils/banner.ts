@@ -81,14 +81,14 @@ function generateBanner(options = {}) {
   const dim = color ? (theme?.ansi?.dim || '\x1b[2m') : '';
 
   const banner = `
-    ${dim}▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄${reset}
-    ${bold}${magenta}◢◣${reset}        ${bold}${cyan}███╗   ███╗███████╗██╗    ██╗${reset}     ${bold}${magenta}◢◣${reset}
-   ${bold}${pink}◢███◣${reset}      ${bold}${cyan}████╗ ████║██╔════╝██║    ██║${reset}    ${bold}${pink}◢███◣${reset}
-  ${bold}${cyan}◢█████◣${reset}     ${bold}${cyan}██╔████╔██║█████╗  ██║ █╗ ██║${reset}   ${bold}${cyan}◢█████◣${reset}
- ${bold}${cyan}◢███${purple}◆${cyan}███◣${reset}    ${bold}${cyan}██║╚██╔╝██║██╔══╝  ██║███╗██║${reset}  ${bold}${cyan}◢███${purple}◆${cyan}███◣${reset}
-${bold}${blue}◢█████████◣${reset}   ${bold}${cyan}██║ ╚═╝ ██║███████╗╚███╔███╔╝${reset} ${bold}${blue}◢█████████◣${reset}
-   ${cyan}/ᐠ｡ꞈ｡ᐟ\\${reset}    ${bold}${cyan}╚═╝     ╚═╝╚══════╝ ╚══╝╚══╝${reset}     ${cyan}/ᐠ｡ꞈ｡ᐟ\\${reset}
-    ${dim}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${reset}
+    ${dim}▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄${reset}
+        ${bold}${magenta}◢◣${reset}        ${bold}${cyan}███╗   ███╗███████╗██╗    ██╗${reset}
+       ${bold}${pink}◢███◣${reset}      ${bold}${cyan}████╗ ████║██╔════╝██║    ██║${reset}
+      ${bold}${cyan}◢█████◣${reset}     ${bold}${cyan}██╔████╔██║█████╗  ██║ █╗ ██║${reset}
+     ${bold}${cyan}◢███${purple}◆${cyan}███◣${reset}    ${bold}${cyan}██║╚██╔╝██║██╔══╝  ██║███╗██║${reset}
+    ${bold}${blue}◢█████████◣${reset}   ${bold}${cyan}██║ ╚═╝ ██║███████╗╚███╔███╔╝${reset}
+      ${cyan}/ᐠ｡ꞈ｡ᐟ\\${reset}     ${bold}${cyan}╚═╝     ╚═╝╚══════╝ ╚══╝╚══╝${reset}
+    ${dim}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${reset}
 
     ${bold}${magenta}◆${reset} ${cyan}Multi-Entity Workspace Protocol${reset} ${dim}v0.4${reset} ${bold}${magenta}◆${reset}
     ${dim}${cyan}"${tagline}"${reset}
