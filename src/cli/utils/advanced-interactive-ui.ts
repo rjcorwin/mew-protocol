@@ -833,7 +833,6 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
 
     // Handle capability grant acknowledgments
     if (message.kind === 'capability/grant-ack') {
-      console.error('[DEBUG] Received grant acknowledgment:', JSON.stringify(message.payload));
       addMessage({
         kind: 'system/info',
         from: 'system',
@@ -845,7 +844,6 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
     if (message.kind === 'system/welcome' && message.to?.includes(participantId)) {
       // This could be an updated welcome after a grant
       const capabilities = message.payload?.you?.capabilities || [];
-      console.error('[DEBUG] Received welcome with capabilities:', capabilities.length);
 
       // Check if this is an update (not the initial welcome)
       if (messages.length > 5) { // Heuristic: not the initial connection
@@ -859,7 +857,6 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
 
     // Handle errors (especially for capability violations)
     if (message.kind === 'system/error') {
-      console.error('[DEBUG] Received error:', JSON.stringify(message.payload));
       if (message.payload?.error === 'capability_violation' &&
           message.payload?.attempted_kind === 'capability/grant') {
         addMessage({
@@ -952,10 +949,6 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
 
     const envelope = wrapEnvelope(message);
 
-    // Debug log for capability/grant messages
-    if (message.kind === 'capability/grant') {
-      console.error('[DEBUG] Sending wrapped grant envelope:', JSON.stringify(envelope, null, 2));
-    }
 
     ws.send(JSON.stringify(envelope));
 
@@ -1942,7 +1935,7 @@ const toolFormatters = {
   /**
    * write_file tool formatter - shows file path and content preview
    */
-  write_file: (args, { proposalColor, detailColor, theme }) => {
+  write_file: (args, { headerLabel = 'Proposal', proposalColor, detailColor, theme }) => {
     const filePath = args.path || 'unknown';
     const content = args.content || '';
 
@@ -1961,7 +1954,7 @@ const toolFormatters = {
 
     return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
       React.createElement(Text, { color: proposalColor, bold: true },
-        `╔╗ Proposal: Write file`
+        `╔╗ ${headerLabel}: Write file`
       ),
       React.createElement(Text, { color: detailColor, marginTop: 1 },
         `File: ${filePath}`
@@ -1989,7 +1982,7 @@ const toolFormatters = {
   /**
    * edit_file tool formatter - shows diff with old/new strings
    */
-  edit_file: (args, { proposalColor, detailColor, theme }) => {
+  edit_file: (args, { headerLabel = 'Proposal', proposalColor, detailColor, theme }) => {
     const filePath = args.path || 'unknown';
     const edits = args.edits || [];
 
@@ -1997,7 +1990,7 @@ const toolFormatters = {
     if (edits.length === 0) {
       return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
         React.createElement(Text, { color: proposalColor, bold: true },
-          `╔╗ Proposal: Edit file`
+          `╔╗ ${headerLabel}: Edit file`
         ),
         React.createElement(Text, { color: detailColor, marginTop: 1 },
           `File: ${filePath}`
@@ -2071,7 +2064,7 @@ const toolFormatters = {
 
     return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
       React.createElement(Text, { color: proposalColor, bold: true },
-        `╔╗ Proposal: Edit file`
+        `╔╗ ${headerLabel}: Edit file`
       ),
       React.createElement(Text, { color: detailColor, marginTop: 1 },
         `File: ${filePath}`
@@ -2117,10 +2110,13 @@ function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
     );
   }
 
-  // Special formatting for mcp/proposal messages
-  if (kind === 'mcp/proposal') {
+  // Special formatting for mcp/proposal and mcp/request messages
+  if (kind === 'mcp/proposal' || kind === 'mcp/request') {
     const proposalColor = theme?.colors?.reasoningMessage || 'cyan';
     const detailColor = theme?.colors?.genericPayload || 'gray';
+
+    const isRequest = kind === 'mcp/request';
+    const headerLabel = isRequest ? 'Request' : 'Proposal';
 
     const method = payload.method || 'unknown';
     const toolName = payload.params?.name || null;
@@ -2130,7 +2126,7 @@ function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
     if (method === 'tools/call' && toolName) {
       const formatter = toolFormatters[toolName];
       if (formatter) {
-        return formatter(argsObj, { proposalColor, detailColor, theme });
+        return formatter(argsObj, { headerLabel, proposalColor, detailColor, theme });
       }
     }
 
@@ -2144,7 +2140,7 @@ function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
 
     return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
       React.createElement(Text, { color: proposalColor, bold: true },
-        `╔╗ Proposal: ${method}${toolName ? ` → ${toolName}` : ''}`
+        `╔╗ ${headerLabel}: ${method}${toolName ? ` → ${toolName}` : ''}`
       ),
       argsStr && React.createElement(Text, {
         color: detailColor,
