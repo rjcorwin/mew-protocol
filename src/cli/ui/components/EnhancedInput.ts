@@ -651,7 +651,7 @@ function EnhancedInput({
     React.createElement(Box, {
       paddingX: 1,
       flexDirection: 'column',
-      minHeight: multiline ? 5 : 1  // Show at least 5 lines in multiline mode
+      minHeight: isAutocompleting ? 1 : (multiline ? 5 : 1)
     },
       renderInput()
     ),
