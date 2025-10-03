@@ -649,8 +649,6 @@ function EnhancedInput({
     opacity: disabled ? 0.5 : 1
   },
     React.createElement(Box, {
-      borderStyle: 'round',
-      borderColor: disabled ? 'gray' : borderColor,
       paddingX: 1,
       flexDirection: 'column',
       minHeight: multiline ? 5 : 1  // Show at least 5 lines in multiline mode

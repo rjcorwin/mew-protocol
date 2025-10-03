@@ -1834,19 +1834,23 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
       theme: theme
     }),
     
-    // Enhanced Input Component
-    React.createElement(EnhancedInput, {
-      onSubmit: processInput,
-      placeholder: 'Type a message or /help for commands...',
-      multiline: true,  // Enable multi-line for Shift+Enter support
-      disabled: pendingOperation !== null,
-      history: commandHistory,
-      onHistoryChange: setCommandHistory,
-      prompt: '> ',
-      showCursor: true,
-      slashContext,
-      theme
-    }),
+    // Enhanced Input Component with borders
+    React.createElement(Box, { flexDirection: "column" },
+      React.createElement(Text, { color: 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
+      React.createElement(EnhancedInput, {
+        onSubmit: processInput,
+        placeholder: 'Type a message or /help for commands...',
+        multiline: true,  // Enable multi-line for Shift+Enter support
+        disabled: pendingOperation !== null,
+        history: commandHistory,
+        onHistoryChange: setCommandHistory,
+        prompt: '> ',
+        showCursor: true,
+        slashContext,
+        theme
+      }),
+      React.createElement(Text, { color: 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80))
+    ),
     
     // Status Bar
     React.createElement(StatusBar, {
