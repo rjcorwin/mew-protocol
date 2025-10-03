@@ -925,6 +925,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
         }, false);
       } else {
         // Show dialog for manual approval
+        // The mcp/proposal envelope itself will be formatted nicely in the message history
         setPendingOperation({
           id: message.id,
           from: message.from,
@@ -1116,7 +1117,103 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
     setPendingAcknowledgements(prev => prev.filter(item => !entries.some(entry => entry.id === item.id)));
   };
 
+  // Handle dialog input (1/2/3) - defined before processInput
+  const handleDialogInput = (input) => {
+    if (!pendingOperation) return false;
+
+    if (input === '1') {
+      // Approve
+      if (pendingOperation.operation) {
+        const { method, params } = pendingOperation.operation;
+        const message = {
+          kind: 'mcp/request',
+          correlation_id: [pendingOperation.id],
+          payload: {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: method,
+            params: params
+          }
+        };
+        if (pendingOperation.to && pendingOperation.to.length > 0) {
+          message.to = pendingOperation.to;
+        }
+        sendMessage(message);
+      }
+      setPendingOperation(null);
+      return true;
+    } else if (input === '2') {
+      // Grant
+      const proposer = pendingOperation.from;
+      const method = pendingOperation.operation?.method;
+      const params = pendingOperation.operation?.params;
+      const toolName = params?.name;
+
+      const capabilityPattern = {
+        kind: 'mcp/request',
+        payload: { method: method }
+      };
+      if (method === 'tools/call' && toolName) {
+        capabilityPattern.payload.params = { name: toolName };
+      }
+
+      setGrantedCapabilities(prev => {
+        const existing = prev.get(proposer) || [];
+        return new Map(prev).set(proposer, [...existing, capabilityPattern]);
+      });
+
+      sendMessage({
+        kind: 'capability/grant',
+        to: [proposer],
+        payload: {
+          recipient: proposer,
+          capabilities: [capabilityPattern],
+          reason: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} for this session`
+        }
+      });
+
+      addMessage({
+        kind: 'system/info',
+        from: 'system',
+        payload: { text: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} to ${proposer} for this session` }
+      }, true);
+
+      if (pendingOperation.operation) {
+        const { method, params } = pendingOperation.operation;
+        sendMessage({
+          kind: 'mcp/request',
+          correlation_id: [pendingOperation.id],
+          payload: {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: method,
+            params: params
+          },
+          to: pendingOperation.to
+        });
+      }
+      setPendingOperation(null);
+      return true;
+    } else if (input === '3') {
+      // Deny
+      sendMessage({
+        kind: 'mcp/reject',
+        to: [pendingOperation.from],
+        correlation_id: [pendingOperation.id],
+        payload: { reason: 'disagree' }
+      });
+      setPendingOperation(null);
+      return true;
+    }
+    return false;
+  };
+
   const processInput = (input) => {
+    // Check for dialog input first (1/2/3)
+    if (handleDialogInput(input)) {
+      return;
+    }
+
     // Allow empty input to clear the input field
     // but don't send empty messages
     if (!input || !input.trim()) {
@@ -1710,145 +1807,34 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
       })
     ),
 
-    // Reasoning Status
-    activeReasoning && React.createElement(ReasoningStatus, {
+    // Reasoning Status - hide when operation confirmation is showing
+    activeReasoning && !pendingOperation && React.createElement(ReasoningStatus, {
       reasoning: activeReasoning,
       theme: theme
     }),
 
-    // Input area - show dialog if pending, otherwise show input
-    pendingOperation ? React.createElement(OperationConfirmation, {
-      operation: pendingOperation,
-      onApprove: () => {
-        // Fulfill the proposal by sending the actual MCP request
-        // According to MEW spec, approval is done by fulfillment with correlation_id
-        if (pendingOperation.operation) {
-          // Extract the method and params from the proposal payload
-          const { method, params } = pendingOperation.operation;
-
-          // Send the MCP request with correlation_id pointing to the proposal
-          // IMPORTANT: Send to the participant specified in the proposal's 'to' field
-          const message = {
-            kind: 'mcp/request',
-            correlation_id: [pendingOperation.id],
-            payload: {
-              jsonrpc: '2.0',
-              id: Date.now(), // Generate a unique request ID
-              method: method,
-              params: params
-            }
-          };
-
-          // If the proposal specified a target participant, send to them
-          if (pendingOperation.to && pendingOperation.to.length > 0) {
-            message.to = pendingOperation.to;
-          }
-
-          sendMessage(message);
-        }
-        setPendingOperation(null);
-      },
-      onGrant: () => {
-        // Grant capability for this operation type
-        const proposer = pendingOperation.from;
-        const method = pendingOperation.operation?.method;
-        const params = pendingOperation.operation?.params;
-        const toolName = params?.name;
-
-        // Create capability pattern for this specific operation
-        const capabilityPattern = {
-          kind: 'mcp/request',
-          payload: {
-            method: method
-          }
-        };
-
-        // For tools/call, include the specific tool name pattern
-        if (method === 'tools/call' && toolName) {
-          capabilityPattern.payload.params = {
-            name: toolName
-          };
-        }
-
-        // Update local grant tracking
-        setGrantedCapabilities(prev => {
-          const existing = prev.get(proposer) || [];
-          return new Map(prev).set(proposer, [...existing, capabilityPattern]);
-        });
-
-        // Send capability grant message
-        const grantMessage = {
-          kind: 'capability/grant',
-          to: [proposer],
-          payload: {
-            recipient: proposer,
-            capabilities: [capabilityPattern],
-            reason: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} for this session`
-          }
-        };
-
-        // Debug: Log the grant message being sent
-        console.error('[DEBUG] Sending capability grant:', JSON.stringify(grantMessage, null, 2));
-        sendMessage(grantMessage);
-
-        // Add a visible message to confirm grant was sent
-        addMessage({
-          kind: 'system/info',
-          from: 'system',
-          payload: { text: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} to ${proposer} for this session` }
-        }, true);
-
-        // Also fulfill the current proposal
-        if (pendingOperation.operation) {
-          const { method, params } = pendingOperation.operation;
-          const fulfillMessage = {
-            kind: 'mcp/request',
-            correlation_id: [pendingOperation.id],
-            payload: {
-              jsonrpc: '2.0',
-              id: Date.now(),
-              method: method,
-              params: params
-            }
-          };
-
-          if (pendingOperation.to && pendingOperation.to.length > 0) {
-            fulfillMessage.to = pendingOperation.to;
-          }
-
-          sendMessage(fulfillMessage);
-        }
-
-        setPendingOperation(null);
-      },
-      onDeny: () => {
-        // Send rejection according to MEW spec
-        sendMessage({
-          kind: 'mcp/reject',
-          to: [pendingOperation.from], // Send rejection back to proposer
-          correlation_id: [pendingOperation.id], // Must be an array
-          payload: {
-            reason: 'disagree'
-          }
-        });
-        setPendingOperation(null);
-      }
-    }) : React.createElement(Box, { flexDirection: "column" },
-      React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
-      React.createElement(EnhancedInput, {
-        onSubmit: processInput,
-        placeholder: 'Type a message or /help for commands...',
-        multiline: true,  // Enable multi-line for Shift+Enter support
-        disabled: pendingOperation !== null,
-        history: commandHistory,
-        onHistoryChange: setCommandHistory,
-        prompt: '> ',
-        showCursor: true,
-        slashContext,
-        theme
-      }),
-      React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80))
-    ),
+    // Input area - or operation confirmation dialog if pending
+    pendingOperation
+      ? React.createElement(OperationConfirmation, {
+          operation: pendingOperation,
+          onInput: handleDialogInput
+        })
+      : React.createElement(Box, { flexDirection: "column" },
+          React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
+          React.createElement(EnhancedInput, {
+            onSubmit: processInput,
+            placeholder: 'Type a message or /help for commands...',
+            multiline: true,  // Enable multi-line for Shift+Enter support
+            disabled: false,
+            history: commandHistory,
+            onHistoryChange: setCommandHistory,
+            prompt: '> ',
+            showCursor: true,
+            slashContext,
+            theme
+          }),
+          React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80))
+        ),
     
     // Status Bar
     React.createElement(StatusBar, {
@@ -1976,6 +1962,36 @@ function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
     );
   }
 
+  // Special formatting for mcp/proposal messages
+  if (kind === 'mcp/proposal') {
+    const proposalColor = theme?.colors?.reasoningMessage || 'cyan';
+    const detailColor = theme?.colors?.genericPayload || 'gray';
+
+    const method = payload.method || 'unknown';
+    const toolName = payload.params?.name || null;
+    const argsObj = payload.params?.arguments || payload.params || {};
+
+    // Format arguments nicely
+    let argsStr;
+    try {
+      argsStr = JSON.stringify(argsObj, null, 2);
+    } catch (e) {
+      argsStr = String(argsObj);
+    }
+
+    return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
+      React.createElement(Text, { color: proposalColor, bold: true },
+        `📋 Proposal: ${method}${toolName ? ` → ${toolName}` : ''}`
+      ),
+      argsStr && React.createElement(Text, {
+        color: detailColor,
+        dimColor: true,
+        marginTop: 1,
+        wrap: "wrap"
+      }, `Arguments:\n${argsStr}`)
+    );
+  }
+
   if (kind === 'system/help' && Array.isArray(payload.lines)) {
     const sectionTitles = new Set(['Available Commands', 'Chat Queue', 'Participant Controls', 'Streams']);
     const basePrefix = contextPrefix || '';
@@ -2023,129 +2039,45 @@ function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
  * Supports both number keys and arrow/enter navigation for better UX.
  * Phase 3: Includes capability grant option
  */
-function OperationConfirmation({ operation, onApprove, onDeny, onGrant }) {
-  // Focus management - ensure this component takes priority for input
-  const { isFocused } = useFocus({ autoFocus: true });
-
-  // Track selected option (0 = Yes once, 1 = Grant, 2 = No)
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  useInput((input, key) => {
-    // Only handle input when focused
-    if (!isFocused) return;
-
-    // Number key shortcuts
-    if (input === '1') {
-      onApprove();
-      return;
-    }
-    if (input === '2') {
-      onGrant();
-      return;
-    }
-    if (input === '3') {
-      onDeny();
-      return;
-    }
-
-    // Arrow key navigation
-    if (key.upArrow) {
-      setSelectedIndex(Math.max(0, selectedIndex - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setSelectedIndex(Math.min(2, selectedIndex + 1));
-      return;
-    }
-
-    // Enter key to confirm selection
-    if (key.return) {
-      if (selectedIndex === 0) {
-        onApprove();
-      } else if (selectedIndex === 1) {
-        onGrant();
-      } else {
-        onDeny();
-      }
-      return;
-    }
-
-    // Escape to cancel
-    if (key.escape) {
-      onDeny();
-      return;
-    }
-  });
-
-  // Format the arguments for display
-  const formatArguments = (args) => {
-    if (!args) return 'none';
-    try {
-      return JSON.stringify(args, null, 2);
-    } catch {
-      return String(args);
-    }
-  };
-
-  // Extract operation details
+function OperationConfirmation({ operation, onInput }) {
   const method = operation.operation?.method || 'unknown';
   const params = operation.operation?.params || {};
-  const target = operation.to?.[0] || 'unknown';
-
-  // For tools/call, extract the tool name
   const toolName = params.name || null;
+
+  // Track selected option (0=Yes, 1=Grant, 2=No)
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Capture number key presses and arrow keys
+  useInput((input, key) => {
+    // Number keys
+    if (input === '1' || input === '2' || input === '3') {
+      onInput(input);
+    }
+    // Arrow keys
+    else if (key.upArrow) {
+      setSelectedIndex(prev => (prev - 1 + 3) % 3);
+    }
+    else if (key.downArrow) {
+      setSelectedIndex(prev => (prev + 1) % 3);
+    }
+    // Enter key to confirm
+    else if (key.return) {
+      onInput(String(selectedIndex + 1));
+    }
+  });
 
   return React.createElement(Box, {
       borderStyle: "round",
       borderColor: "yellow",
       paddingX: 2,
-      paddingY: 1,
-      marginY: 1,
-      width: 60
+      paddingY: 1
     },
     React.createElement(Box, { flexDirection: "column" },
-      // Header
-      React.createElement(Text, { bold: true },
-        `${operation.from} wants to execute operation`
-      ),
-      React.createElement(Box, { marginTop: 1 }),
-
-      // Operation details
-      React.createElement(Text, null, `Method: ${method}`),
-      toolName && React.createElement(Text, null, `Tool: ${toolName}`),
-      React.createElement(Text, null, `Target: ${target}`),
-
-      React.createElement(Box, { marginTop: 1 }),
-
-      // Arguments section
-      React.createElement(Text, null, "Arguments:"),
-      React.createElement(Box, {
-        borderStyle: "single",
-        borderColor: "gray",
-        paddingX: 1,
-        marginTop: 0,
-        marginBottom: 1
-      },
-        React.createElement(Text, { color: "cyan" },
-          formatArguments(params.arguments || params)
-        )
-      ),
-
-      // Options
-      React.createElement(Text, null, "Do you want to allow this?"),
-      React.createElement(Text, { color: selectedIndex === 0 ? "green" : "white" },
-        `${selectedIndex === 0 ? '❯' : ' '} 1. Yes (this time only)`
-      ),
-      React.createElement(Text, { color: selectedIndex === 1 ? "cyan" : "white" },
-        `${selectedIndex === 1 ? '❯' : ' '} 2. Yes, allow ${operation.from} to ${method === 'tools/call' && toolName ? `use '${toolName}'` : method} for this session`
-      ),
-      React.createElement(Text, { color: selectedIndex === 2 ? "red" : "white" },
-        `${selectedIndex === 2 ? '❯' : ' '} 3. No`
-      ),
-      React.createElement(Box, { marginTop: 1 }),
-      React.createElement(Text, { color: "gray", fontSize: 12 },
-        "Use ↑↓ arrows + Enter, or press 1/2/3, or Esc to cancel"
-      )
+      React.createElement(Text, { bold: true }, `${operation.from} → ${method}${toolName ? ` (${toolName})` : ''}`),
+      React.createElement(Text, { color: "gray", dimColor: true }, "(scroll up to see proposal envelope)"),
+      React.createElement(Text, {}, `${selectedIndex === 0 ? '> ' : '  '}1=Yes  `),
+      React.createElement(Text, {}, `${selectedIndex === 1 ? '> ' : '  '}2=Grant  `),
+      React.createElement(Text, {}, `${selectedIndex === 2 ? '> ' : '  '}3=No`)
     )
   );
 }
