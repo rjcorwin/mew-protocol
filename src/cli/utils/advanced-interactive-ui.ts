@@ -2324,7 +2324,7 @@ function getPayloadPreview(payload, kind) {
   }
 
   if (kind === 'chat' && payload.text) {
-    return `"${payload.text}"`;
+    return payload.text;
   }
 
   if (kind === 'mcp/request' && payload.method) {
