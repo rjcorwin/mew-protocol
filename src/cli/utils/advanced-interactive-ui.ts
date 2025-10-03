@@ -1935,6 +1935,161 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
 }
 
 /**
+ * Tool Formatters - Pluggable system for formatting tool proposals
+ * Each formatter receives (args, { proposalColor, detailColor, theme })
+ */
+const toolFormatters = {
+  /**
+   * write_file tool formatter - shows file path and content preview
+   */
+  write_file: (args, { proposalColor, detailColor, theme }) => {
+    const filePath = args.path || 'unknown';
+    const content = args.content || '';
+
+    // Show first and last few lines of content
+    const lines = content.split('\n');
+    const maxPreviewLines = 10;
+    let displayLines;
+
+    if (lines.length <= maxPreviewLines) {
+      displayLines = lines;
+    } else {
+      const firstLines = lines.slice(0, 5);
+      const lastLines = lines.slice(-5);
+      displayLines = [...firstLines, `... (${lines.length - maxPreviewLines} lines omitted) ...`, ...lastLines];
+    }
+
+    return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
+      React.createElement(Text, { color: proposalColor, bold: true },
+        `╔╗ Proposal: Write file`
+      ),
+      React.createElement(Text, { color: detailColor, marginTop: 1 },
+        `File: ${filePath}`
+      ),
+      React.createElement(Text, { color: detailColor, marginTop: 1 },
+        `Lines: ${lines.length}`
+      ),
+      React.createElement(Box, {
+        flexDirection: "column",
+        borderStyle: "round",
+        borderColor: "gray",
+        marginTop: 1,
+        paddingX: 1
+      },
+        ...displayLines.map((line, index) =>
+          React.createElement(Text, {
+            key: index,
+            color: line.includes('omitted') ? detailColor : "green"
+          }, line.includes('omitted') ? line : `+ ${line}`)
+        )
+      )
+    );
+  },
+
+  /**
+   * edit_file tool formatter - shows diff with old/new strings
+   */
+  edit_file: (args, { proposalColor, detailColor, theme }) => {
+    const filePath = args.path || 'unknown';
+    const edits = args.edits || [];
+
+    // If no edits, show empty
+    if (edits.length === 0) {
+      return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
+        React.createElement(Text, { color: proposalColor, bold: true },
+          `╔╗ Proposal: Edit file`
+        ),
+        React.createElement(Text, { color: detailColor, marginTop: 1 },
+          `File: ${filePath}`
+        ),
+        React.createElement(Text, { color: detailColor, marginTop: 1 },
+          'No edits specified'
+        )
+      );
+    }
+
+    // Process all edits
+    const editElements = [];
+    edits.forEach((edit, editIndex) => {
+      const oldString = edit.oldText || '';
+      const newString = edit.newText || '';
+
+      // Split into lines and truncate if too many
+      const oldLines = oldString.split('\n');
+      const newLines = newString.split('\n');
+      const maxLines = 15;
+
+      let oldDisplay = oldLines;
+      let newDisplay = newLines;
+
+      if (oldLines.length > maxLines) {
+        const firstLines = oldLines.slice(0, 7);
+        const lastLines = oldLines.slice(-7);
+        oldDisplay = [...firstLines, `... (${oldLines.length - 14} lines omitted) ...`, ...lastLines];
+      }
+
+      if (newLines.length > maxLines) {
+        const firstLines = newLines.slice(0, 7);
+        const lastLines = newLines.slice(-7);
+        newDisplay = [...firstLines, `... (${newLines.length - 14} lines omitted) ...`, ...lastLines];
+      }
+
+      // Add edit header if multiple edits
+      if (edits.length > 1) {
+        editElements.push(
+          React.createElement(Text, {
+            key: `edit-header-${editIndex}`,
+            color: proposalColor,
+            marginTop: editIndex > 0 ? 2 : 0
+          }, `Edit ${editIndex + 1} of ${edits.length}:`)
+        );
+      }
+
+      // Add old lines
+      oldDisplay.forEach((line, index) => {
+        editElements.push(
+          React.createElement(Text, {
+            key: `edit-${editIndex}-old-${index}`,
+            color: line.includes('omitted') ? detailColor : "red"
+          }, line.includes('omitted') ? line : `- ${line}`)
+        );
+      });
+
+      // Add separator
+      editElements.push(React.createElement(Text, { key: `edit-${editIndex}-sep` }, ""));
+
+      // Add new lines
+      newDisplay.forEach((line, index) => {
+        editElements.push(
+          React.createElement(Text, {
+            key: `edit-${editIndex}-new-${index}`,
+            color: line.includes('omitted') ? detailColor : "green"
+          }, line.includes('omitted') ? line : `+ ${line}`)
+        );
+      });
+    });
+
+    return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
+      React.createElement(Text, { color: proposalColor, bold: true },
+        `╔╗ Proposal: Edit file`
+      ),
+      React.createElement(Text, { color: detailColor, marginTop: 1 },
+        `File: ${filePath}`
+      ),
+      React.createElement(Box, {
+        flexDirection: "column",
+        borderStyle: "round",
+        borderColor: "gray",
+        marginTop: 1,
+        paddingX: 1
+      },
+        ...editElements
+      )
+    );
+  }
+};
+
+/**
  * Reasoning Display Component - Shows payload with better formatting for reasoning
  */
 function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
@@ -1971,7 +2126,15 @@ function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
     const toolName = payload.params?.name || null;
     const argsObj = payload.params?.arguments || payload.params || {};
 
-    // Format arguments nicely
+    // Use tool-specific formatter if available
+    if (method === 'tools/call' && toolName) {
+      const formatter = toolFormatters[toolName];
+      if (formatter) {
+        return formatter(argsObj, { proposalColor, detailColor, theme });
+      }
+    }
+
+    // Default formatting for unknown tools
     let argsStr;
     try {
       argsStr = JSON.stringify(argsObj, null, 2);
@@ -1981,7 +2144,7 @@ function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
 
     return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
       React.createElement(Text, { color: proposalColor, bold: true },
-        `📋 Proposal: ${method}${toolName ? ` → ${toolName}` : ''}`
+        `╔╗ Proposal: ${method}${toolName ? ` → ${toolName}` : ''}`
       ),
       argsStr && React.createElement(Text, {
         color: detailColor,
