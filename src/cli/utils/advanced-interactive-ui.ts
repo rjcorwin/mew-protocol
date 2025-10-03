@@ -1710,8 +1710,14 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
       })
     ),
 
-    // MCP Operation Confirmation
-    pendingOperation && React.createElement(OperationConfirmation, {
+    // Reasoning Status
+    activeReasoning && React.createElement(ReasoningStatus, {
+      reasoning: activeReasoning,
+      theme: theme
+    }),
+
+    // Input area - show dialog if pending, otherwise show input
+    pendingOperation ? React.createElement(OperationConfirmation, {
       operation: pendingOperation,
       onApprove: () => {
         // Fulfill the proposal by sending the actual MCP request
@@ -1827,15 +1833,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
         });
         setPendingOperation(null);
       }
-    }),
-    // Reasoning Status
-    activeReasoning && React.createElement(ReasoningStatus, {
-      reasoning: activeReasoning,
-      theme: theme
-    }),
-    
-    // Enhanced Input Component with borders
-    React.createElement(Box, { flexDirection: "column" },
+    }) : React.createElement(Box, { flexDirection: "column" },
       React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
       React.createElement(EnhancedInput, {
         onSubmit: processInput,
