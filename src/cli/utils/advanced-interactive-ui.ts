@@ -2075,9 +2075,21 @@ function OperationConfirmation({ operation, onInput }) {
     React.createElement(Box, { flexDirection: "column" },
       React.createElement(Text, { bold: true }, `${operation.from} → ${method}${toolName ? ` (${toolName})` : ''}`),
       React.createElement(Text, { color: "gray", dimColor: true }, "(scroll up to see proposal envelope)"),
-      React.createElement(Text, {}, `${selectedIndex === 0 ? '> ' : '  '}1=Yes  `),
-      React.createElement(Text, {}, `${selectedIndex === 1 ? '> ' : '  '}2=Grant  `),
-      React.createElement(Text, {}, `${selectedIndex === 2 ? '> ' : '  '}3=No`)
+      React.createElement(Box, {},
+        React.createElement(Text, {}, selectedIndex === 0 ? '> ' : '  '),
+        React.createElement(Text, { dimColor: true }, '1='),
+        React.createElement(Text, {}, 'Yes')
+      ),
+      React.createElement(Box, {},
+        React.createElement(Text, {}, selectedIndex === 1 ? '> ' : '  '),
+        React.createElement(Text, { dimColor: true }, '2='),
+        React.createElement(Text, {}, 'Grant')
+      ),
+      React.createElement(Box, {},
+        React.createElement(Text, {}, selectedIndex === 2 ? '> ' : '  '),
+        React.createElement(Text, { dimColor: true }, '3='),
+        React.createElement(Text, {}, 'No')
+      )
     )
   );
 }
