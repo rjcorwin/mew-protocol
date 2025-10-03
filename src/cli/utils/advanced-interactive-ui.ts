@@ -2157,7 +2157,7 @@ function OperationConfirmation({ operation, onApprove, onDeny, onGrant }) {
  */
 function ReasoningStatus({ reasoning, theme }) {
   const [spinnerIndex, setSpinnerIndex] = useState(0);
-  const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  const spinnerChars = ['·', '◇', '◈', '◆', '✦', '◆', '◈', '◇'];
 
   const spinnerColor = theme?.colors?.reasoningSpinner || 'magenta';
   const titleColor = theme?.colors?.reasoningTitle || 'cyan';
@@ -2173,7 +2173,7 @@ function ReasoningStatus({ reasoning, theme }) {
   useEffect(() => {
     const interval = setInterval(() => {
       setSpinnerIndex(prev => (prev + 1) % spinnerChars.length);
-    }, 100);
+    }, 150);
     return () => clearInterval(interval);
   }, []);
 
