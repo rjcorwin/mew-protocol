@@ -8,6 +8,8 @@ space:
 
 participants:
   human:
+    default_to:
+      chat: ["mew"]
     capabilities:
       - kind: "*"  # Full access so humans can use every capability, including reasoning cancel
 

@@ -10,6 +10,8 @@ participants:
   # Human participant with full capabilities (can approve proposals)
   human:
     # No tokens field - generated at runtime in .mew/tokens/
+    default_to:
+      chat: ["mew"]
     capabilities:
       - kind: "*"  # Full capabilities including proposal approval
 
@@ -106,7 +108,7 @@ participants:
   mcp-fs-bridge:
     type: local
     command: "mew"
-    args: ["bridge", "start", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "mcp-fs-bridge", "--mcp-command", "mew", "--mcp-args", "mcp,filesystem,./"]
+    args: ["bridge", "start", "--gateway", "ws://localhost:${PORT}", "--space", "{{SPACE_NAME}}", "--token", "${TOKEN}", "--participant-id", "mcp-fs-bridge", "--mcp-command", "mew", "--mcp-args", "mcp,filesystem,{{WORKSPACE_PATH}}"]
     auto_start: true
     # No tokens field - generated at runtime in .mew/tokens/
     capabilities:

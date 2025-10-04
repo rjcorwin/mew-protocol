@@ -957,10 +957,27 @@ async function spaceUpAction(options) {
 
           // Start interactive UI
           if (useDebugUI) {
-            const ui = new InteractiveUI(ws, participant.id, spaceId);
+            const defaultChatTargets = {
+              participant: Array.isArray(config?.participants?.[participant.id]?.default_to?.chat)
+                ? config.participants[participant.id].default_to.chat.slice()
+                : null,
+              global: Array.isArray(config?.defaults?.routing?.default_to?.chat)
+                ? config.defaults.routing.default_to.chat.slice()
+                : null
+            };
+            const ui = new InteractiveUI(ws, participant.id, spaceId, defaultChatTargets);
             ui.start();
           } else {
-            startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName);
+            // Compute default chat targets from config
+            const defaultChatTargets = {
+              participant: Array.isArray(config?.participants?.[participant.id]?.default_to?.chat)
+                ? config.participants[participant.id].default_to.chat.slice()
+                : null,
+              global: Array.isArray(config?.defaults?.routing?.default_to?.chat)
+                ? config.defaults.routing.default_to.chat.slice()
+                : null
+            };
+            startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets);
           }
         });
 
@@ -1612,7 +1629,16 @@ space
           const ui = new InteractiveUI(ws, participant.id, spaceId);
           ui.start();
         } else {
-          startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName);
+          // Compute default chat targets from config
+          const defaultChatTargets = {
+            participant: Array.isArray(config?.participants?.[participant.id]?.default_to?.chat)
+              ? config.participants[participant.id].default_to.chat.slice()
+              : null,
+            global: Array.isArray(config?.defaults?.routing?.default_to?.chat)
+              ? config.defaults.routing.default_to.chat.slice()
+              : null
+          };
+          startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets);
         }
       });
 

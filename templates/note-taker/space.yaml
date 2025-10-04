@@ -7,6 +7,8 @@ space:
 participants:
   human:
     # No tokens field - generated at runtime in .mew/tokens/
+    default_to:
+      chat: ["assistant"]
     capabilities:
       - kind: "*"  # Grant humans full capability set (chat, MCP, reasoning, streams, etc.)
 
