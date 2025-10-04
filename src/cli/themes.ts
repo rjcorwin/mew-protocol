@@ -70,12 +70,12 @@ export interface Theme {
 }
 
 /**
- * Hyper Light Drifter Theme
- * Neon magenta/cyan/pink pixel art aesthetic
+ * Neon Pulse Theme
+ * Vibrant magenta/cyan/pink pixel aesthetic
  */
-export const hldTheme: Theme = {
-  name: 'hld',
-  description: 'Hyper Light Drifter - Neon pixel art',
+export const neonPulseTheme: Theme = {
+  name: 'neon-pulse',
+  description: 'Neon pulse - vibrant magenta/cyan pixel aesthetic',
   colors: {
     promptText: 'magenta',
     inputText: 'white',
@@ -132,12 +132,12 @@ export const hldTheme: Theme = {
 };
 
 /**
- * Fallout Theme
- * Classic retro green terminal aesthetic
+ * Retro Terminal Theme
+ * Classic monochrome green terminal aesthetic
  */
-export const falloutTheme: Theme = {
-  name: 'fallout',
-  description: 'Fallout - Classic green terminal',
+export const retroTermTheme: Theme = {
+  name: 'retro-term',
+  description: 'Retro terminal - classic monochrome green',
   colors: {
     promptText: 'green',
     inputText: 'green',
@@ -180,11 +180,11 @@ export const falloutTheme: Theme = {
   },
   ansi: {
     reset: '\x1b[0m',
-    cyan: '\x1b[92m',      // Use green
-    magenta: '\x1b[92m',   // Use green
-    pink: '\x1b[92m',      // Use green
-    purple: '\x1b[92m',    // Use green
-    blue: '\x1b[92m',      // Use green
+    cyan: '\x1b[92m',
+    magenta: '\x1b[92m',
+    pink: '\x1b[92m',
+    purple: '\x1b[92m',
+    blue: '\x1b[92m',
     green: '\x1b[92m',
     yellow: '\x1b[93m',
     white: '\x1b[97m',
@@ -194,13 +194,13 @@ export const falloutTheme: Theme = {
 };
 
 /**
- * Starfield Theme
- * Blue/yellow/orange/red space aesthetic
- * Official Starfield colors: blue #1f3f78, red #d2152a, yellow #e1b350, orange #e75824
+ * Deep Space Theme
+ * Blue/yellow/orange/red space-inspired palette
+ * Palette colors: blue #1f3f78, red #d2152a, yellow #e1b350, orange #e75824
  */
-export const starfieldTheme: Theme = {
-  name: 'starfield',
-  description: 'Starfield - Blue/yellow/orange space',
+export const deepSpaceTheme: Theme = {
+  name: 'deep-space',
+  description: 'Deep space - blue and amber space-inspired palette',
   colors: {
     promptText: 'blue',
     inputText: 'white',
@@ -257,12 +257,12 @@ export const starfieldTheme: Theme = {
 };
 
 /**
- * Cyberpunk Theme
+ * Neon City Theme
  * Blue/yellow neon aesthetic
  */
-export const cyberpunkTheme: Theme = {
-  name: 'cyberpunk',
-  description: 'Cyberpunk - Blue and yellow neon',
+export const neonCityTheme: Theme = {
+  name: 'neon-city',
+  description: 'Neon city - blue and yellow neon',
   colors: {
     promptText: 'blue',
     inputText: 'white',
@@ -306,9 +306,9 @@ export const cyberpunkTheme: Theme = {
   ansi: {
     reset: '\x1b[0m',
     cyan: '\x1b[96m',
-    magenta: '\x1b[94m',    // Use blue
-    pink: '\x1b[93m',       // Use yellow
-    purple: '\x1b[94m',     // Use blue
+    magenta: '\x1b[94m',
+    pink: '\x1b[93m',
+    purple: '\x1b[94m',
     blue: '\x1b[94m',
     green: '\x1b[92m',
     yellow: '\x1b[93m',
@@ -319,13 +319,13 @@ export const cyberpunkTheme: Theme = {
 };
 
 export const themes: Record<string, Theme> = {
-  hld: hldTheme,
-  fallout: falloutTheme,
-  starfield: starfieldTheme,
-  cyberpunk: cyberpunkTheme,
+  'neon-pulse': neonPulseTheme,
+  'retro-term': retroTermTheme,
+  'deep-space': deepSpaceTheme,
+  'neon-city': neonCityTheme,
 };
 
-export const defaultTheme = hldTheme;
+export const defaultTheme = neonPulseTheme;
 
 /**
  * Get theme by name, falling back to default
