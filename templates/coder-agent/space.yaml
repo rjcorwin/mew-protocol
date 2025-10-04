@@ -10,6 +10,8 @@ participants:
   # Human participant with full capabilities (can approve proposals)
   human:
     # No tokens field - generated at runtime in .mew/tokens/
+    default_to:
+      chat: ["mew"]
     capabilities:
       - kind: "*"  # Full capabilities including proposal approval
 
