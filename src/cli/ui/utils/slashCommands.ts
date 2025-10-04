@@ -517,6 +517,26 @@ const commandDefinitions = [
     sequence: [literal('/streams')]
   }),
   createCommand({
+    id: 'target',
+    description: 'Set or show default chat targets',
+    category: 'General',
+    usage: '/target [show|none|<participant...>]',
+    sequence: [
+      literal('/target'),
+      choice('mode', [
+        { value: 'show', description: 'Show current effective chat target' },
+        { value: 'none', description: 'Clear session override (revert to config/default)' }
+      ], { optional: true }),
+      parameter('participants', {
+        optional: true,
+        description: 'Participants to target for chat (space-separated)',
+        placeholder: 'participant...',
+        resolverKey: 'participants',
+        variadic: true
+      })
+    ]
+  }),
+  createCommand({
     id: 'ui-board-control',
     description: 'Control Signal Board visibility',
     category: 'General',
