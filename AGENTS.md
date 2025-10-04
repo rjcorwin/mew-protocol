@@ -90,7 +90,7 @@ mew space down
 
 ## Key Files
 - Protocol types: `src/types/protocol.ts`
-- Gateway: `src/gateway/gateway.ts`
+- Gateway: `src/cli/commands/gateway.ts`
 - Agent: `src/agent/MEWAgent.ts`
 - Client: `src/client/MEWClient.ts`
 - Test examples: `e2e/scenario-*/`
@@ -101,7 +101,6 @@ mew space down
 - DO follow TypeScript strict mode
 - DO run `npm run build` after changes
 - DO update specs if changing protocol
-- DO send stream/close when done with a stream (agents must clean up)
 
 ## Making Changes
 1. **Protocol changes**: Update spec/protocol/draft/ → src/types/ → implementations → tests
