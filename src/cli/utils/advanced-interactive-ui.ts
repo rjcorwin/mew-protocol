@@ -1983,7 +1983,10 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
   const showTopSeparator = isChat;
   const showBottomSeparator = isChat;
 
-  const separatorColor = theme?.colors?.chatSeparator || 'magenta';
+  // Use input border color for your own messages, chat separator color for others
+  const separatorColor = sent
+    ? (theme?.colors?.inputBorder || 'cyan')
+    : (theme?.colors?.chatSeparator || 'magenta');
 
   if (verbose) {
     return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
