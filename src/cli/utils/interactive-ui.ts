@@ -11,7 +11,7 @@ import chalk from 'chalk';
 import { v4 as uuidv4 } from 'uuid';
 
 class InteractiveUI {
-  constructor(ws, participantId, spaceId) {
+  constructor(ws, participantId, spaceId, defaultChatTargets = {}) {
     this.ws = ws;
     this.participantId = participantId;
     this.spaceId = spaceId;
@@ -19,10 +19,33 @@ class InteractiveUI {
     this.messageHistory = [];
     this.rl = null;
 
+    // Default chat targeting
+    this.defaultChatTargets = defaultChatTargets || {};
+    this.chatTargetOverride = null; // array of ids or null
+
     // Environment configuration
     this.showHeartbeat = process.env.MEW_INTERACTIVE_SHOW_HEARTBEAT === 'true';
     this.showSystem = process.env.MEW_INTERACTIVE_SHOW_SYSTEM !== 'false'; // default true
     this.useColor = process.env.MEW_INTERACTIVE_COLOR !== 'false'; // default true
+  }
+
+  getEffectiveChatTargets() {
+    if (Array.isArray(this.chatTargetOverride) && this.chatTargetOverride.length > 0) {
+      return this.chatTargetOverride;
+    }
+    const participant = Array.isArray(this.defaultChatTargets?.participant)
+      ? this.defaultChatTargets.participant
+      : null;
+    if (participant && participant.length > 0) {
+      return participant;
+    }
+    const global = Array.isArray(this.defaultChatTargets?.global)
+      ? this.defaultChatTargets.global
+      : null;
+    if (global && global.length > 0) {
+      return global;
+    }
+    return null;
   }
 
   /**
@@ -191,6 +214,32 @@ class InteractiveUI {
       case '/exit':
         this.rl.close();
         break;
+
+      case '/target': {
+        // /target [show|none|<participant...>]
+        if (args.length === 0 || args[0] === 'show') {
+          const eff = this.getEffectiveChatTargets();
+          if (Array.isArray(eff) && eff.length > 0) {
+            console.log(`Chat target: ${eff.join(', ')}${Array.isArray(this.chatTargetOverride) ? ' (override)' : this.defaultChatTargets?.participant || this.defaultChatTargets?.global ? ' (config)' : ''}.`);
+          } else {
+            console.log('Chat target: broadcast');
+          }
+          break;
+        }
+        if (args[0] === 'none') {
+          this.chatTargetOverride = null;
+          console.log('Cleared chat target override.');
+          break;
+        }
+        const targets = args.filter(Boolean);
+        if (targets.length === 0) {
+          console.log('Usage: /target [show|none|<participant...>]');
+          break;
+        }
+        this.chatTargetOverride = targets;
+        console.log(`Set chat target to: ${targets.join(', ')}`);
+        break;
+      }
 
       default:
         console.log(`Unknown command: ${cmd}. Type /help for available commands.`);
@@ -437,7 +486,7 @@ class InteractiveUI {
    * @returns {Object} - Full envelope
    */
   wrapEnvelope(message) {
-    return {
+    const base = {
       protocol: 'mew/v0.4',
       id: `msg-${uuidv4()}`,
       ts: new Date().toISOString(),
@@ -446,6 +495,21 @@ class InteractiveUI {
       payload: message.payload,
       ...message,
     };
+
+    // Apply default chat targets if applicable and not explicitly provided
+    try {
+      if (base && base.kind === 'chat') {
+        const hasExplicitTo = Array.isArray(base.to) && base.to.length > 0;
+        if (!hasExplicitTo) {
+          const targets = this.getEffectiveChatTargets();
+          if (Array.isArray(targets) && targets.length > 0) {
+            base.to = targets.slice();
+          }
+        }
+      }
+    } catch {}
+
+    return base;
   }
 }
 
