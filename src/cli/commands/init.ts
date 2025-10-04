@@ -277,10 +277,10 @@ class InitCommand {
    */
   async selectTheme(themeName) {
     const themes = [
-      { name: 'hld', description: 'Hyper Light Drifter - Neon pixel art (magenta/cyan)' },
-      { name: 'fallout', description: 'Fallout - Classic green terminal' },
-      { name: 'starfield', description: 'Starfield - Blue/yellow/orange space' },
-      { name: 'cyberpunk', description: 'Cyberpunk - Blue and yellow neon' }
+      { name: 'neon-pulse', description: 'Neon pulse - vibrant magenta/cyan pixel aesthetic' },
+      { name: 'retro-term', description: 'Retro terminal - classic monochrome green' },
+      { name: 'deep-space', description: 'Deep space - blue and amber space-inspired palette' },
+      { name: 'neon-city', description: 'Neon city - blue and yellow neon' }
     ];
 
     // If theme specified, use it
@@ -288,7 +288,7 @@ class InitCommand {
       const theme = themes.find(t => t.name === themeName);
       if (!theme) {
         console.error(`Theme '${themeName}' not found`);
-        console.log('Available themes: hld, fallout, starfield, cyberpunk');
+        console.log('Available themes: neon-pulse, retro-term, deep-space, neon-city');
         process.exit(1);
       }
       return theme.name;
@@ -296,7 +296,7 @@ class InitCommand {
 
     // Non-interactive mode - use default theme
     if (!process.stdin.isTTY) {
-      return 'hld';
+      return 'neon-pulse';
     }
 
     // Interactive selection

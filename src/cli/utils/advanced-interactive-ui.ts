@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import EnhancedInput from '../ui/components/EnhancedInput.js';
 import { slashCommandList, slashCommandGroups } from '../ui/utils/slashCommands.js';
 import { getTheme } from '../themes.js';
+import { stripThinkingTags } from '../ui/utils/thinkingFilter.js';
 
 const DECORATIVE_SYSTEM_KINDS = new Set([
   'system/welcome',
@@ -44,7 +45,7 @@ function createSignalBoardSummary(ackCount, statusCount, pauseState, includeAck 
 /**
  * Main Advanced Interactive UI Component
  */
-function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }) {
+function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-pulse' }) {
   // Load theme
   const theme = getTheme(themeName);
 
@@ -338,9 +339,22 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
   }, [ws, exit]);
 
   const addMessage = (message, sent = false) => {
+    // Filter thinking tags from chat payloads before adding
+    const filtered = (() => {
+      try {
+        if (message && message.kind === 'chat' && message.payload && typeof message.payload.text === 'string') {
+          const cleaned = stripThinkingTags(message.payload.text);
+          if (cleaned !== message.payload.text) {
+            return { ...message, payload: { ...message.payload, text: cleaned } };
+          }
+        }
+      } catch {}
+      return message;
+    })();
+
     setMessages(prev => [...prev, {
-      id: message.id || uuidv4(),
-      message,
+      id: filtered.id || uuidv4(),
+      message: filtered,
       sent,
       timestamp: new Date(),
     }]);
@@ -505,7 +519,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
     const addressedToMe = !message.to || message.to.length === 0 || message.to.includes(participantId);
 
     if (message.kind === 'chat' && message.from !== participantId) {
-      const text = message.payload?.text || '';
+      const rawText = message.payload?.text || '';
+      const text = typeof rawText === 'string' ? stripThinkingTags(rawText) : rawText;
       setPendingAcknowledgements(prev => {
         if (prev.some(entry => entry.id === message.id)) {
           return prev;
@@ -1002,9 +1017,11 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'hld' }
   };
 
   const sendChat = (text) => {
+    // Filter thinking tags on outbound chat too (just for display safety)
+    const cleaned = typeof text === 'string' ? stripThinkingTags(text) : text;
     sendMessage({
       kind: 'chat',
-      payload: { text },
+      payload: { text: cleaned },
     });
   };
 
@@ -3078,7 +3095,7 @@ function SidePanel({ participantId, myPendingAcknowledgements, participantStatus
 /**
  * Starts the advanced interactive UI
  */
-function startAdvancedInteractiveUI(ws, participantId, spaceId, themeName = 'hld') {
+function startAdvancedInteractiveUI(ws, participantId, spaceId, themeName = 'neon-pulse') {
   const { rerender, unmount } = render(
     React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId, themeName })
   );

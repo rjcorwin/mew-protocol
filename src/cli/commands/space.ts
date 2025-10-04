@@ -940,7 +940,7 @@ async function spaceUpAction(options) {
           ws.send(JSON.stringify(joinMessage));
 
           // Get theme for UI
-          const themeName = config.space?.ui_theme || 'hld';
+          const themeName = config.space?.ui_theme || 'neon-pulse';
           const theme = getTheme(themeName);
 
           // Display banner before starting UI
@@ -1592,7 +1592,7 @@ space
         ws.send(JSON.stringify(joinMessage));
 
         // Get theme for UI
-        const themeName = config.space?.ui_theme || 'hld';
+        const themeName = config.space?.ui_theme || 'neon-pulse';
         const theme = getTheme(themeName);
 
         // Display banner before starting UI

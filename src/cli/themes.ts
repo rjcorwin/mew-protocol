@@ -332,5 +332,6 @@ export const defaultTheme = neonPulseTheme;
  */
 export function getTheme(name?: string): Theme {
   if (!name) return defaultTheme;
-  return themes[name] || defaultTheme;
+  const normalized = String(name).toLowerCase();
+  return themes[normalized] || defaultTheme;
 }
