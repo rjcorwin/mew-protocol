@@ -14,7 +14,8 @@ mcp
   .description('Run MCP filesystem server')
   .action(async (path) => {
     // Use the official @modelcontextprotocol/server-filesystem package
-    const child = spawn('npx', ['-y', '@modelcontextprotocol/server-filesystem', path], {
+    // Force latest version to get edit_file tool
+    const child = spawn('npx', ['-y', '@modelcontextprotocol/server-filesystem@latest', path], {
       stdio: 'inherit',
       cwd: process.cwd()
     });

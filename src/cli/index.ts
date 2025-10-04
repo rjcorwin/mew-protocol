@@ -25,6 +25,7 @@ import mcpCommand from './commands/mcp.js';
 import tokenCommand from './commands/token.js';
 import spaceCommand, { spaceUpAction, spaceDownAction } from './commands/space.js';
 import InitCommand from './commands/init.js';
+import { playStartupAnimation, showQuickBanner } from './startup-animation.js';
 
 // Check if space configuration exists
 function checkSpaceExists() {
@@ -125,30 +126,35 @@ if (process.argv.length === 2) {
     // Space exists - check if it's running
     if (isSpaceRunning()) {
       // Space is running - connect to it
+      showQuickBanner();
       console.log('Connecting to running space...');
       process.argv.push('space', 'connect');
     } else {
       // Space exists but not running - start it interactively
+      showQuickBanner();
       console.log('Starting space and connecting interactively...');
       process.argv.push('space', 'up', '-i');
     }
   } else {
     // No space - run init, then connect
-    console.log('Welcome to MEW Protocol! Let\'s set up your space.');
-    const initCommand = new InitCommand();
-    initCommand.execute({}).then(() => {
-      console.log('\nSpace initialized! Starting and connecting...');
-      // After init, start the space interactively by spawning a new process
-      const child = spawn(process.argv[0], [process.argv[1], 'space', 'up', '-i'], {
-        stdio: 'inherit'
+    (async () => {
+      await playStartupAnimation();
+      console.log('Let\'s set up your space.\n');
+      const initCommand = new InitCommand();
+      initCommand.execute({}).then(() => {
+        console.log('\nSpace initialized! Starting and connecting...');
+        // After init, start the space interactively by spawning a new process
+        const child = spawn(process.argv[0], [process.argv[1], 'space', 'up', '-i'], {
+          stdio: 'inherit'
+        });
+        child.on('exit', (code) => {
+          process.exit(code || 0);
+        });
+      }).catch(error => {
+        console.error('Error:', error.message);
+        process.exit(1);
       });
-      child.on('exit', (code) => {
-        process.exit(code || 0);
-      });
-    }).catch(error => {
-      console.error('Error:', error.message);
-      process.exit(1);
-    });
+    })();
     // Don't parse args since we're handling it async
     shouldParse = false;
   }

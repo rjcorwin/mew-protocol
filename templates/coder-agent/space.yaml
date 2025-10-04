@@ -4,6 +4,7 @@ space:
   name: "{{SPACE_NAME}}"
   description: "Coding assistant that requires human approval for file modifications"
   default_participant: human
+  ui_theme: "{{UI_THEME}}"
 
 participants:
   # Human participant with full capabilities (can approve proposals)

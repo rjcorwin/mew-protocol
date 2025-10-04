@@ -13,6 +13,8 @@ import { render, Box, Text, Static, useInput, useApp, useFocus, useStdout } from
 import { v4 as uuidv4 } from 'uuid';
 import EnhancedInput from '../ui/components/EnhancedInput.js';
 import { slashCommandList, slashCommandGroups } from '../ui/utils/slashCommands.js';
+import { getTheme } from '../themes.js';
+import { stripThinkingTags } from '../ui/utils/thinkingFilter.js';
 
 const DECORATIVE_SYSTEM_KINDS = new Set([
   'system/welcome',
@@ -43,7 +45,10 @@ function createSignalBoardSummary(ackCount, statusCount, pauseState, includeAck 
 /**
  * Main Advanced Interactive UI Component
  */
-function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
+function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-pulse' }) {
+  // Load theme
+  const theme = getTheme(themeName);
+
   const [messages, setMessages] = useState([]);
   const [commandHistory, setCommandHistory] = useState([]);
   const [pendingOperation, setPendingOperation] = useState(null);
@@ -334,9 +339,22 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   }, [ws, exit]);
 
   const addMessage = (message, sent = false) => {
+    // Filter thinking tags from chat payloads before adding
+    const filtered = (() => {
+      try {
+        if (message && message.kind === 'chat' && message.payload && typeof message.payload.text === 'string') {
+          const cleaned = stripThinkingTags(message.payload.text);
+          if (cleaned !== message.payload.text) {
+            return { ...message, payload: { ...message.payload, text: cleaned } };
+          }
+        }
+      } catch {}
+      return message;
+    })();
+
     setMessages(prev => [...prev, {
-      id: message.id || uuidv4(),
-      message,
+      id: filtered.id || uuidv4(),
+      message: filtered,
       sent,
       timestamp: new Date(),
     }]);
@@ -501,7 +519,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     const addressedToMe = !message.to || message.to.length === 0 || message.to.includes(participantId);
 
     if (message.kind === 'chat' && message.from !== participantId) {
-      const text = message.payload?.text || '';
+      const rawText = message.payload?.text || '';
+      const text = typeof rawText === 'string' ? stripThinkingTags(rawText) : rawText;
       setPendingAcknowledgements(prev => {
         if (prev.some(entry => entry.id === message.id)) {
           return prev;
@@ -829,11 +848,10 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
 
     // Handle capability grant acknowledgments
     if (message.kind === 'capability/grant-ack') {
-      console.error('[DEBUG] Received grant acknowledgment:', JSON.stringify(message.payload));
       addMessage({
         kind: 'system/info',
         from: 'system',
-        payload: { text: `✅ Capability grant acknowledged by ${message.from}` }
+        payload: { text: `◆ Capability grant acknowledged by ${message.from}` }
       }, false);
     }
 
@@ -841,27 +859,25 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     if (message.kind === 'system/welcome' && message.to?.includes(participantId)) {
       // This could be an updated welcome after a grant
       const capabilities = message.payload?.you?.capabilities || [];
-      console.error('[DEBUG] Received welcome with capabilities:', capabilities.length);
 
       // Check if this is an update (not the initial welcome)
       if (messages.length > 5) { // Heuristic: not the initial connection
         addMessage({
           kind: 'system/info',
           from: 'system',
-          payload: { text: `📋 Your capabilities have been updated (${capabilities.length} total)` }
+          payload: { text: `◇ Your capabilities have been updated (${capabilities.length} total)` }
         }, false);
       }
     }
 
     // Handle errors (especially for capability violations)
     if (message.kind === 'system/error') {
-      console.error('[DEBUG] Received error:', JSON.stringify(message.payload));
       if (message.payload?.error === 'capability_violation' &&
           message.payload?.attempted_kind === 'capability/grant') {
         addMessage({
           kind: 'system/error',
           from: 'system',
-          payload: { text: `❌ Cannot grant capabilities: You lack the 'capability/grant' permission` }
+          payload: { text: `╳ Cannot grant capabilities: You lack the 'capability/grant' permission` }
         }, false);
       }
     }
@@ -921,6 +937,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
         }, false);
       } else {
         // Show dialog for manual approval
+        // The mcp/proposal envelope itself will be formatted nicely in the message history
         setPendingOperation({
           id: message.id,
           from: message.from,
@@ -947,10 +964,6 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
 
     const envelope = wrapEnvelope(message);
 
-    // Debug log for capability/grant messages
-    if (message.kind === 'capability/grant') {
-      console.error('[DEBUG] Sending wrapped grant envelope:', JSON.stringify(envelope, null, 2));
-    }
 
     ws.send(JSON.stringify(envelope));
 
@@ -1004,9 +1017,11 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
   };
 
   const sendChat = (text) => {
+    // Filter thinking tags on outbound chat too (just for display safety)
+    const cleaned = typeof text === 'string' ? stripThinkingTags(text) : text;
     sendMessage({
       kind: 'chat',
-      payload: { text },
+      payload: { text: cleaned },
     });
   };
 
@@ -1112,7 +1127,103 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
     setPendingAcknowledgements(prev => prev.filter(item => !entries.some(entry => entry.id === item.id)));
   };
 
+  // Handle dialog input (1/2/3) - defined before processInput
+  const handleDialogInput = (input) => {
+    if (!pendingOperation) return false;
+
+    if (input === '1') {
+      // Approve
+      if (pendingOperation.operation) {
+        const { method, params } = pendingOperation.operation;
+        const message = {
+          kind: 'mcp/request',
+          correlation_id: [pendingOperation.id],
+          payload: {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: method,
+            params: params
+          }
+        };
+        if (pendingOperation.to && pendingOperation.to.length > 0) {
+          message.to = pendingOperation.to;
+        }
+        sendMessage(message);
+      }
+      setPendingOperation(null);
+      return true;
+    } else if (input === '2') {
+      // Grant
+      const proposer = pendingOperation.from;
+      const method = pendingOperation.operation?.method;
+      const params = pendingOperation.operation?.params;
+      const toolName = params?.name;
+
+      const capabilityPattern = {
+        kind: 'mcp/request',
+        payload: { method: method }
+      };
+      if (method === 'tools/call' && toolName) {
+        capabilityPattern.payload.params = { name: toolName };
+      }
+
+      setGrantedCapabilities(prev => {
+        const existing = prev.get(proposer) || [];
+        return new Map(prev).set(proposer, [...existing, capabilityPattern]);
+      });
+
+      sendMessage({
+        kind: 'capability/grant',
+        to: [proposer],
+        payload: {
+          recipient: proposer,
+          capabilities: [capabilityPattern],
+          reason: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} for this session`
+        }
+      });
+
+      addMessage({
+        kind: 'system/info',
+        from: 'system',
+        payload: { text: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} to ${proposer} for this session` }
+      }, true);
+
+      if (pendingOperation.operation) {
+        const { method, params } = pendingOperation.operation;
+        sendMessage({
+          kind: 'mcp/request',
+          correlation_id: [pendingOperation.id],
+          payload: {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: method,
+            params: params
+          },
+          to: pendingOperation.to
+        });
+      }
+      setPendingOperation(null);
+      return true;
+    } else if (input === '3') {
+      // Deny
+      sendMessage({
+        kind: 'mcp/reject',
+        to: [pendingOperation.from],
+        correlation_id: [pendingOperation.id],
+        payload: { reason: 'disagree' }
+      });
+      setPendingOperation(null);
+      return true;
+    }
+    return false;
+  };
+
   const processInput = (input) => {
+    // Check for dialog input first (1/2/3)
+    if (handleDialogInput(input)) {
+      return;
+    }
+
     // Allow empty input to clear the input field
     // but don't send empty messages
     if (!input || !input.trim()) {
@@ -1675,7 +1786,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
             key: item.id,
             item: item,
             verbose: verbose,
-            useColor: useColor
+            useColor: useColor,
+            theme: theme
           })
         )
       ),
@@ -1705,141 +1817,34 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       })
     ),
 
-    // MCP Operation Confirmation
-    pendingOperation && React.createElement(OperationConfirmation, {
-      operation: pendingOperation,
-      onApprove: () => {
-        // Fulfill the proposal by sending the actual MCP request
-        // According to MEW spec, approval is done by fulfillment with correlation_id
-        if (pendingOperation.operation) {
-          // Extract the method and params from the proposal payload
-          const { method, params } = pendingOperation.operation;
-
-          // Send the MCP request with correlation_id pointing to the proposal
-          // IMPORTANT: Send to the participant specified in the proposal's 'to' field
-          const message = {
-            kind: 'mcp/request',
-            correlation_id: [pendingOperation.id],
-            payload: {
-              jsonrpc: '2.0',
-              id: Date.now(), // Generate a unique request ID
-              method: method,
-              params: params
-            }
-          };
-
-          // If the proposal specified a target participant, send to them
-          if (pendingOperation.to && pendingOperation.to.length > 0) {
-            message.to = pendingOperation.to;
-          }
-
-          sendMessage(message);
-        }
-        setPendingOperation(null);
-      },
-      onGrant: () => {
-        // Grant capability for this operation type
-        const proposer = pendingOperation.from;
-        const method = pendingOperation.operation?.method;
-        const params = pendingOperation.operation?.params;
-        const toolName = params?.name;
-
-        // Create capability pattern for this specific operation
-        const capabilityPattern = {
-          kind: 'mcp/request',
-          payload: {
-            method: method
-          }
-        };
-
-        // For tools/call, include the specific tool name pattern
-        if (method === 'tools/call' && toolName) {
-          capabilityPattern.payload.params = {
-            name: toolName
-          };
-        }
-
-        // Update local grant tracking
-        setGrantedCapabilities(prev => {
-          const existing = prev.get(proposer) || [];
-          return new Map(prev).set(proposer, [...existing, capabilityPattern]);
-        });
-
-        // Send capability grant message
-        const grantMessage = {
-          kind: 'capability/grant',
-          to: [proposer],
-          payload: {
-            recipient: proposer,
-            capabilities: [capabilityPattern],
-            reason: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} for this session`
-          }
-        };
-
-        // Debug: Log the grant message being sent
-        console.error('[DEBUG] Sending capability grant:', JSON.stringify(grantMessage, null, 2));
-        sendMessage(grantMessage);
-
-        // Add a visible message to confirm grant was sent
-        addMessage({
-          kind: 'system/info',
-          from: 'system',
-          payload: { text: `Granted ${method}${toolName ? ` for tool '${toolName}'` : ''} to ${proposer} for this session` }
-        }, true);
-
-        // Also fulfill the current proposal
-        if (pendingOperation.operation) {
-          const { method, params } = pendingOperation.operation;
-          const fulfillMessage = {
-            kind: 'mcp/request',
-            correlation_id: [pendingOperation.id],
-            payload: {
-              jsonrpc: '2.0',
-              id: Date.now(),
-              method: method,
-              params: params
-            }
-          };
-
-          if (pendingOperation.to && pendingOperation.to.length > 0) {
-            fulfillMessage.to = pendingOperation.to;
-          }
-
-          sendMessage(fulfillMessage);
-        }
-
-        setPendingOperation(null);
-      },
-      onDeny: () => {
-        // Send rejection according to MEW spec
-        sendMessage({
-          kind: 'mcp/reject',
-          to: [pendingOperation.from], // Send rejection back to proposer
-          correlation_id: [pendingOperation.id], // Must be an array
-          payload: {
-            reason: 'disagree'
-          }
-        });
-        setPendingOperation(null);
-      }
+    // Reasoning Status - hide when operation confirmation is showing
+    activeReasoning && !pendingOperation && React.createElement(ReasoningStatus, {
+      reasoning: activeReasoning,
+      theme: theme
     }),
-    // Reasoning Status
-    activeReasoning && React.createElement(ReasoningStatus, {
-      reasoning: activeReasoning
-    }),
-    
-    // Enhanced Input Component
-    React.createElement(EnhancedInput, {
-      onSubmit: processInput,
-      placeholder: 'Type a message or /help for commands...',
-      multiline: true,  // Enable multi-line for Shift+Enter support
-      disabled: pendingOperation !== null,
-      history: commandHistory,
-      onHistoryChange: setCommandHistory,
-      prompt: '> ',
-      showCursor: true,
-      slashContext
-    }),
+
+    // Input area - or operation confirmation dialog if pending
+    pendingOperation
+      ? React.createElement(OperationConfirmation, {
+          operation: pendingOperation,
+          onInput: handleDialogInput
+        })
+      : React.createElement(Box, { flexDirection: "column" },
+          React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
+          React.createElement(EnhancedInput, {
+            onSubmit: processInput,
+            placeholder: 'Type a message or /help for commands...',
+            multiline: true,  // Enable multi-line for Shift+Enter support
+            disabled: false,
+            history: commandHistory,
+            onHistoryChange: setCommandHistory,
+            prompt: '> ',
+            showCursor: true,
+            slashContext,
+            theme
+          }),
+          React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80))
+        ),
     
     // Status Bar
     React.createElement(StatusBar, {
@@ -1853,7 +1858,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
       pauseState: pauseState,
       activeStreamCount: activeStreams.size,
       contextUsage: contextUsageEntries,
-      participantStatusCount: participantStatuses.size
+      participantStatusCount: participantStatuses.size,
+      theme: theme
     })
   );
 }
@@ -1861,7 +1867,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId }) {
 /**
  * Message Display Component
  */
-function MessageDisplay({ item, verbose, useColor }) {
+function MessageDisplay({ item, verbose, useColor, theme }) {
   const { message, sent, timestamp } = item;
   const time = timestamp.toLocaleTimeString('en-US', {
     hour12: false,
@@ -1870,72 +1876,313 @@ function MessageDisplay({ item, verbose, useColor }) {
     second: '2-digit',
   });
 
-  const direction = sent ? '→' : '←';
   const participant = sent ? 'you' : message.from || 'system';
   const kind = message.kind || 'unknown';
 
-  // Add context indicator
-  const contextPrefix = message.context ? '  └─ ' : '';
+  // Add context indicator - diamond bullet for nested messages
+  // Currently disabled to keep all headers at the same level
+  const contextPrefix = '';
+
+  // Chat messages get special treatment: filled diamonds and separators
+  const isChat = kind === 'chat' && !message.context;
+  const showTopSeparator = isChat;
+  const showBottomSeparator = isChat;
+
+  const separatorColor = theme?.colors?.chatSeparator || 'magenta';
 
   if (verbose) {
     return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
       React.createElement(Text, { color: "gray" },
-        `${contextPrefix}[${time}] ${direction} ${participant} ${kind}`
+        `${contextPrefix}${participant} → ${kind}` // (${time})
       ),
       React.createElement(Text, null, JSON.stringify(message, null, 2))
     );
   }
 
-  let headerColor = useColor ? getColorForKind(kind) : 'white';
+  let headerColor = useColor ? getColorForKind(kind, theme) : 'white';
 
+  // Envelope marker: filled diamond for chat, hollow diamond for others
+  const envelopePrefix = isChat ? '◆ ' : '◇ ';
+
+  // For payload, use spacing without the diamond indicator (header already has it)
+  const payloadIndent = '';
+
+  // For chat messages, add visual separation with full-width top and bottom borders
+  if (isChat) {
+    return React.createElement(Box, {
+      flexDirection: "column",
+      marginBottom: 1
+    },
+      React.createElement(Text, { color: separatorColor, dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
+      React.createElement(Text, { color: headerColor },
+        `${contextPrefix}${envelopePrefix}${participant} →` // (${time})
+      ),
+      message.payload && React.createElement(ReasoningDisplay, {
+        payload: message.payload,
+        kind: kind,
+        contextPrefix: payloadIndent,
+        isChat: isChat,
+        theme: theme
+      }),
+      React.createElement(Box, { height: 1 }),
+      React.createElement(Text, { color: separatorColor, dimColor: true }, '▔'.repeat(process.stdout.columns || 80))
+    );
+  }
+
+  // Non-chat messages use simple layout
   return React.createElement(Box, { flexDirection: "column", marginBottom: kind === 'reasoning/thought' ? 2 : 1 },
     React.createElement(Text, { color: headerColor },
-      `${contextPrefix}[${time}] ${direction} ${participant} ${kind}`
+      `${contextPrefix}${envelopePrefix}${participant} → ${kind}` // (${time})
     ),
     message.payload && React.createElement(ReasoningDisplay, {
       payload: message.payload,
       kind: kind,
-      contextPrefix: contextPrefix
+      contextPrefix: payloadIndent,
+      isChat: isChat,
+      theme: theme
     })
   );
 }
 
 /**
+ * Tool Formatters - Pluggable system for formatting tool proposals
+ * Each formatter receives (args, { proposalColor, detailColor, theme })
+ */
+const toolFormatters = {
+  /**
+   * write_file tool formatter - shows file path and content preview
+   */
+  write_file: (args, { headerLabel = 'Proposal', proposalColor, detailColor, theme }) => {
+    const filePath = args.path || 'unknown';
+    const content = args.content || '';
+
+    // Show first and last few lines of content
+    const lines = content.split('\n');
+    const maxPreviewLines = 10;
+    let displayLines;
+
+    if (lines.length <= maxPreviewLines) {
+      displayLines = lines;
+    } else {
+      const firstLines = lines.slice(0, 5);
+      const lastLines = lines.slice(-5);
+      displayLines = [...firstLines, `... (${lines.length - maxPreviewLines} lines omitted) ...`, ...lastLines];
+    }
+
+    return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
+      React.createElement(Text, { color: proposalColor, bold: true },
+        `╔╗ ${headerLabel}: Write file`
+      ),
+      React.createElement(Text, { color: detailColor, marginTop: 1 },
+        `File: ${filePath}`
+      ),
+      React.createElement(Text, { color: detailColor, marginTop: 1 },
+        `Lines: ${lines.length}`
+      ),
+      React.createElement(Box, {
+        flexDirection: "column",
+        borderStyle: "round",
+        borderColor: "gray",
+        marginTop: 1,
+        paddingX: 1
+      },
+        ...displayLines.map((line, index) =>
+          React.createElement(Text, {
+            key: index,
+            color: line.includes('omitted') ? detailColor : "green"
+          }, line.includes('omitted') ? line : `+ ${line}`)
+        )
+      )
+    );
+  },
+
+  /**
+   * edit_file tool formatter - shows diff with old/new strings
+   */
+  edit_file: (args, { headerLabel = 'Proposal', proposalColor, detailColor, theme }) => {
+    const filePath = args.path || 'unknown';
+    const edits = args.edits || [];
+
+    // If no edits, show empty
+    if (edits.length === 0) {
+      return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
+        React.createElement(Text, { color: proposalColor, bold: true },
+          `╔╗ ${headerLabel}: Edit file`
+        ),
+        React.createElement(Text, { color: detailColor, marginTop: 1 },
+          `File: ${filePath}`
+        ),
+        React.createElement(Text, { color: detailColor, marginTop: 1 },
+          'No edits specified'
+        )
+      );
+    }
+
+    // Process all edits
+    const editElements = [];
+    edits.forEach((edit, editIndex) => {
+      const oldString = edit.oldText || '';
+      const newString = edit.newText || '';
+
+      // Split into lines and truncate if too many
+      const oldLines = oldString.split('\n');
+      const newLines = newString.split('\n');
+      const maxLines = 15;
+
+      let oldDisplay = oldLines;
+      let newDisplay = newLines;
+
+      if (oldLines.length > maxLines) {
+        const firstLines = oldLines.slice(0, 7);
+        const lastLines = oldLines.slice(-7);
+        oldDisplay = [...firstLines, `... (${oldLines.length - 14} lines omitted) ...`, ...lastLines];
+      }
+
+      if (newLines.length > maxLines) {
+        const firstLines = newLines.slice(0, 7);
+        const lastLines = newLines.slice(-7);
+        newDisplay = [...firstLines, `... (${newLines.length - 14} lines omitted) ...`, ...lastLines];
+      }
+
+      // Add edit header if multiple edits
+      if (edits.length > 1) {
+        editElements.push(
+          React.createElement(Text, {
+            key: `edit-header-${editIndex}`,
+            color: proposalColor,
+            marginTop: editIndex > 0 ? 2 : 0
+          }, `Edit ${editIndex + 1} of ${edits.length}:`)
+        );
+      }
+
+      // Add old lines
+      oldDisplay.forEach((line, index) => {
+        editElements.push(
+          React.createElement(Text, {
+            key: `edit-${editIndex}-old-${index}`,
+            color: line.includes('omitted') ? detailColor : "red"
+          }, line.includes('omitted') ? line : `- ${line}`)
+        );
+      });
+
+      // Add separator
+      editElements.push(React.createElement(Text, { key: `edit-${editIndex}-sep` }, ""));
+
+      // Add new lines
+      newDisplay.forEach((line, index) => {
+        editElements.push(
+          React.createElement(Text, {
+            key: `edit-${editIndex}-new-${index}`,
+            color: line.includes('omitted') ? detailColor : "green"
+          }, line.includes('omitted') ? line : `+ ${line}`)
+        );
+      });
+    });
+
+    return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
+      React.createElement(Text, { color: proposalColor, bold: true },
+        `╔╗ ${headerLabel}: Edit file`
+      ),
+      React.createElement(Text, { color: detailColor, marginTop: 1 },
+        `File: ${filePath}`
+      ),
+      React.createElement(Box, {
+        flexDirection: "column",
+        borderStyle: "round",
+        borderColor: "gray",
+        marginTop: 1,
+        paddingX: 1
+      },
+        ...editElements
+      )
+    );
+  }
+};
+
+/**
  * Reasoning Display Component - Shows payload with better formatting for reasoning
  */
-function ReasoningDisplay({ payload, kind, contextPrefix }) {
+function ReasoningDisplay({ payload, kind, contextPrefix, isChat, theme }) {
   const preview = getPayloadPreview(payload, kind);
 
   // Special formatting for reasoning/thought messages
   if (kind === 'reasoning/thought' && payload.reasoning) {
+    const reasoningColor = theme?.colors?.reasoningThoughts || 'cyan';
+    const actionColor = theme?.colors?.reasoningAction || 'magenta';
+
     return React.createElement(Box, { flexDirection: "column" },
-      React.createElement(Text, { color: "blue" }, `${contextPrefix}└─ reasoning/thought`),
       React.createElement(Text, {
-        color: "blackBright",
+        color: reasoningColor,
+        dimColor: true,
         marginLeft: 6,
         marginTop: 1,
         wrap: "wrap"
       }, payload.reasoning),
       payload.action && React.createElement(Text, {
-        color: "gray",
+        color: actionColor,
+        dimColor: true,
         marginLeft: 6,
         marginTop: 1
       }, `→ action: ${payload.action}`)
     );
   }
 
+  // Special formatting for mcp/proposal and mcp/request messages
+  if (kind === 'mcp/proposal' || kind === 'mcp/request') {
+    const proposalColor = theme?.colors?.reasoningMessage || 'cyan';
+    const detailColor = theme?.colors?.genericPayload || 'gray';
+
+    const isRequest = kind === 'mcp/request';
+    const headerLabel = isRequest ? 'Request' : 'Proposal';
+
+    const method = payload.method || 'unknown';
+    const toolName = payload.params?.name || null;
+    const argsObj = payload.params?.arguments || payload.params || {};
+
+    // Use tool-specific formatter if available
+    if (method === 'tools/call' && toolName) {
+      const formatter = toolFormatters[toolName];
+      if (formatter) {
+        return formatter(argsObj, { headerLabel, proposalColor, detailColor, theme });
+      }
+    }
+
+    // Default formatting for unknown tools
+    let argsStr;
+    try {
+      argsStr = JSON.stringify(argsObj, null, 2);
+    } catch (e) {
+      argsStr = String(argsObj);
+    }
+
+    return React.createElement(Box, { flexDirection: "column", marginLeft: 6, marginTop: 1 },
+      React.createElement(Text, { color: proposalColor, bold: true },
+        `╔╗ ${headerLabel}: ${method}${toolName ? ` → ${toolName}` : ''}`
+      ),
+      argsStr && React.createElement(Text, {
+        color: detailColor,
+        dimColor: true,
+        marginTop: 1,
+        wrap: "wrap"
+      }, `Arguments:\n${argsStr}`)
+    );
+  }
+
   if (kind === 'system/help' && Array.isArray(payload.lines)) {
     const sectionTitles = new Set(['Available Commands', 'Chat Queue', 'Participant Controls', 'Streams']);
     const basePrefix = contextPrefix || '';
-    const firstLinePrefix = `${basePrefix}└─ `;
+    const firstLinePrefix = basePrefix;
     const baseSpaces = basePrefix.replace(/[^\s]/g, ' ');
     const subsequentPrefix = `${baseSpaces}   `;
+    const systemColor = theme?.colors?.systemMessage || 'gray';
+    const highlightColor = theme?.colors?.reasoningMessage || 'cyan';
+
     return React.createElement(Box, { flexDirection: "column" },
       payload.lines.map((line, index) => {
         if (!line) {
-          return React.createElement(Text, { key: index, color: "gray" }, ' ');
+          return React.createElement(Text, { key: index, color: systemColor }, ' ');
         }
-        const color = sectionTitles.has(line) ? 'cyan' : 'gray';
+        const color = sectionTitles.has(line) ? highlightColor : systemColor;
         return React.createElement(Text, {
           key: index,
           color,
@@ -1947,16 +2194,18 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
 
   // Special formatting for chat messages
   if (kind === 'chat') {
+    const chatColor = theme?.colors?.chatContent || 'white';
     return React.createElement(Text, {
-      color: "white",
+      color: chatColor,
       wrap: "wrap"
-    }, `${contextPrefix}└─ ${preview}`);
+    }, `${contextPrefix}${preview}`);
   }
 
   // Default single-line display for other message types
+  const defaultColor = theme?.colors?.genericPayload || 'gray';
   return React.createElement(Text, {
-    color: "blackBright"
-  }, `${contextPrefix}└─ ${preview}`);
+    color: defaultColor
+  }, `${contextPrefix}${preview}`);
 }
 
 /**
@@ -1966,128 +2215,56 @@ function ReasoningDisplay({ payload, kind, contextPrefix }) {
  * Supports both number keys and arrow/enter navigation for better UX.
  * Phase 3: Includes capability grant option
  */
-function OperationConfirmation({ operation, onApprove, onDeny, onGrant }) {
-  // Focus management - ensure this component takes priority for input
-  const { isFocused } = useFocus({ autoFocus: true });
-
-  // Track selected option (0 = Yes once, 1 = Grant, 2 = No)
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  useInput((input, key) => {
-    // Only handle input when focused
-    if (!isFocused) return;
-
-    // Number key shortcuts
-    if (input === '1') {
-      onApprove();
-      return;
-    }
-    if (input === '2') {
-      onGrant();
-      return;
-    }
-    if (input === '3') {
-      onDeny();
-      return;
-    }
-
-    // Arrow key navigation
-    if (key.upArrow) {
-      setSelectedIndex(Math.max(0, selectedIndex - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setSelectedIndex(Math.min(2, selectedIndex + 1));
-      return;
-    }
-
-    // Enter key to confirm selection
-    if (key.return) {
-      if (selectedIndex === 0) {
-        onApprove();
-      } else if (selectedIndex === 1) {
-        onGrant();
-      } else {
-        onDeny();
-      }
-      return;
-    }
-
-    // Escape to cancel
-    if (key.escape) {
-      onDeny();
-      return;
-    }
-  });
-
-  // Format the arguments for display
-  const formatArguments = (args) => {
-    if (!args) return 'none';
-    try {
-      return JSON.stringify(args, null, 2);
-    } catch {
-      return String(args);
-    }
-  };
-
-  // Extract operation details
+function OperationConfirmation({ operation, onInput }) {
   const method = operation.operation?.method || 'unknown';
   const params = operation.operation?.params || {};
-  const target = operation.to?.[0] || 'unknown';
-
-  // For tools/call, extract the tool name
   const toolName = params.name || null;
+
+  // Track selected option (0=Yes, 1=Grant, 2=No)
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Capture number key presses and arrow keys
+  useInput((input, key) => {
+    // Number keys
+    if (input === '1' || input === '2' || input === '3') {
+      onInput(input);
+    }
+    // Arrow keys
+    else if (key.upArrow) {
+      setSelectedIndex(prev => (prev - 1 + 3) % 3);
+    }
+    else if (key.downArrow) {
+      setSelectedIndex(prev => (prev + 1) % 3);
+    }
+    // Enter key to confirm
+    else if (key.return) {
+      onInput(String(selectedIndex + 1));
+    }
+  });
 
   return React.createElement(Box, {
       borderStyle: "round",
       borderColor: "yellow",
       paddingX: 2,
-      paddingY: 1,
-      marginY: 1,
-      width: 60
+      paddingY: 1
     },
     React.createElement(Box, { flexDirection: "column" },
-      // Header
-      React.createElement(Text, { bold: true },
-        `${operation.from} wants to execute operation`
+      React.createElement(Text, { bold: true }, `${operation.from} → ${method}${toolName ? ` (${toolName})` : ''}`),
+      React.createElement(Text, { color: "gray", dimColor: true }, "(scroll up to see proposal envelope)"),
+      React.createElement(Box, {},
+        React.createElement(Text, {}, selectedIndex === 0 ? '> ' : '  '),
+        React.createElement(Text, { dimColor: true }, '1='),
+        React.createElement(Text, {}, 'Yes')
       ),
-      React.createElement(Box, { marginTop: 1 }),
-
-      // Operation details
-      React.createElement(Text, null, `Method: ${method}`),
-      toolName && React.createElement(Text, null, `Tool: ${toolName}`),
-      React.createElement(Text, null, `Target: ${target}`),
-
-      React.createElement(Box, { marginTop: 1 }),
-
-      // Arguments section
-      React.createElement(Text, null, "Arguments:"),
-      React.createElement(Box, {
-        borderStyle: "single",
-        borderColor: "gray",
-        paddingX: 1,
-        marginTop: 0,
-        marginBottom: 1
-      },
-        React.createElement(Text, { color: "cyan" },
-          formatArguments(params.arguments || params)
-        )
+      React.createElement(Box, {},
+        React.createElement(Text, {}, selectedIndex === 1 ? '> ' : '  '),
+        React.createElement(Text, { dimColor: true }, '2='),
+        React.createElement(Text, {}, 'Grant')
       ),
-
-      // Options
-      React.createElement(Text, null, "Do you want to allow this?"),
-      React.createElement(Text, { color: selectedIndex === 0 ? "green" : "white" },
-        `${selectedIndex === 0 ? '❯' : ' '} 1. Yes (this time only)`
-      ),
-      React.createElement(Text, { color: selectedIndex === 1 ? "cyan" : "white" },
-        `${selectedIndex === 1 ? '❯' : ' '} 2. Yes, allow ${operation.from} to ${method === 'tools/call' && toolName ? `use '${toolName}'` : method} for this session`
-      ),
-      React.createElement(Text, { color: selectedIndex === 2 ? "red" : "white" },
-        `${selectedIndex === 2 ? '❯' : ' '} 3. No`
-      ),
-      React.createElement(Box, { marginTop: 1 }),
-      React.createElement(Text, { color: "gray", fontSize: 12 },
-        "Use ↑↓ arrows + Enter, or press 1/2/3, or Esc to cancel"
+      React.createElement(Box, {},
+        React.createElement(Text, {}, selectedIndex === 2 ? '> ' : '  '),
+        React.createElement(Text, { dimColor: true }, '3='),
+        React.createElement(Text, {}, 'No')
       )
     )
   );
@@ -2096,15 +2273,25 @@ function OperationConfirmation({ operation, onApprove, onDeny, onGrant }) {
 /**
  * Reasoning Status Component
  */
-function ReasoningStatus({ reasoning }) {
+function ReasoningStatus({ reasoning, theme }) {
   const [spinnerIndex, setSpinnerIndex] = useState(0);
-  const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  const spinnerChars = ['·', '◇', '◈', '◆', '✦', '◆', '◈', '◇'];
+
+  const spinnerColor = theme?.colors?.reasoningSpinner || 'magenta';
+  const titleColor = theme?.colors?.reasoningTitle || 'cyan';
+  const timerColor = theme?.colors?.reasoningTimer || 'magenta';
+  const tokensColor = theme?.colors?.reasoningTokens || 'cyan';
+  const actionColor = theme?.colors?.reasoningAction || 'magenta';
+  const thoughtsColor = theme?.colors?.reasoningThoughts || 'cyan';
+  const summaryColor = theme?.colors?.reasoningTokenSummary || 'cyan';
+  const deltaColor = theme?.colors?.reasoningTokenDelta || 'magenta';
+  const cancelColor = theme?.colors?.reasoningCancel || 'magenta';
 
   // Animate the thinking indicator with a rotating spinner
   useEffect(() => {
     const interval = setInterval(() => {
       setSpinnerIndex(prev => (prev + 1) % spinnerChars.length);
-    }, 100);
+    }, 150);
     return () => clearInterval(interval);
   }, []);
 
@@ -2132,43 +2319,43 @@ function ReasoningStatus({ reasoning }) {
 
   return React.createElement(Box, {
     borderStyle: "round",
-    borderColor: "cyan",
+    borderColor: titleColor,
     paddingX: 1,
     marginBottom: 1,
     height: 8  // Fixed height to completely prevent jitter
   },
     React.createElement(Box, { flexDirection: "column", height: "100%" },
       React.createElement(Box, { width: "100%" },
-        React.createElement(Text, { color: "cyan", bold: true }, spinnerChars[spinnerIndex] + " "),
-        React.createElement(Text, { color: "cyan" }, `${reasoning.from} is thinking`),
-        React.createElement(Text, { color: "gray", marginLeft: 4 }, `  ${elapsedTime}s  `),
-        reasoning.tokenCount || reasoning.thoughtCount > 0 ? React.createElement(Text, { color: "gray", marginLeft: 3 },
+        React.createElement(Text, { color: spinnerColor, bold: true }, spinnerChars[spinnerIndex] + " "),
+        React.createElement(Text, { color: titleColor, bold: true }, `${reasoning.from} is thinking`),
+        React.createElement(Text, { color: timerColor, dimColor: true, marginLeft: 4 }, `  ${elapsedTime}s  `),
+        reasoning.tokenCount || reasoning.thoughtCount > 0 ? React.createElement(Text, { color: tokensColor, dimColor: true, marginLeft: 3 },
           reasoning.tokenCount ? `${reasoning.tokenCount} tokens` : `${reasoning.thoughtCount} thoughts`
         ) : null
       ),
       React.createElement(Box, { height: 1 },  // Fixed height for action line
-        React.createElement(Text, { color: "gray" }, reasoning.action || ' ')  // Use space instead of empty string
+        React.createElement(Text, { color: actionColor, dimColor: true }, reasoning.action || ' ')  // Use space instead of empty string
       ),
       React.createElement(Box, { marginTop: 0, height: maxLines },  // Fixed height for text preview - always rendered
-        React.createElement(Text, { color: "gray", italic: true, wrap: "wrap" },
+        React.createElement(Text, { color: thoughtsColor, dimColor: true, italic: true, wrap: "wrap" },
           textPreview || ' '  // Use space to avoid empty string error
         )
       ),
       tokenSummary?.summary ? React.createElement(Box, { marginTop: 0 },
-        React.createElement(Text, { color: "cyan" }, `Tokens: ${tokenSummary.summary}`)
+        React.createElement(Text, { color: summaryColor }, `Tokens: ${tokenSummary.summary}`)
       ) : null,
       tokenSummary?.deltas ? React.createElement(Box, { marginTop: 0 },
-        React.createElement(Text, { color: "cyan" }, `Δ ${tokenSummary.deltas}`)
+        React.createElement(Text, { color: deltaColor }, `Δ ${tokenSummary.deltas}`)
       ) : null,
       tokenSummary?.details ? React.createElement(Box, { marginTop: 0 },
-        React.createElement(Text, { color: "gray" }, tokenSummary.details)
+        React.createElement(Text, { color: summaryColor, dimColor: true }, tokenSummary.details)
       ) : null,
       tokenSummary && tokenUpdatedAgo ? React.createElement(Box, { marginTop: 0 },
-        React.createElement(Text, { color: "gray" }, `Updated ${tokenUpdatedAgo}`)
+        React.createElement(Text, { color: summaryColor, dimColor: true }, `Updated ${tokenUpdatedAgo}`)
       ) : null,
       React.createElement(Box, { marginTop: 0, flexGrow: 1 }),  // Spacer to push cancel hint to bottom
       React.createElement(Box, null,
-        React.createElement(Text, { color: "gray" }, 'Use /cancel to interrupt reasoning.')
+        React.createElement(Text, { color: cancelColor, dimColor: true }, 'Use /cancel to interrupt reasoning.')
       )
     )
   );
@@ -2182,9 +2369,15 @@ function ReasoningStatus({ reasoning }) {
 /**
  * Status Bar Component
  */
-function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [], participantStatusCount = 0 }) {
+function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [], participantStatusCount = 0, theme }) {
   const status = connected ? 'Connected' : 'Disconnected';
   const statusColor = connected ? 'green' : 'red';
+
+  const accentColor = theme?.colors?.statusBarAccent || 'magenta';
+  const separatorColor = theme?.colors?.statusBarSeparator || 'magenta';
+  const spaceColor = theme?.colors?.statusBarSpace || 'cyan';
+  const participantColor = theme?.colors?.statusBarParticipant || 'magenta';
+  const hintColor = theme?.colors?.statusBarHint || 'cyan';
 
   const extras = [];
   extras.push(`${messageCount} msgs`);
@@ -2221,26 +2414,26 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId
 
   return React.createElement(Box, { justifyContent: "space-between", paddingX: 1 },
     React.createElement(Text, null,
-      "🐱 | ",
+      React.createElement(Text, { color: accentColor, bold: true }, "◆ "),
       React.createElement(Text, { color: statusColor }, status),
-      " | ",
-      React.createElement(Text, { color: "cyan" }, spaceId),
-      " | ",
-      React.createElement(Text, { color: "blue" }, participantId),
+      React.createElement(Text, { color: separatorColor, dimColor: true }, " ◇ "),
+      React.createElement(Text, { color: spaceColor }, spaceId),
+      React.createElement(Text, { color: separatorColor, dimColor: true }, " ◇ "),
+      React.createElement(Text, { color: participantColor }, participantId),
       extrasText
     ),
-    React.createElement(Text, { color: "gray" }, "Ctrl+C to exit")
+    React.createElement(Text, { color: hintColor, dimColor: true }, "Ctrl+C to exit")
   );
 }
 
 // Helper functions
-function getColorForKind(kind) {
-  if (kind.startsWith('system/error')) return 'red';
-  if (kind.startsWith('system/')) return 'blackBright';
-  if (kind.startsWith('mcp/')) return 'blackBright';
-  if (kind.startsWith('reasoning/')) return 'blue';  // Reasoning headers in blue
-  if (kind === 'chat') return 'white';  // Clean white for chat messages
-  return 'blackBright';
+function getColorForKind(kind, theme) {
+  if (kind.startsWith('system/error')) return theme?.colors?.errorMessage || 'red';
+  if (kind.startsWith('system/')) return theme?.colors?.systemMessage || 'gray';
+  if (kind.startsWith('mcp/')) return theme?.colors?.mcpMessage || 'magenta';
+  if (kind.startsWith('reasoning/')) return theme?.colors?.reasoningMessage || 'cyan';
+  if (kind === 'chat') return theme?.colors?.chatHeader || 'cyan';
+  return theme?.colors?.genericPayload || 'gray';
 }
 
 function getPayloadPreview(payload, kind) {
@@ -2249,7 +2442,7 @@ function getPayloadPreview(payload, kind) {
   }
 
   if (kind === 'chat' && payload.text) {
-    return `"${payload.text}"`;
+    return payload.text;
   }
 
   if (kind === 'mcp/request' && payload.method) {
@@ -2317,17 +2510,17 @@ function getPayloadPreview(payload, kind) {
   if (kind === 'reasoning/start') {
     if (payload.message) {
       const message = payload.message;
-      return `🧠 Starting: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
+      return `◇ Starting: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
     }
-    return '🧠 Started reasoning session';
+    return '◇ Started reasoning session';
   }
 
   if (kind === 'reasoning/conclusion') {
     if (payload.message) {
       const message = payload.message;
-      return `✅ Concluded: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
+      return `◆ Concluded: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
     }
-    return '✅ Reasoning session complete';
+    return '◆ Reasoning session complete';
   }
 
   if (typeof payload === 'string') {
@@ -2902,9 +3095,9 @@ function SidePanel({ participantId, myPendingAcknowledgements, participantStatus
 /**
  * Starts the advanced interactive UI
  */
-function startAdvancedInteractiveUI(ws, participantId, spaceId) {
+function startAdvancedInteractiveUI(ws, participantId, spaceId, themeName = 'neon-pulse') {
   const { rerender, unmount } = render(
-    React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId })
+    React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId, themeName })
   );
 
   // Handle cleanup

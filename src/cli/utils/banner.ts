@@ -62,42 +62,49 @@ function getRandomTagline() {
  * @param {string} options.participantId - Current participant ID
  * @param {string} options.gateway - Gateway URL
  * @param {boolean} options.color - Whether to use colors
+ * @param {Object} options.theme - Theme object with ansi colors
  * @returns {string} The formatted banner
  */
 function generateBanner(options = {}) {
   const tagline = getRandomTagline();
   const color = options.color !== false;
 
-  // Colors using ANSI escape codes
-  const cyan = color ? '\x1b[36m' : '';
-  const yellow = color ? '\x1b[33m' : '';
-  const green = color ? '\x1b[32m' : '';
-  const reset = color ? '\x1b[0m' : '';
-  const bold = color ? '\x1b[1m' : '';
+  // Use theme colors if provided, otherwise fall back to HLD colors
+  const theme = options.theme;
+  const cyan = color ? (theme?.ansi?.cyan || '\x1b[96m') : '';
+  const magenta = color ? (theme?.ansi?.magenta || '\x1b[95m') : '';
+  const pink = color ? (theme?.ansi?.pink || '\x1b[38;5;213m') : '';
+  const purple = color ? (theme?.ansi?.purple || '\x1b[38;5;141m') : '';
+  const blue = color ? (theme?.ansi?.blue || '\x1b[38;5;117m') : '';
+  const reset = color ? (theme?.ansi?.reset || '\x1b[0m') : '';
+  const bold = color ? (theme?.ansi?.bright || '\x1b[1m') : '';
+  const dim = color ? (theme?.ansi?.dim || '\x1b[2m') : '';
 
   const banner = `
-     ${yellow}/\\_/\\${reset}  ${bold}███╗   ███╗███████╗██╗    ██╗${reset}
-    ${yellow}( ^.^ )${reset} ${bold}████╗ ████║██╔════╝██║    ██║${reset}
-     ${yellow}> ^ <${reset}  ${bold}██╔████╔██║█████╗  ██║ █╗ ██║${reset}
-    ${yellow}/     \\${reset} ${bold}██║╚██╔╝██║██╔══╝  ██║███╗██║${reset}
-            ${bold}██║ ╚═╝ ██║███████╗╚███╔███╔╝${reset}
-            ${bold}╚═╝     ╚═╝╚══════╝ ╚══╝╚══╝${reset}
+    ${dim}▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄${reset}
+        ${bold}${magenta}◢◣${reset}        ${bold}${cyan}███╗   ███╗███████╗██╗    ██╗${reset}
+       ${bold}${pink}◢███◣${reset}      ${bold}${cyan}████╗ ████║██╔════╝██║    ██║${reset}
+      ${bold}${cyan}◢█████◣${reset}     ${bold}${cyan}██╔████╔██║█████╗  ██║ █╗ ██║${reset}
+     ${bold}${cyan}◢███${purple}◆${cyan}███◣${reset}    ${bold}${cyan}██║╚██╔╝██║██╔══╝  ██║███╗██║${reset}
+    ${bold}${blue}◢█████████◣${reset}   ${bold}${cyan}██║ ╚═╝ ██║███████╗╚███╔███╔╝${reset}
+      ${cyan}/ᐠ｡ꞈ｡ᐟ\\${reset}     ${bold}${cyan}╚═╝     ╚═╝╚══════╝ ╚══╝╚══╝${reset}
+    ${dim}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${reset}
 
-    ${green}Multi-Entity Workspace Protocol v0.4${reset}
-    ${cyan}"${tagline}"${reset}
+    ${bold}${magenta}◆${reset} ${cyan}Multi-Entity Workspace Protocol${reset} ${dim}v0.4${reset} ${bold}${magenta}◆${reset}
+    ${dim}${cyan}"${tagline}"${reset}
 `;
 
   // Add space info if provided
   if (options.spaceName || options.participantId) {
     const infoLines = [];
     if (options.spaceName) {
-      infoLines.push(`${green}▸${reset} Space: ${bold}${options.spaceName}${reset}`);
+      infoLines.push(`    ${magenta}◆${reset} Space: ${bold}${cyan}${options.spaceName}${reset}`);
     }
     if (options.participantId) {
-      infoLines.push(`${green}▸${reset} You are: ${bold}${options.participantId}${reset}`);
+      infoLines.push(`    ${magenta}◆${reset} You are: ${bold}${pink}${options.participantId}${reset}`);
     }
     if (options.gateway) {
-      infoLines.push(`${green}▸${reset} Gateway: ${options.gateway}`);
+      infoLines.push(`    ${magenta}◆${reset} Gateway: ${dim}${options.gateway}${reset}`);
     }
 
     if (infoLines.length > 0) {
