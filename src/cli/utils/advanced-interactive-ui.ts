@@ -2538,8 +2538,27 @@ function getColorForKind(kind, theme) {
 }
 
 function getPayloadPreview(payload, kind) {
+  if (kind === 'chat/acknowledge') {
+    // Format based on spec: payload just has 'status' field
+    const status = payload.status || 'acknowledged';
+    return `✓ ${status}`;
+  }
+
   if (kind === 'system/help') {
     return 'help overview';
+  }
+
+  if (kind === 'system/info' && payload.text) {
+    return payload.text;
+  }
+
+  if (kind === 'system/welcome') {
+    const yourId = payload.you?.id || 'unknown';
+    const capCount = payload.you?.capabilities?.length || 0;
+    const participantIds = payload.participants?.map(p => p.id).join(', ') || 'none';
+    const participantCount = payload.participants?.length || 0;
+
+    return `connected as ${yourId} (${capCount} capabilities) • ${participantCount} other participant${participantCount === 1 ? '' : 's'}: ${participantIds}`;
   }
 
   if (kind === 'chat' && payload.text) {
@@ -2622,6 +2641,25 @@ function getPayloadPreview(payload, kind) {
       return `◆ Concluded: "${message.length > 120 ? message.substring(0, 120) + '...' : message}"`;
     }
     return '◆ Reasoning session complete';
+  }
+
+  if (kind === 'stream/request') {
+    const direction = payload.direction || 'unknown';
+    const desc = payload.description ? ` "${payload.description}"` : '';
+    const size = payload.expected_size_bytes ? ` (${(payload.expected_size_bytes / 1024 / 1024).toFixed(1)}MB)` : '';
+    return `${direction} stream${desc}${size}`;
+  }
+
+  if (kind === 'stream/open') {
+    const streamId = payload.stream_id || 'unknown';
+    const encoding = payload.encoding || 'unknown';
+    return `opened ${streamId} [${encoding}]`;
+  }
+
+  if (kind === 'stream/close') {
+    const streamId = payload.stream_id ? `${payload.stream_id} ` : '';
+    const reason = payload.reason || 'closed';
+    return `${streamId}${reason}`;
   }
 
   if (typeof payload === 'string') {
