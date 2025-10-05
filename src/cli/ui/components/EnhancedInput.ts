@@ -17,17 +17,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { getCommand } from '../keyMatchers.js';
 import { defaultKeyBindings } from '../../config/keyBindings.js';
 import { getSlashCommandSuggestions } from '../utils/slashCommands.js';
-import fs from 'fs';
-import path from 'path';
-// Helper function for debug logging
-const debugLog = (message) => {
-  const logFile = path.join(process.cwd(), '.mew', 'debug.log');
-  const mewDir = path.join(process.cwd(), '.mew');
-  if (!fs.existsSync(mewDir)) {
-    fs.mkdirSync(mewDir, { recursive: true });
-  }
-  fs.appendFileSync(logFile, message);
-};
+import { debugLog } from '../../utils/debug.js';
 
 /**
  * Enhanced Input Component
@@ -44,12 +34,12 @@ const debugLog = (message) => {
  * @returns {React.Element}
  */
 function EnhancedInput({
-  onSubmit = () => {},
+  onSubmit = () => { },
   placeholder = '',
   multiline = false,
   disabled = false,
   history = [],
-  onHistoryChange = () => {},
+  onHistoryChange = () => { },
   keyBindings = defaultKeyBindings,
   showCursor = true,
   prompt = '> ',
@@ -326,7 +316,7 @@ function EnhancedInput({
 
       // Submission
       case 'SUBMIT':
-        debugLog(`\n>>> SUBMIT CASE REACHED <<<\n`);
+        debugLog(`\n>>> SUBMIT CASE REACHED 2 <<<\n`);
         debugLog(`>>> Buffer text: "${buffer.getText()}"\n`);
         if (!multiline || !buffer.getText().includes('\n')) {
           debugLog(`>>> CALLING handleSubmit() <<<\n`);

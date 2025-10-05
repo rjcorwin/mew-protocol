@@ -17,7 +17,6 @@ import {
   getInteractiveOverrides,
 } from '../utils/participant-resolver.js';
 import { printBanner } from '../utils/banner.js';
-import * as interactiveUI from '../utils/interactive-ui.js';
 import * as advancedInteractiveUI from '../utils/advanced-interactive-ui.js';
 import { getTheme } from '../themes.js';
 
@@ -894,15 +893,6 @@ async function spaceUpAction(options) {
     if (options.interactive) {
       console.log('\nConnecting interactively...\n');
 
-      // Determine UI mode
-      const useDebugUI = options.debug || options.simple || options.noUi;
-
-      // Select appropriate UI module
-      const InteractiveUI = useDebugUI ? interactiveUI : null;
-      const startAdvancedInteractiveUI = useDebugUI
-        ? null
-        : advancedInteractiveUI.startAdvancedInteractiveUI;
-
       try {
         // Resolve participant
         const participant = await resolveParticipant({
@@ -944,41 +934,27 @@ async function spaceUpAction(options) {
           const theme = getTheme(themeName);
 
           // Display banner before starting UI
-          if (!useDebugUI) {
-            printBanner({
-              spaceName: spaceName,
-              spaceId: spaceId,
-              participantId: participant.id,
-              gateway: `ws://localhost:${selectedPort}`,
-              color: process.env.NO_COLOR !== '1',
-              theme: theme
-            });
-          }
+          printBanner({
+            spaceName: spaceName,
+            spaceId: spaceId,
+            participantId: participant.id,
+            gateway: `ws://localhost:${selectedPort}`,
+            color: process.env.NO_COLOR !== '1',
+            theme: theme
+          });
 
-          // Start interactive UI
-          if (useDebugUI) {
-            const defaultChatTargets = {
-              participant: Array.isArray(config?.participants?.[participant.id]?.default_to?.chat)
-                ? config.participants[participant.id].default_to.chat.slice()
-                : null,
-              global: Array.isArray(config?.defaults?.routing?.default_to?.chat)
-                ? config.defaults.routing.default_to.chat.slice()
-                : null
-            };
-            const ui = new InteractiveUI(ws, participant.id, spaceId, defaultChatTargets);
-            ui.start();
-          } else {
-            // Compute default chat targets from config
-            const defaultChatTargets = {
-              participant: Array.isArray(config?.participants?.[participant.id]?.default_to?.chat)
-                ? config.participants[participant.id].default_to.chat.slice()
-                : null,
-              global: Array.isArray(config?.defaults?.routing?.default_to?.chat)
-                ? config.defaults.routing.default_to.chat.slice()
-                : null
-            };
-            startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets);
-          }
+          // Compute default chat targets from config
+          const defaultChatTargets = {
+            participant: Array.isArray(config?.participants?.[participant.id]?.default_to?.chat)
+              ? config.participants[participant.id].default_to.chat.slice()
+              : null,
+            global: Array.isArray(config?.defaults?.routing?.default_to?.chat)
+              ? config.defaults.routing.default_to.chat.slice()
+              : null
+          };
+
+          // Start advanced interactive UI
+          advancedInteractiveUI.startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets);
         });
 
         ws.on('error', (err) => {
@@ -1003,9 +979,6 @@ space
   .option('-i, --interactive', 'Connect interactively after starting space')
   .option('--detach', 'Run in background (default if not interactive)')
   .option('--participant <id>', 'Connect as this participant (with --interactive)')
-  .option('--debug', 'Use simple debug interface instead of advanced UI')
-  .option('--simple', 'Alias for --debug')
-  .option('--no-ui', 'Disable UI enhancements, use plain interface')
   .action(spaceUpAction);
 
 // Action handler for space down
@@ -1539,9 +1512,6 @@ space
   .option('-d, --space-dir <path>', 'Directory of space to connect to', '.')
   .option('--participant <id>', 'Connect as this participant')
   .option('--gateway <url>', 'Override gateway URL (default: from running space)')
-  .option('--debug', 'Use simple debug interface instead of advanced UI')
-  .option('--simple', 'Alias for --debug')
-  .option('--no-ui', 'Disable UI enhancements, use plain interface')
   .action(async (options) => {
     const spaceDir = path.resolve(options.spaceDir);
     const configPath = path.join(spaceDir, path.basename(options.config));
@@ -1562,15 +1532,6 @@ space
 
     console.log(`Space: ${pids.spaceName} (${spaceId})`);
     console.log(`Gateway: ${gatewayUrl}`);
-
-    // Determine UI mode
-    const useDebugUI = options.debug || options.simple || options.noUi;
-
-    // Select appropriate UI module
-    const InteractiveUI = useDebugUI ? interactiveUI : null;
-    const startAdvancedInteractiveUI = useDebugUI
-      ? null
-      : advancedInteractiveUI.startAdvancedInteractiveUI;
 
     try {
       // Resolve participant
@@ -1613,33 +1574,27 @@ space
         const theme = getTheme(themeName);
 
         // Display banner before starting UI
-        if (!useDebugUI) {
-          printBanner({
-            spaceName: pids.spaceName,
-            spaceId: spaceId,
-            participantId: participant.id,
-            gateway: gatewayUrl,
-            color: process.env.NO_COLOR !== '1',
-            theme: theme
-          });
-        }
+        printBanner({
+          spaceName: pids.spaceName,
+          spaceId: spaceId,
+          participantId: participant.id,
+          gateway: gatewayUrl,
+          color: process.env.NO_COLOR !== '1',
+          theme: theme
+        });
 
-        // Start interactive UI
-        if (useDebugUI) {
-          const ui = new InteractiveUI(ws, participant.id, spaceId);
-          ui.start();
-        } else {
-          // Compute default chat targets from config
-          const defaultChatTargets = {
-            participant: Array.isArray(config?.participants?.[participant.id]?.default_to?.chat)
-              ? config.participants[participant.id].default_to.chat.slice()
-              : null,
-            global: Array.isArray(config?.defaults?.routing?.default_to?.chat)
-              ? config.defaults.routing.default_to.chat.slice()
-              : null
-          };
-          startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets);
-        }
+        // Compute default chat targets from config
+        const defaultChatTargets = {
+          participant: Array.isArray(config?.participants?.[participant.id]?.default_to?.chat)
+            ? config.participants[participant.id].default_to.chat.slice()
+            : null,
+          global: Array.isArray(config?.defaults?.routing?.default_to?.chat)
+            ? config.defaults.routing.default_to.chat.slice()
+            : null
+        };
+
+        // Start advanced interactive UI
+        advancedInteractiveUI.startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets);
       });
 
       ws.on('error', (err) => {

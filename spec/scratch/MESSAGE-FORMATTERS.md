@@ -9,22 +9,30 @@ This document inventories which MEW protocol messages have dedicated formatters 
 ### ✅ Implemented Formatters
 
 #### `chat`
-- **Location**: `src/cli/utils/interactive-ui.ts` (line ~770), `src/cli/utils/advanced-interactive-ui.ts` (line ~1900)
-- **Formatting**: 
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~1900)
+- **Formatting**:
   - Shows text content directly
-  - In advanced UI: Full-width separators (top/bottom borders) for visual distinction
+  - Full-width separators (top/bottom borders) for visual distinction
   - Filled diamond (◆) prefix
   - Theme-aware colors
 
+#### `chat/acknowledge`
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~2544)
+- **Formatting**:
+  - Checkmark (✓) prefix
+  - Shows status field from payload (e.g., "processing", "received", "seen")
+  - Example: `✓ processing` or `✓ received`
+  - Note: Per spec, payload only contains `status` field; correlation_id (in envelope) references acknowledged message
+
 #### `mcp/request` and `mcp/proposal`
-- **Location**: `src/cli/utils/interactive-ui.ts` (line ~775), `src/cli/utils/advanced-interactive-ui.ts` (line ~1920)
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~1920)
 - **Formatting**:
   - Shows method and tool name
   - Arguments preview
   - Special handling for `tools/call` with tool-specific formatters
 
 #### `mcp/response`
-- **Location**: `src/cli/utils/interactive-ui.ts` (line ~780), `src/cli/utils/advanced-interactive-ui.ts` (line ~1940)
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~1940)
 - **Formatting**:
   - Handles result content arrays (shows first text item)
   - Object results with key summary
@@ -44,12 +52,45 @@ This document inventories which MEW protocol messages have dedicated formatters 
   - Prefixes: ◇ for start, ◆ for conclusion
   - Message preview (truncated to 120 chars)
 
+#### `stream/request`
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~2642)
+- **Formatting**:
+  - Shows direction (upload/download)
+  - Shows description if present
+  - Shows expected size in MB if present
+  - Example: `upload stream "reasoning:reason-123"` or `download stream (5.2MB)`
+
+#### `stream/open`
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~2649)
+- **Formatting**:
+  - Shows stream ID and encoding
+  - Example: `opened stream-4 [text]` or `opened stream-42 [binary]`
+
+#### `stream/close`
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~2655)
+- **Formatting**:
+  - Shows stream ID (if present) and reason
+  - Example: `stream-4 complete` or `cancelled`
+
 #### `system/help`
 - **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~1970)
 - **Formatting**:
   - Multi-line display with proper indentation
   - Section titles highlighted
   - Line-by-line rendering
+
+#### `system/info`
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~2565)
+- **Formatting**:
+  - Shows text content directly
+  - Example: `Stream closed (complete)`
+
+#### `system/welcome`
+- **Location**: `src/cli/utils/advanced-interactive-ui.ts` (line ~2569)
+- **Formatting**:
+  - Shows your participant ID, capability count, and other participants
+  - Example: `connected as participant-123 (2 capabilities) • 2 other participants: mew, mcp-fs-bridge`
+  - Concise format to avoid bloat (per spec recommendation)
 
 ### 🛠️ Tool-Specific Formatters
 
@@ -77,11 +118,10 @@ The advanced UI includes a pluggable tool formatter system for `mcp/proposal` me
 
 These message types fall back to generic JSON preview in `getPayloadPreview()`:
 
-#### `system/*` (except `help`)
-- `system/welcome`
+#### `system/*` (except `help`, `info`, `welcome`)
 - `system/heartbeat`
 - `system/error`
-- `system/info`
+- `system/presence`
 - **Current behavior**: Generic object preview showing first 2-3 keys
 
 #### `participant/*`
@@ -97,19 +137,15 @@ These message types fall back to generic JSON preview in `getPayloadPreview()`:
 - `participant/compact-done`
 - **Current behavior**: Generic object preview
 
-#### `stream/*`
-- `stream/open`
-- `stream/close`
-- `stream/request`
-- `stream/data`
-- **Current behavior**: Generic object preview (though `stream/data` is filtered from display)
+#### `stream/data`
+- **Current behavior**: Filtered from display (binary/chunked data, not shown in envelope view)
 
 #### `capability/*`
 - `capability/grant`
 - `capability/grant-ack`
 - **Current behavior**: Generic object preview
 
-#### `chat/acknowledge` & `chat/cancel`
+#### `chat/cancel`
 - **Current behavior**: Generic object preview
 
 #### Other Protocol Messages
@@ -118,29 +154,25 @@ These message types fall back to generic JSON preview in `getPayloadPreview()`:
 
 ## Formatter Architecture
 
-### Interactive UI (Simple)
-- **File**: `src/cli/utils/interactive-ui.ts`
-- **Function**: `getPayloadPreview()` (line ~700)
-- **Approach**: Switch statement with kind-specific logic
-
-### Advanced UI (Rich)
+### Advanced UI (Only)
 - **File**: `src/cli/utils/advanced-interactive-ui.ts`
+- **Function**: `getPayloadPreview()` (line ~2540)
 - **Component**: `ReasoningDisplay` (line ~1880)
 - **Approach**: React component with pluggable tool formatters
 - **Tool Formatters**: Object registry at line ~1300
+- **Note**: The simple readline UI has been removed as of v0.5
 
 ## Recommendations
 
 ### High Priority Formatters
 1. **`system/error`** - Errors should have distinct formatting (red, prominent)
 2. **`participant/status`** - Status telemetry could be tabular
-3. **`stream/open`** - Stream info could show direction/encoding
-4. **`capability/grant`** - Security-critical, needs clear display
+3. **`capability/grant`** - Security-critical, needs clear display
 
 ### Medium Priority Formatters
-1. **`system/welcome`** - Connection info could be structured
-2. **`participant/pause`** - Show timeout and reason clearly
-3. **`chat/acknowledge`** - Show ack status visually
+1. **`participant/pause`** - Show timeout and reason clearly
+2. **`chat/cancel`** - Show cancellation status visually
+3. **`system/presence`** - Show join/leave events clearly
 
 ### Tool Formatters to Add
 1. **`read_file`** - Show file path and size
