@@ -45,11 +45,35 @@ function createSignalBoardSummary(ackCount, statusCount, pauseState, includeAck 
 /**
  * Main Advanced Interactive UI Component
  */
-function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-pulse' }) {
+function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-pulse', defaultChatTargets = {} }) {
   // Load theme
   const theme = getTheme(themeName);
 
   const [messages, setMessages] = useState([]);
+  const [chatTargetOverride, setChatTargetOverride] = useState(null); // session-scoped override: array of ids or null
+  const warnedUnknownTargetsRef = useRef(new Set()); // warn once per unknown target
+  const participantDefaultTargets = useMemo(() => {
+    const list = defaultChatTargets?.participant;
+    return Array.isArray(list) ? list.filter(Boolean) : null;
+  }, [defaultChatTargets]);
+  const globalDefaultTargets = useMemo(() => {
+    const list = defaultChatTargets?.global;
+    return Array.isArray(list) ? list.filter(Boolean) : null;
+  }, [defaultChatTargets]);
+
+  const getEffectiveChatTargets = useCallback(() => {
+    // Precedence: override > participant defaults > global defaults
+    if (Array.isArray(chatTargetOverride) && chatTargetOverride.length > 0) {
+      return chatTargetOverride;
+    }
+    if (Array.isArray(participantDefaultTargets) && participantDefaultTargets.length > 0) {
+      return participantDefaultTargets;
+    }
+    if (Array.isArray(globalDefaultTargets) && globalDefaultTargets.length > 0) {
+      return globalDefaultTargets;
+    }
+    return null;
+  }, [chatTargetOverride, participantDefaultTargets, globalDefaultTargets]);
   const [commandHistory, setCommandHistory] = useState([]);
   const [pendingOperation, setPendingOperation] = useState(null);
   const [verbose, setVerbose] = useState(false);
@@ -1743,21 +1767,78 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
         addSystemMessage(`Signal Board ${nextState ? 'expanded' : 'collapsed'}.`);
         break;
       }
+      case '/target': {
+        // Usage: /target [show|none|<participant...>]
+        if (args.length === 0 || args[0] === 'show') {
+          const eff = getEffectiveChatTargets();
+          if (Array.isArray(eff) && eff.length > 0) {
+            addSystemMessage(`Chat target: ${eff.join(', ')}${Array.isArray(chatTargetOverride) ? ' (override)' : participantDefaultTargets ? ' (config)' : ''}.`);
+          } else {
+            addSystemMessage('Chat target: broadcast');
+          }
+          break;
+        }
+        if (args[0] === 'none') {
+          setChatTargetOverride(null);
+          addSystemMessage('Cleared chat target override.');
+          break;
+        }
+        // Otherwise treat all args as participant IDs
+        const targets = args.filter(Boolean);
+        if (targets.length === 0) {
+          addSystemMessage('Usage: /target [show|none|<participant...>]');
+          break;
+        }
+        setChatTargetOverride(targets);
+        addSystemMessage(`Set chat target to: ${targets.join(', ')}`);
+        break;
+      }
       default:
         addSystemMessage(`Unknown command: ${cmd}`);
     }
   };
 
   const wrapEnvelope = (message) => {
-    return {
+    const base = {
       protocol: 'mew/v0.4',
       id: `msg-${uuidv4()}`,
       ts: new Date().toISOString(),
       from: participantId,
       kind: message.kind,
       payload: message.payload,
-      ...message,
+      ...message, // allow caller to override defaults
     };
+
+    // Apply default chat targets if applicable and not explicitly provided
+    try {
+      if (base && base.kind === 'chat') {
+        const hasExplicitTo = Array.isArray(base.to) && base.to.length > 0;
+        if (!hasExplicitTo) {
+          const targets = getEffectiveChatTargets();
+          if (Array.isArray(targets) && targets.length > 0) {
+            base.to = targets.slice();
+
+            // Warn once for unknown targets
+            const known = new Set(knownParticipants);
+            targets.forEach(t => {
+              if (t && !known.has(t) && t !== participantId) {
+                const warned = warnedUnknownTargetsRef.current;
+                if (!warned.has(t)) {
+                  warned.add(t);
+                  addMessage({
+                    kind: 'system/info',
+                    from: 'system',
+                    payload: { text: `Target '${t}' is not known yet; sending anyway.` }
+                  }, false);
+                }
+              }
+            });
+          }
+        }
+      }
+    } catch {}
+
+    return base;
   };
 
   const isValidEnvelope = (obj) => {
@@ -1787,7 +1868,14 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
             item: item,
             verbose: verbose,
             useColor: useColor,
-            theme: theme
+            theme: theme,
+      chatTarget: (() => {
+        const targets = getEffectiveChatTargets();
+        if (Array.isArray(targets) && targets.length > 0) {
+          return targets.join(', ');
+        }
+        return null;
+      })()
           })
         )
       ),
@@ -1859,7 +1947,14 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
       activeStreamCount: activeStreams.size,
       contextUsage: contextUsageEntries,
       participantStatusCount: participantStatuses.size,
-      theme: theme
+      theme: theme,
+      chatTarget: (() => {
+        const targets = getEffectiveChatTargets();
+        if (Array.isArray(targets) && targets.length > 0) {
+          return targets.join(', ');
+        }
+        return null;
+      })()
     })
   );
 }
@@ -1888,7 +1983,10 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
   const showTopSeparator = isChat;
   const showBottomSeparator = isChat;
 
-  const separatorColor = theme?.colors?.chatSeparator || 'magenta';
+  // Use input border color for your own messages, chat separator color for others
+  const separatorColor = sent
+    ? (theme?.colors?.inputBorder || 'cyan')
+    : (theme?.colors?.chatSeparator || 'magenta');
 
   if (verbose) {
     return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
@@ -2369,7 +2467,7 @@ function ReasoningStatus({ reasoning, theme }) {
 /**
  * Status Bar Component
  */
-function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [], participantStatusCount = 0, theme }) {
+function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [], participantStatusCount = 0, theme, chatTarget = null }) {
   const status = connected ? 'Connected' : 'Disconnected';
   const statusColor = connected ? 'green' : 'red';
 
@@ -2403,6 +2501,9 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId
     if (ctxSegments.length > 0) {
       extras.push(`ctx ${ctxSegments.join(', ')}`);
     }
+  }
+  if (chatTarget) {
+    extras.push(`to ${chatTarget}`);
   }
 
   const boardSummary = createSignalBoardSummary(awaitingAckCount, participantStatusCount, pauseState, awaitingAckCount === 0);
@@ -3095,9 +3196,9 @@ function SidePanel({ participantId, myPendingAcknowledgements, participantStatus
 /**
  * Starts the advanced interactive UI
  */
-function startAdvancedInteractiveUI(ws, participantId, spaceId, themeName = 'neon-pulse') {
+function startAdvancedInteractiveUI(ws, participantId, spaceId, themeName = 'neon-pulse', defaultChatTargets = {}) {
   const { rerender, unmount } = render(
-    React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId, themeName })
+    React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId, themeName, defaultChatTargets })
   );
 
   // Handle cleanup
