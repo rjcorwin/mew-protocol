@@ -1563,6 +1563,50 @@ This simplified approach provides essential approval functionality without the c
 
 These advanced features can be added in future iterations as the system matures beyond MVP.
 
+### Tool Formatter System
+
+The advanced interactive UI includes a pluggable rendering system for MCP tool proposals. This system converts incoming mcp/proposal envelopes that target tools/call into compact, human-scannable previews shown in the proposal viewer and message history.
+
+Purpose and scope:
+- Provide readable, action-oriented previews for tool proposals before user approval
+- Keep proposal rendering decoupled from business logic and protocol handling
+- Allow targeted formatters for specific tools while preserving a safe default for all others
+
+Architecture:
+- Registry: A map of tool name -> formatter function lives in the advanced UI layer. Keys must exactly match the tool name announced in a proposal (for example, the params.name in tools/call).
+- Default renderer: If no formatter is registered for a tool, a generic JSON-based renderer is used. This guarantees proposals are always displayable.
+- Rendering framework: Formatters return React elements compatible with Ink. They do not manipulate terminal state directly; the UI orchestrator places them into the proposal panel with borders, spacing, and theming.
+
+Formatter contract:
+- Input: (a) the tool arguments object extracted from the proposal (params.arguments), (b) a small context object with theme-aware colors and UI hints. Arguments are untrusted and may be missing or malformed; formatters must handle this gracefully.
+- Output: A pure React element tree. Formatters must be side-effect-free and deterministic based only on their inputs.
+- Constraints: No file system or network access from within formatters; they are presentational only. They must not block rendering or perform long-running work.
+
+Lifecycle:
+1. Receipt: CLI receives an mcp/proposal envelope and parses method, target tool, and arguments.
+2. Selection: The UI looks up a formatter by tool name. If none exists, it falls back to the default renderer.
+3. Render: The formatter’s React output is mounted in the proposal preview area. The UI may re-render the component when theme or window size changes.
+4. Decision: When the operator approves or denies, the preview becomes part of the conversation history for traceability but does not update further. Formatters have no participation in fulfillment; they only render.
+
+Behavioral requirements:
+- Compactness: Formatters must present critical information first and use truncation where appropriate to preserve readable histories.
+- Theming: All colors and styles come from UI-provided theme values to ensure accessibility and consistency.
+- Robustness: Handle unknown or partial arguments without throwing; prefer showing clearly labeled placeholders over failing.
+- Fallback safety: Default renderer must always be available and produce a valid, minimally styled preview for any proposal.
+
+Extensibility:
+- Built-in formatters can be extended by registering additional entries in the tool-to-formatter registry at load time. Unknown tools automatically use the default renderer; no additional wiring is required.
+- Future evolutions may allow external registration points; the contract above remains the compatibility boundary.
+
+Security and performance:
+- Treat all formatter inputs as untrusted. Never execute or evaluate content from tool arguments. Escape or safely render text.
+- Keep render logic lightweight; avoid heavy computation to maintain UI responsiveness.
+
+Testing guidance:
+- Validate that formatters render correctly with representative and degenerate arguments.
+- Verify fallback behavior when a formatter is removed or when the tool name does not match any registry entry.
+- Check theme responsiveness (light/dark, color-disabled) and truncation behavior in narrow terminals.
+
 ### Terminal Input Features (v0.4.2)
 
 The CLI provides comprehensive terminal input capabilities through the EnhancedInput component, adapted from Google's Gemini CLI patterns. These features significantly improve the user experience for composing messages and commands.
