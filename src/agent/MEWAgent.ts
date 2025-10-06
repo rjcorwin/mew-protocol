@@ -188,6 +188,9 @@ export class MEWAgent extends MEWParticipant {
 
     this.setupAgentBehavior();
 
+    // Register internal management tools
+    this.registerAgentTools();
+
     // Enable auto-discovery for agents
     this.enableAutoDiscovery();
 
@@ -299,6 +302,44 @@ export class MEWAgent extends MEWParticipant {
    */
   addResource(resource: Resource): void {
     this.registerResource(resource);
+  }
+
+  /**
+   * Register built-in tools exposed by the agent
+   */
+  private registerAgentTools(): void {
+    this.registerTool({
+      name: 'set_model',
+      description: 'Update the AI model used for reasoning and chat responses.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          model: {
+            type: 'string',
+            description: 'Identifier of the OpenAI-compatible model to use for future requests.'
+          }
+        },
+        required: ['model']
+      },
+      execute: async (args: any) => {
+        const proposedModel = typeof args?.model === 'string' ? args.model.trim() : '';
+
+        if (!proposedModel) {
+          throw new Error('model must be a non-empty string');
+        }
+
+        const previousModel = this.config.model;
+        this.config.model = proposedModel;
+
+        this.log('info', `🧠 Updated model via tool request: ${previousModel || 'unspecified'} → ${proposedModel}`);
+
+        return {
+          status: 'ok',
+          model: proposedModel,
+          previousModel: previousModel ?? null
+        };
+      }
+    });
   }
 
   /**
