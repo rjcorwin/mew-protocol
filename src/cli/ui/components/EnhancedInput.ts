@@ -10,7 +10,7 @@
  * @license MIT
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
 import { Box, Text } from 'ink';
 import TextBuffer from '../utils/text-buffer.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -33,7 +33,7 @@ import { debugLog } from '../../utils/debug.js';
  * @param {string} props.prompt - Prompt character(s)
  * @returns {React.Element}
  */
-function EnhancedInput({
+const EnhancedInput = React.forwardRef(function EnhancedInput({
   onSubmit = () => { },
   placeholder = '',
   multiline = false,
@@ -44,13 +44,30 @@ function EnhancedInput({
   showCursor = true,
   prompt = '> ',
   slashContext = null,
-  theme = null
-}) {
+  theme = null,
+  onCursorChange = undefined
+}, ref) {
   // Text buffer for managing input
   const bufferRef = useRef(new TextBuffer());
   const buffer = bufferRef.current;
   const [updateCounter, setUpdateCounter] = useState(0);
   const suppressSuggestionsRef = useRef(false);
+
+  const emitCursor = useCallback(() => {
+    if (typeof onCursorChange !== 'function') {
+      return;
+    }
+
+    if (typeof buffer.getCursorPosition === 'function') {
+      const position = buffer.getCursorPosition();
+      if (position && typeof position.column === 'number' && typeof position.line === 'number') {
+        onCursorChange({ x: position.column, y: position.line });
+        return;
+      }
+    }
+
+    onCursorChange({ x: 0, y: 0 });
+  }, [buffer, onCursorChange]);
 
   // History navigation
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -92,6 +109,14 @@ function EnhancedInput({
   const update = useCallback(() => {
     setUpdateCounter(c => c + 1);
   }, []);
+
+  useEffect(() => {
+    emitCursor();
+  }, [emitCursor]);
+
+  useEffect(() => {
+    emitCursor();
+  }, [emitCursor, updateCounter]);
 
   // Handle autocomplete (defined early so other hooks can depend on it)
   const handleAutocompleteAccept = useCallback(() => {
@@ -437,10 +462,11 @@ function EnhancedInput({
   }, [history, historyIndex, tempInput, buffer, update]);
 
   // Handle autocomplete
-  // Keyboard input handler
-  useKeypress((key) => {
+  const processKey = useCallback((key) => {
+    if (!key) {
+      return;
+    }
 
-    // More comprehensive logging for debugging
     const keyLog = {
       input: key.input,
       name: key.name,
@@ -451,9 +477,8 @@ function EnhancedInput({
       raw: key.raw
     };
 
-    // Check if this might be a delete key
     if (!key.input && !key.name) {
-      keyLog.fullKey = key;  // Log the entire key object
+      keyLog.fullKey = key;
       keyLog.note = "Empty key - might be delete";
     }
 
@@ -464,7 +489,6 @@ function EnhancedInput({
       return;
     }
 
-    // Debug logging
     if (process.env.DEBUG_INPUT) {
       console.error('Key received:', {
         input: key.input,
@@ -477,17 +501,15 @@ function EnhancedInput({
       });
     }
 
-    // Get command from key binding first
     let command = getCommand(key, keyBindings);
 
-    // Special case: empty key object might be forward delete on Mac or Tab without a name
     if (!key.input && !key.name && !command) {
       if (key.tab) {
         debugLog(`Detected nameless key with tab flag - treating as AUTOCOMPLETE\n`);
         command = 'AUTOCOMPLETE';
       } else {
         debugLog(`Detected empty key - treating as DELETE_BACKWARD (Mac delete key)\n`);
-        command = 'DELETE_BACKWARD';  // Changed to backward for Mac compatibility
+        command = 'DELETE_BACKWARD';
       }
     }
 
@@ -495,14 +517,12 @@ function EnhancedInput({
 
     if (process.env.DEBUG_INPUT) {
       console.error('Command matched:', command);
-      // Special debug for Enter key
       if (key.return || key.enter) {
         console.error('Enter key detected! key.return:', key.return, 'key.enter:', key.enter);
         console.error('SUBMIT binding:', keyBindings.SUBMIT);
       }
     }
 
-    // Special handling for Shift+Enter (detected via escape sequence or shiftEnter flag)
     if (key.shiftEnter || (key.input === '[27;2;13~') || (key.input === '\x1b[27;2;13~')) {
       debugLog(`\n>>> SHIFT+ENTER detected - Inserting newline <<<\n`);
       if (multiline) {
@@ -511,14 +531,12 @@ function EnhancedInput({
       }
     }
 
-    // Special handling for Alt+Enter or Option+Enter for multiline
     if ((key.return || key.enter) && (key.alt || key.meta) && multiline && !command) {
       debugLog(`\n>>> ALT/OPTION+ENTER detected - Inserting newline <<<\n`);
       handleCommand('INSERT_NEWLINE');
       return;
     }
 
-    // Special handling for Enter key if not matched as SUBMIT
     if ((key.return || key.enter) && !command) {
       debugLog(`\n>>> ENTER KEY FALLBACK - Forcing SUBMIT <<<\n`);
       debugLog(`key.return: ${key.return}, key.enter: ${key.enter}\n`);
@@ -527,22 +545,61 @@ function EnhancedInput({
     }
 
     if (command && command !== 'INSERT_CHAR') {
-      // Handle non-character commands
       handleCommand(command);
     } else if (key.input && !key.ctrl && !key.alt && !key.meta) {
-      // Regular character input (including when command is INSERT_CHAR)
-      // Don't insert return/newline characters as text
       if (key.input !== '\r' && key.input !== '\n') {
         buffer.insert(key.input);
         update();
       }
 
-      // Debug logging
       if (process.env.DEBUG_INPUT) {
         console.error('Buffer after insert:', buffer.getText());
       }
     }
+  }, [buffer, disabled, handleCommand, keyBindings, multiline, update]);
+
+  // Keyboard input handler
+  useKeypress((key) => {
+    processKey(key);
   }, { isActive: !disabled });
+
+  const handleExternalInput = useCallback((payload) => {
+    if (disabled) {
+      return;
+    }
+
+    if (typeof payload === 'string') {
+      if (payload.length === 0) {
+        return;
+      }
+      buffer.insert(payload);
+      update();
+      return;
+    }
+
+    if (payload && typeof payload === 'object') {
+      processKey(payload);
+    }
+  }, [buffer, disabled, processKey, update]);
+
+  useImperativeHandle(ref, () => ({
+    inject: handleExternalInput,
+    clear: () => {
+      buffer.clear();
+      setHistoryIndex(-1);
+      setTempInput('');
+      update();
+    },
+    getCursor: () => {
+      if (typeof buffer.getCursorPosition === 'function') {
+        const position = buffer.getCursorPosition();
+        if (position) {
+          return { x: position.column ?? 0, y: position.line ?? 0 };
+        }
+      }
+      return { x: 0, y: 0 };
+    }
+  }), [buffer, handleExternalInput, update]);
 
   // Render the input component
   const renderInput = () => {
@@ -647,6 +704,6 @@ function EnhancedInput({
     ),
     renderSuggestions()
   );
-}
+});
 
 export default EnhancedInput;

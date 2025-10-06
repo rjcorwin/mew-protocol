@@ -15,6 +15,7 @@ import EnhancedInput from '../ui/components/EnhancedInput.js';
 import { slashCommandList, slashCommandGroups } from '../ui/utils/slashCommands.js';
 import { getTheme } from '../themes.js';
 import { stripThinkingTags } from '../ui/utils/thinkingFilter.js';
+import { ControlPlaneStdout } from './control-plane-stdout.js';
 
 const DECORATIVE_SYSTEM_KINDS = new Set([
   'system/welcome',
@@ -45,7 +46,7 @@ function createSignalBoardSummary(ackCount, statusCount, pauseState, includeAck 
 /**
  * Main Advanced Interactive UI Component
  */
-function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-pulse', defaultChatTargets = {} }) {
+function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-pulse', defaultChatTargets = {}, controlOptions = null }) {
   // Load theme
   const theme = getTheme(themeName);
 
@@ -97,6 +98,9 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
   const [signalBoardOverride, setSignalBoardOverride] = useState(null);
   const { exit } = useApp();
   const { stdout } = useStdout();
+  const latestStateRef = useRef(null);
+  const enhancedInputRef = useRef(null);
+  const controlPlane = controlOptions ? controlOptions : null;
   const [terminalWidth, setTerminalWidth] = useState(() => {
     if (stdout && typeof stdout.columns === 'number') {
       return stdout.columns;
@@ -123,6 +127,246 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
       stdout.off('resize', handleResize);
     };
   }, [stdout]);
+
+  const forwardInputPayload = useCallback((payload) => {
+    const handle = enhancedInputRef.current;
+    if (!handle || typeof handle.inject !== 'function') {
+      throw new Error('INPUT_NOT_READY');
+    }
+    handle.inject(payload);
+  }, []);
+
+  useEffect(() => {
+    if (!controlPlane?.inputHandle) {
+      return undefined;
+    }
+
+    controlPlane.inputHandle.current = {
+      send: forwardInputPayload
+    };
+
+    return () => {
+      if (controlPlane.inputHandle) {
+        controlPlane.inputHandle.current = null;
+      }
+    };
+  }, [controlPlane, forwardInputPayload]);
+
+  useEffect(() => {
+    return () => {
+      controlPlane?.onShutdown?.();
+    };
+  }, [controlPlane]);
+
+  useEffect(() => {
+    if (!controlPlane?.stdout) {
+      return;
+    }
+    if (enhancedInputRef.current?.getCursor) {
+      controlPlane.stdout.setCursor(enhancedInputRef.current.getCursor());
+    }
+  }, [controlPlane]);
+
+  const safeParse = useCallback((value) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }, []);
+
+  const buildSnapshot = useCallback(() => {
+    const mapArray = (value) => (Array.isArray(value) ? value.slice() : (value ? [value] : null));
+
+    const reasoningSnapshot = (() => {
+      if (!activeReasoning) {
+        return {
+          active: false,
+          participant: null,
+          elapsedMs: 0,
+          tokens: null,
+          preview: null
+        };
+      }
+
+      const start = activeReasoning.startTime instanceof Date ? activeReasoning.startTime : null;
+      const elapsedMs = start ? Date.now() - start.getTime() : 0;
+      const previewText = activeReasoning.streamText || activeReasoning.message || null;
+      let tokens = null;
+
+      const tokenMetrics = activeReasoning.tokenMetrics;
+      if (tokenMetrics?.absolute && typeof tokenMetrics.absolute.get === 'function') {
+        const candidates = ['total_tokens', 'output_tokens', 'input_tokens'];
+        for (const key of candidates) {
+          const upperKey = typeof key === 'string' ? key.toUpperCase() : key;
+          const value = tokenMetrics.absolute.get(key) ?? tokenMetrics.absolute.get(upperKey);
+          if (typeof value === 'number') {
+            tokens = value;
+            break;
+          }
+        }
+      }
+
+      return {
+        active: true,
+        participant: activeReasoning.from ?? null,
+        elapsedMs,
+        tokens,
+        preview: previewText
+      };
+    })();
+
+    const pendingOpSnapshot = pendingOperation
+      ? {
+          id: pendingOperation.id,
+          kind: pendingOperation.kind ?? pendingOperation.operation?.kind ?? null,
+          requestedBy: pendingOperation.from ?? null,
+          createdAt: pendingOperation.timestamp instanceof Date
+            ? pendingOperation.timestamp.toISOString()
+            : pendingOperation.timestamp ?? null
+        }
+      : null;
+
+    const activeStreamEntries = Array.from(activeStreams.values()).map((stream) => ({
+      streamId: stream.streamId,
+      openedBy: stream.openedBy ?? null,
+      openedAt: stream.openedAt instanceof Date ? stream.openedAt.toISOString() : stream.openedAt ?? null,
+      lastActivityAt: stream.lastActivityAt instanceof Date
+        ? stream.lastActivityAt.toISOString()
+        : stream.lastActivityAt ?? null
+    }));
+
+    const frameEntries = streamFrames.map((frame) => ({
+      streamId: frame.streamId,
+      payload: safeParse(frame.payload),
+      timestamp: frame.timestamp instanceof Date ? frame.timestamp.toISOString() : frame.timestamp ?? null
+    }));
+
+    const acknowledgementEntries = pendingAcknowledgements.map((ack) => ({
+      id: ack.id,
+      from: ack.from ?? null,
+      to: Array.isArray(ack.to) ? ack.to.slice() : [],
+      requestedAt: ack.timestamp instanceof Date ? ack.timestamp.toISOString() : ack.timestamp ?? null,
+      status: ack.status ?? 'pending'
+    }));
+
+    const participantStatusEntries = Object.fromEntries(
+      Array.from(participantStatuses.entries()).map(([id, status]) => [
+        id,
+        {
+          status: status?.status ?? null,
+          summary: status?.summary ?? null,
+          lastUpdated: status?.updatedAt instanceof Date ? status.updatedAt.toISOString() : status?.updatedAt ?? null
+        }
+      ])
+    );
+
+    const toolEntries = Object.fromEntries(
+      Array.from(toolCatalog.entries()).map(([id, entries]) => [
+        id,
+        Array.isArray(entries)
+          ? entries.map((tool) => ({
+              name: tool?.name ?? tool?.id ?? null,
+              displayName: tool?.displayName ?? tool?.display_name ?? null,
+              description: tool?.description ?? null,
+              inputSchema: tool?.inputSchema ?? tool?.input_schema ?? null
+            }))
+          : []
+      ])
+    );
+
+    const pauseSnapshot = pauseState
+      ? {
+          active: true,
+          requestedBy: pauseState.requestedBy ?? pauseState.from ?? null,
+          expiresAt: pauseState.expiresAt instanceof Date
+            ? pauseState.expiresAt.toISOString()
+            : pauseState.until instanceof Date
+              ? pauseState.until.toISOString()
+              : pauseState.expiresAt ?? pauseState.until ?? null,
+          reason: pauseState.reason ?? null
+        }
+      : null;
+
+    return {
+      messages: messages.map((entry) => ({
+        id: entry.id,
+        kind: entry.message?.kind ?? null,
+        from: entry.message?.from ?? null,
+        to: Array.isArray(entry.message?.to) ? entry.message.to.slice() : null,
+        payload: entry.message?.payload ?? null,
+        sent: Boolean(entry.sent),
+        receivedAt: entry.timestamp instanceof Date
+          ? entry.timestamp.toISOString()
+          : entry.timestamp ?? new Date().toISOString()
+      })),
+      participants: Array.isArray(knownParticipants) ? knownParticipants.slice() : [],
+      chatTargets: {
+        effective: mapArray(getEffectiveChatTargets()),
+        override: Array.isArray(chatTargetOverride) ? chatTargetOverride.slice() : null,
+        participantDefault: Array.isArray(participantDefaultTargets) ? participantDefaultTargets.slice() : null,
+        globalDefault: Array.isArray(globalDefaultTargets) ? globalDefaultTargets.slice() : null
+      },
+      ui: {
+        reasoning: reasoningSnapshot,
+        pendingOperation: pendingOpSnapshot,
+        signalBoard: {
+          expanded: signalBoardExpanded,
+          override: signalBoardOverride ?? null,
+          ackCount: pendingAcknowledgements.length,
+          statusCount: participantStatuses.size,
+          pauseState: pauseState
+            ? { participant: pauseState.participant ?? pauseState.from ?? null, reason: pauseState.reason ?? null }
+            : null
+        },
+        verboseMode: verbose,
+        showStreams,
+        terminalWidth
+      },
+      streams: {
+        active: activeStreamEntries,
+        recentFrames: frameEntries
+      },
+      acknowledgements: {
+        pending: acknowledgementEntries,
+        myPending: myPendingAcknowledgements.map((ack) => ack.id)
+      },
+      participantStatuses: participantStatusEntries,
+      toolCatalog: toolEntries,
+      pauseState: pauseSnapshot
+    };
+  }, [
+    activeReasoning,
+    activeStreams,
+    chatTargetOverride,
+    getEffectiveChatTargets,
+    globalDefaultTargets,
+    knownParticipants,
+    messages,
+    myPendingAcknowledgements,
+    participantDefaultTargets,
+    participantStatuses,
+    pauseState,
+    pendingAcknowledgements,
+    pendingOperation,
+    safeParse,
+    showStreams,
+    signalBoardExpanded,
+    signalBoardOverride,
+    streamFrames,
+    terminalWidth,
+    toolCatalog,
+    verbose
+  ]);
+
+  useEffect(() => {
+    const snapshot = buildSnapshot();
+    latestStateRef.current = snapshot;
+    controlPlane?.publishState?.(snapshot);
+  }, [buildSnapshot, controlPlane]);
 
   const registerParticipants = useCallback((ids) => {
     if (!ids) {
@@ -1920,6 +2164,7 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
       : React.createElement(Box, { flexDirection: "column" },
           React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
           React.createElement(EnhancedInput, {
+            ref: enhancedInputRef,
             onSubmit: processInput,
             placeholder: 'Type a message or /help for commands...',
             multiline: true,  // Enable multi-line for Shift+Enter support
@@ -1929,7 +2174,10 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
             prompt: '> ',
             showCursor: true,
             slashContext,
-            theme
+            theme,
+            onCursorChange: (cursor) => {
+              controlPlane?.stdout?.setCursor(cursor);
+            }
           }),
           React.createElement(Text, { color: theme?.colors?.inputBorder || 'cyan', dimColor: true }, '▔'.repeat(process.stdout.columns || 80))
         ),
@@ -3234,18 +3482,35 @@ function SidePanel({ participantId, myPendingAcknowledgements, participantStatus
 /**
  * Starts the advanced interactive UI
  */
-function startAdvancedInteractiveUI(ws, participantId, spaceId, themeName = 'neon-pulse', defaultChatTargets = {}) {
-  const { rerender, unmount } = render(
-    React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId, themeName, defaultChatTargets })
+function startAdvancedInteractiveUI(ws, participantId, spaceId, themeName = 'neon-pulse', defaultChatTargets = {}, controlOptions = undefined) {
+  const controlEnabled = Boolean(controlOptions);
+  const stdin = controlOptions?.stdin ?? process.stdin;
+  const inkStdout = controlEnabled
+    ? (controlOptions?.stdout ?? new ControlPlaneStdout(process.stdout))
+    : process.stdout;
+
+  if (controlEnabled && !(inkStdout instanceof ControlPlaneStdout)) {
+    throw new Error('controlOptions.stdout must be ControlPlaneStdout when control plane enabled');
+  }
+
+  const instance = render(
+    React.createElement(AdvancedInteractiveUI, { ws, participantId, spaceId, themeName, defaultChatTargets, controlOptions }),
+    { stdout: inkStdout as unknown as NodeJS.WriteStream, stdin, patchConsole: true }
   );
+
+  if (controlEnabled) {
+    const stdoutProxy = inkStdout;
+    controlOptions?.registerScreen?.(() => stdoutProxy.snapshot());
+  }
 
   // Handle cleanup
   process.on('SIGINT', () => {
-    unmount();
+    instance.unmount();
+    controlOptions?.onShutdown?.();
     process.exit(0);
   });
 
-  return { rerender, unmount };
+  return instance;
 }
 
 export { startAdvancedInteractiveUI, AdvancedInteractiveUI };
