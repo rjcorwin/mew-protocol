@@ -4,6 +4,13 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.5.1] - 2025-01-06
+
+### Fixed
+- **Missing dependencies** - Added `micromatch` and `debug` to dependencies (were causing runtime errors on npm install)
+
+## [v0.5.0] - 2025-01-06
+
 ### Changed
 - **BREAKING: Repository restructure** - Flattened from monorepo to single-package layout
   - Moved `packages/mew/src/` → `src/`
@@ -12,6 +19,61 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
   - Simplified TypeScript configuration (removed project references)
   - Updated CI workflows to work with new structure
   - Contributors with open PRs will need to rebase
+- **BREAKING: Package consolidation** - Unified all `@mcpx-protocol/*` packages into single `@mew-protocol/mew` package
+  - All functionality (CLI, SDK, gateway, client, agent, bridge) now in one package
+  - Simpler installation: `npm install -g @mew-protocol/mew`
+  - Maintained exports for backward compatibility via package subpaths
+
+### Added
+
+#### CLI Theme System
+- **Customizable themes** - Complete color scheme system for interactive UI
+  - New `src/cli/themes.ts` with comprehensive theme definitions
+  - Configure via `ui_theme` field in `space.yaml`
+  - Themes control input, status bar, messages, reasoning display, and more
+  - Visual polish with startup animations
+
+#### Default-to Configuration
+- **Auto-targeting for chat** - Send messages without specifying recipient every time
+  - Configure default recipients in `space.yaml`: `default_to.chat: ["participant"]`
+  - Eliminates repetitive `@participant` mentions
+  - Especially useful for 1:1 human-agent interactions
+  - Applied to all bundled templates (coder-agent, note-taker, cat-maze)
+
+#### Enhanced Message Formatters
+- **Rich formatting for 15+ envelope kinds** - Better visual display of protocol messages
+  - `chat` - Full-width borders, diamond prefix, theme-aware colors
+  - `chat/acknowledge` - Checkmark prefix with status display
+  - `mcp/request`, `mcp/proposal`, `mcp/response` - Method, tool, and result formatting
+  - `reasoning/thought`, `reasoning/start`, `reasoning/conclusion` - Colored reasoning display
+  - `stream/request`, `stream/open`, `stream/close` - Stream lifecycle indicators
+  - `system/help` - Multi-line help with section highlighting
+  - Tool-specific formatters for common MCP operations
+  - Documented in `spec/scratch/MESSAGE-FORMATTERS.md`
+
+#### Thinking Tag Filter
+- **Clean agent output** - Automatically filters internal reasoning from display
+  - Removes `<thinking>`, `<reasoning>`, `<scratchpad>` tags
+  - Agent can use tags for internal planning without cluttering user view
+  - Implemented in `src/cli/ui/utils/thinkingFilter.ts`
+  - Updated coder-agent prompt to use thinking tags
+
+#### Improved Coding Agent
+- **Better prompts and filesystem handling**
+  - Updated system prompt with thinking tag guidance
+  - Filesystem hygiene: excludes `node_modules`, `.git`, `.mew/node_modules`, `dist`, `build`
+  - Workspace path templating for MCP bridge (replaces hardcoded `./`)
+  - More concise output by default, explains only when asked
+
+### Documentation
+- **AGENTS.md** - Quick reference guide for AI agents developing with MEW
+- **Tool formatters spec** - Documented formatter system in CLI spec
+- **Repository spec** - New `spec/repo/REPO-SPEC.md` documenting repo structure
+- **Decision records** - ADR-015 for CLI TypeScript conversion
+
+### Fixed
+- Template variable substitution for workspace paths
+- Consistent message colors in chat display
 
 ## [v0.4.10] - 2025-09-29
 

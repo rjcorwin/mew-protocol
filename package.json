@@ -1,6 +1,6 @@
 {
   "name": "@mew-protocol/mew",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "MEW Protocol - Multi-Entity Workspace Protocol SDK and CLI",
   "type": "module",
   "bin": {
@@ -59,11 +59,13 @@
     "body-parser": "^1.20.2",
     "chalk": "^4.1.2",
     "commander": "^11.0.0",
+    "debug": "^4.3.4",
     "eventemitter3": "^5.0.1",
     "express": "^4.18.2",
     "ink": "^3.2.0",
     "js-yaml": "^4.1.0",
     "jsonpath-plus": "^10.3.0",
+    "micromatch": "^4.0.5",
     "openai": "^5.20.1",
     "pm2": "^6.0.10",
     "react": "^18.2.0",
@@ -94,7 +96,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjcorwin/mew-protocol.git"
+    "url": "git+https://github.com/rjcorwin/mew-protocol.git"
   },
   "homepage": "https://github.com/rjcorwin/mew-protocol#readme",
   "bugs": {
