@@ -160,24 +160,40 @@ Calling `/control/screen` again shows the live help overlay exactly as it appear
 
 ### Verifying CLI UI Changes
 
-When developing CLI UI features, you may need to verify the output programmatically, especially when working with only one terminal or as a coding agent. Here are two approaches:
+When developing CLI UI features, you may need to verify the output programmatically.
 
-#### Option 1: Using Screen Utility (No Control Plane Required)
+**⚠️ CRITICAL for single-terminal environments (coding agents, CI/CD):**
 
-The `screen` utility can run MEW in a detached session and capture its output:
+The interactive UI (`mew space up --interactive`) **requires a dedicated terminal**. If you only have one terminal or are a coding agent, you **MUST use `screen`** to run the UI in the background while you capture output in your primary terminal.
+
+**Screen is not optional** - it's how you get background execution. Once screen is running, you have two options for capturing the output:
+
+#### Option 1: Screen Hardcopy (Simplest, Requires v5.0.1+)
+
+Use `screen -X hardcopy` to capture the terminal buffer directly.
+
+**CRITICAL for Coding Agents:** Hardcopy only works in screen v5.0.1+. macOS ships with v4.0.3 (broken hardcopy), so you MUST install homebrew screen:
 
 ```bash
-# IMPORTANT: Must run from an initialized space directory (contains space.yaml)
-cd spaces/my-test
-screen -dmS verify-ui bash -c "mew space up --interactive"
+# 1. VERIFY screen version (MUST be 5.0.1+, not the system 4.0.3)
+screen -v
+# If you see "4.00.03", install homebrew version: brew install screen
+# Then use absolute path or restart shell: /opt/homebrew/bin/screen -v
 
-# Wait for space to initialize
+# 2. Run from an initialized space directory (contains space.yaml)
+cd spaces/my-test
+
+# 3. Start MEW in detached screen (use full path if needed)
+screen -dmS verify-ui bash -c "mew space up --interactive"
+# Or with full path: /opt/homebrew/bin/screen -dmS verify-ui bash -c "mew space up --interactive"
+
+# 4. Wait for space to initialize
 sleep 6
 
-# Capture the screen buffer (includes scrollback)
+# 5. Capture the screen buffer (includes scrollback)
 screen -S verify-ui -X hardcopy ./tmp/screen-output.txt
 
-# View the captured output
+# 6. View the captured output
 cat ./tmp/screen-output.txt
 
 # Send input to the session
@@ -197,26 +213,34 @@ mew space down
 - Can inject input with `screen -X stuff`
 - Works with only one terminal available
 
-**Limitations:**
-- macOS ships with screen v4.0.3 (2006) which has a hardcopy bug requiring manual attach
-- To fix: `brew install screen` (installs v5.0+), then restart your shell to update PATH
-- Verify with `screen -v` - should show v5.0.1 or higher for automated capture
+**Limitations & Version Requirements:**
+- **macOS default screen (v4.0.3 from 2006) WILL NOT WORK** - hardcopy produces empty files
+- **You MUST install homebrew screen:** `brew install screen` (installs v5.0.1+)
+- **After install:** Either restart shell to update PATH, or use `/opt/homebrew/bin/screen`
+- **Always verify version first:** `screen -v` should show "Screen version 5.0.1" or higher
+- **If hardcopy produces empty files:** You're using the wrong screen version
 
-#### Option 2: Using Control Plane (Recommended for Automation)
+#### Option 2: Control Plane Capture (Works with Any Screen Version)
 
-The control plane provides more structured access to the UI state:
+If you're stuck with screen v4.0.3 (broken hardcopy), use the control plane to capture output instead. This still requires running `mew space up --interactive` in a screen session for background execution, but captures via HTTP instead of hardcopy:
+
+The control plane provides structured access to application state and UI via HTTP:
 
 ```bash
-# Start with control plane enabled
-mew space up --interactive --control-port 9999
+# Start MEW in screen with control plane enabled
+cd spaces/my-test
+screen -dmS verify-ui bash -c "mew space up --interactive --control-port 9999"
+sleep 6
 
-# In another terminal or automated script:
+# Now capture via HTTP (works with any screen version):
 
-# Get current screen snapshot
+# Get current screen snapshot (rendered UI)
 curl -s http://localhost:9999/control/screen | jq -r '.plain'
 
-# Get structured message state
+# Get structured application state (messages, participants, reasoning, tools, etc.)
 curl -s http://localhost:9999/control/state | jq '.messages'
+curl -s http://localhost:9999/control/state | jq '.ui.reasoning'
+curl -s http://localhost:9999/control/state | jq '.toolCatalog'
 
 # Send input programmatically
 curl -s -X POST http://localhost:9999/control/send_input \
@@ -226,19 +250,29 @@ curl -s -X POST http://localhost:9999/control/send_input \
   -H 'Content-Type: application/json' \
   -d '{"key":"enter"}'
 
-# Verify the result
+# Verify the result (both rendered and state)
 curl -s http://localhost:9999/control/screen | jq -r '.plain'
+curl -s http://localhost:9999/control/state | jq '.messages[-1]'
+
+# Clean up
+screen -S verify-ui -X quit
+mew space down
 ```
 
 **Benefits:**
 - Structured JSON output
 - Real-time state access via HTTP
+- No dependency on screen version (works everywhere)
 - Better for automated testing and CI/CD
-- Can query specific message fields
+- Access to internal application state, not just rendered UI
 
-**Use Cases:**
-- **Screen**: Quick verification when you only have one terminal (coding agents: ensure screen v5.0+)
-- **Control Plane**: Automated testing, CI/CD pipelines (provides structured JSON output)
+**Summary for Coding Agents:**
+- **Screen is REQUIRED** for background execution in single-terminal environments
+- **Capture method depends on screen version:**
+  - **v5.0.1+:** Use `screen -X hardcopy` (simplest)
+  - **v4.0.3 (macOS default):** Use control plane + `curl` for capture
+- **Control plane bonus:** Provides structured state access (messages, reasoning, tools) beyond just rendered UI
+- **Recommendation:** Install `brew install screen` for v5.0.1+ to simplify verification
 
 ## Common Development Tasks
 

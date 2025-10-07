@@ -81,6 +81,45 @@ mew space connect
 mew space down
 ```
 
+## Verifying CLI UI Changes (Coding Agents)
+
+**⚠️ CRITICAL for one-terminal environments:** Must use screen to run `mew space up --interactive` in background.
+
+**Screen Version Requirements:**
+- macOS ships with v4.0.3 (broken hardcopy)
+- Need v5.0.1+ for `screen -X hardcopy` to work
+- Install: `brew install screen` then restart shell
+
+**Two capture methods once screen is running:**
+
+### Method 1: Screen Hardcopy (Requires v5.0.1+)
+```bash
+# MUST verify version first!
+screen -v  # Must show "5.0.1+" not "4.00.03"
+
+cd spaces/my-test
+screen -dmS test bash -c "mew space up --interactive"
+sleep 6
+screen -S test -X hardcopy ./tmp/output.txt
+cat ./tmp/output.txt
+screen -S test -X quit && mew space down
+```
+
+### Method 2: Control Plane (Works with any screen version)
+```bash
+# Use if stuck with screen v4.0.3
+cd spaces/my-test
+screen -dmS test bash -c "mew space up --interactive --control-port 9999"
+sleep 6
+curl -s http://localhost:9999/control/screen | jq -r '.plain'
+curl -s http://localhost:9999/control/state | jq '.messages'
+screen -S test -X quit && mew space down
+```
+
+**Bottom line:** Screen v5.0.1+ = one command. Screen v4.0.3 = need control plane for capture.
+
+See `docs/development.md` for full details.
+
 ## Development Workflow
 1. Read existing patterns before implementing
 2. Update types first (`src/types/`), then implementations
