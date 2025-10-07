@@ -81,6 +81,73 @@ mew space connect
 mew space down
 ```
 
+## Verifying CLI UI Changes (Coding Agents)
+
+**⚠️ CRITICAL for one-terminal environments:** Must use screen to run `mew space up --interactive` in background.
+
+**Screen Version Requirements:**
+- macOS ships with v4.0.3 (broken hardcopy)
+- Need v5.0.1+ for `screen -X hardcopy` to work
+- Install: `brew install screen` then restart shell
+
+**Two capture methods once screen is running:**
+
+### Method 1: Screen Hardcopy (Requires v5.0.1+)
+```bash
+# MUST verify version first!
+screen -v  # Must show "5.0.1+" not "4.00.03"
+
+cd spaces/my-test
+screen -dmS test bash -c "mew space up --interactive"
+sleep 6
+screen -S test -X hardcopy ./tmp/output.txt
+cat ./tmp/output.txt
+screen -S test -X quit && mew space down
+```
+
+### Method 2: Control Plane (Works with any screen version)
+```bash
+# Use if stuck with screen v4.0.3
+cd spaces/my-test
+screen -dmS test bash -c "mew space up --interactive --control-port 9999"
+sleep 6
+curl -s http://localhost:9999/control/screen | jq -r '.plain'
+curl -s http://localhost:9999/control/state | jq '.messages'
+screen -S test -X quit && mew space down
+```
+
+**Bottom line:** Screen v5.0.1+ = one command. Screen v4.0.3 = need control plane for capture.
+
+See `docs/development.md` for full details.
+
+## Interactive UI Navigation
+
+When connected to a space with `mew space connect` or `mew space up --interactive`, you can use **vim-style navigation** to browse message history:
+
+### Entering Navigation Mode
+- Press `j` or `k` when the input is empty to enter navigation mode
+- Status bar shows: `Navigate (N/Total) - ↵ to exit`
+
+### Navigation Keys
+- `j` or `↓` - Move down to next message
+- `k` or `↑` - Move up to previous message
+- `g` - Jump to first message
+- `G` - Jump to last message
+- `i` - Exit navigation mode and return to input
+
+### Visual Indicators
+- `▶` appears next to the focused message
+- Status bar shows current position (e.g., `Navigate (5/15)`)
+- Only 5 messages displayed at a time (centered on focused message)
+
+### Implementation Details
+- **File:** `src/cli/utils/advanced-interactive-ui.ts`
+- **Window size:** 5 messages (ensures all content fits on screen)
+- **Focus system:** Uses Ink's `useFocus` + `useFocusManager` with programmatic focus control
+- **Viewport:** Sliding window centered on focused message (vim-style scrolling)
+
+See `docs/development.md` sections on "Verifying CLI UI Changes" for testing navigation programmatically.
+
 ## Development Workflow
 1. Read existing patterns before implementing
 2. Update types first (`src/types/`), then implementations

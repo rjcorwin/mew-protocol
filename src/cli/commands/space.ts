@@ -19,6 +19,9 @@ import {
 import { printBanner } from '../utils/banner.js';
 import * as advancedInteractiveUI from '../utils/advanced-interactive-ui.js';
 import { getTheme } from '../themes.js';
+import { ControlPlaneStdout, createEmptyScreenSnapshot } from '../utils/control-plane-stdout.js';
+import { startControlServer } from '../control-server.js';
+import React from 'react';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -197,6 +200,33 @@ function disconnectPM2() {
  */
 function generateSecureToken() {
   return crypto.randomBytes(32).toString('base64url');
+}
+
+function createInitialSnapshot() {
+  const terminalWidth = typeof process.stdout?.columns === 'number' ? process.stdout.columns : null;
+  return {
+    messages: [],
+    participants: [],
+    chatTargets: {
+      effective: null,
+      override: null,
+      participantDefault: null,
+      globalDefault: null
+    },
+    ui: {
+      reasoning: { active: false, participant: null, elapsedMs: 0, tokens: null, preview: null },
+      pendingOperation: null,
+      signalBoard: { expanded: false, override: null, ackCount: 0, statusCount: 0, pauseState: null },
+      verboseMode: false,
+      showStreams: false,
+      terminalWidth
+    },
+    streams: { active: [], recentFrames: [] },
+    acknowledgements: { pending: [], myPending: [] },
+    participantStatuses: {},
+    toolCatalog: {},
+    pauseState: null
+  };
 }
 
 /**
@@ -520,6 +550,8 @@ async function spaceUpAction(options) {
       process.exit(1);
     }
     const spaceDir = path.resolve(options.spaceDir);
+    const parsedControlPort = options.controlPort ? parseInt(options.controlPort, 10) : null;
+    const controlPort = Number.isFinite(parsedControlPort) ? parsedControlPort : null;
 
     // Construct config path - if options.config is relative, make it relative to spaceDir
     let configPath;
@@ -911,6 +943,11 @@ async function spaceUpAction(options) {
 
         // Connect to gateway
         const ws = new WebSocket(`ws://localhost:${selectedPort}`);
+        let latestScreen = () => createEmptyScreenSnapshot();
+        let latestState = createInitialSnapshot();
+        const inputHandle = React.createRef();
+        let controlServer = null;
+        let controlStdout = null;
 
         ws.on('open', () => {
           // Send join message
@@ -954,13 +991,71 @@ async function spaceUpAction(options) {
           };
 
           // Start advanced interactive UI
-          advancedInteractiveUI.startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets);
+          if (controlPort) {
+            controlStdout = new ControlPlaneStdout(process.stdout);
+            latestScreen = () => controlStdout.snapshot();
+            try {
+              controlServer = startControlServer({
+                port: controlPort,
+                sendInput: (payload) => {
+                  const handle = inputHandle.current;
+                  if (!handle || typeof handle.send !== 'function') {
+                    throw new Error('INPUT_NOT_READY');
+                  }
+                  handle.send(payload);
+                },
+                getState: () => latestState,
+                getScreen: () => {
+                  const snapshot = latestScreen();
+                  if (snapshot && (snapshot.current || snapshot.history || snapshot.raw !== undefined)) {
+                    return snapshot;
+                  }
+                  return controlStdout ? controlStdout.snapshot() : createEmptyScreenSnapshot();
+                }
+              });
+              controlServer.ready
+                .then(() => {
+                  console.log(`Control plane listening on http://localhost:${controlServer.port}`);
+                })
+                .catch(() => {
+                  console.log(`Control plane listening on http://localhost:${controlPort}`);
+                });
+            } catch (error) {
+              console.error(`Failed to start control server: ${error.message}`);
+            }
+          }
+
+          advancedInteractiveUI.startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets, controlPort ? {
+            stdout: controlStdout || undefined,
+            inputHandle,
+            registerScreen: (getter) => {
+              latestScreen = getter;
+            },
+            publishState: (state) => {
+              latestState = state;
+            },
+            onShutdown: () => {
+              if (controlServer) {
+                controlServer.stop().catch(() => {});
+              }
+            }
+          } : undefined);
         });
 
         ws.on('error', (err) => {
           console.error('Failed to connect:', err.message);
+          if (controlServer) {
+            controlServer.stop().catch(() => {});
+          }
           process.exit(1);
         });
+        if (controlPort) {
+          ws.on('close', () => {
+            if (controlServer) {
+              controlServer.stop().catch(() => {});
+            }
+          });
+        }
       } catch (error) {
         console.error('Failed to resolve participant:', error.message);
         process.exit(1);
@@ -979,6 +1074,7 @@ space
   .option('-i, --interactive', 'Connect interactively after starting space')
   .option('--detach', 'Run in background (default if not interactive)')
   .option('--participant <id>', 'Connect as this participant (with --interactive)')
+  .option('--control-port <port>', 'Enable control plane on port (for testing)')
   .action(spaceUpAction);
 
 // Action handler for space down
@@ -1512,8 +1608,11 @@ space
   .option('-d, --space-dir <path>', 'Directory of space to connect to', '.')
   .option('--participant <id>', 'Connect as this participant')
   .option('--gateway <url>', 'Override gateway URL (default: from running space)')
+  .option('--control-port <port>', 'Enable control plane on port (for testing)')
   .action(async (options) => {
     const spaceDir = path.resolve(options.spaceDir);
+    const parsedControlPort = options.controlPort ? parseInt(options.controlPort, 10) : null;
+    const controlPort = Number.isFinite(parsedControlPort) ? parsedControlPort : null;
     const configPath = path.join(spaceDir, path.basename(options.config));
 
     console.log(`Connecting to space in ${spaceDir}...`);
@@ -1551,6 +1650,11 @@ space
 
       // Connect to gateway
       const ws = new WebSocket(gatewayUrl);
+      let latestScreen = () => createEmptyScreenSnapshot();
+      let latestState = createInitialSnapshot();
+      const inputHandle = React.createRef();
+      let controlServer = null;
+      let controlStdout = null;
 
       ws.on('open', () => {
         // Send join message
@@ -1594,17 +1698,65 @@ space
         };
 
         // Start advanced interactive UI
-        advancedInteractiveUI.startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets);
+        if (controlPort) {
+          controlStdout = new ControlPlaneStdout(process.stdout);
+          latestScreen = () => controlStdout.snapshot();
+          try {
+            controlServer = startControlServer({
+              port: controlPort,
+              sendInput: (payload) => {
+                const handle = inputHandle.current;
+                if (!handle || typeof handle.send !== 'function') {
+                  throw new Error('INPUT_NOT_READY');
+                }
+                handle.send(payload);
+              },
+              getState: () => latestState,
+              getScreen: () => {
+                const snapshot = latestScreen();
+                if (snapshot && (snapshot.current || snapshot.history || snapshot.raw !== undefined)) {
+                  return snapshot;
+                }
+                return controlStdout ? controlStdout.snapshot() : createEmptyScreenSnapshot();
+              }
+            });
+            console.log(`Control plane listening on http://localhost:${controlServer.port}`);
+          } catch (error) {
+            console.error(`Failed to start control server: ${error.message}`);
+          }
+        }
+
+        advancedInteractiveUI.startAdvancedInteractiveUI(ws, participant.id, spaceId, themeName, defaultChatTargets, controlPort ? {
+          stdout: controlStdout || undefined,
+          inputHandle,
+          registerScreen: (getter) => {
+            latestScreen = getter;
+          },
+          publishState: (state) => {
+            latestState = state;
+          },
+          onShutdown: () => {
+            if (controlServer) {
+              controlServer.stop().catch(() => {});
+            }
+          }
+        } : undefined);
       });
 
       ws.on('error', (err) => {
         console.error('Failed to connect:', err.message);
         console.error('Make sure the space is running with "mew space up"');
+        if (controlServer) {
+          controlServer.stop().catch(() => {});
+        }
         process.exit(1);
       });
 
       ws.on('close', () => {
         console.log('\nConnection closed');
+        if (controlServer) {
+          controlServer.stop().catch(() => {});
+        }
         process.exit(0);
       });
     } catch (error) {

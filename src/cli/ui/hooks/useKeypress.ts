@@ -71,7 +71,7 @@ function useKeypress(handler, options = {}) {
       backspace: key.name === 'backspace' || input === '\x7F' || input === '\b',
       delete: key.name === 'delete' || key.sequence === '\x1B[3~',
       tab: isTabKey,
-      escape: key.name === 'escape' || key.name === 'esc',
+      escape: key.name === 'escape' || key.name === 'esc' || key.escape === true,
       space: key.name === 'space' || input === ' ',
 
       // Arrow keys - check both name and arrow properties from Ink

@@ -135,6 +135,205 @@ npm run build
 
 The global `mew` command will immediately use the updated code after rebuilding.
 
+### Exercising the CLI Control Plane
+
+The CLI exposes an automated control plane that mirrors the interactive Ink UI over HTTP. After starting a space with `--control-port`, you can drive the interface programmatically and capture terminal snapshots. A minimal workflow:
+
+```bash
+# Launch an interactive session with the control plane listening on port 7777
+mew space up --space-dir /tmp/control-plane-demo --port 18080 --interactive --control-port 7777
+
+# Check health and read the current screen with preserved line breaks
+curl -s http://localhost:7777/control/health | jq
+curl -s http://localhost:7777/control/screen | jq -r '.mode, .plain'
+
+# Inject /help and press enter via the control server
+curl -s -X POST http://localhost:7777/control/send_input \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"/help"}'
+curl -s -X POST http://localhost:7777/control/send_input \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"enter"}'
+```
+
+Calling `/control/screen` again shows the live help overlay exactly as it appears in the terminal, and `/control/state` records the corresponding `system/help` payload. Refer to `CONTROL_PLANE_USAGE.md` for a complete set of scenarios, including history replay and scripted chat messages.
+
+### Verifying CLI UI Changes
+
+When developing CLI UI features (e.g., vim-style navigation, status bar updates, interactive prompts), you may need to verify the output programmatically.
+
+**⚠️ CRITICAL for single-terminal environments (coding agents, CI/CD):**
+
+The interactive UI (`mew space up --interactive`) **requires a dedicated terminal**. If you only have one terminal or are a coding agent, you **MUST use `screen`** to run the UI in the background while you capture output in your primary terminal.
+
+**Screen is not optional** - it's how you get background execution. Once screen is running, you have two options for capturing the output:
+
+#### Option 1: Screen Hardcopy (Simplest, Requires v5.0.1+)
+
+Use `screen -X hardcopy` to capture the terminal buffer directly.
+
+**CRITICAL for Coding Agents:** Hardcopy only works in screen v5.0.1+. macOS ships with v4.0.3 (broken hardcopy), so you MUST install homebrew screen:
+
+```bash
+# 1. VERIFY screen version (MUST be 5.0.1+, not the system 4.0.3)
+screen -v
+# If you see "4.00.03", install homebrew version: brew install screen
+# Then use absolute path or restart shell: /opt/homebrew/bin/screen -v
+
+# 2. Run from an initialized space directory (contains space.yaml)
+cd spaces/my-test
+
+# 3. Start MEW in detached screen (use full path if needed)
+screen -dmS verify-ui bash -c "mew space up --interactive"
+# Or with full path: /opt/homebrew/bin/screen -dmS verify-ui bash -c "mew space up --interactive"
+
+# 4. Wait for space to initialize
+sleep 6
+
+# 5. Capture the screen buffer (includes scrollback)
+screen -S verify-ui -X hardcopy ./tmp/screen-output.txt
+
+# 6. View the captured output
+cat ./tmp/screen-output.txt
+
+# Send input to the session
+screen -S verify-ui -X stuff "hello\n"
+
+# Capture again to see the result
+screen -S verify-ui -X hardcopy ./tmp/screen-output2.txt
+
+# Clean up
+screen -S verify-ui -X quit
+mew space down
+```
+
+**Benefits:**
+- No additional ports or HTTP setup needed
+- Captures the complete terminal buffer including scrollback
+- Can inject input with `screen -X stuff`
+- Works with only one terminal available
+
+**Limitations & Version Requirements:**
+- **macOS default screen (v4.0.3 from 2006) WILL NOT WORK** - hardcopy produces empty files
+- **You MUST install homebrew screen:** `brew install screen` (installs v5.0.1+)
+- **After install:** Either restart shell to update PATH, or use `/opt/homebrew/bin/screen`
+- **Always verify version first:** `screen -v` should show "Screen version 5.0.1" or higher
+- **If hardcopy produces empty files:** You're using the wrong screen version
+
+#### Option 2: Control Plane Capture (Works with Any Screen Version)
+
+If you're stuck with screen v4.0.3 (broken hardcopy), use the control plane to capture output instead. This still requires running `mew space up --interactive` in a screen session for background execution, but captures via HTTP instead of hardcopy:
+
+The control plane provides structured access to application state and UI via HTTP:
+
+```bash
+# Start MEW in screen with control plane enabled
+cd spaces/my-test
+screen -dmS verify-ui bash -c "mew space up --interactive --control-port 9999"
+sleep 6
+
+# Now capture via HTTP (works with any screen version):
+
+# Get current screen snapshot (rendered UI)
+curl -s http://localhost:9999/control/screen | jq -r '.plain'
+
+# Get structured application state (messages, participants, reasoning, tools, etc.)
+curl -s http://localhost:9999/control/state | jq '.messages'
+curl -s http://localhost:9999/control/state | jq '.ui.reasoning'
+curl -s http://localhost:9999/control/state | jq '.toolCatalog'
+
+# Send input programmatically
+curl -s -X POST http://localhost:9999/control/send_input \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"hello"}' && \
+curl -s -X POST http://localhost:9999/control/send_input \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"enter"}'
+
+# Verify the result (both rendered and state)
+curl -s http://localhost:9999/control/screen | jq -r '.plain'
+curl -s http://localhost:9999/control/state | jq '.messages[-1]'
+
+# Clean up
+screen -S verify-ui -X quit
+mew space down
+```
+
+**Benefits:**
+- Structured JSON output
+- Real-time state access via HTTP
+- No dependency on screen version (works everywhere)
+- Better for automated testing and CI/CD
+- Access to internal application state, not just rendered UI
+
+**Summary for Coding Agents:**
+- **Screen is REQUIRED** for background execution in single-terminal environments
+- **Capture method depends on screen version:**
+  - **v5.0.1+:** Use `screen -X hardcopy` (simplest)
+  - **v4.0.3 (macOS default):** Use control plane + `curl` for capture
+- **Control plane bonus:** Provides structured state access (messages, reasoning, tools) beyond just rendered UI
+- **Recommendation:** Install `brew install screen` for v5.0.1+ to simplify verification
+
+#### Testing Interactive Features (Example: Vim Navigation)
+
+The vim-style navigation feature allows users to browse message history with j/k/g/G keys. Here's how to test it programmatically:
+
+```bash
+# Start space in screen with control plane
+cd /tmp/test-navigation
+screen -dmS nav-test bash -c "mew space up --interactive --control-port 9999"
+sleep 6
+
+# Send test messages
+TOKEN=$(cat .mew/tokens/human.token)
+for i in {1..15}; do
+  curl -X POST "http://localhost:8080/participants/human/messages?space=test-agent" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{\"protocol\":\"mew/v0.4\",\"id\":\"msg-$i\",\"from\":\"human\",\"to\":[\"mew\"],\"kind\":\"chat\",\"payload\":{\"text\":\"Message $i\",\"format\":\"plain\"}}" \
+    -s > /dev/null
+  sleep 0.2
+done
+sleep 2
+
+# Enter navigation mode by sending 'k' key
+screen -S nav-test -X stuff 'k'
+sleep 1
+
+# Verify navigation mode is active (status bar shows "Navigate")
+curl -s http://localhost:9999/control/screen | jq -r '.plain' | tail -3
+# Expected: "Navigate (N/15) - ↵ to exit"
+
+# Test jump to first message with 'g'
+screen -S nav-test -X stuff 'g'
+sleep 1
+curl -s http://localhost:9999/control/screen | jq -r '.plain' | grep "▶"
+# Expected: ▶ indicator on first message
+
+# Test jump to last message with 'G'
+screen -S nav-test -X stuff 'G'
+sleep 1
+curl -s http://localhost:9999/control/screen | jq -r '.plain' | tail -3
+# Expected: "Navigate (15/15)"
+
+# Exit navigation mode with 'i'
+screen -S nav-test -X stuff 'i'
+sleep 1
+curl -s http://localhost:9999/control/screen | jq -r '.plain' | tail -3
+# Expected: Normal status bar without "Navigate"
+
+# Clean up
+screen -S nav-test -X quit
+mew space down
+```
+
+**Key Testing Points:**
+- Status bar changes when entering/exiting navigation mode
+- Focus indicator (▶) appears next to current message
+- Position counter shows current/total (e.g., "Navigate (5/15)")
+- Only 5 messages visible at a time (centered on focused message)
+- Viewport shifts as you navigate with j/k/g/G
+
 ## Common Development Tasks
 
 ### Creating a New Space Template
