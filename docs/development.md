@@ -158,6 +158,88 @@ curl -s -X POST http://localhost:7777/control/send_input \
 
 Calling `/control/screen` again shows the live help overlay exactly as it appears in the terminal, and `/control/state` records the corresponding `system/help` payload. Refer to `CONTROL_PLANE_USAGE.md` for a complete set of scenarios, including history replay and scripted chat messages.
 
+### Verifying CLI UI Changes
+
+When developing CLI UI features, you may need to verify the output programmatically, especially when working with only one terminal or as a coding agent. Here are two approaches:
+
+#### Option 1: Using Screen Utility (No Control Plane Required)
+
+The `screen` utility can run MEW in a detached session and capture its output:
+
+```bash
+# IMPORTANT: Must run from an initialized space directory (contains space.yaml)
+cd spaces/my-test
+screen -dmS verify-ui bash -c "mew space up --interactive"
+
+# Wait for space to initialize
+sleep 6
+
+# Capture the screen buffer (includes scrollback)
+screen -S verify-ui -X hardcopy ./tmp/screen-output.txt
+
+# View the captured output
+cat ./tmp/screen-output.txt
+
+# Send input to the session
+screen -S verify-ui -X stuff "hello\n"
+
+# Capture again to see the result
+screen -S verify-ui -X hardcopy ./tmp/screen-output2.txt
+
+# Clean up
+screen -S verify-ui -X quit
+mew space down
+```
+
+**Benefits:**
+- No additional ports or HTTP setup needed
+- Captures the complete terminal buffer including scrollback
+- Can inject input with `screen -X stuff`
+- Works with only one terminal available
+
+**Limitations:**
+- macOS ships with screen v4.0.3 (2006) which has a hardcopy bug requiring manual attach
+- To fix: `brew install screen` (installs v5.0+), then restart your shell to update PATH
+- Verify with `screen -v` - should show v5.0.1 or higher for automated capture
+
+#### Option 2: Using Control Plane (Recommended for Automation)
+
+The control plane provides more structured access to the UI state:
+
+```bash
+# Start with control plane enabled
+mew space up --interactive --control-port 9999
+
+# In another terminal or automated script:
+
+# Get current screen snapshot
+curl -s http://localhost:9999/control/screen | jq -r '.plain'
+
+# Get structured message state
+curl -s http://localhost:9999/control/state | jq '.messages'
+
+# Send input programmatically
+curl -s -X POST http://localhost:9999/control/send_input \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"hello"}' && \
+curl -s -X POST http://localhost:9999/control/send_input \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"enter"}'
+
+# Verify the result
+curl -s http://localhost:9999/control/screen | jq -r '.plain'
+```
+
+**Benefits:**
+- Structured JSON output
+- Real-time state access via HTTP
+- Better for automated testing and CI/CD
+- Can query specific message fields
+
+**Use Cases:**
+- **Screen**: Quick verification when you only have one terminal (coding agents: ensure screen v5.0+)
+- **Control Plane**: Automated testing, CI/CD pipelines (provides structured JSON output)
+
 ## Common Development Tasks
 
 ### Creating a New Space Template
