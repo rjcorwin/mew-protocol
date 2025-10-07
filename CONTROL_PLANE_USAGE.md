@@ -75,13 +75,16 @@ Sample response:
 Fetch the live screen buffer and cursor metadata (the default response is the current terminal frame exactly as an operator sees it):
 
 ```bash
-curl -s http://localhost:7777/control/screen | jq '.mode, .plain'
+curl -s http://localhost:7777/control/screen | jq -r '.mode, .plain'
 ```
 
 ```
-"current"
-"◇ system:gateway → system/welcome\nconnected as participant-1759757375418 ..."
+current
+◇ system:gateway → system/welcome
+connected as participant-1759757375418 ...
 ```
+
+> **Tip:** Use `jq -r '.plain'` (note the `-r` flag) whenever you want the control plane's `plain` snapshot printed with real line breaks instead of JSON-escaped `\n` sequences.
 
 If you need to replay the full ANSI scrollback, append `?history=1` to include the raw control sequences that produced the latest frame:
 

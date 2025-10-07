@@ -146,6 +146,11 @@ export class ControlPlaneStdout extends Writable {
 
     const nextChar = text[startIndex + 1];
 
+    if (nextChar === 'c') {
+      this.#resetFrame();
+      return startIndex + 2;
+    }
+
     if (nextChar === '[') {
       let cursor = startIndex + 2;
       while (cursor < text.length && !CSI_FINAL_BYTE_PATTERN.test(text[cursor])) {
@@ -346,9 +351,7 @@ export class ControlPlaneStdout extends Writable {
 
   #clearScreen(mode) {
     if (mode === 2 || mode === 3) {
-      this.#frameLines = [''];
-      this.#frameCursor = { x: 0, y: 0 };
-      this.#frameCursorSnapshot = { x: 0, y: 0 };
+      this.#resetFrame();
       return;
     }
 
@@ -363,6 +366,12 @@ export class ControlPlaneStdout extends Writable {
         this.#frameLines[row] = '';
       }
     }
+  }
+
+  #resetFrame() {
+    this.#frameLines = [''];
+    this.#frameCursor = { x: 0, y: 0 };
+    this.#frameCursorSnapshot = { x: 0, y: 0 };
   }
 
   #clearLine(mode) {
