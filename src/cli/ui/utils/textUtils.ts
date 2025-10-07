@@ -217,11 +217,17 @@ function escapeForTerminal(text) {
 /**
  * Strip ANSI escape codes from text
  */
+const ANSI_PATTERN = /[\u001B\u009B][[\]()#;?]*(?:\d{1,4}(?:;\d{0,4})*)?[0-9A-PR-TZcf-nq-uy=><]/g;
+const OSC_PATTERN = /\u001B\][^\u0007\u001B]*(?:\u0007|\u001B\\)/g;
+
 function stripAnsi(text) {
   if (!text) return '';
 
-  // Remove ANSI escape sequences
-  return text.replace(/\x1b\[[0-9;]*m/g, '');
+  return text
+    .replace(OSC_PATTERN, '')
+    .replace(ANSI_PATTERN, '')
+    .replace(/[\u0007\u0008]/g, '')
+    .replace(/\r/g, '');
 }
 
 /**

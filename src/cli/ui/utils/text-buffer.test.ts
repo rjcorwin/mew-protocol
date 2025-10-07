@@ -238,6 +238,7 @@ describe('TextUtils', () => {
     it('strips ANSI codes', () => {
       expect(textUtils.stripAnsi('\x1b[31mRed Text\x1b[0m')).toBe('Red Text');
       expect(textUtils.stripAnsi('No ANSI')).toBe('No ANSI');
+      expect(textUtils.stripAnsi('\u001b[2K\u001b[1;32mPrompt\u001b[0m')).toBe('Prompt');
     });
   });
 

@@ -1013,7 +1013,13 @@ async function spaceUpAction(options) {
                   return controlStdout ? controlStdout.snapshot() : createEmptyScreenSnapshot();
                 }
               });
-              console.log(`Control plane listening on http://localhost:${controlServer.port}`);
+              controlServer.ready
+                .then(() => {
+                  console.log(`Control plane listening on http://localhost:${controlServer.port}`);
+                })
+                .catch(() => {
+                  console.log(`Control plane listening on http://localhost:${controlPort}`);
+                });
             } catch (error) {
               console.error(`Failed to start control server: ${error.message}`);
             }

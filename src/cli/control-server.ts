@@ -301,14 +301,40 @@ export function startControlServer(options) {
   });
 
   const server = app.listen(options.port, '127.0.0.1');
-  const resolvedPort = server.address()?.port ?? options.port;
+  let resolvedPort = typeof options.port === 'number' ? options.port : 0;
 
-  return {
+  const ready = new Promise((resolve) => {
+    if (server.listening) {
+      resolve(undefined);
+      return;
+    }
+
+    server.once('listening', () => resolve(undefined));
+  });
+
+  const updatePort = () => {
+    const address = server.address();
+    if (typeof address === 'object' && address) {
+      resolvedPort = address.port;
+      result.port = resolvedPort;
+    }
+  };
+
+  const result = {
     port: resolvedPort,
+    ready,
     stop: () => new Promise((resolve) => {
       server.close(() => resolve(undefined));
     })
   };
+
+  if (server.listening) {
+    updatePort();
+  } else {
+    ready.then(updatePort).catch(() => {});
+  }
+
+  return result;
 }
 
 export { InputNotReadyError };
