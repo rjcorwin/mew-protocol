@@ -38,6 +38,8 @@ const EnhancedInput = React.forwardRef(function EnhancedInput({
   placeholder = '',
   multiline = false,
   disabled = false,
+  checkDisabled = null,
+  shouldEnterNavigationMode = null,
   history = [],
   onHistoryChange = () => { },
   keyBindings = defaultKeyBindings,
@@ -507,6 +509,10 @@ const EnhancedInput = React.forwardRef(function EnhancedInput({
       if (key.tab) {
         debugLog(`Detected nameless key with tab flag - treating as AUTOCOMPLETE\n`);
         command = 'AUTOCOMPLETE';
+      } else if (key.escape) {
+        debugLog(`Detected escape key - ignoring\n`);
+        // Don't process escape as delete
+        return;
       } else {
         debugLog(`Detected empty key - treating as DELETE_BACKWARD (Mac delete key)\n`);
         command = 'DELETE_BACKWARD';
@@ -560,8 +566,16 @@ const EnhancedInput = React.forwardRef(function EnhancedInput({
 
   // Keyboard input handler
   useKeypress((key) => {
+    // Check if this key should enter navigation mode
+    if (shouldEnterNavigationMode && shouldEnterNavigationMode(key.input)) {
+      // Don't process this key - let navigation handler take over
+      return;
+    }
+    // Check dynamic disabled state if provided
+    const isDisabled = checkDisabled ? checkDisabled() : disabled;
+    if (isDisabled) return;
     processKey(key);
-  }, { isActive: !disabled });
+  }, { isActive: true });
 
   const handleExternalInput = useCallback((payload) => {
     if (disabled) {
@@ -598,6 +612,13 @@ const EnhancedInput = React.forwardRef(function EnhancedInput({
         }
       }
       return { x: 0, y: 0 };
+    },
+    getValue: () => {
+      return buffer.getText();
+    },
+    isEmpty: () => {
+      const text = buffer.getText();
+      return !text || text.trim().length === 0;
     }
   }), [buffer, handleExternalInput, update]);
 

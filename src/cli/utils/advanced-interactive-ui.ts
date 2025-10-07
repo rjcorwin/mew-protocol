@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { render, Box, Text, Static, useInput, useApp, useFocus, useStdout } from 'ink';
+import { render, Box, Text, Static, useInput, useApp, useFocus, useFocusManager, useStdout } from 'ink';
 import { v4 as uuidv4 } from 'uuid';
 import EnhancedInput from '../ui/components/EnhancedInput.js';
 import { slashCommandList, slashCommandGroups } from '../ui/utils/slashCommands.js';
@@ -96,8 +96,12 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
   const contextUsageEntries = useMemo(() => buildContextUsageEntries(participantStatuses), [participantStatuses]);
   const [signalBoardExpanded, setSignalBoardExpanded] = useState(false);
   const [signalBoardOverride, setSignalBoardOverride] = useState(null);
+  const [focusedMessageIndex, setFocusedMessageIndex] = useState(null);
+  const [navigationMode, setNavigationMode] = useState(false);
+  const navigationModeRef = useRef(false);
   const { exit } = useApp();
   const { stdout } = useStdout();
+  const { focus } = useFocusManager();
   const latestStateRef = useRef(null);
   const enhancedInputRef = useRef(null);
   const controlPlane = controlOptions ? controlOptions : null;
@@ -166,6 +170,69 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
       controlPlane.stdout.setCursor(enhancedInputRef.current.getCursor());
     }
   }, [controlPlane]);
+
+  // Programmatically focus the message when focusedMessageIndex changes
+  useEffect(() => {
+    if (navigationMode && focusedMessageIndex !== null && messages[focusedMessageIndex]) {
+      const messageId = `msg-${messages[focusedMessageIndex].id}`;
+      focus(messageId);
+    }
+  }, [navigationMode, focusedMessageIndex, messages, focus]);
+
+  // Navigation mode input handler
+  useInput((input, key) => {
+    // Don't handle input if there's a pending operation dialog
+    if (pendingOperation) {
+      return;
+    }
+
+    if (navigationMode) {
+      // In navigation mode: handle j/k/g/G/Enter/Escape/i
+      if (input === 'j' || key.downArrow) {
+        setFocusedMessageIndex(prev => {
+          if (prev === null) return 0;
+          return Math.min(prev + 1, messages.length - 1);
+        });
+      } else if (input === 'k' || key.upArrow) {
+        setFocusedMessageIndex(prev => {
+          if (prev === null) return messages.length - 1;
+          return Math.max(prev - 1, 0);
+        });
+      } else if (input === 'g') {
+        // Go to first message
+        if (messages.length > 0) {
+          setFocusedMessageIndex(0);
+        }
+      } else if (input === 'G') {
+        // Go to last message
+        if (messages.length > 0) {
+          setFocusedMessageIndex(messages.length - 1);
+        }
+      } else if (key.return || key.escape || input === 'i') {
+        navigationModeRef.current = false;
+        setNavigationMode(false);
+        setFocusedMessageIndex(null);
+      }
+    } else {
+      // Not in navigation mode: check if j/k pressed with empty input
+      const inputEmpty = enhancedInputRef.current?.isEmpty?.() ?? true;
+      if ((input === 'j' || input === 'k') && inputEmpty) {
+        // Set ref immediately - EnhancedInput will skip processing this key
+        navigationModeRef.current = true;
+        setNavigationMode(true);
+
+        // Start from the last message when entering navigation mode
+        let initialFocus = messages.length - 1;
+
+        // Move up one if 'k' was pressed
+        if (input === 'k' && messages.length > 0) {
+          initialFocus = Math.max(0, messages.length - 2);
+        }
+
+        setFocusedMessageIndex(initialFocus);
+      }
+    }
+  }, { isActive: !pendingOperation });
 
   const safeParse = useCallback((value) => {
     if (typeof value !== 'string') {
@@ -2091,6 +2158,28 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
 
   const isDockedLayout = layoutMode === 'docked';
 
+  // Calculate visible message window for navigation mode
+  // Render only messages that fit on the visible terminal screen
+  const { visibleMessages, windowStartIndex } = useMemo(() => {
+    if (!navigationMode) {
+      return { visibleMessages: messages, windowStartIndex: 0 };
+    }
+
+    // In navigation mode - show a small window of messages centered on the focused message
+    // This ensures the focused message is always visible on screen (like vim)
+    const windowSize = 5; // Show only 5 messages at a time to fit on screen
+    const halfWindow = Math.floor(windowSize / 2);
+
+    const centerIndex = focusedMessageIndex ?? messages.length - 1;
+    const startIndex = Math.max(0, centerIndex - halfWindow);
+    const endIndex = Math.min(messages.length, startIndex + windowSize);
+
+    return {
+      visibleMessages: messages.slice(startIndex, endIndex),
+      windowStartIndex: startIndex
+    };
+  }, [messages, navigationMode, focusedMessageIndex]);
+
   return React.createElement(Box, { flexDirection: "column", height: "100%" },
     React.createElement(Box, {
       flexDirection: isDockedLayout ? "row" : "column",
@@ -2106,22 +2195,40 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
           spaceId,
           participantId
         }),
-        React.createElement(Static, { items: messages }, (item) =>
-          React.createElement(MessageDisplay, {
-            key: item.id,
-            item: item,
-            verbose: verbose,
-            useColor: useColor,
-            theme: theme,
-      chatTarget: (() => {
-        const targets = getEffectiveChatTargets();
-        if (Array.isArray(targets) && targets.length > 0) {
-          return targets.join(', ');
-        }
-        return null;
-      })()
-          })
-        )
+        navigationMode
+          ? React.createElement(Box, { flexDirection: "column" },
+              ...visibleMessages.map((item, index) => {
+                const absoluteIndex = windowStartIndex + index;
+                const shouldAutoFocus = absoluteIndex === focusedMessageIndex;
+                return React.createElement(FocusableMessage, {
+                  key: item.id,
+                  messageId: `msg-${item.id}`,
+                  item: item,
+                  verbose: verbose,
+                  useColor: useColor,
+                  theme: theme,
+                  isActive: true,
+                  shouldAutoFocus: shouldAutoFocus
+                });
+              })
+            )
+          : React.createElement(Static, { items: messages }, (item, index) =>
+              React.createElement(MessageDisplay, {
+                key: item.id,
+                item: item,
+                verbose: verbose,
+                useColor: useColor,
+                theme: theme,
+                focused: false,
+                chatTarget: (() => {
+                  const targets = getEffectiveChatTargets();
+                  if (Array.isArray(targets) && targets.length > 0) {
+                    return targets.join(', ');
+                  }
+                  return null;
+                })()
+              })
+            )
       ),
       signalBoardExpanded && isDockedLayout && React.createElement(SidePanel, {
         participantId,
@@ -2168,7 +2275,13 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
             onSubmit: processInput,
             placeholder: 'Type a message or /help for commands...',
             multiline: true,  // Enable multi-line for Shift+Enter support
-            disabled: false,
+            disabled: navigationMode,
+            checkDisabled: () => navigationModeRef.current,
+            shouldEnterNavigationMode: (input) => {
+              // Check if j/k pressed with empty input to enter navigation mode
+              const inputEmpty = enhancedInputRef.current?.isEmpty?.() ?? true;
+              return (input === 'j' || input === 'k') && inputEmpty && !navigationModeRef.current;
+            },
             history: commandHistory,
             onHistoryChange: setCommandHistory,
             prompt: '> ',
@@ -2196,6 +2309,8 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
       contextUsage: contextUsageEntries,
       participantStatusCount: participantStatuses.size,
       theme: theme,
+      navigationMode: navigationMode,
+      focusedMessageIndex: focusedMessageIndex,
       chatTarget: (() => {
         const targets = getEffectiveChatTargets();
         if (Array.isArray(targets) && targets.length > 0) {
@@ -2208,9 +2323,25 @@ function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-p
 }
 
 /**
+ * Focusable Message Wrapper
+ * Wraps MessageDisplay to enable Ink's focus management system
+ */
+function FocusableMessage({ item, verbose, useColor, theme, messageId, isActive, shouldAutoFocus = false }) {
+  const { isFocused } = useFocus({ autoFocus: shouldAutoFocus, isActive, id: messageId });
+
+  return React.createElement(MessageDisplay, {
+    item,
+    verbose,
+    useColor,
+    theme,
+    focused: isFocused
+  });
+}
+
+/**
  * Message Display Component
  */
-function MessageDisplay({ item, verbose, useColor, theme }) {
+function MessageDisplay({ item, verbose, useColor, theme, focused = false }) {
   const { message, sent, timestamp } = item;
   const time = timestamp.toLocaleTimeString('en-US', {
     hour12: false,
@@ -2236,10 +2367,13 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
     ? (theme?.colors?.inputBorder || 'cyan')
     : (theme?.colors?.chatSeparator || 'magenta');
 
+  // Focus indicator: show arrow when message is focused in navigation mode
+  const focusIndicator = focused ? '▶ ' : '';
+
   if (verbose) {
     return React.createElement(Box, { flexDirection: "column", marginBottom: 1 },
       React.createElement(Text, { color: "gray" },
-        `${contextPrefix}${participant} → ${kind}` // (${time})
+        `${focusIndicator}${contextPrefix}${participant} → ${kind}` // (${time})
       ),
       React.createElement(Text, null, JSON.stringify(message, null, 2))
     );
@@ -2261,7 +2395,7 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
     },
       React.createElement(Text, { color: separatorColor, dimColor: true }, '▔'.repeat(process.stdout.columns || 80)),
       React.createElement(Text, { color: headerColor },
-        `${contextPrefix}${envelopePrefix}${participant} →` // (${time})
+        `${focusIndicator}${contextPrefix}${envelopePrefix}${participant} →` // (${time})
       ),
       message.payload && React.createElement(ReasoningDisplay, {
         payload: message.payload,
@@ -2278,7 +2412,7 @@ function MessageDisplay({ item, verbose, useColor, theme }) {
   // Non-chat messages use simple layout
   return React.createElement(Box, { flexDirection: "column", marginBottom: kind === 'reasoning/thought' ? 2 : 1 },
     React.createElement(Text, { color: headerColor },
-      `${contextPrefix}${envelopePrefix}${participant} → ${kind}` // (${time})
+      `${focusIndicator}${contextPrefix}${envelopePrefix}${participant} → ${kind}` // (${time})
     ),
     message.payload && React.createElement(ReasoningDisplay, {
       payload: message.payload,
@@ -2715,7 +2849,7 @@ function ReasoningStatus({ reasoning, theme }) {
 /**
  * Status Bar Component
  */
-function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [], participantStatusCount = 0, theme, chatTarget = null }) {
+function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId, participantId, awaitingAckCount = 0, pauseState, activeStreamCount = 0, contextUsage = [], participantStatusCount = 0, theme, chatTarget = null, navigationMode = false, focusedMessageIndex = null }) {
   const status = connected ? 'Connected' : 'Disconnected';
   const statusColor = connected ? 'green' : 'red';
 
@@ -2738,6 +2872,9 @@ function StatusBar({ connected, messageCount, verbose, pendingOperation, spaceId
   }
   if (verbose) {
     extras.push('verbose');
+  }
+  if (navigationMode && focusedMessageIndex !== null) {
+    extras.push(`Navigate (${focusedMessageIndex + 1}/${messageCount}) - ↵ to exit`);
   }
   if (pauseState) {
     const reason = pauseState.reason ? `: ${pauseState.reason}` : '';
@@ -2807,6 +2944,13 @@ function getPayloadPreview(payload, kind) {
     const participantCount = payload.participants?.length || 0;
 
     return `connected as ${yourId} (${capCount} capabilities) • ${participantCount} other participant${participantCount === 1 ? '' : 's'}: ${participantIds}`;
+  }
+
+  if (kind === 'system/presence') {
+    const event = payload.event || 'unknown';
+    const participantId = payload.participant?.id || 'unknown';
+    const capCount = payload.participant?.capabilities?.length || 0;
+    return `${participantId} ${event === 'join' ? 'joined' : 'left'} (${capCount} capabilities)`;
   }
 
   if (kind === 'chat' && payload.text) {
