@@ -20,6 +20,7 @@ participants:
     capabilities:
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
 
   fulfiller:
     type: local
@@ -42,6 +43,7 @@ participants:
       - kind: "mcp/proposal"
       - kind: "chat"
       - kind: "system/*"
+      - kind: "participant/status"
 
   proposer:
     tokens: ["proposer-token"]
@@ -50,6 +52,7 @@ participants:
     capabilities:
       - kind: "mcp/proposal"
       - kind: "system/*"
+      - kind: "participant/status"
 
 defaults:
   capabilities:

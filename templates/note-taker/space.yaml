@@ -33,3 +33,4 @@ participants:
       - kind: "chat"
       - kind: "chat/acknowledge"
       - kind: "chat/cancel"
+      - kind: "participant/status"

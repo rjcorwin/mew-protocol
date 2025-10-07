@@ -32,6 +32,7 @@ participants:
       - kind: "stream/*"
       - kind: "participant/*"
       - kind: "system/*"
+      - kind: "participant/status"
     output_log: "./logs/test-client-output.log"
     auto_connect: true
 

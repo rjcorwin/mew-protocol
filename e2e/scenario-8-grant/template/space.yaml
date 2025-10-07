@@ -28,6 +28,7 @@ participants:
       - kind: "mcp/response"
       - kind: "chat"
       - kind: "capability/grant-ack"
+      - kind: "participant/status"
 
   file-server:
     type: local
@@ -51,6 +52,7 @@ participants:
     capabilities:
       - kind: "mcp/response"
       - kind: "chat"
+      - kind: "participant/status"
 
   test-client:
     tokens: ["test-token"]
@@ -62,6 +64,7 @@ participants:
       - kind: "mcp/response"
       - kind: "capability/grant"
       - kind: "system/*"
+      - kind: "participant/status"
     output_log: "./logs/test-client-output.log"
     auto_connect: true
 

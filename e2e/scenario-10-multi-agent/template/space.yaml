@@ -24,6 +24,7 @@ participants:
       - kind: "mcp/request"
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
 
   worker-agent:
     type: local
@@ -46,6 +47,7 @@ participants:
           method: "tools/*"
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
 
   calculator-agent:
     type: local
@@ -63,6 +65,7 @@ participants:
     capabilities:
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
 
   test-client:
     tokens: ["test-token"]
@@ -71,6 +74,7 @@ participants:
       - kind: "mcp/request"
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
     output_log: "./logs/test-client-output.log"
     auto_connect: true
 

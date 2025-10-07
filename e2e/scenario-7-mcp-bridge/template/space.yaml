@@ -11,6 +11,7 @@ participants:
     capabilities:
       - kind: "mcp/response"
       - kind: "chat"
+      - kind: "participant/status"
     mcp_server:
       command: "node"
       args:
@@ -29,6 +30,7 @@ participants:
           method: "tools/*"
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
     output_log: "./logs/test-client-output.log"
     auto_connect: true
 

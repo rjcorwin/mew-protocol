@@ -20,6 +20,7 @@ participants:
     capabilities:
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
 
   coordinator:
     tokens: ["admin-token"]
@@ -29,6 +30,7 @@ participants:
       - kind: "capability/grant"
       - kind: "capability/revoke"
       - kind: "system/*"
+      - kind: "participant/status"
 
   limited-agent:
     tokens: ["limited-token"]
@@ -39,6 +41,7 @@ participants:
       - kind: "mcp/request"
         payload:
           method: "tools/*"
+      - kind: "participant/status"
 
 defaults:
   capabilities:

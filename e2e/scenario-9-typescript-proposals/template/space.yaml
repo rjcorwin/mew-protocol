@@ -31,6 +31,7 @@ participants:
         payload:
           method: "tools/list"
       - kind: "reasoning/*"
+      - kind: "participant/status"
     env:
       MEW_AGENT_CONFIG: '{"mockLLM":true,"autoRespond":true}'
 
@@ -54,6 +55,7 @@ participants:
       - kind: "mcp/response"
       - kind: "chat"
       - kind: "system/*"
+      - kind: "participant/status"
 
   test-client:
     tokens: ["test-token"]
@@ -65,6 +67,7 @@ participants:
       - kind: "mcp/response"
       - kind: "capability/grant"
       - kind: "system/*"
+      - kind: "participant/status"
     output_log: "./logs/test-client-output.log"
     auto_connect: true
 

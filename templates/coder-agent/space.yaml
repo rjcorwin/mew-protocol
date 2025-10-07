@@ -94,6 +94,7 @@ participants:
           method: "tools/call"
           params:
             name: "get_file_info"
+      - kind: "participant/status"
     env:
       # API configuration - these read from environment at runtime
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
@@ -115,6 +116,7 @@ participants:
       - kind: "mcp/request"
       - kind: "mcp/response"
       - kind: "mcp/notification"
+      - kind: "participant/status"
 
   # Auto-fulfiller for proposals (disabled by default for manual testing)
   auto-fulfiller:
@@ -128,6 +130,7 @@ participants:
       - kind: "mcp/request"   # Can execute approved operations
       - kind: "mcp/response"  # Can respond to requests
       - kind: "chat"
+      - kind: "participant/status"
     env:
       NODE_PATH: "./.mew/node_modules"
       MEW_GATEWAY: "ws://localhost:${PORT}"

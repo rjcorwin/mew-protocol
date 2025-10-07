@@ -30,6 +30,7 @@ participants:
         payload:
           method: "tools/*"
       - kind: "mcp/response"
+      - kind: "participant/status"
     env:
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
@@ -46,6 +47,7 @@ participants:
       - kind: "mcp/request"
       - kind: "mcp/response"
       - kind: "mcp/notification"
+      - kind: "participant/status"
 
 defaults:
   capabilities:

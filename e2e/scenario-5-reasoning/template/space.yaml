@@ -20,6 +20,7 @@ participants:
     capabilities:
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
 
   research-agent:
     tokens: ["research-token"]
@@ -30,6 +31,7 @@ participants:
           method: "tools/*"
       - kind: "chat"
       - kind: "system/*"
+      - kind: "participant/status"
     output_log: "./logs/research-agent-output.log"
     auto_connect: true
 

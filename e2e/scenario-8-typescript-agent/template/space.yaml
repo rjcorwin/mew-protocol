@@ -24,6 +24,7 @@ participants:
       - kind: "mcp/response"
       - kind: "chat"
       - kind: "reasoning/*"
+      - kind: "participant/status"
     env:
       MEW_AGENT_CONFIG: '{"mockLLM":true,"autoRespond":true}'
 
@@ -36,6 +37,7 @@ participants:
       - kind: "mcp/response"
       - kind: "chat"
       - kind: "system/*"
+      - kind: "participant/status"
     output_log: "./logs/test-client-output.log"
     auto_connect: true
 

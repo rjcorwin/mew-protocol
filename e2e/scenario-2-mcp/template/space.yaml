@@ -20,6 +20,7 @@ participants:
     capabilities:
       - kind: "mcp/response"
       - kind: "system/*"
+      - kind: "participant/status"
   test-client:
     tokens: ["test-token"]
     capabilities:
@@ -27,6 +28,7 @@ participants:
         payload:
           method: "tools/*"
       - kind: "system/*"
+      - kind: "participant/status"
     output_log: "./logs/test-client-output.log"
     auto_connect: true
 
