@@ -160,7 +160,7 @@ Calling `/control/screen` again shows the live help overlay exactly as it appear
 
 ### Verifying CLI UI Changes
 
-When developing CLI UI features, you may need to verify the output programmatically.
+When developing CLI UI features (e.g., vim-style navigation, status bar updates, interactive prompts), you may need to verify the output programmatically.
 
 **⚠️ CRITICAL for single-terminal environments (coding agents, CI/CD):**
 
@@ -273,6 +273,66 @@ mew space down
   - **v4.0.3 (macOS default):** Use control plane + `curl` for capture
 - **Control plane bonus:** Provides structured state access (messages, reasoning, tools) beyond just rendered UI
 - **Recommendation:** Install `brew install screen` for v5.0.1+ to simplify verification
+
+#### Testing Interactive Features (Example: Vim Navigation)
+
+The vim-style navigation feature allows users to browse message history with j/k/g/G keys. Here's how to test it programmatically:
+
+```bash
+# Start space in screen with control plane
+cd /tmp/test-navigation
+screen -dmS nav-test bash -c "mew space up --interactive --control-port 9999"
+sleep 6
+
+# Send test messages
+TOKEN=$(cat .mew/tokens/human.token)
+for i in {1..15}; do
+  curl -X POST "http://localhost:8080/participants/human/messages?space=test-agent" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{\"protocol\":\"mew/v0.4\",\"id\":\"msg-$i\",\"from\":\"human\",\"to\":[\"mew\"],\"kind\":\"chat\",\"payload\":{\"text\":\"Message $i\",\"format\":\"plain\"}}" \
+    -s > /dev/null
+  sleep 0.2
+done
+sleep 2
+
+# Enter navigation mode by sending 'k' key
+screen -S nav-test -X stuff 'k'
+sleep 1
+
+# Verify navigation mode is active (status bar shows "Navigate")
+curl -s http://localhost:9999/control/screen | jq -r '.plain' | tail -3
+# Expected: "Navigate (N/15) - ↵ to exit"
+
+# Test jump to first message with 'g'
+screen -S nav-test -X stuff 'g'
+sleep 1
+curl -s http://localhost:9999/control/screen | jq -r '.plain' | grep "▶"
+# Expected: ▶ indicator on first message
+
+# Test jump to last message with 'G'
+screen -S nav-test -X stuff 'G'
+sleep 1
+curl -s http://localhost:9999/control/screen | jq -r '.plain' | tail -3
+# Expected: "Navigate (15/15)"
+
+# Exit navigation mode with 'i'
+screen -S nav-test -X stuff 'i'
+sleep 1
+curl -s http://localhost:9999/control/screen | jq -r '.plain' | tail -3
+# Expected: Normal status bar without "Navigate"
+
+# Clean up
+screen -S nav-test -X quit
+mew space down
+```
+
+**Key Testing Points:**
+- Status bar changes when entering/exiting navigation mode
+- Focus indicator (▶) appears next to current message
+- Position counter shows current/total (e.g., "Navigate (5/15)")
+- Only 5 messages visible at a time (centered on focused message)
+- Viewport shifts as you navigate with j/k/g/G
 
 ## Common Development Tasks
 

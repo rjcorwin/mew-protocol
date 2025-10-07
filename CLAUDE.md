@@ -120,6 +120,34 @@ screen -S test -X quit && mew space down
 
 See `docs/development.md` for full details.
 
+## Interactive UI Navigation
+
+When connected to a space with `mew space connect` or `mew space up --interactive`, you can use **vim-style navigation** to browse message history:
+
+### Entering Navigation Mode
+- Press `j` or `k` when the input is empty to enter navigation mode
+- Status bar shows: `Navigate (N/Total) - ↵ to exit`
+
+### Navigation Keys
+- `j` or `↓` - Move down to next message
+- `k` or `↑` - Move up to previous message
+- `g` - Jump to first message
+- `G` - Jump to last message
+- `i` - Exit navigation mode and return to input
+
+### Visual Indicators
+- `▶` appears next to the focused message
+- Status bar shows current position (e.g., `Navigate (5/15)`)
+- Only 5 messages displayed at a time (centered on focused message)
+
+### Implementation Details
+- **File:** `src/cli/utils/advanced-interactive-ui.ts`
+- **Window size:** 5 messages (ensures all content fits on screen)
+- **Focus system:** Uses Ink's `useFocus` + `useFocusManager` with programmatic focus control
+- **Viewport:** Sliding window centered on focused message (vim-style scrolling)
+
+See `docs/development.md` sections on "Verifying CLI UI Changes" for testing navigation programmatically.
+
 ## Development Workflow
 1. Read existing patterns before implementing
 2. Update types first (`src/types/`), then implementations

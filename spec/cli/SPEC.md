@@ -1612,6 +1612,8 @@ Testing guidance:
 The CLI provides comprehensive terminal input capabilities through the EnhancedInput component, adapted from Google's Gemini CLI patterns. These features significantly improve the user experience for composing messages and commands.
 
 #### Message History Navigation
+
+**Sent Message History (↑↓ arrows):**
 - **Arrow Keys**: Up/Down arrows navigate through previously sent messages
 - **Smart Context**:
   - Single-line text: Arrows navigate history
@@ -1619,6 +1621,21 @@ The CLI provides comprehensive terminal input capabilities through the EnhancedI
   - At text boundaries: Continue history navigation
 - **History Preservation**: Current input saved when starting navigation
 - **Session-based**: History maintained for duration of session (persistence planned for future)
+
+**Received Message Navigation (vim-style j/k):**
+- **Entry**: Press `j` or `k` when input is empty to enter navigation mode
+- **Navigation Keys**:
+  - `j` or `↓` - Move to next (newer) message
+  - `k` or `↑` - Move to previous (older) message
+  - `g` - Jump to first (oldest) message
+  - `G` - Jump to last (newest) message
+- **Exit**: Press `i` to return to input mode
+- **Visual Feedback**:
+  - `▶` indicator marks currently focused message
+  - Status bar shows position (e.g., "Navigate (5/15) - ↵ to exit")
+  - Only 5 messages displayed at a time (centered on focused message)
+- **Viewport**: Sliding window ensures focused message is always visible
+- **Implementation**: Uses Ink's `useFocus` + `useFocusManager` with programmatic focus control
 
 #### Multi-line Input Support
 - **Shift+Enter**: Insert new lines without submitting message
