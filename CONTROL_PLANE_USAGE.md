@@ -72,18 +72,29 @@ Sample response:
 }
 ```
 
-Fetch the live screen buffer and cursor metadata:
+Fetch the live screen buffer and cursor metadata (the default response is the current terminal frame exactly as an operator sees it):
 
 ```bash
-curl -s http://localhost:7777/control/screen | jq '.frames_rendered, .cursor'
+curl -s http://localhost:7777/control/screen | jq '.mode, .plain'
 ```
 
 ```
-8
-null
+"current"
+"◇ system:gateway → system/welcome\nconnected as participant-1759757375418 ..."
 ```
 
-The `/control/screen` payload also includes `raw`, `plain`, terminal dimensions, and scrollback bookkeeping for replay clients.
+If you need to replay the full ANSI scrollback, append `?history=1` to include the raw control sequences that produced the latest frame:
+
+```bash
+curl -s 'http://localhost:7777/control/screen?history=1' | jq '.mode, .scrollback.buffer_size'
+```
+
+```
+"history"
+1432
+```
+
+The `/control/screen` payload also provides terminal dimensions, cursor coordinates, rendered frame lines, and scrollback bookkeeping for replay clients.
 
 ## Scenario 3 – Driving `/help` via injected input
 

@@ -1007,7 +1007,7 @@ async function spaceUpAction(options) {
                 getState: () => latestState,
                 getScreen: () => {
                   const snapshot = latestScreen();
-                  if (snapshot && snapshot.raw !== undefined) {
+                  if (snapshot && (snapshot.current || snapshot.history || snapshot.raw !== undefined)) {
                     return snapshot;
                   }
                   return controlStdout ? controlStdout.snapshot() : createEmptyScreenSnapshot();
@@ -1708,7 +1708,7 @@ space
               getState: () => latestState,
               getScreen: () => {
                 const snapshot = latestScreen();
-                if (snapshot && snapshot.raw !== undefined) {
+                if (snapshot && (snapshot.current || snapshot.history || snapshot.raw !== undefined)) {
                   return snapshot;
                 }
                 return controlStdout ? controlStdout.snapshot() : createEmptyScreenSnapshot();

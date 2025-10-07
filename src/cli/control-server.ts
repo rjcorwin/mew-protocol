@@ -232,22 +232,60 @@ export function startControlServer(options) {
   app.get('/control/screen', (req, res) => {
     try {
       const screen = options.getScreen();
-      const raw = screen?.raw ?? '';
-      const plain = stripAnsi(raw);
-      res.json({
+      const frame = screen?.current ?? null;
+      const history = screen?.history ?? null;
+      const historyParam = typeof req.query?.history === 'string' ? req.query.history : Array.isArray(req.query?.history) ? req.query.history[0] : undefined;
+      const includeHistoryRaw = typeof historyParam === 'string'
+        ? ['1', 'true', 'yes', 'full'].includes(historyParam.toLowerCase())
+        : false;
+
+      const historyRaw = history?.raw ?? screen?.raw ?? '';
+      const historyInfo = {
+        buffer_size: history?.bufferSize ?? historyRaw.length,
+        truncated: Boolean(history?.truncated ?? screen?.truncated)
+      };
+
+      const raw = includeHistoryRaw
+        ? historyRaw
+        : frame?.raw ?? (historyRaw ? stripAnsi(historyRaw) : '');
+      const plain = frame?.plain ?? stripAnsi(raw);
+      const lines = Array.isArray(frame?.lines) ? frame.lines : plain.split('\n');
+      const width = frame?.dimensions?.width ?? screen?.dimensions?.width ?? 0;
+      const height = frame?.dimensions?.height ?? screen?.dimensions?.height ?? 0;
+      const cursor = frame?.cursor ?? screen?.cursor ?? null;
+      const lastFrame = screen?.lastFrame instanceof Date
+        ? screen.lastFrame
+        : screen?.lastFrame
+          ? new Date(screen.lastFrame)
+          : new Date(0);
+
+      const response = {
+        mode: includeHistoryRaw ? 'history' : 'current',
         raw,
         plain,
-        lines: plain.split('\n'),
-        width: screen?.dimensions?.width ?? 0,
-        height: screen?.dimensions?.height ?? 0,
-        cursor: screen?.cursor ?? null,
-        last_frame: screen?.lastFrame ? new Date(screen.lastFrame).toISOString() : new Date(0).toISOString(),
+        lines,
+        width,
+        height,
+        cursor,
+        last_frame: lastFrame.toISOString(),
         frames_rendered: screen?.framesRendered ?? 0,
-        scrollback: {
-          buffer_size: screen?.bufferSize ?? raw.length,
-          truncated: Boolean(screen?.truncated)
-        }
-      });
+        scrollback: historyInfo
+      };
+
+      if (includeHistoryRaw) {
+        response.scrollback.raw = historyRaw;
+      }
+
+      if (frame) {
+        response.frame = {
+          plain: frame.plain,
+          lines,
+          cursor,
+          dimensions: frame.dimensions
+        };
+      }
+
+      res.json(response);
     } catch (error) {
       res.status(500).json({ error: error?.message || 'Failed to capture screen' });
     }
