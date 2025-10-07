@@ -135,6 +135,29 @@ npm run build
 
 The global `mew` command will immediately use the updated code after rebuilding.
 
+### Exercising the CLI Control Plane
+
+The CLI exposes an automated control plane that mirrors the interactive Ink UI over HTTP. After starting a space with `--control-port`, you can drive the interface programmatically and capture terminal snapshots. A minimal workflow:
+
+```bash
+# Launch an interactive session with the control plane listening on port 7777
+mew space up --space-dir /tmp/control-plane-demo --port 18080 --interactive --control-port 7777
+
+# Check health and read the current screen with preserved line breaks
+curl -s http://localhost:7777/control/health | jq
+curl -s http://localhost:7777/control/screen | jq -r '.mode, .plain'
+
+# Inject /help and press enter via the control server
+curl -s -X POST http://localhost:7777/control/send_input \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"/help"}'
+curl -s -X POST http://localhost:7777/control/send_input \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"enter"}'
+```
+
+Calling `/control/screen` again shows the live help overlay exactly as it appears in the terminal, and `/control/state` records the corresponding `system/help` payload. Refer to `CONTROL_PLANE_USAGE.md` for a complete set of scenarios, including history replay and scripted chat messages.
+
 ## Common Development Tasks
 
 ### Creating a New Space Template
