@@ -753,7 +753,7 @@ if (envelope.kind === "custom/action") {
 
 ## Related Documentation
 
-- **[Protocol Spec](../spec/protocol/v0.4/SPEC.md)** - Complete protocol reference
+- **[Protocol Spec](../spec/protocol/SPEC.md)** - Complete protocol reference
 - **[SDK Spec](../spec/sdk/SPEC.md)** - SDK architecture and patterns
 - **[Bridge Spec](../spec/bridge/SPEC.md)** - MCP-MEW bridge details
 - **[CLI Spec](../spec/cli/SPEC.md)** - Command-line interface

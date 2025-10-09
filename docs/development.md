@@ -415,7 +415,7 @@ tail -f .mew/logs/envelope-history.jsonl | jq .
 
 ## Additional Resources
 
-- [MEW Protocol Specification](../spec/protocol/v0.4/SPEC.md)
+- [MEW Protocol Specification](../spec/protocol/SPEC.md)
 - [Testing Guide](testing.md)
 - [Templates Guide](templates.md)
 - [End-to-End Test Scenarios](../e2e/README.md)
@@ -425,7 +425,7 @@ tail -f .mew/logs/envelope-history.jsonl | jq .
 
 - Check existing issues: https://github.com/rjcorwin/mew-protocol/issues
 - Review test scenarios for examples: `e2e/scenario-*/`
-- Read the protocol specification: `spec/protocol/v0.4/SPEC.md`
+- Read the protocol specification: `spec/protocol/SPEC.md`
 
 ## Important Notes
 
