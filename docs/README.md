@@ -11,8 +11,7 @@
 - [Release Process](releasing.md) - Publishing packages
 
 ## Specifications
-- [Protocol Spec](../spec/protocol/v0.4/SPEC.md) - Current stable (v0.4)
-- [Protocol Draft](../spec/protocol/draft/SPEC.md) - Next version
+- [Protocol Spec](../spec/protocol/SPEC.md) - Core MEW Protocol (v0.4)
 - [CLI Spec](../spec/cli/SPEC.md) - Command-line interface
 - [SDK Spec](../spec/sdk/SPEC.md) - TypeScript SDK
 - [Bridge Spec](../spec/bridge/SPEC.md) - MCP-MEW bridge

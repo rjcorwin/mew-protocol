@@ -656,4 +656,4 @@ The note-taker agent is designed for simple, conversational note-taking without 
 
 - Explore [Testing Guide](testing.md) for automated test scenarios
 - See [Development Guide](development.md) for creating custom templates
-- Read the [Protocol Specification](../spec/protocol/v0.4/SPEC.md) for deeper protocol understanding
+- Read the [Protocol Specification](../spec/protocol/SPEC.md) for deeper protocol understanding

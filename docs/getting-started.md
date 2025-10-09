@@ -308,7 +308,7 @@ mew
 
 ### Understand the Protocol
 
-- **[Protocol Specification](../spec/protocol/v0.4/SPEC.md)** - Complete protocol reference
+- **[Protocol Specification](../spec/protocol/SPEC.md)** - Complete protocol reference
 - **[CLI Spec](../spec/cli/SPEC.md)** - Command-line interface details
 - **[SDK Spec](../spec/sdk/SPEC.md)** - Build your own participants
 

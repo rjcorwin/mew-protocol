@@ -1298,9 +1298,6 @@ await agent.start();
 
 ## Future Considerations
 
-### Composition vs Inheritance
-The current implementation uses inheritance, but will be refactored to use composition per ADR-cmp (see `decisions/accepted/001-cmp-composition-over-inheritance.md`). This refactoring is planned for the next major version (2.0) to provide better separation of concerns, testability, and flexibility.
-
 ### Plugin System
 Allow extending agents with plugins:
 - Custom thinking strategies
