@@ -22,7 +22,10 @@ mew-protocol/
 ├── dist/                   # Compiled output
 ├── e2e/                    # End-to-end test scenarios
 ├── spec/                   # All specifications
-│   ├── protocol/          # Protocol spec (v0.4, draft)
+│   ├── protocol/          # Protocol spec (v0.4)
+│   │   ├── SPEC.md
+│   │   ├── proposals/     # All proposals
+│   │   └── rejected/      # Rejected proposals
 │   ├── cli/               # CLI spec
 │   ├── sdk/               # SDK spec
 │   └── bridge/            # Bridge spec
@@ -93,8 +96,9 @@ When making changes, follow the workflow in `CONTRIBUTING.md`:
 
 1. **Start with CHANGELOG** - Add entry to `CHANGELOG.md` "Next" section
 2. **Create proposal** - Document in `spec/<area>/proposals/XXX-name/`
-   - Use 3-char alphanumeric code: `a7z`, `k3p`, `m9w` (NOT 001, 002, or "bat", "tok")
-   - Include motivation, research, decisions, spec
+   - Use 3-char alphanumeric code: `a7z`, `k3p`, `m9w` (avoid 001, 002, or bat, tok)
+   - Each proposal contains: `proposal.md`, `research.md`, `decision-XXX-name.md` files
+   - `<area>` = protocol, cli, sdk, or bridge
 3. **Incorporate into specs** - Update main spec docs, mark CHANGELOG as needing implementation
 4. **Create implementation plan** (if complex) - `spec/integration-plans/XXX-name.md`
 5. **Implement code** - Write code, tests, examples; update CHANGELOG status
@@ -104,6 +108,7 @@ When making changes, follow the workflow in `CONTRIBUTING.md`:
 - Proposals stay in `proposals/` permanently (status tracked in CHANGELOG)
 - Specs and code developed together in same PR
 - All changes must update relevant specs
+- If you code first, backfill proposal/spec/CHANGELOG before opening PR
 - See `CONTRIBUTING.md` for full workflow details
 
 ## Key Files
@@ -139,7 +144,6 @@ When making changes, follow the workflow in `CONTRIBUTING.md`:
 - Testing: `docs/testing.md`
 - Templates: `docs/templates.md`
 - Releasing: `docs/releasing.md`
-
 ## Specs Navigation
 - All specs: `spec/README.md`
 - Protocol (v0.4): `spec/protocol/SPEC.md`
