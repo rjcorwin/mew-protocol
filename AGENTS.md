@@ -88,6 +88,25 @@ mew space down
 4. Check TypeScript errors: `npm run lint`
 5. Rebuild after changes: `npm run build`
 
+## Spec-Driven Development (IMPORTANT!)
+
+When making changes, follow the workflow in `CONTRIBUTING.md`:
+
+1. **Start with CHANGELOG** - Add entry to `CHANGELOG.md` "Next" section
+2. **Create proposal** - Document in `spec/<area>/proposals/XXX-name/`
+   - Use 3-char alphanumeric code: `a7z`, `k3p`, `m9w` (NOT 001, 002, or "bat", "tok")
+   - Include motivation, research, decisions, spec
+3. **Incorporate into specs** - Update main spec docs, mark CHANGELOG as needing implementation
+4. **Create implementation plan** (if complex) - `spec/integration-plans/XXX-name.md`
+5. **Implement code** - Write code, tests, examples; update CHANGELOG status
+6. **Submit PR** - Include proposals, spec updates, code, tests, CHANGELOG
+
+**Key points:**
+- Proposals stay in `proposals/` permanently (status tracked in CHANGELOG)
+- Specs and code developed together in same PR
+- All changes must update relevant specs
+- See `CONTRIBUTING.md` for full workflow details
+
 ## Key Files
 - Protocol types: `src/types/protocol.ts`
 - Gateway: `src/cli/commands/gateway.ts`
@@ -103,9 +122,17 @@ mew space down
 - DO update specs if changing protocol
 
 ## Making Changes
-1. **Protocol changes**: Update spec/protocol/draft/ → src/types/ → implementations → tests
-2. **New features**: Check spec → implement → test → document
-3. **Bug fixes**: Write failing test → fix → verify all tests pass
+
+**All changes must follow the spec-driven workflow above.** Quick reference:
+
+1. **New features/protocol changes**:
+   - Create proposal in `spec/<area>/proposals/XXX-name/`
+   - Update specs, add to CHANGELOG
+   - Implement: types → implementations → tests
+
+2. **Bug fixes**:
+   - If trivial: Write failing test → fix → verify
+   - If significant: Create proposal documenting the issue and fix
 
 ## Documentation
 - Main docs hub: `docs/README.md`
