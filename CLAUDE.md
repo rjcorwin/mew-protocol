@@ -1,8 +1,7 @@
 # 🤖 Agent Quick Reference - MEW Protocol
 
 ## Critical Docs (READ FIRST AND UPDATE AFTER COMPLETING WORK)
-- MEW Protocol: spec/protocol/v0.4/SPEC.md (current stable)
-- Protocol Draft: spec/protocol/draft/SPEC.md (next version)
+- MEW Protocol: spec/protocol/SPEC.md (v0.4)
 - CLI Spec: spec/cli/SPEC.md
 - SDK Spec: spec/sdk/SPEC.md
 - Bridge Spec: spec/bridge/SPEC.md
@@ -140,12 +139,9 @@ When making changes, follow the workflow in `CONTRIBUTING.md`:
 - Testing: `docs/testing.md`
 - Templates: `docs/templates.md`
 - Releasing: `docs/releasing.md`
-- Spec guide: `docs/guides/SPEC-GUIDE.md`
-
 ## Specs Navigation
 - All specs: `spec/README.md`
-- Protocol v0.4 (stable): `spec/protocol/v0.4/SPEC.md`
-- Protocol draft (next): `spec/protocol/draft/SPEC.md`
+- Protocol (v0.4): `spec/protocol/SPEC.md`
 - CLI spec: `spec/cli/SPEC.md`
 - SDK spec: `spec/sdk/SPEC.md`
 - Bridge spec: `spec/bridge/SPEC.md`

@@ -51,7 +51,7 @@ The **proposal mechanism** ensures humans stay in control. New agents start with
 
 **v0.4** - Released 2025-09-26 🎉
 
-MEW Protocol is in experimental phase (v0.x) with breaking changes allowed between versions. See [spec/protocol/v0.4/SPEC.md](spec/protocol/v0.4/SPEC.md) for the current specification.
+MEW Protocol is in experimental phase (v0.x) with breaking changes allowed between versions. See [spec/protocol/SPEC.md](spec/protocol/SPEC.md) for the current specification.
 
 ## 🚀 Quick Start
 
@@ -97,9 +97,11 @@ See [docs/README.md](docs/README.md) for complete documentation including:
 
 ## 📋 Specifications
 
-- [Current Specification (v0.4)](spec/protocol/v0.4/SPEC.md)
-- [Draft Specification (next version)](spec/protocol/draft/SPEC.md)
-- [Architecture Decision Records](spec/protocol/v0.4/accepted/)
+- [Protocol Specification](spec/protocol/SPEC.md) - Core MEW Protocol (v0.4)
+- [CLI Specification](spec/cli/SPEC.md) - Command-line interface
+- [SDK Specification](spec/sdk/SPEC.md) - TypeScript SDK
+- [Bridge Specification](spec/bridge/SPEC.md) - MCP-MEW bridge
+- [All Specifications](spec/README.md) - Complete spec hub
 - [Changelog](CHANGELOG.md)
 
 ## 🐈 Why "MEW"?
