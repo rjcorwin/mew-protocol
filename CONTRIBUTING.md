@@ -19,6 +19,8 @@ Thank you for contributing to MEW Protocol! This guide covers how to contribute 
 
 MEW Protocol follows a spec-driven development approach where specifications are designed and documented before code implementation. All changes begin with a CHANGELOG entry that tracks the proposal and implementation status throughout the lifecycle.
 
+**Note:** If you've already implemented code changes, that's okay! Before opening your PR, create a proposal documenting the design, incorporate it into the relevant spec, and add a CHANGELOG entry. This ensures we maintain clear documentation of all changes.
+
 ### Lifecycle Stages
 
 1. **Draft** - Add CHANGELOG entry, design and write proposals in proposals/ (in Draft PR)
@@ -29,13 +31,23 @@ MEW Protocol follows a spec-driven development approach where specifications are
 6. **Merge** - Merge approved changes (specs + code together)
 7. **Release** - Tag version with all merged changes (happens later)
 
-### Folder Structure
+### Folder Structure & Naming
 
-- **`spec/<area>/proposals/XXX-name/`** - All proposals (status tracked in CHANGELOG)
-  - XXX = unique 3-character alphanumeric code (e.g., `a7z`, `k3p`, `m9w`)
-- **`spec/<area>/rejected/XXX-name/`** - Rejected proposals (moved out of proposals/)
-- **`spec/integration-plans/XXX-name.md`** - Implementation plans for complex changes
-  - XXX = unique 3-character alphanumeric code (e.g., `b4x`, `r8n`)
+**Note:** `<area>` refers to the spec area: `protocol`, `cli`, `sdk`, or `bridge`
+
+**Proposals:** `spec/<area>/proposals/XXX-name/`
+- XXX = unique 3-character alphanumeric code (e.g., `a7z`, `k3p`, `m9w`; avoid 001, 002, or bat, tok)
+- name = kebab-case description (e.g., `message-batching`, `token-limits`)
+- Each proposal directory contains:
+  - `proposal.md` - Main specification with motivation, goals, technical details
+  - `research.md` - Background research, constraints, current state, prior art
+  - `decision-XXX-name.md` - Individual ADR-style decision records as needed
+
+**Rejected proposals:** `spec/<area>/rejected/XXX-name/`
+
+**Implementation plans:** `spec/integration-plans/XXX-name.md`
+- Same XXX-name format as proposals
+- Optional, for complex changes requiring coordination
 
 ### Core Documents
 
@@ -43,14 +55,6 @@ MEW Protocol follows a spec-driven development approach where specifications are
 - **Main Specs** - Authoritative documentation (updated from proposals)
 - **CHANGELOG.md** - Tracks status of all proposals (Draft → Needs Implementation → In Progress → Done → Released)
 - **Implementation Plans** - Guides code development (optional, for complex changes)
-
-### Naming Convention
-
-- Proposals and implementation plans use unique 3-character alphanumeric codes
-- Format: `XXX-descriptive-name` (e.g., `a7z-message-batching`, `k3p-token-limits`, `m9w-new-feature`)
-- Codes must be unique within their scope (proposals per spec area, implementation plans globally)
-- Use random alphanumeric combinations (mix letters and numbers) to avoid conflicts across concurrent PRs
-- Avoid sequential numbers (001, 002) or word-like abbreviations (bat, tok) that may conflict
 
 ---
 
