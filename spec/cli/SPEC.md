@@ -1474,7 +1474,7 @@ A lightweight terminal interface for protocol debugging and automated testing. T
 
 ### MCP Operation Confirmation Workflow
 
-The advanced interactive mode includes built-in confirmation dialogs for MCP (Model Context Protocol) operations that require human approval. The implementation follows a phased approach from [ADR-009: Approval Dialog UX](./decisions/accepted/009-aud-approval-dialog-ux.md).
+The advanced interactive mode includes built-in confirmation dialogs for MCP (Model Context Protocol) operations that require human approval. The implementation follows a phased approach from [ADR-009: Approval Dialog UX](./proposals/aud-approval-dialog-ux.md).
 
 #### Phase 1: Generic Template (✅ IMPLEMENTED)
 
