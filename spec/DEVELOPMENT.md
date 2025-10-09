@@ -19,11 +19,20 @@ All changes begin with a CHANGELOG entry that tracks the proposal and implementa
 
 **Folder Structure**:
 - **`spec/<area>/proposals/XXX-name/`** - All proposals (status tracked in CHANGELOG)
+  - XXX = unique 3-character alphanumeric code (e.g., `a7z`, `k3p`, `m9w`)
 - **`spec/<area>/rejected/XXX-name/`** - Rejected proposals (moved out of proposals/)
-- **`spec/integration-plans/`** - Implementation plans for complex changes
+- **`spec/integration-plans/XXX-name.md`** - Implementation plans for complex changes
+  - XXX = unique 3-character alphanumeric code (e.g., `b4x`, `r8n`)
 
 **Core Documents**:
 - **Proposals** - Design rationale, research, decisions (stay in `proposals/` permanently)
 - **Main Specs** - Authoritative documentation (updated from proposals)
 - **CHANGELOG.md** - Tracks status of all proposals (Draft → Needs Implementation → In Progress → Done → Released)
 - **Implementation Plans** - Guides code development (optional, for complex changes)
+
+**Naming Convention**:
+- Proposals and implementation plans use unique 3-character alphanumeric codes
+- Format: `XXX-descriptive-name` (e.g., `a7z-message-batching`, `k3p-token-limits`, `m9w-new-feature`)
+- Codes must be unique within their scope (proposals per spec area, implementation plans globally)
+- Use random alphanumeric combinations (mix letters and numbers) to avoid conflicts across concurrent PRs
+- Avoid sequential numbers (001, 002) or word-like abbreviations (bat, tok) that may conflict
