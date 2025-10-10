@@ -21,4 +21,3 @@
 5. /thinking slash command to toggle display of those sections in chat messages.
 7. "Selected code" VSCode integration
 
-- Figure out how to give coding agents the ability to run mew interactive cli and test
