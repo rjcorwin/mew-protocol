@@ -77,6 +77,27 @@ mew space up
 
 ---
 
+### isometric-fleet
+
+**Purpose**: Experiment with multiplayer movement streaming and shared vehicle mechanics
+
+**What it includes**:
+- Four pre-registered human participants for manual play
+- Four MEW agents following patrol routes via the isometric world simulation
+- A demo ship (`aurora-skiff`) that maintains boarded player positions while cruising
+- Streaming hooks that broadcast the world snapshot to connected clients
+
+**Try it**:
+```bash
+mew init isometric-fleet
+cd isometric-fleet
+mew space up
+```
+
+**Use case**: Prototype isometric Phaser/Electron clients that need synchronized player and ship state before the full rendering stack is ready.
+
+---
+
 ## Template Structure
 
 Each template contains:

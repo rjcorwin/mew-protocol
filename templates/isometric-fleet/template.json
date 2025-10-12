@@ -1,0 +1,49 @@
+{
+  "name": "isometric-fleet",
+  "description": "Multiplayer isometric playground with four humans, four MEW agents, and a shared ship",
+  "author": "MEW Protocol Team",
+  "version": "0.1.0",
+  "tags": ["demo", "game", "isometric"],
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Name of your space",
+      "default": "${dirname}",
+      "prompt": true
+    },
+    {
+      "name": "UI_THEME",
+      "description": "UI theme for the default dashboard",
+      "default": "light",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_API_KEY",
+      "description": "API key for autonomous MEW agents",
+      "env_sources": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "API_KEY"],
+      "default": "",
+      "prompt": true,
+      "sensitive": true,
+      "required": false
+    },
+    {
+      "name": "AGENT_BASE_URL",
+      "description": "Base URL for the LLM API",
+      "env_sources": ["OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "BASE_URL"],
+      "default": "https://api.openai.com/v1",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_MODEL",
+      "description": "Model used by the MEW agents",
+      "default": "gpt-5",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_PROMPT",
+      "description": "System prompt for the MEW agents",
+      "default": "You coordinate a crew of explorers inside an isometric world. Keep everyone updated on their position and ensure the ship stays safe.",
+      "prompt": false
+    }
+  ]
+}
