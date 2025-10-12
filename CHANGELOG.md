@@ -7,6 +7,7 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 ### Added
 - **Isometric Fleet template** – New multiplayer-ready space template featuring four humans, four MEW agents, and a streaming ship controller for prototyping Phaser/Electron clients.
 - **Isometric world simulation helpers** – Introduced `src/game/isometric` with reusable world, agent, and ship controllers for synchronizing player positions via MEW streams.
+- **Isometric Fleet MCP server** – Added `mew mcp isometric-fleet` so the Aurora Skiff bridge can expose helm tools, notifications, and world snapshots out of the box.
 
 ## [v0.5.1] - 2025-01-06
 

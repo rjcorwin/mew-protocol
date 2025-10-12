@@ -213,6 +213,127 @@ pm2 list
 ✅ Cat started moving through the maze
 ✅ All processes stopped cleanly
 
+## Isometric Fleet Template
+
+The isometric fleet template showcases the new world simulation helpers and the accompanying `isometric-fleet` MCP server. Use it when you want to prototype a multiplayer top-down client with streaming positions, patrol agents, and a controllable ship.
+
+### What's in the Isometric Fleet Template?
+
+- **Gateway**: Routes chat, stream, and MCP envelopes between all participants
+- **Humans**: Four explorers (`human-1`..`human-4`) ready to connect from clients
+- **MEW agents**: Four patrol bots (`agent-1`..`agent-4`) that continually walk square paths
+- **Aurora Skiff MCP bridge**: Launches the `isometric-fleet` world server and exposes helm tools
+
+### Step 1: Create and Initialize Space
+
+```bash
+mkdir isometric-demo
+cd isometric-demo
+
+mew init isometric-fleet --name isometric-demo
+```
+
+The initializer copies `.mew/space.yaml`, seeds the MCP bridge config, and prepares token storage.
+
+### Step 2: Start the Space
+
+```bash
+mew space up
+```
+
+You should see PM2 processes for the gateway, four MEW agents, and the Aurora Skiff MCP bridge. Confirm with `pm2 list`.
+
+### Step 3: Fetch a World Snapshot
+
+Grab a human token and call the `get_world_state` tool to verify the MCP bridge is reachable:
+
+```bash
+HUMAN_TOKEN=$(cat .mew/tokens/human-1.token)
+
+curl -X POST "http://localhost:8080/participants/human-1/messages?space=isometric-demo" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${HUMAN_TOKEN}" \
+  -d '{
+    "protocol": "mew/v0.4",
+    "id": "snapshot-1",
+    "from": "human-1",
+    "to": ["aurora-skiff"],
+    "kind": "mcp/request",
+    "payload": {
+      "method": "tools/call",
+      "params": {
+        "name": "get_world_state",
+        "arguments": {}
+      }
+    }
+  }'
+```
+
+The response contains a structured list of players, their current positions, and the Aurora Skiff velocity.
+
+### Step 4: Steer the Ship
+
+Use `set_ship_heading` to adjust the vessel. This example slows the ship and nudges it north-east:
+
+```bash
+curl -X POST "http://localhost:8080/participants/human-1/messages?space=isometric-demo" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${HUMAN_TOKEN}" \
+  -d '{
+    "protocol": "mew/v0.4",
+    "id": "helm-1",
+    "from": "human-1",
+    "to": ["aurora-skiff"],
+    "kind": "mcp/request",
+    "payload": {
+      "method": "tools/call",
+      "params": {
+        "name": "set_ship_heading",
+        "arguments": {
+          "shipId": "aurora-skiff",
+          "headingX": 0.25,
+          "headingY": 0.2
+        }
+      }
+    }
+  }'
+```
+
+Watch the terminal logs or subscribe to the `isometric/world-snapshot` notifications to see the ship and boarded players update.
+
+### Step 5: Board a Player
+
+To put `human-1` on the ship deck:
+
+```bash
+curl -X POST "http://localhost:8080/participants/human-1/messages?space=isometric-demo" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${HUMAN_TOKEN}" \
+  -d '{
+    "protocol": "mew/v0.4",
+    "id": "board-1",
+    "from": "human-1",
+    "to": ["aurora-skiff"],
+    "kind": "mcp/request",
+    "payload": {
+      "method": "tools/call",
+      "params": {
+        "name": "board_ship",
+        "arguments": {
+          "playerId": "human-1",
+          "shipId": "aurora-skiff",
+          "deckX": 0,
+          "deckY": 0
+        }
+      }
+    }
+  }'
+```
+
+Once boarded, the player will inherit the ship velocity on every world tick. Call `disembark` to place them back on land.
+
+---
+
 ## Coder-Agent Template
 
 The coder-agent template provides an AI coding assistant with file system access and a human-in-the-loop approval workflow for file modifications.

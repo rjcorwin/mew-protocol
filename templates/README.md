@@ -84,7 +84,7 @@ mew space up
 **What it includes**:
 - Four pre-registered human participants for manual play
 - Four MEW agents following patrol routes via the isometric world simulation
-- A demo ship (`aurora-skiff`) that maintains boarded player positions while cruising
+- The built-in `isometric-fleet` MCP server powering the Aurora Skiff helm tools
 - Streaming hooks that broadcast the world snapshot to connected clients
 
 **Try it**:

@@ -61,12 +61,37 @@ mcp
   });
 
 mcp
+  .command('isometric-fleet')
+  .description('Run MCP isometric fleet world server')
+  .action(async () => {
+    const serverPath = resolve(__dirname, '../../mcp-servers/isometric-fleet.js');
+
+    const child = spawn('node', [serverPath], {
+      stdio: 'inherit',
+      cwd: process.cwd()
+    });
+
+    child.on('exit', (code) => {
+      process.exit(code || 0);
+    });
+
+    process.on('SIGINT', () => {
+      child.kill('SIGINT');
+    });
+
+    process.on('SIGTERM', () => {
+      child.kill('SIGTERM');
+    });
+  });
+
+mcp
   .command('list')
   .description('List available MCP servers')
   .action(() => {
     console.log('\nAvailable MCP servers:\n');
     console.log('  filesystem <path>  - Filesystem MCP server for file operations');
     console.log('  cat-maze           - Interactive maze game for AI agents');
+    console.log('  isometric-fleet    - Multiplayer isometric world with controllable ship');
     console.log('');
   });
 
