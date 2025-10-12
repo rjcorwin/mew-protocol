@@ -252,6 +252,8 @@ async function main(): Promise<void> {
 
 // Export for use as a module
 export { MEWAgent, AgentConfig };
+export { MobileMEWAgent } from './MobileMEWAgent.js';
+export type { MobileAgentConfig } from './MobileMEWAgent.js';
 
 // Run main if executed directly (not imported as a module)
 // Check if this is the main module (CommonJS style check for ESM compatibility)

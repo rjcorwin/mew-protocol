@@ -77,6 +77,40 @@ mew space up
 
 ---
 
+### isometric-fleet
+
+**Purpose**: Demonstrate MEW streams, AI locomotion, and MCP-driven ship control inside a shared isometric world.
+
+**What it includes**:
+- Harbor master world server that tracks players, terrain, and ship state
+- Electron/Phaser client with connection form, keyboard movement, and isometric rendering
+- Four AI deckhands powered by the `MobileMEWAgent` superclass
+- MCP tools for steering the Aurora between manual waypoints or autopilot
+
+**Try it**:
+```bash
+mew init isometric-fleet
+cd isometric-fleet
+mew space up
+
+# In another terminal run the desktop client
+cd client
+npm install
+npm start
+```
+
+**Use case**: Prototype multiplayer experiences, experiment with stream-based telemetry, and extend `MobileMEWAgent` for deterministic patrols or task-driven navigation.
+
+**Key features**:
+- **Movement streams** – Humans and agents share `isometric-player-input` streams to broadcast commands
+- **World broadcast** – Harbor master pushes `isometric-world-state` updates with player/ship telemetry
+- **Ship MCP tools** – `ship.set_manual_target` and `ship.resume_autopilot` expose helm controls via MEW
+- **Electron bridge** – Desktop UI integrates MEW participant SDKs with Phaser rendering
+
+**Full Guide**: See [docs/templates.md - Isometric Fleet Template](../docs/templates.md#isometric-fleet-template)
+
+---
+
 ## Template Structure
 
 Each template contains:

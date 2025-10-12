@@ -1,0 +1,14 @@
+{
+  "name": "isometric-fleet-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@mew-protocol/mew": "^0.5.1",
+    "electron": "^32.2.0",
+    "phaser": "^3.80.0"
+  }
+}

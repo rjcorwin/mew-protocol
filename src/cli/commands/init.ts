@@ -131,63 +131,40 @@ class InitCommand {
    * Discover available templates from various sources
    */
   async discoverTemplates() {
-    const templates = [];
+    const templateMap = new Map();
 
-    // Built-in templates
-    try {
-      const builtIn = await fs.readdir(this.templatesDir);
-      for (const name of builtIn) {
-        const templatePath = path.join(this.templatesDir, name);
-        const stat = await fs.stat(templatePath);
-        if (stat.isDirectory()) {
-          templates.push({
-            name,
-            path: templatePath,
-            source: 'built-in'
-          });
-        }
+    const registerTemplate = (template, priority) => {
+      const existing = templateMap.get(template.name);
+      if (!existing || priority < existing.priority) {
+        templateMap.set(template.name, { ...template, priority });
       }
-    } catch (error) {
-      // Built-in templates directory doesn't exist
-    }
+    };
 
-    // User templates
-    try {
-      const userTemplates = await fs.readdir(this.userTemplatesDir);
-      for (const name of userTemplates) {
-        const templatePath = path.join(this.userTemplatesDir, name);
-        const stat = await fs.stat(templatePath);
-        if (stat.isDirectory()) {
-          templates.push({
-            name,
-            path: templatePath,
-            source: 'user'
-          });
+    const scanDirectory = async (directory, source, priority) => {
+      try {
+        const entries = await fs.readdir(directory);
+        for (const name of entries) {
+          const templatePath = path.join(directory, name);
+          const stat = await fs.stat(templatePath);
+          if (stat.isDirectory()) {
+            registerTemplate({
+              name,
+              path: templatePath,
+              source
+            }, priority);
+          }
         }
+      } catch {
+        // Directory doesn't exist - ignore
       }
-    } catch {
-      // User templates directory doesn't exist
-    }
+    };
 
-    // Local templates
-    try {
-      const localTemplates = await fs.readdir(this.localTemplatesDir);
-      for (const name of localTemplates) {
-        const templatePath = path.join(this.localTemplatesDir, name);
-        const stat = await fs.stat(templatePath);
-        if (stat.isDirectory()) {
-          templates.push({
-            name,
-            path: templatePath,
-            source: 'local'
-          });
-        }
-      }
-    } catch {
-      // Local templates directory doesn't exist
-    }
+    // Lower priority number wins so local overrides user which overrides built-in
+    await scanDirectory(this.templatesDir, 'built-in', 2);
+    await scanDirectory(this.userTemplatesDir, 'user', 1);
+    await scanDirectory(this.localTemplatesDir, 'local', 0);
 
-    return templates;
+    return Array.from(templateMap.values()).map(({ priority, ...template }) => template);
   }
 
   /**
