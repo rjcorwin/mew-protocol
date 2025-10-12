@@ -1,0 +1,175 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "{{SPACE_NAME}}"
+  description: "Isometric crew simulation with humans, MEW agents, and a shared ship"
+  default_participant: human-1
+  ui_theme: "{{UI_THEME}}"
+
+participants:
+  human-1:
+    default_to:
+      chat: ["aurora-skiff", "agent-1", "agent-2", "agent-3", "agent-4"]
+    capabilities:
+      - kind: "*"
+  human-2:
+    default_to:
+      chat: ["aurora-skiff", "agent-1", "agent-2", "agent-3", "agent-4"]
+    capabilities:
+      - kind: "*"
+  human-3:
+    default_to:
+      chat: ["aurora-skiff", "agent-1", "agent-2", "agent-3", "agent-4"]
+    capabilities:
+      - kind: "*"
+  human-4:
+    default_to:
+      chat: ["aurora-skiff", "agent-1", "agent-2", "agent-3", "agent-4"]
+    capabilities:
+      - kind: "*"
+
+  agent-1:
+    type: local
+    command: "mew"
+    args:
+      [
+        "agent",
+        "run",
+        "--gateway",
+        "ws://localhost:${PORT}",
+        "--space",
+        "{{SPACE_NAME}}",
+        "--token",
+        "${TOKEN}",
+        "--id",
+        "agent-1"
+      ]
+    auto_start: true
+    env:
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
+      OPENAI_MODEL: "{{AGENT_MODEL}}"
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+  agent-2:
+    type: local
+    command: "mew"
+    args:
+      [
+        "agent",
+        "run",
+        "--gateway",
+        "ws://localhost:${PORT}",
+        "--space",
+        "{{SPACE_NAME}}",
+        "--token",
+        "${TOKEN}",
+        "--id",
+        "agent-2"
+      ]
+    auto_start: true
+    env:
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
+      OPENAI_MODEL: "{{AGENT_MODEL}}"
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+  agent-3:
+    type: local
+    command: "mew"
+    args:
+      [
+        "agent",
+        "run",
+        "--gateway",
+        "ws://localhost:${PORT}",
+        "--space",
+        "{{SPACE_NAME}}",
+        "--token",
+        "${TOKEN}",
+        "--id",
+        "agent-3"
+      ]
+    auto_start: true
+    env:
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
+      OPENAI_MODEL: "{{AGENT_MODEL}}"
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+  agent-4:
+    type: local
+    command: "mew"
+    args:
+      [
+        "agent",
+        "run",
+        "--gateway",
+        "ws://localhost:${PORT}",
+        "--space",
+        "{{SPACE_NAME}}",
+        "--token",
+        "${TOKEN}",
+        "--id",
+        "agent-4"
+      ]
+    auto_start: true
+    env:
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "{{AGENT_BASE_URL}}"
+      OPENAI_MODEL: "{{AGENT_MODEL}}"
+      AGENT_PROMPT: "{{AGENT_PROMPT}}"
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+
+  aurora-skiff:
+    type: local
+    command: "mew"
+    args:
+      [
+        "bridge",
+        "start",
+        "--gateway",
+        "ws://localhost:${PORT}",
+        "--space",
+        "{{SPACE_NAME}}",
+        "--token",
+        "${TOKEN}",
+        "--participant-id",
+        "aurora-skiff",
+        "--mcp-command",
+        "mew",
+        "--mcp-args",
+        "mcp,isometric-fleet"
+      ]
+    auto_start: true
+    capabilities:
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+
+defaults:
+  capabilities:
+    - kind: "chat"
+    - kind: "stream/open"
+    - kind: "stream/close"
