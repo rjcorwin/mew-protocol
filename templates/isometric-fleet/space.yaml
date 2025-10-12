@@ -1,0 +1,184 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Isometric Fleet - {{SPACE_NAME}}"
+  description: "Sail the Aurora, coordinate four humans and four MEW agents, and explore a shared harbor in real time."
+  default_participant: human-alpha
+  ui_theme: "{{UI_THEME}}"
+
+participants:
+  harbor-master:
+    type: local
+    command: node
+    args:
+      - "./agents/isometric-world-server.mjs"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "${TOKEN}"
+      - "--participant-id"
+      - "harbor-master"
+    auto_start: true
+    capabilities:
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "participant/status"
+
+  mew-agent-1:
+    type: local
+    command: node
+    args:
+      - "./agents/isometric-agent-runner.mjs"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "${TOKEN}"
+      - "--id"
+      - "mew-agent-1"
+      - "--name"
+      - "Deckhand Ada"
+    auto_start: true
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+
+  mew-agent-2:
+    type: local
+    command: node
+    args:
+      - "./agents/isometric-agent-runner.mjs"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "${TOKEN}"
+      - "--id"
+      - "mew-agent-2"
+      - "--name"
+      - "Deckhand Bruno"
+    auto_start: true
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+
+  mew-agent-3:
+    type: local
+    command: node
+    args:
+      - "./agents/isometric-agent-runner.mjs"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "${TOKEN}"
+      - "--id"
+      - "mew-agent-3"
+      - "--name"
+      - "Deckhand Celeste"
+    auto_start: true
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+
+  mew-agent-4:
+    type: local
+    command: node
+    args:
+      - "./agents/isometric-agent-runner.mjs"
+      - "--gateway"
+      - "ws://localhost:${PORT}"
+      - "--space"
+      - "{{SPACE_NAME}}"
+      - "--token"
+      - "${TOKEN}"
+      - "--id"
+      - "mew-agent-4"
+      - "--name"
+      - "Deckhand Dax"
+    auto_start: true
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "participant/status"
+
+  human-alpha:
+    default_to:
+      chat: ["harbor-master"]
+    capabilities:
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "participant/status"
+
+  human-beta:
+    default_to:
+      chat: ["harbor-master"]
+    capabilities:
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "participant/status"
+
+  human-gamma:
+    default_to:
+      chat: ["harbor-master"]
+    capabilities:
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "participant/status"
+
+  human-delta:
+    default_to:
+      chat: ["harbor-master"]
+    capabilities:
+      - kind: "chat"
+      - kind: "chat/acknowledge"
+      - kind: "chat/cancel"
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "mcp/request"
+      - kind: "mcp/response"
+      - kind: "participant/status"
+
+defaults:
+  capabilities:
+    - kind: "chat"

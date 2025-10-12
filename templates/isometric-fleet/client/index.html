@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Isometric Fleet Client</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(180deg, #0f172a 0%, #1f2937 100%);
+        color: #f8fafc;
+      }
+      header {
+        padding: 16px 24px;
+        background: rgba(15, 23, 42, 0.9);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+      }
+      header h1 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: 0.05em;
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 64px);
+      }
+      #connect-panel {
+        padding: 16px 24px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        background: rgba(15, 23, 42, 0.8);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      #connect-panel label {
+        display: flex;
+        flex-direction: column;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(226, 232, 240, 0.85);
+      }
+      #connect-panel input {
+        margin-top: 6px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(15, 23, 42, 0.6);
+        color: #f8fafc;
+      }
+      #connect-panel button {
+        padding: 10px 14px;
+        border-radius: 6px;
+        border: none;
+        background: #38bdf8;
+        color: #0f172a;
+        font-weight: 600;
+        cursor: pointer;
+        align-self: flex-end;
+      }
+      #status-bar {
+        padding: 8px 24px;
+        font-size: 13px;
+        background: rgba(15, 23, 42, 0.7);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      #game-container {
+        flex: 1;
+        position: relative;
+      }
+      #game-container canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+      }
+      #overlay-message {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(226, 232, 240, 0.8);
+        pointer-events: none;
+        font-size: 18px;
+        letter-spacing: 0.04em;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Isometric Fleet Bridge</h1>
+    </header>
+    <main>
+      <form id="connect-panel">
+        <label>Gateway URL
+          <input id="gateway" name="gateway" type="text" value="ws://localhost" required />
+        </label>
+        <label>Port
+          <input id="port" name="port" type="number" value="8080" min="1" max="65535" required />
+        </label>
+        <label>Space
+          <input id="space" name="space" type="text" value="isometric-fleet" required />
+        </label>
+        <label>Token
+          <input id="token" name="token" type="password" required />
+        </label>
+        <label>Participant ID
+          <input id="participant" name="participant" type="text" value="human-alpha" required />
+        </label>
+        <label>Display Name
+          <input id="username" name="username" type="text" value="Harbor Guest" />
+        </label>
+        <div style="grid-column: span 2; display:flex; gap:12px; align-items:flex-end;">
+          <button id="connect" type="submit">Connect</button>
+          <button id="disconnect" type="button">Disconnect</button>
+        </div>
+      </form>
+      <div id="status-bar">Disconnected</div>
+      <div id="game-container">
+        <div id="overlay-message">Connect to render the harbor.</div>
+      </div>
+    </main>
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>

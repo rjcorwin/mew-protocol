@@ -1,0 +1,26 @@
+{
+  "name": "isometric-fleet",
+  "description": "Multiplayer harbor with Phaser/Electron client, AI crewmates, and controllable ship",
+  "author": "MEW Protocol Team",
+  "version": "1.0.0",
+  "tags": [
+    "game",
+    "demo",
+    "isometric",
+    "electron"
+  ],
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Name of your space",
+      "default": "${dirname}",
+      "prompt": true
+    },
+    {
+      "name": "UI_THEME",
+      "description": "CLI theme to use when connecting",
+      "default": "midnight",
+      "prompt": true
+    }
+  ]
+}

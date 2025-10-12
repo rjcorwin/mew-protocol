@@ -652,6 +652,60 @@ mew client connect
 
 The note-taker agent is designed for simple, conversational note-taking without file system access or complex tool integration.
 
+## Isometric Fleet Template
+
+The **Isometric Fleet** template turns a MEW space into a multiplayer harbor. Four humans can join via the Electron/Phaser client, four MEW agents wander the docks using the new `MobileMEWAgent` superclass, and a rule-based ship sails between waypoints.
+
+### What's Included?
+
+- **Harbor Master** (`harbor-master`): Node-based world server that maintains terrain, players, and ship state, broadcasting positions over a MEW stream.
+- **AI Deckhands** (`mew-agent-1` … `mew-agent-4`): Mobile MEW agents that explore the docks using deterministic pathfinding (no LLM calls required).
+- **Electron Client** (`client/`): Cross-platform desktop client with Phaser isometric rendering, connection form, and keyboard controls.
+- **Ship MCP Tools**: `ship.set_manual_target` and `ship.resume_autopilot` tools let humans or agents steer the Aurora.
+
+### Quick Start
+
+```bash
+mew init isometric-fleet
+cd isometric-fleet
+mew space up
+
+# Start the desktop client in another terminal
+cd client
+npm install
+npm start
+```
+
+1. Launch the Electron app (`npm start`).
+2. Enter the gateway URL (`ws://localhost`), port from `mew space up`, target space name, token, participant ID (`human-alpha` … `human-delta`), and desired display name.
+3. Click **Connect**. The harbor renders once the world stream is active.
+4. Use **WASD** or arrow keys to walk. Press **B** to request a disembark.
+
+### Participants and Roles
+
+| Participant          | Role                                | Notes |
+| -------------------- | ----------------------------------- | ----- |
+| `harbor-master`      | World server & MCP tool host        | Auto-starts, exposes ship controls |
+| `mew-agent-1` … `4`  | AI deckhands using `MobileMEWAgent` | Roam the docks at 1.6 tiles/sec |
+| `human-alpha` … `delta` | Human slots for Electron client | Stream permissions + MCP access |
+
+### Ship Controls (MCP Tools)
+
+- `ship.set_manual_target` – Provide `{ "x": number, "y": number }` to direct the Aurora to a specific tile (must accommodate the 3×3 deck footprint).
+- `ship.resume_autopilot` – Revert to the default patrol loop through the harbor channel.
+
+### Keyboard Controls
+
+- **Arrow Keys / WASD** – Move one tile (world server enforces speed caps).
+- **B** – Attempt to disembark from the ship onto adjacent walkable tiles.
+- Boarding is automatic: step onto a deck tile and the harbor master tracks relative deck coordinates.
+
+### MobileMEWAgent Highlights
+
+- Requests a movement stream (`isometric-player-input`) and throttles commands based on configured speed.
+- Listens for world broadcast stream (`isometric-world-state`), parses terrain, and uses BFS to pick new destinations.
+- Default configuration avoids water tiles (`stayOnGround` optional) and runs with `mockLLM: true` for deterministic behavior.
+
 ## Next Steps
 
 - Explore [Testing Guide](testing.md) for automated test scenarios
