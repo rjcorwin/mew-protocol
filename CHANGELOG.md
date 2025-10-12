@@ -8,6 +8,9 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 - **Isometric Fleet template** – Phaser/Electron client, harbor master world server, MCP ship controls, and eight-participant space for multiplayer navigation demos.
 - **MobileMEWAgent superclass** – Movement-aware extension of `MEWAgent` with stream bookkeeping, throttled move commands, and grid-based pathfinding for AI locomotion.
 
+### Fixed
+- **Template discovery precedence** – Ensure `mew init` lists the isometric-fleet template and favors local overrides when template names collide.
+
 ## [v0.5.1] - 2025-01-06
 
 ### Fixed
