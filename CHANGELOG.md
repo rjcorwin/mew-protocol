@@ -4,6 +4,9 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Isometric fleet demo** - Introduced a Phaser/Electron multiplayer client with movement streaming helpers and a matching space template featuring four humans, four MEW copilots, and ship deck support.
+
 ## [v0.5.1] - 2025-01-06
 
 ### Fixed

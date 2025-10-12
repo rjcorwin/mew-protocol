@@ -9,3 +9,6 @@ export { MEWClient, ClientOptions } from './MEWClient.js';
 
 // Type exports
 export * from './types.js';
+
+// Game client exports
+export * from './game/index.js';

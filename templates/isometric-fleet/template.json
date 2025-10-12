@@ -1,0 +1,66 @@
+{
+  "name": "isometric-fleet",
+  "description": "Multiplayer isometric fleet with four humans, four MEW agents, and sharable navigation streams",
+  "author": "MEW Protocol Team",
+  "version": "0.1.0",
+  "tags": [
+    "game",
+    "demo",
+    "phaser",
+    "electron"
+  ],
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Name of your space",
+      "default": "${dirname}",
+      "prompt": true
+    },
+    {
+      "name": "UI_THEME",
+      "description": "UI theme for the gateway",
+      "default": "midnight",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_API_KEY",
+      "description": "API key for AI copilots (optional - required if you want the MEW agents to plan routes)",
+      "env_sources": [
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "API_KEY"
+      ],
+      "default": "",
+      "prompt": true,
+      "sensitive": true,
+      "required": false
+    },
+    {
+      "name": "AGENT_BASE_URL",
+      "description": "Base URL for AI copilots",
+      "env_sources": [
+        "OPENAI_BASE_URL",
+        "ANTHROPIC_BASE_URL",
+        "BASE_URL"
+      ],
+      "default": "https://api.openai.com/v1",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_MODEL",
+      "description": "Model to use for AI copilots",
+      "env_sources": [
+        "AGENT_MODEL",
+        "MODEL_NAME"
+      ],
+      "default": "gpt-4o",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_PROMPT",
+      "description": "System prompt for MEW copilots",
+      "default": "You are a MEW fleet navigator responsible for guiding ships and teammates across an isometric ocean. Provide succinct status updates and request human confirmation before taking control of shared assets.",
+      "prompt": false
+    }
+  ]
+}
