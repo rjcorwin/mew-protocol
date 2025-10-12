@@ -37,4 +37,4 @@ Fill in the gateway URL, port, username (matching a participant such as `human-1
 
 ## Ship Autopilot
 
-The Phaser scene includes deck support for ships. You can broadcast ship position updates by creating a participant that sends `ship-update` frames over the movement stream using the exported `MovementStream` helper from `@mew-protocol/mew/client/game`.
+The Phaser scene includes deck support for ships. You can broadcast ship position updates by creating a participant that sends `ship-update` frames over the movement stream using the `MovementStream` helper located at `@mew-protocol/mew/dist/client/game/network/MovementStream.js`.
