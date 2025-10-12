@@ -4,6 +4,14 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Isometric fleet demo** - Introduced a Phaser/Electron multiplayer client with movement streaming helpers and a matching space template featuring four humans, four MEW copilots, and ship deck support.
+
+### Fixed
+- **Template discovery** - Added automated coverage that provisions the isometric fleet template
+  through `mew init` so the CLI continues to surface it and generate a runnable space configuration.
+- **Template discovery** - Prevented the CLI from importing the Phaser renderer during template discovery so `mew init --list-templates` works in headless Node environments and surfaces the isometric fleet template as expected.
+
 ## [v0.5.1] - 2025-01-06
 
 ### Fixed
