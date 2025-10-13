@@ -67,6 +67,10 @@ When you launch the Electron app (`npm start` from `clients/mew-world/`):
 // - Username: player1
 // - Token: (from .mew/tokens/player1.token)
 
+// MEW World uses the standard MEWClient from the SDK
+// Defined in: src/client/MEWClient.ts
+import { MEWClient } from '@mew-protocol/mew/client';
+
 const client = new MEWClient({
   gateway: 'ws://localhost:8080',
   space: 'mew-world',
@@ -364,6 +368,54 @@ If we lose contact with a player, we could predict their movement based on their
 ### Lag Compensation (Future)
 When you see other players, you're seeing them slightly in the past (due to network latency). Advanced games compensate for this. MEW World uses simple interpolation instead.
 
+## MEWClient: The Foundation
+
+MEW World doesn't implement its own WebSocket client - it uses the **standard MEWClient from the MEW Protocol SDK**.
+
+### Why This Matters
+
+**MEWClient is generic and reusable:**
+- Defined in `src/client/MEWClient.ts`
+- Handles WebSocket connections, authentication, heartbeats, reconnection
+- Used by all MEW applications: games, agents, bridges, CLI tools
+- Applications just send/receive custom message types
+
+**The abstraction layers:**
+```
+┌─────────────────────────────────────┐
+│   MEW World Game Logic              │
+│   (GameScene.ts)                    │
+│   - Sends game/position messages    │
+│   - Listens for game/position       │
+└──────────────┬──────────────────────┘
+               │ uses
+┌──────────────▼──────────────────────┐
+│   MEWClient (SDK)                   │
+│   (src/client/MEWClient.ts)         │
+│   - WebSocket management            │
+│   - Protocol envelope handling      │
+│   - Generic send/receive            │
+└──────────────┬──────────────────────┘
+               │ talks to
+┌──────────────▼──────────────────────┐
+│   MEW Gateway                       │
+│   - Routes messages between clients │
+│   - Validates capabilities          │
+└─────────────────────────────────────┘
+```
+
+**Key MEWClient methods used by MEW World:**
+- `send(envelope)` - Send any message type (MEW World sends `kind: 'game/position'`)
+- `onMessage(handler)` - Listen for all incoming messages (MEW World filters for `kind: 'game/position'`)
+- `onWelcome(handler)` - Know when connection succeeds
+- `connect()` / `disconnect()` - Connection lifecycle
+
+**Benefits:**
+- MEW World doesn't need WebSocket expertise
+- MEWClient doesn't need game logic
+- Protocol upgrades benefit all applications
+- Same pattern used by AI agents, MCP bridges, and other MEW apps
+
 ## File Reference
 
 - `spec/mew-world/SPEC.md` - Full specification
@@ -373,6 +425,7 @@ When you see other players, you're seeing them slightly in the past (due to netw
 - `clients/mew-world/src/game/GameScene.ts` - Game logic
 - `clients/mew-world/src/types.ts` - TypeScript interfaces
 - `clients/mew-world/index.html` - UI layout
+- **`src/client/MEWClient.ts`** - SDK client used by MEW World
 
 ## Next Steps
 
