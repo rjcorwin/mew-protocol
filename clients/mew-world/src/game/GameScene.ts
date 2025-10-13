@@ -88,37 +88,28 @@ export class GameScene extends Phaser.Scene {
   }
 
   private async requestPositionStream() {
-    // Request a stream for position updates
-    this.client.send({
-      kind: 'stream/request',
-      to: ['gateway'],
-      payload: {
-        description: 'player-position',
-        direction: 'bidirectional',
-      },
-    });
-
-    // Listen for stream/open response
-    this.client.on('stream/open', (envelope: any) => {
-      this.streamId = envelope.payload.stream_id;
-      console.log(`Position stream opened: ${this.streamId}`);
-    });
+    // Use a shared stream name for all players
+    this.streamId = 'mew-world-positions';
+    console.log(`Using shared position stream: ${this.streamId}`);
   }
 
   private subscribeToPositionUpdates() {
-    this.client.onStreamData((frame) => {
-      try {
-        const update: PositionUpdate = JSON.parse(frame.payload);
+    // Subscribe to position messages from all participants
+    this.client.onMessage((envelope: any) => {
+      if (envelope.kind === 'game/position') {
+        try {
+          const update: PositionUpdate = envelope.payload;
 
-        // Ignore our own updates
-        if (update.participantId === this.playerId) {
-          return;
+          // Ignore our own updates
+          if (update.participantId === this.playerId) {
+            return;
+          }
+
+          // Update or create remote player
+          this.updateRemotePlayer(update);
+        } catch (error) {
+          console.error('Failed to parse position update:', error);
         }
-
-        // Update or create remote player
-        this.updateRemotePlayer(update);
-      } catch (error) {
-        console.error('Failed to parse position update:', error);
       }
     });
   }
@@ -182,7 +173,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Publish position update at regular intervals
-    if (time - this.lastPositionUpdate > POSITION_UPDATE_RATE && this.streamId) {
+    if (time - this.lastPositionUpdate > POSITION_UPDATE_RATE) {
       this.publishPosition(velocity);
       this.lastPositionUpdate = time;
     }
@@ -203,8 +194,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private publishPosition(velocity: Phaser.Math.Vector2) {
-    if (!this.streamId) return;
-
     const update: PositionUpdate = {
       participantId: this.playerId,
       worldCoords: {
@@ -223,6 +212,11 @@ export class GameScene extends Phaser.Scene {
       platformRef: null,
     };
 
-    this.client.sendStreamData(this.streamId, JSON.stringify(update));
+    // Broadcast position to all players
+    this.client.send({
+      kind: 'game/position',
+      to: [], // Broadcast to all
+      payload: update,
+    });
   }
 }

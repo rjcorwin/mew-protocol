@@ -27,3 +27,157 @@ Ships are movable platforms implemented as non-AI MEW participants backed by an 
 ## Coordinate Systems & Relative Movement
 
 The game implements a dual coordinate system to handle players moving on moving platforms. World coordinates are absolute positions in the game world, while platform coordinates are relative offsets from a platform's origin point (used when standing on a ship). Each player's state includes a `platform_ref` field that is null when on solid ground or references a ship participant ID when aboard. When a player is on a ship, their world position is calculated as `ship.world_position + player.platform_offset`, recalculated every frame as the ship moves. Movement commands from players on ships are interpreted as relative movements within the ship's coordinate frame, with collision detection checking against the ship's deck boundaries rather than world terrain. The rendering system transforms ship-relative coordinates to screen space by first applying the ship's world transform, then the player's relative offset, ensuring players appear to move correctly both when walking on a stationary ship and when walking on a moving ship.
+
+## Current Client Implementation
+
+The Electron-based game client (`clients/mew-world`) provides the complete player experience for MEW World. Built with Electron 28, Phaser 3.90, and TypeScript, the client handles connection management, game rendering, input processing, and network synchronization.
+
+### Technology Stack
+
+- **Electron 28**: Desktop application framework providing native windowing and Node.js integration
+- **Phaser 3.90**: Game engine handling rendering, sprites, input, and game loop
+- **TypeScript**: Type-safe development with ES modules
+- **esbuild**: Fast bundling of renderer code with CommonJS output for Electron compatibility
+- **MEW SDK Client**: WebSocket-based protocol client for real-time communication
+
+### Connection Flow
+
+1. **Launch**: Application displays a connection form with four fields:
+   - Gateway URL (default: `ws://localhost:8080`)
+   - Space name (e.g., `mew-world`)
+   - Username (must match a participant ID: `player1`, `player2`, etc.)
+   - Token (from `.mew/tokens/<username>.token` in the space directory)
+
+2. **Connection**: On form submission, the client:
+   - Creates a `MEWClient` instance with the provided credentials
+   - Establishes WebSocket connection to the gateway
+   - Waits for `system/welcome` message confirming successful join
+   - Transitions from connection screen to game view
+
+3. **Game Start**: Once connected, Phaser game initializes with:
+   - 1280x720 window with resizable viewport
+   - Isometric grid (20x20 tiles, 64x32 tile dimensions)
+   - Local player sprite (green circle at center)
+   - Arrow key input binding
+   - Position update subscription
+
+### Position Synchronization Protocol
+
+Position updates use custom MEW protocol messages rather than dedicated streams, ensuring all participants receive broadcasts regardless of join order.
+
+**Message Format:**
+```typescript
+{
+  kind: "game/position",
+  to: [],  // Broadcast to all participants
+  payload: {
+    participantId: string,
+    worldCoords: { x: number, y: number },
+    tileCoords: { x: number, y: number },
+    velocity: { x: number, y: number },
+    timestamp: number,
+    platformRef: string | null
+  }
+}
+```
+
+**Publishing:**
+- Local player position published every 100ms (10 Hz)
+- Only publishes when position data is available (no throttling on movement)
+- Updates include current world coordinates, tile coordinates, velocity, and timestamp
+
+**Subscribing:**
+- Client listens for all `game/position` messages via `onMessage` handler
+- Filters out own updates by comparing `participantId`
+- Creates or updates remote player sprites based on received positions
+
+### Remote Player Rendering
+
+When a remote player's position update arrives:
+
+1. **Player Creation** (first update):
+   - Creates new Phaser sprite at received world coordinates
+   - Sets red tint to distinguish from local player (green)
+   - Stores player in `remotePlayers` Map indexed by participant ID
+   - Logs join event to console
+
+2. **Position Updates** (subsequent):
+   - Sets target position from received coordinates
+   - Stores timestamp and velocity for interpolation
+
+3. **Interpolation** (every frame):
+   - Calculates distance between sprite and target position
+   - Smoothly moves sprite toward target at 5x speed factor
+   - Prevents jittery movement from network latency
+   - Only interpolates if distance > 1 pixel (reduces unnecessary calculations)
+
+### Local Player Movement
+
+**Input Processing:**
+- Arrow keys control movement in 4 directions
+- Diagonal movement automatically normalized
+- Movement speed: 100 pixels/second
+- Delta-time based for frame-rate independence
+
+**Rendering:**
+- Local player sprite rendered as green circle (12px radius)
+- Camera follows player with smooth lerp (0.1 factor)
+- Sprite anchored at (0.5, 0.8) for proper isometric positioning
+
+### Isometric Grid System
+
+**Grid Rendering:**
+- 20x20 tile grid with diamond-shaped tiles
+- Tile dimensions: 64px wide, 32px tall
+- Alternating tile colors for visual clarity (#3a6e2f, #4a7e3f)
+- Screen position calculated via isometric projection:
+  ```
+  screenX = (x - y) * (tileWidth / 2)
+  screenY = (x + y) * (tileHeight / 2)
+  ```
+
+**Coordinate Conversion:**
+- World coordinates: Pixel positions in game space
+- Tile coordinates: Grid positions (calculated from world coords)
+- Both included in position updates for future pathfinding use
+
+### Build Process
+
+The client uses a two-stage build:
+
+1. **TypeScript Compilation**: Compiles `.ts` files to `.js` with ES module format
+2. **esbuild Bundling**: Bundles renderer code with dependencies
+   - Format: CommonJS (for Electron renderer compatibility)
+   - Platform: Node.js (to preserve Node built-ins like `events`, `ws`)
+   - Externals: `electron`, `phaser3spectorjs` (loaded at runtime)
+   - Output: `dist/renderer.bundle.js` (~6.5MB including Phaser)
+
+**Key Configuration:**
+```json
+{
+  "type": "module",
+  "main": "dist/main.js",
+  "nodeIntegration": true,
+  "contextIsolation": false
+}
+```
+
+### Multi-Instance Testing
+
+To test with multiple players:
+
+1. Build once: `npm run build`
+2. Launch multiple Electron instances: `npm start` (in separate terminals)
+3. Each instance connects with different player credentials
+4. All players see each other's movements in real-time
+5. Movement is smooth thanks to client-side interpolation
+
+### Known Limitations (Current Implementation)
+
+- No collision detection (players can overlap)
+- No terrain boundaries (players can move infinitely)
+- Simple circle sprites (no animations)
+- No AI agents yet (requires GameAgent implementation)
+- No ships yet (requires ship MCP server)
+- No platform coordinate system yet (required for ships)
+- Position updates sent continuously at 10 Hz (could optimize to only send when moving)
