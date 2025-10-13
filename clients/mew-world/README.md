@@ -91,6 +91,25 @@ npm run dev
    - Each client connects as a different player (player1, player2, etc.)
    - Move around and see each other in real-time!
 
+## Headless Simulation (No Electron)
+
+Useful for CI or remote servers where a display isn't available.
+
+```bash
+cd clients/mew-world
+npm run headless -- \
+  --gateway ws://localhost:8080 \
+  --space mew-world \
+  --participant player1 \
+  --token "$(cat /path/to/.mew/tokens/player1.token)" \
+  --duration 10000
+```
+
+- Builds the renderer, connects with `MEWClient`, and requests the shared position stream.
+- Publishes circular movement updates at 10 Hz using `sendStreamData`.
+- Logs any remote frames that arrive so you can pair it with another headless process or a running Electron client.
+- Optional flags: `--interval` (ms cadence) and `--radius` (movement distance) for stress scenarios.
+
 ## Architecture
 
 - **Main Process** (`src/main.ts`): Electron window management

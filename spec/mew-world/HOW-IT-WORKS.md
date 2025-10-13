@@ -104,6 +104,10 @@ create() {
   // Set up arrow key controls
   this.cursors = this.input.keyboard!.createCursorKeys();
 
+  // Prepare position streaming helper
+  this.positionStreamManager = new PositionStreamManager(this.client, this.playerId);
+  this.initializePositionStream();
+
   // Subscribe to position updates from other players
   this.subscribeToPositionUpdates();
 }
@@ -160,10 +164,15 @@ This is where multiplayer magic happens (see `GameScene.ts:196-221`):
 
 ```typescript
 private publishPosition(velocity: Phaser.Math.Vector2) {
+  const streamId = this.positionStreamManager.getLocalStreamId();
+  if (!streamId) {
+    return; // Stream handshake not finished yet
+  }
+
   const update: PositionUpdate = {
-    participantId: this.playerId,  // "player1"
+    participantId: this.playerId,
     worldCoords: {
-      x: this.localPlayer.x,  // Current pixel position
+      x: this.localPlayer.x,
       y: this.localPlayer.y
     },
     tileCoords: {
@@ -172,24 +181,19 @@ private publishPosition(velocity: Phaser.Math.Vector2) {
     },
     velocity: { x: velocity.x, y: velocity.y },
     timestamp: Date.now(),
-    platformRef: null  // Future: for standing on ships
+    platformRef: null
   };
 
-  // CRITICAL: Broadcast to ALL participants
-  this.client.send({
-    kind: 'game/position',  // Custom message type
-    to: [],                 // Empty = broadcast to everyone
-    payload: update
-  });
+  this.client.sendStreamData(streamId, JSON.stringify(update));
 }
 ```
 
 **What happens:**
-1. Player 1 moves → sends `game/position` message
-2. Gateway receives it
-3. Gateway looks at `to: []` (empty array = broadcast)
-4. Gateway sends message to ALL other participants
-5. Player 2's client receives it
+1. Player 1 moves → sends JSON frame on their stream (`#stream-42#{...}`)
+2. Gateway verifies Player 1 owns `stream-42`
+3. Gateway forwards the raw frame to EVERY participant in the space
+4. Player 2 receives the frame and parses it as a `PositionUpdate`
+5. Remote sprites update instantly without polluting the envelope log
 
 ### 6. Receiving Remote Players
 
@@ -197,21 +201,20 @@ Every client listens for these messages (see `GameScene.ts:96-115`):
 
 ```typescript
 private subscribeToPositionUpdates() {
-  this.client.onMessage((envelope: any) => {
-    if (envelope.kind === 'game/position') {
-      const update: PositionUpdate = envelope.payload;
+  this.client.onStreamData((frame) => {
+    const update = this.positionStreamManager.parseFrame(frame);
 
-      // Ignore our own broadcasts
-      if (update.participantId === this.playerId) {
-        return;
-      }
-
-      // Create or update remote player sprite
-      this.updateRemotePlayer(update);
+    if (!update || update.participantId === this.playerId) {
+      return;
     }
+
+    // Create or update remote player sprite
+    this.updateRemotePlayer(update);
   });
 }
 ```
+
+`PositionStreamManager` keeps stream negotiation centralized. It records every `stream/request` and `stream/open` pair, exposes the local `stream_id`, and safely parses incoming frames before the game scene touches them.
 
 **First time seeing a player** (see `GameScene.ts:117-147`):
 ```typescript
@@ -303,26 +306,24 @@ Update target position for Player 1's sprite
 Every frame (60 FPS): Interpolate toward target
 ```
 
-## Why Broadcast Instead of Streams?
+## Why Streams Instead of Broadcast?
 
-The original buggy version used individual streams:
+Broadcast envelopes were easy to prototype, but they came with heavy downsides:
 
-```typescript
-// WRONG: Each player creates their own stream
-this.client.send({
-  kind: 'stream/request',
-  to: ['gateway'],
-  payload: { description: 'player-position' }
-});
-```
+- **10 Hz spam** in the shared envelope log made debugging other activity painful
+- **Larger payloads** due to JSON metadata on every update (protocol, ids, timestamps)
+- **No binary option** which prevented future sprite or animation syncing
 
-**Problem:** Player 1's stream ≠ Player 2's stream. They couldn't see each other!
+Streams fix all three issues while staying within the spec’s lifecycle rules:
 
-**Solution:** Use broadcast messages with `to: []`:
-- Single message type all clients listen for
-- Gateway automatically routes to everyone
-- Works regardless of join order
-- Simpler than managing stream subscriptions
+1. **Handshake** – each participant sends a `stream/request` with `description: "mew-world/positions"`
+2. **Gateway reply** – everyone receives the `stream/open` for that request and stores the `stream_id`
+3. **Raw frames** – players send `#stream-id#{JSON}` payloads without envelope wrappers
+4. **Parsing** – `PositionStreamManager` validates the stream owner and converts frames back into `PositionUpdate` objects
+
+Late joiners still succeed because `PositionStreamManager` records the owner when it sees the first valid payload, even if the original handshake happened before they connected.
+
+Result: the envelope history stays clean, bandwidth drops, and the rendering loop consumes structured updates exactly as before.
 
 ## Try It Yourself
 
@@ -353,6 +354,26 @@ npm start  # Don't need to rebuild
    - Token: (paste from `.mew/tokens/player2.token`)
 
 5. **Move around with arrow keys** - you'll see each other move in real-time!
+
+## Headless Testing (No Electron Required)
+
+Need to verify networking on CI or a server without a display? The headless harness exercises the same stream logic as the game scene:
+
+```bash
+cd clients/mew-world
+npm run headless -- \
+  --gateway ws://localhost:8080 \
+  --space mew-world \
+  --participant player1 \
+  --token "$(cat /path/to/.mew/tokens/player1.token)" \
+  --duration 15000
+```
+
+- Builds the client, connects with `MEWClient`, requests the position stream, and sends circular movement updates.
+- Prints any remote player frames that arrive on the stream so you can pair it with another headless process or an Electron client.
+- Accepts optional flags: `--interval` (ms between updates) and `--radius` (movement size) for stress testing.
+
+Launch a second terminal with a different participant to confirm both sides exchange streamed updates without opening Electron windows.
 
 ## Key Concepts
 

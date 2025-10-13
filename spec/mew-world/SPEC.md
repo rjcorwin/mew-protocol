@@ -16,6 +16,8 @@ All participants in the game are represented as players with a common base inter
 
 Player movement is communicated through MEW protocol streams using a dedicated `player/position` stream that all participants subscribe to. Each position update message contains the player's participant ID, world coordinates (x, y), tile coordinates for the isometric grid, velocity vector, timestamp, and optional platform reference if standing on a ship. The game uses client-side prediction where local players see immediate movement feedback, while remote players' positions are interpolated smoothly based on received updates. The stream handler applies dead reckoning to estimate positions between updates and implements lag compensation to ensure fair gameplay despite network latency. Movement speed is measured in tiles per second, with the game loop updating positions at 60 FPS and broadcasting position updates at a configurable rate (default 10 Hz) to balance network efficiency with visual smoothness.
 
+`PositionStreamManager` (renderer utility) wraps the handshake (`stream/request`, `stream/open`, `stream/close`) and parses incoming frames before handing `PositionUpdate` objects to the Phaser scene.
+
 ## AI Agent System
 
 AI agents extend the base MEWAgent class with a new `GameAgent` superclass that adds spatial reasoning and autonomous navigation capabilities. This superclass provides MCP tools that wrap the core movement system, allowing the AI to call `decide_next_move` which returns available adjacent tiles with metadata about terrain, obstacles, and other players. The AI uses Claude's reasoning to select a destination tile based on goals, then calls `execute_move` to initiate pathfinding. The GameAgent implements an A* pathfinding algorithm to navigate around obstacles and other players, respecting the movement speed constraints of the player type. The AI decision loop runs at a slower cadence (1-2 Hz) to avoid excessive API calls, with the pathfinding system handling smooth execution of multi-tile movements. GameAgents can have high-level goals set through their system prompt, such as "explore the world," "follow other players," or "patrol an area," which guide their decision-making process.
@@ -63,33 +65,46 @@ The Electron-based game client (`clients/mew-world`) provides the complete playe
 
 ### Position Synchronization Protocol
 
-Position updates use custom MEW protocol messages rather than dedicated streams, ensuring all participants receive broadcasts regardless of join order.
+All movement is synchronized over MEW protocol streams. Each participant negotiates a stream once per session using `PositionStreamManager`:
 
-**Message Format:**
-```typescript
+1. **Request** – send `stream/request` with `description: "mew-world/positions"` and `direction: "bidirectional"`.
+2. **Open** – the gateway broadcasts `stream/open` and everyone records the `stream_id` owner.
+3. **Frames** – send raw frames formatted as `#<stream_id>#<json>` at 10 Hz.
+4. **Close** – optional `stream/close` when disconnecting or pausing.
+
+**Stream Request Envelope:**
+```json
 {
-  kind: "game/position",
-  to: [],  // Broadcast to all participants
-  payload: {
-    participantId: string,
-    worldCoords: { x: number, y: number },
-    tileCoords: { x: number, y: number },
-    velocity: { x: number, y: number },
-    timestamp: number,
-    platformRef: string | null
+  "kind": "stream/request",
+  "to": ["gateway"],
+  "payload": {
+    "direction": "bidirectional",
+    "description": "mew-world/positions"
   }
 }
 ```
 
+**Frame Payload (stringified JSON):**
+```json
+{
+  "participantId": "player1",
+  "worldCoords": { "x": 412.5, "y": 296.3 },
+  "tileCoords": { "x": 6, "y": 9 },
+  "velocity": { "x": 42.1, "y": -17.6 },
+  "timestamp": 1736202000123,
+  "platformRef": null
+}
+```
+
 **Publishing:**
-- Local player position published every 100ms (10 Hz)
-- Only publishes when position data is available (no throttling on movement)
-- Updates include current world coordinates, tile coordinates, velocity, and timestamp
+- Local player position published every 100ms (10 Hz) via `MEWClient.sendStreamData`.
+- Payload matches `PositionUpdate` but travels without extra envelope metadata.
+- Stream ID cached by `PositionStreamManager` so the render loop can skip sending until ready.
 
 **Subscribing:**
-- Client listens for all `game/position` messages via `onMessage` handler
-- Filters out own updates by comparing `participantId`
-- Creates or updates remote player sprites based on received positions
+- `MEWClient.onStreamData` feeds frames into `PositionStreamManager.parseFrame`.
+- Manager validates the owner and returns a typed `PositionUpdate`.
+- Game scene ignores updates originating from the local participant ID.
 
 ### Remote Player Rendering
 
@@ -171,6 +186,7 @@ To test with multiple players:
 3. Each instance connects with different player credentials
 4. All players see each other's movements in real-time
 5. Movement is smooth thanks to client-side interpolation
+6. Headless option: `npm run headless -- --gateway ws://localhost:8080 --space mew-world --participant player1 --token <token>`
 
 ### Known Limitations (Current Implementation)
 

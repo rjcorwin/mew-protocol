@@ -4,6 +4,12 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- MEW World client now negotiates MEW streams for player position updates, reducing envelope noise and aligning with protocol streaming guidance. Updated docs and specs describe the shared stream workflow and headless simulation support.
+
+### Added
+- Headless MEW World harness (`npm run headless`) for exercising the stream pipeline without launching Electron, suitable for CI and automated regression checks.
+
 ## [v0.5.1] - 2025-01-06
 
 ### Fixed

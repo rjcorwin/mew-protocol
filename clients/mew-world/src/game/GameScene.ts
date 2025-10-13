@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { MEWClient } from '@mew-protocol/mew/client';
 import { PositionUpdate, Player } from '../types.js';
+import { PositionStreamManager } from '../network/PositionStreamManager.js';
 
 const TILE_WIDTH = 64;
 const TILE_HEIGHT = 32;
@@ -15,7 +16,7 @@ export class GameScene extends Phaser.Scene {
   private localPlayer!: Phaser.GameObjects.Sprite;
   private remotePlayers: Map<string, Player> = new Map();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private streamId: string | null = null;
+  private positionStreamManager!: PositionStreamManager;
   private lastPositionUpdate = 0;
 
   constructor() {
@@ -54,8 +55,9 @@ export class GameScene extends Phaser.Scene {
     // Set up keyboard input
     this.cursors = this.input.keyboard!.createCursorKeys();
 
-    // Request stream for position updates
-    this.requestPositionStream();
+    // Initialize stream manager for position updates
+    this.positionStreamManager = new PositionStreamManager(this.client, this.playerId);
+    this.initializePositionStream();
 
     // Subscribe to position updates from other players
     this.subscribeToPositionUpdates();
@@ -87,30 +89,25 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private async requestPositionStream() {
-    // Use a shared stream name for all players
-    this.streamId = 'mew-world-positions';
-    console.log(`Using shared position stream: ${this.streamId}`);
+  private initializePositionStream() {
+    this.positionStreamManager
+      .ensureLocalStream()
+      .then((streamId) => {
+        console.log(`Position stream ready: ${streamId}`);
+      })
+      .catch((error) => {
+        console.error('Failed to establish position stream', error);
+      });
   }
 
   private subscribeToPositionUpdates() {
-    // Subscribe to position messages from all participants
-    this.client.onMessage((envelope: any) => {
-      if (envelope.kind === 'game/position') {
-        try {
-          const update: PositionUpdate = envelope.payload;
-
-          // Ignore our own updates
-          if (update.participantId === this.playerId) {
-            return;
-          }
-
-          // Update or create remote player
-          this.updateRemotePlayer(update);
-        } catch (error) {
-          console.error('Failed to parse position update:', error);
-        }
+    this.client.onStreamData((frame) => {
+      const update = this.positionStreamManager.parseFrame(frame);
+      if (!update || update.participantId === this.playerId) {
+        return;
       }
+
+      this.updateRemotePlayer(update);
     });
   }
 
@@ -212,11 +209,11 @@ export class GameScene extends Phaser.Scene {
       platformRef: null,
     };
 
-    // Broadcast position to all players
-    this.client.send({
-      kind: 'game/position',
-      to: [], // Broadcast to all
-      payload: update,
-    });
+    const streamId = this.positionStreamManager.getLocalStreamId();
+    if (!streamId) {
+      return;
+    }
+
+    this.client.sendStreamData(streamId, JSON.stringify(update));
   }
 }
