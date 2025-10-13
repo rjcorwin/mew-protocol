@@ -10,7 +10,8 @@
     "build": "tsc && npm run bundle",
     "build:watch": "tsc --watch",
     "bundle": "esbuild dist/renderer.js --bundle --outfile=dist/renderer.bundle.js --format=cjs --platform=node --external:electron",
-    "package": "electron-builder"
+    "package": "electron-builder",
+    "headless": "npm run build && node dist/headless/headless-simulation.js"
   },
   "author": "MEW Protocol Team",
   "license": "MIT",
