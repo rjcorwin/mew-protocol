@@ -84,21 +84,24 @@ All movement is synchronized over MEW protocol streams. Each participant negotia
 }
 ```
 
-**Frame Payload (stringified JSON):**
-```json
-{
-  "participantId": "player1",
-  "worldCoords": { "x": 412.5, "y": 296.3 },
-  "tileCoords": { "x": 6, "y": 9 },
-  "velocity": { "x": 42.1, "y": -17.6 },
-  "timestamp": 1736202000123,
-  "platformRef": null
-}
+**Frame Payload (compact string):**
 ```
+1|player1|l0xet8|412.5,296.3|6,9|42.1,-17.6|~
+```
+
+Field breakdown:
+
+1. `1` – format version identifier
+2. `player1` – participant ID that must match the owning stream (URL-encoded)
+3. `l0xet8` – timestamp (milliseconds since epoch) encoded base36
+4. `412.5,296.3` – world coordinates trimmed to 3 decimal places
+5. `6,9` – tile coordinates (integers)
+6. `42.1,-17.6` – velocity vector trimmed to 3 decimal places
+7. `~` – platform reference (`~` signifies `null`; non-null values are URL-encoded)
 
 **Publishing:**
 - Local player position published every 100ms (10 Hz) via `MEWClient.sendStreamData`.
-- Payload matches `PositionUpdate` but travels without extra envelope metadata.
+- Payload matches `PositionUpdate` but travels without extra envelope metadata or JSON parsing costs.
 - Stream ID cached by `PositionStreamManager` so the render loop can skip sending until ready.
 
 **Subscribing:**

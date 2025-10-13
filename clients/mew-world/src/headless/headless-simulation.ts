@@ -1,6 +1,7 @@
 import { MEWClient } from '@mew-protocol/mew/client';
 import type { ClientOptions } from '@mew-protocol/mew/client';
 import { PositionStreamManager } from '../network/PositionStreamManager.js';
+import { encodeMovementFrame } from '../network/movement-stream.js';
 import { PositionUpdate } from '../types.js';
 
 export interface HeadlessSimulationOptions {
@@ -87,7 +88,16 @@ export async function runHeadlessSimulation(options: HeadlessSimulationOptions):
       platformRef: null,
     };
 
-    client.sendStreamData(streamId, JSON.stringify(update));
+    const payload = encodeMovementFrame({
+      participantId: update.participantId,
+      timestamp: update.timestamp,
+      world: update.worldCoords,
+      tile: update.tileCoords,
+      velocity: update.velocity,
+      platformRef: update.platformRef,
+    });
+
+    client.sendStreamData(streamId, payload);
   }, intervalMs);
 
   await new Promise<void>((resolve) => setTimeout(resolve, durationMs));

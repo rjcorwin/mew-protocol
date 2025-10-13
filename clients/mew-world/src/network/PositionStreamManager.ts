@@ -1,30 +1,13 @@
 import { MEWClient } from '@mew-protocol/mew/client';
 import type { Envelope } from '@mew-protocol/mew/types';
 import { PositionUpdate } from '../types.js';
+import { decodeMovementFrame } from './movement-stream.js';
 
 const POSITION_STREAM_DESCRIPTION = 'mew-world/positions';
 
 interface StreamFrame {
   streamId: string;
   payload: string;
-}
-
-function isPositionUpdate(data: any): data is PositionUpdate {
-  return (
-    data &&
-    typeof data === 'object' &&
-    typeof data.participantId === 'string' &&
-    data.worldCoords &&
-    typeof data.worldCoords.x === 'number' &&
-    typeof data.worldCoords.y === 'number' &&
-    data.tileCoords &&
-    typeof data.tileCoords.x === 'number' &&
-    typeof data.tileCoords.y === 'number' &&
-    data.velocity &&
-    typeof data.velocity.x === 'number' &&
-    typeof data.velocity.y === 'number' &&
-    typeof data.timestamp === 'number'
-  );
 }
 
 export class PositionStreamManager {
@@ -66,29 +49,33 @@ export class PositionStreamManager {
       return null;
     }
 
-    try {
-      const parsed = JSON.parse(frame.payload);
-      if (!isPositionUpdate(parsed)) {
-        return null;
-      }
-
-      const owner = this.streamOwners.get(frame.streamId);
-      if (owner && owner !== parsed.participantId) {
-        console.warn(
-          `Ignoring frame for stream ${frame.streamId} due to participant mismatch (${owner} vs ${parsed.participantId})`,
-        );
-        return null;
-      }
-
-      if (!owner) {
-        this.streamOwners.set(frame.streamId, parsed.participantId);
-      }
-
-      return parsed;
-    } catch (error) {
-      console.error('Failed to parse position stream frame:', error);
+    const decoded = decodeMovementFrame(frame.payload);
+    if (!decoded) {
       return null;
     }
+
+    const owner = this.streamOwners.get(frame.streamId);
+    if (owner && owner !== decoded.participantId) {
+      console.warn(
+        `Ignoring frame for stream ${frame.streamId} due to participant mismatch (${owner} vs ${decoded.participantId})`,
+      );
+      return null;
+    }
+
+    if (!owner) {
+      this.streamOwners.set(frame.streamId, decoded.participantId);
+    }
+
+    const update: PositionUpdate = {
+      participantId: decoded.participantId,
+      worldCoords: decoded.world,
+      tileCoords: decoded.tile,
+      velocity: decoded.velocity,
+      timestamp: decoded.timestamp,
+      platformRef: decoded.platformRef,
+    };
+
+    return update;
   }
 
   private issueStreamRequest(requestId: string): void {

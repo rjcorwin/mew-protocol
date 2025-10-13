@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { MEWClient } from '@mew-protocol/mew/client';
 import { PositionUpdate, Player } from '../types.js';
 import { PositionStreamManager } from '../network/PositionStreamManager.js';
+import { encodeMovementFrame } from '../network/movement-stream.js';
 
 const TILE_WIDTH = 64;
 const TILE_HEIGHT = 32;
@@ -214,6 +215,15 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.client.sendStreamData(streamId, JSON.stringify(update));
+    const payload = encodeMovementFrame({
+      participantId: update.participantId,
+      timestamp: update.timestamp,
+      world: update.worldCoords,
+      tile: update.tileCoords,
+      velocity: update.velocity,
+      platformRef: update.platformRef,
+    });
+
+    this.client.sendStreamData(streamId, payload);
   }
 }

@@ -160,7 +160,7 @@ update(time: number, delta: number) {
 
 ### 5. Position Broadcasting (The Key Part!)
 
-This is where multiplayer magic happens (see `GameScene.ts:196-221`):
+This is where multiplayer magic happens (see `GameScene.ts:196-221`). The helper `encodeMovementFrame` (defined in `network/movement-stream.ts`) turns a structured `PositionUpdate` into the compact string payload:
 
 ```typescript
 private publishPosition(velocity: Phaser.Math.Vector2) {
@@ -184,15 +184,25 @@ private publishPosition(velocity: Phaser.Math.Vector2) {
     platformRef: null
   };
 
-  this.client.sendStreamData(streamId, JSON.stringify(update));
+  this.client.sendStreamData(
+    streamId,
+    encodeMovementFrame({
+      participantId: update.participantId,
+      timestamp: update.timestamp,
+      world: update.worldCoords,
+      tile: update.tileCoords,
+      velocity: update.velocity,
+      platformRef: update.platformRef,
+    })
+  );
 }
 ```
 
 **What happens:**
-1. Player 1 moves → sends JSON frame on their stream (`#stream-42#{...}`)
+1. Player 1 moves → sends a compact movement frame on their stream (`#stream-42#1|player1|...`) where IDs/platform refs are URL-encoded to avoid delimiter collisions
 2. Gateway verifies Player 1 owns `stream-42`
 3. Gateway forwards the raw frame to EVERY participant in the space
-4. Player 2 receives the frame and parses it as a `PositionUpdate`
+4. Player 2 receives the frame, decodes the pipe-delimited payload, and converts it to a `PositionUpdate`
 5. Remote sprites update instantly without polluting the envelope log
 
 ### 6. Receiving Remote Players
@@ -318,8 +328,8 @@ Streams fix all three issues while staying within the spec’s lifecycle rules:
 
 1. **Handshake** – each participant sends a `stream/request` with `description: "mew-world/positions"`
 2. **Gateway reply** – everyone receives the `stream/open` for that request and stores the `stream_id`
-3. **Raw frames** – players send `#stream-id#{JSON}` payloads without envelope wrappers
-4. **Parsing** – `PositionStreamManager` validates the stream owner and converts frames back into `PositionUpdate` objects
+3. **Raw frames** – players send `#stream-id#1|…` payloads without envelope wrappers
+4. **Parsing** – `PositionStreamManager` validates the stream owner and converts the pipe-delimited frames back into `PositionUpdate` objects
 
 Late joiners still succeed because `PositionStreamManager` records the owner when it sees the first valid payload, even if the original handshake happened before they connected.
 

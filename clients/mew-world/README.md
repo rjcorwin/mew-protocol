@@ -106,7 +106,7 @@ npm run headless -- \
 ```
 
 - Builds the renderer, connects with `MEWClient`, and requests the shared position stream.
-- Publishes circular movement updates at 10 Hz using `sendStreamData`.
+- Publishes circular movement updates at 10 Hz using `sendStreamData` with the compact movement stream format.
 - Logs any remote frames that arrive so you can pair it with another headless process or a running Electron client.
 - Optional flags: `--interval` (ms cadence) and `--radius` (movement distance) for stress scenarios.
 
@@ -119,20 +119,23 @@ npm run headless -- \
 
 ## Network Protocol
 
-Position updates are sent via MEW protocol streams:
+Position updates are sent via MEW protocol streams as a pipe-delimited string that avoids JSON parsing overhead:
 
-```typescript
-{
-  participantId: string;
-  worldCoords: { x: number; y: number };
-  tileCoords: { x: number; y: number };
-  velocity: { x: number; y: number };
-  timestamp: number;
-  platformRef: string | null;
-}
+```
+1|player1|l0xet8|412.5,296.25|6,9|42.1,-17.6|~
 ```
 
-Updates are published at 10 Hz (every 100ms) when the player is moving.
+Fields:
+
+1. `1` – payload version tag so we can evolve the format later
+2. `player1` – participant ID that owns the stream (URL-encoded to avoid delimiter clashes)
+3. `l0xet8` – timestamp encoded as base36 milliseconds since epoch
+4. `412.5,296.25` – world coordinates trimmed to 3 decimal places
+5. `6,9` – tile coordinates (integers)
+6. `42.1,-17.6` – velocity vector
+7. `~` – platform reference (tilde represents `null`; non-null values are URL-encoded)
+
+Updates are published at 10 Hz (every 100ms) whenever the local player is moving, and decoded back into a `PositionUpdate` before rendering.
 
 ## Troubleshooting
 
