@@ -89,9 +89,29 @@ camera.startFollow(this.localPlayer, true, 0.1, 0.1);
 **What are bounds?**
 Camera bounds define the area the camera can view. The camera will never show pixels outside these bounds.
 
-- **Width**: 20 tiles × 64 pixels = 1280 pixels
-- **Height**: 20 tiles × 32 pixels = 640 pixels
-- **Origin**: (0, 0) at top-left
+**Important: Isometric grids extend into negative X coordinates!**
+
+Because of the isometric projection formula `screenX = (x - y) × 32`, tiles on the left side of the grid have negative X positions:
+
+```
+Tile (0, 0):  screenX = 0
+Tile (0, 19): screenX = -608  ← Leftmost edge
+Tile (19, 0): screenX = 608   ← Rightmost edge
+```
+
+**Correct camera bounds** (`GameScene.ts:36-39`):
+```typescript
+const minX = -(WORLD_HEIGHT - 1) * (TILE_WIDTH / 2);  // -608
+const maxX = (WORLD_WIDTH - 1) * (TILE_WIDTH / 2);    // 608
+const maxY = (WORLD_WIDTH + WORLD_HEIGHT - 1) * (TILE_HEIGHT / 2); // 624
+camera.setBounds(minX, 0, maxX - minX, maxY);
+// Results in: camera.setBounds(-608, 0, 1216, 624)
+```
+
+**Grid dimensions:**
+- **X range**: -608 to 608 pixels (1216 pixels wide, centered at X=0)
+- **Y range**: 0 to 624 pixels
+- **Player starts at**: (0, 320) - the center tile (10, 10)
 
 ### Camera Following
 
@@ -265,6 +285,43 @@ Camera shows only portion of map
 Player can be off-screen if near edges
 Map feels "larger" because you see less
 Camera follows more aggressively
+```
+
+## Common Issues
+
+### Camera Not Following to Left Edge (Fixed)
+
+**The Problem:**
+Originally, the camera bounds were set to `(0, 0, 1280, 640)`, which prevented the camera from following the player to the left side of the map. This happened because:
+
+1. Isometric grids have negative X coordinates on the left side
+2. Camera bounds starting at X=0 cannot show negative coordinates
+3. The left half of the map (tiles with high Y values) was invisible
+
+**The Solution:**
+Calculate the actual extent of the isometric grid including negative coordinates:
+```typescript
+// OLD (incorrect):
+camera.setBounds(0, 0, WORLD_WIDTH * TILE_WIDTH, WORLD_HEIGHT * TILE_HEIGHT);
+// Camera couldn't see left side of map!
+
+// NEW (correct):
+const minX = -(WORLD_HEIGHT - 1) * (TILE_WIDTH / 2);  // -608
+const maxX = (WORLD_WIDTH - 1) * (TILE_WIDTH / 2);    // 608
+camera.setBounds(minX, 0, maxX - minX, maxY);
+// Camera can now follow player across entire grid
+```
+
+**Visual explanation:**
+```
+OLD bounds:               NEW bounds:
+┌────────────┐           ┌────────────┐
+│ 0          │           │ -608    608│
+│  ####      │           │    ####    │
+│  ####      │           │    ####    │  ← Full grid visible
+│  (half)    │           │  (full)    │
+└────────────┘           └────────────┘
+   Can't see left           Can see all
 ```
 
 ## Future Enhancements

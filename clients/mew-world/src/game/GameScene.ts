@@ -29,13 +29,23 @@ export class GameScene extends Phaser.Scene {
 
     // Set up camera
     const camera = this.cameras.main;
-    camera.setBounds(0, 0, WORLD_WIDTH * TILE_WIDTH, WORLD_HEIGHT * TILE_HEIGHT);
+    // Isometric grid extends from negative X to positive X
+    // Leftmost point: (0, WORLD_HEIGHT-1) → screenX = (0 - 19) * 32 = -608
+    // Rightmost point: (WORLD_WIDTH-1, 0) → screenX = (19 - 0) * 32 = 608
+    // Total width: 1216 pixels, centered around X=0
+    const minX = -(WORLD_HEIGHT - 1) * (TILE_WIDTH / 2);
+    const maxX = (WORLD_WIDTH - 1) * (TILE_WIDTH / 2);
+    const maxY = (WORLD_WIDTH + WORLD_HEIGHT - 1) * (TILE_HEIGHT / 2);
+    camera.setBounds(minX, 0, maxX - minX, maxY);
 
     // Create isometric grid (visual only, for now just a simple ground)
     this.createIsometricGround();
 
-    // Create local player sprite
-    this.localPlayer = this.add.sprite(400, 300, 'player');
+    // Create local player sprite at center of grid
+    // Center tile (10, 10) in isometric coordinates
+    const centerX = (10 - 10) * (TILE_WIDTH / 2); // = 0
+    const centerY = (10 + 10) * (TILE_HEIGHT / 2); // = 320
+    this.localPlayer = this.add.sprite(centerX, centerY, 'player');
     this.localPlayer.setOrigin(0.5, 0.8);
     this.localPlayer.setTint(0x00ff00); // Green for local player
 
