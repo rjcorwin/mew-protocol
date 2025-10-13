@@ -1,8 +1,16 @@
 # MEW World Implementation Plan
 
-## Milestone 1: Space Template
+## Milestone 1: Space Template ✅
 
-Create the `game-isometric` space template with 4 human participants and 4 MEW agent participants configured. Include necessary capabilities and stream subscriptions in the template configuration so spaces can be spun up for testing.
+Create the `mew-world` space template with 4 human participants and 4 MEW agent participants configured. Include necessary capabilities for streams and chat so spaces can be spun up for testing.
+
+**Status:** Complete
+- Template created at `templates/mew-world/`
+- 4 human participants (player1-4) with full capabilities
+- 4 AI agents (agent1-4) with stream and MCP capabilities
+- Stream capabilities configured (dynamic stream creation via stream/request)
+- README and documentation included
+- Template tested and working
 
 ## Milestone 2: Electron Client with Multi-Player Sync
 

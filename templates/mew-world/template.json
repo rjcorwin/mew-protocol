@@ -1,0 +1,39 @@
+{
+  "name": "mew-world",
+  "description": "Multiplayer isometric game with human players and AI agents",
+  "author": "MEW Protocol Team",
+  "version": "1.0.0",
+  "tags": ["game", "multiplayer", "isometric", "mew-world"],
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Name of your game space",
+      "default": "${dirname}",
+      "prompt": true
+    },
+    {
+      "name": "AGENT_API_KEY",
+      "description": "API key for AI agents",
+      "env_sources": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "API_KEY"],
+      "default": "",
+      "prompt": true,
+      "sensitive": true,
+      "required": false
+    },
+    {
+      "name": "AGENT_BASE_URL",
+      "description": "Base URL for AI model API",
+      "env_sources": ["OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "BASE_URL"],
+      "default": "https://api.openai.com/v1",
+      "prompt": true,
+      "sensitive": false
+    },
+    {
+      "name": "AGENT_MODEL",
+      "description": "AI model to use for game agents",
+      "env_sources": ["AGENT_MODEL", "MODEL_NAME"],
+      "default": "gpt-5-mini",
+      "prompt": true
+    }
+  ]
+}
