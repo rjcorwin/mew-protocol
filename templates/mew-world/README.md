@@ -7,7 +7,7 @@ A multiplayer isometric game space built on MEW Protocol, where humans and AI ag
 - **4 Human Players**: Connect multiple human players to the same game world
 - **4 AI Agents**: Autonomous AI agents that can navigate and interact in the world
 - **Real-time Position Sync**: All player movements synchronized via MEW protocol streams
-- **Ship Support**: Players can board ships and sail together (coming soon)
+- **Ship & Plane Transports**: Board ships or planes, ride along, and disembark while the world keeps streaming
 
 ## Quick Start
 
@@ -71,6 +71,8 @@ The 4 AI agents (`agent1`, `agent2`, `agent3`, `agent4`) start automatically wit
 
 - **player1, player2, player3, player4**: Human participants with full capabilities
 - **agent1, agent2, agent3, agent4**: AI-powered game agents with movement capabilities
+- **ship1**: MCP transport server exposing sailing tools and publishing ship motion
+- **plane1**: MCP transport server exposing flight tools (heading, speed, altitude)
 
 ### Streams
 
@@ -104,7 +106,8 @@ Position updates are published to the `player/position` stream with this format:
   "tileCoords": {"x": 10, "y": 20},
   "velocity": {"x": 0, "y": 0},
   "timestamp": 1234567890,
-  "platformRef": null
+  "platformRef": null,
+  "platformKind": null
 }
 ```
 
@@ -116,8 +119,7 @@ See the [MEW World Specification](../../spec/mew-world/SPEC.md) for implementati
 
 1. Build the Electron client with Phaser 3 integration
 2. Implement GameAgent base class for AI navigation
-3. Add ship MCP server for movable platforms
-4. Implement platform coordinate system for ship boarding
+3. Extend collision and navigation rules for moving transports
 
 ## Troubleshooting
 

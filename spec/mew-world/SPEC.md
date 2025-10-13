@@ -24,11 +24,27 @@ AI agents extend the base MEWAgent class with a new `GameAgent` superclass that 
 
 ## Ship System
 
-Ships are movable platforms implemented as non-AI MEW participants backed by an MCP server that provides rule-based control tools. Each ship has an MCP tool interface including `set_sail_direction` to control heading, `set_sail_speed` to adjust velocity, `get_ship_position` for current location, and `get_passengers` to list players currently on the ship. The ship MCP server maintains the ship's position and broadcasts updates through the same `player/position` stream used by regular players, using a special participant ID. The ship has a defined collision boundary and walkable deck area represented as a set of relative tile coordinates. When a player moves to a tile that intersects with a ship's boundary, the game engine automatically registers them as "on ship" and changes their coordinate reference frame from world-absolute to ship-relative. The ship server runs a simple physics loop that updates the ship's world position based on its velocity vector, checking for collisions with land or other ships.
+Ships are movable platforms implemented as non-AI MEW participants backed by an MCP server that provides rule-based control tools. Transport logic lives in a shared `TransportLifecycleManager` that tracks heading, speed, deck bounds, passenger offsets, and world position. The ship MCP server advertises the following tools:
+
+- `set_sail_direction` – updates heading in degrees (0° points east, values increase counter-clockwise)
+- `set_sail_speed` – sets forward speed in pixels per second
+- `get_ship_position` – returns world position, heading, speed, and altitude (`0` for surface vessels)
+- `get_passengers` – lists passenger IDs plus their relative deck offsets and boarding timestamps
+- `report_player_position` – ingests a nearby player's world position so the lifecycle manager can detect boarding/disembarking transitions
+
+Every 100 ms the server advances the lifecycle manager, which updates the ship position and carries passengers by re-applying their stored offsets. The ship publishes frames to the shared `mew-world/positions` stream using the compact format above with `platformRef` equal to the ship participant ID and `platformKind` set to `ship`. The deck footprint is axis-aligned and includes a small configurable boarding margin to prevent jittery passengers from falling off due to network noise.
+
+When a player's reported position enters the deck bounds the manager marks them as onboard, emits `platformRef`/`platformKind` in their movement frames, and locks their world coordinates to the ship's transform. Stepping outside the margin triggers an automatic disembark event that clears the reference.
+
+## Plane System
+
+Planes share the same lifecycle manager with an alternate configuration: a narrower fuselage footprint and altitude tracking. The MCP wrapper exposes aviation-flavoured tools (`set_flight_heading`, `set_flight_speed`, `set_altitude`, `get_plane_position`, `get_passengers`, plus the shared `report_player_position`). Altitude is measured in pixels above sea level and is optional—clients that are not ready for 3D rendering can ignore it safely.
+
+Plane movement frames carry `platformKind: "plane"` so clients can render unique sprites or apply different physics. Boarding and disembarking follow the same automatic detection rules as ships, including the configurable margin to avoid flapping at the airframe boundaries.
 
 ## Coordinate Systems & Relative Movement
 
-The game implements a dual coordinate system to handle players moving on moving platforms. World coordinates are absolute positions in the game world, while platform coordinates are relative offsets from a platform's origin point (used when standing on a ship). Each player's state includes a `platform_ref` field that is null when on solid ground or references a ship participant ID when aboard. When a player is on a ship, their world position is calculated as `ship.world_position + player.platform_offset`, recalculated every frame as the ship moves. Movement commands from players on ships are interpreted as relative movements within the ship's coordinate frame, with collision detection checking against the ship's deck boundaries rather than world terrain. The rendering system transforms ship-relative coordinates to screen space by first applying the ship's world transform, then the player's relative offset, ensuring players appear to move correctly both when walking on a stationary ship and when walking on a moving ship.
+The game implements a dual coordinate system to handle players moving on moving platforms. World coordinates are absolute positions in the game world, while platform coordinates are relative offsets from a platform's origin point (used when standing on a ship). Each player's state includes a `platform_ref` field that is null when on solid ground or references a transport participant ID when aboard, plus a `platform_kind` discriminator (`ship`, `plane`, etc.) that mirrors the transport's advertised type. When a player is on a ship, their world position is calculated as `ship.world_position + player.platform_offset`, recalculated every frame as the ship moves. Movement commands from players on ships are interpreted as relative movements within the ship's coordinate frame, with collision detection checking against the ship's deck boundaries rather than world terrain. The rendering system transforms ship-relative coordinates to screen space by first applying the ship's world transform, then the player's relative offset, ensuring players appear to move correctly both when walking on a stationary ship and when walking on a moving ship.
 
 ## Current Client Implementation
 
@@ -86,18 +102,21 @@ All movement is synchronized over MEW protocol streams. Each participant negotia
 
 **Frame Payload (compact string):**
 ```
-1|player1|l0xet8|412.5,296.3|6,9|42.1,-17.6|~
+2|player1|l0xet8|412.5,296.3|6,9|42.1,-17.6|~|~
 ```
 
 Field breakdown:
 
-1. `1` – format version identifier
+1. `2` – format version identifier (`1` is still accepted for backward compatibility)
 2. `player1` – participant ID that must match the owning stream (URL-encoded)
 3. `l0xet8` – timestamp (milliseconds since epoch) encoded base36
 4. `412.5,296.3` – world coordinates trimmed to 3 decimal places
 5. `6,9` – tile coordinates (integers)
 6. `42.1,-17.6` – velocity vector trimmed to 3 decimal places
 7. `~` – platform reference (`~` signifies `null`; non-null values are URL-encoded)
+8. `~` – platform kind (`ship`, `plane`, etc.); `~` denotes ground movement
+
+When `platformKind` is non-null the frame describes a moving platform update. Player frames set `platformKind` when they are standing on a transport, while transport participants use it to advertise their vehicle type so clients can choose appropriate sprites and behaviours.
 
 **Publishing:**
 - Local player position published every 100ms (10 Hz) via `MEWClient.sendStreamData`.

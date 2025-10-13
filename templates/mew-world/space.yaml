@@ -179,6 +179,64 @@ participants:
       OPENAI_MODEL: "{{AGENT_MODEL}}"
       MEW_AGENT_CONFIG: '{"maxIterations": 50, "requestTimeout": 300000, "reasoningEnabled": true, "conversationHistoryLength": 20, "systemPrompt": "You are a game agent in an isometric multiplayer world. You can move around using MCP tools. Explore the world and interact with other players."}'
 
+  # Ship Transport
+  ship1:
+    type: local
+    command: "mew"
+    args:
+      [
+        "mcp",
+        "ship",
+        "--gateway",
+        "ws://localhost:${PORT}",
+        "--space",
+        "{{SPACE_NAME}}",
+        "--token",
+        "${TOKEN}",
+        "--id",
+        "ship1",
+      ]
+    auto_start: true
+    capabilities:
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "stream/publish"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "participant/status"
+
+  # Plane Transport
+  plane1:
+    type: local
+    command: "mew"
+    args:
+      [
+        "mcp",
+        "plane",
+        "--gateway",
+        "ws://localhost:${PORT}",
+        "--space",
+        "{{SPACE_NAME}}",
+        "--token",
+        "${TOKEN}",
+        "--id",
+        "plane1",
+      ]
+    auto_start: true
+    capabilities:
+      - kind: "stream/request"
+      - kind: "stream/open"
+      - kind: "stream/close"
+      - kind: "stream/publish"
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "participant/status"
+
 defaults:
   capabilities:
     - kind: "chat"

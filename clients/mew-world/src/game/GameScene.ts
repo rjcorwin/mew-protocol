@@ -132,6 +132,7 @@ export class GameScene extends Phaser.Scene {
         lastUpdate: update.timestamp,
         velocity: update.velocity,
         platformRef: update.platformRef,
+        platformKind: update.platformKind,
       };
 
       this.remotePlayers.set(update.participantId, player);
@@ -141,6 +142,8 @@ export class GameScene extends Phaser.Scene {
       player.targetPosition = { x: update.worldCoords.x, y: update.worldCoords.y };
       player.lastUpdate = update.timestamp;
       player.velocity = update.velocity;
+      player.platformRef = update.platformRef;
+      player.platformKind = update.platformKind;
     }
   }
 
@@ -208,6 +211,7 @@ export class GameScene extends Phaser.Scene {
       },
       timestamp: Date.now(),
       platformRef: null,
+      platformKind: null,
     };
 
     const streamId = this.positionStreamManager.getLocalStreamId();
@@ -222,6 +226,7 @@ export class GameScene extends Phaser.Scene {
       tile: update.tileCoords,
       velocity: update.velocity,
       platformRef: update.platformRef,
+      platformKind: update.platformKind,
     });
 
     this.client.sendStreamData(streamId, payload);

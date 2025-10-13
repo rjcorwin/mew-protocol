@@ -17,6 +17,7 @@ export interface PositionUpdate {
   };
   timestamp: number;
   platformRef: string | null; // Reference to ship if player is on a ship
+  platformKind: string | null; // Transport type when platformRef is set
 }
 
 /**
@@ -29,6 +30,7 @@ export interface Player {
   lastUpdate: number;
   velocity: { x: number; y: number };
   platformRef: string | null;
+  platformKind: string | null;
 }
 
 /**

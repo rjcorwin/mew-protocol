@@ -10,6 +10,8 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ### Added
 - Headless MEW World harness (`npm run headless`) for exercising the stream pipeline without launching Electron, suitable for CI and automated regression checks.
+- Ship and plane transport MCP servers powered by a shared lifecycle manager, including automatic boarding detection and movement stream publishing for MEW World.
+- Headless transport lifecycle tests covering boarding, carriage, altitude changes, and disembarking to keep future regressions in check.
 
 ## [v0.5.1] - 2025-01-06
 

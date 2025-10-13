@@ -1,6 +1,6 @@
 const FIELD_SEPARATOR = '|';
 const VECTOR_SEPARATOR = ',';
-const VERSION_TAG = '1';
+const CURRENT_VERSION_TAG = '2';
 const NULL_SENTINEL = '~';
 const MAX_VECTOR_COMPONENTS = 2;
 
@@ -11,6 +11,7 @@ export interface MovementFrame {
   tile: { x: number; y: number };
   velocity: { x: number; y: number };
   platformRef: string | null;
+  platformKind: string | null;
 }
 
 function formatScalar(value: number): string {
@@ -58,17 +59,19 @@ function decodeVector(value: string): { x: number; y: number } | null {
 
 export function encodeMovementFrame(frame: MovementFrame): string {
   const platformField = frame.platformRef === null ? NULL_SENTINEL : encodeURIComponent(frame.platformRef);
+  const kindField = frame.platformKind === null ? NULL_SENTINEL : encodeURIComponent(frame.platformKind);
   const timestampField = Math.round(frame.timestamp).toString(36);
   const participantField = encodeURIComponent(frame.participantId);
 
   return [
-    VERSION_TAG,
+    CURRENT_VERSION_TAG,
     participantField,
     timestampField,
     encodeVector(frame.world),
     encodeVector(frame.tile),
     encodeVector(frame.velocity),
     platformField,
+    kindField,
   ].join(FIELD_SEPARATOR);
 }
 
@@ -78,13 +81,24 @@ export function decodeMovementFrame(payload: string): MovementFrame | null {
   }
 
   const fields = payload.split(FIELD_SEPARATOR);
-  if (fields.length !== 7) {
+  if (fields.length !== 7 && fields.length !== 8) {
     return null;
   }
 
-  const [version, participantIdField, timestampField, worldField, tileField, velocityField, platformField] = fields;
+  const version = fields[0];
+  const participantIdField = fields[1];
+  const timestampField = fields[2];
+  const worldField = fields[3];
+  const tileField = fields[4];
+  const velocityField = fields[5];
+  const platformField = fields[6];
+  const platformKindField = fields.length === 8 ? fields[7] : NULL_SENTINEL;
 
-  if (version !== VERSION_TAG || !participantIdField) {
+  if (version !== '1' && version !== CURRENT_VERSION_TAG) {
+    return null;
+  }
+
+  if (!participantIdField) {
     return null;
   }
 
@@ -95,9 +109,11 @@ export function decodeMovementFrame(payload: string): MovementFrame | null {
 
   let participantId: string;
   let platformRef: string | null;
+  let platformKind: string | null = null;
   try {
     participantId = decodeURIComponent(participantIdField);
     platformRef = platformField === NULL_SENTINEL ? null : decodeURIComponent(platformField);
+    platformKind = platformKindField === NULL_SENTINEL ? null : decodeURIComponent(platformKindField);
   } catch {
     return null;
   }
@@ -117,5 +133,6 @@ export function decodeMovementFrame(payload: string): MovementFrame | null {
     tile,
     velocity,
     platformRef,
+    platformKind,
   };
 }
