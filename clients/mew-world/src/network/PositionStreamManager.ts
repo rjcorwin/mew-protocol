@@ -73,6 +73,7 @@ export class PositionStreamManager {
       velocity: decoded.velocity,
       timestamp: decoded.timestamp,
       platformRef: decoded.platformRef,
+      platformKind: decoded.platformKind ?? null,
     };
 
     return update;

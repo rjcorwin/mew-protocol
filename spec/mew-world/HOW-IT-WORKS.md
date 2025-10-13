@@ -193,10 +193,18 @@ private publishPosition(velocity: Phaser.Math.Vector2) {
       tile: update.tileCoords,
       velocity: update.velocity,
       platformRef: update.platformRef,
+      platformKind: update.platformKind,
     })
   );
 }
 ```
+
+### 6. Ship & Plane Transports
+
+- The `mew mcp ship` command launches the transport MCP server in ship mode. It spins up a `TransportLifecycleManager` with a wide deck footprint, exposes ship tools (`set_sail_direction`, `set_sail_speed`, `get_ship_position`, `get_passengers`, plus `report_player_position`), and publishes frames with `platformKind: "ship"`.
+- `mew mcp plane` reuses the same server with a plane preset (narrow fuselage footprint, altitude enabled). Additional tools include `set_flight_heading`, `set_flight_speed`, and `set_altitude`; `get_plane_position` returns altitude along with world coordinates.
+- Both transports automatically board players whose reported world position falls inside the platform footprint (with a configurable buffer). While aboard, players inherit the transport's velocity and their movement frames reference the transport via `platformRef`/`platformKind`.
+- Stepping outside the footprint triggers a disembark event that clears the reference so clients resume ground-relative movement.
 
 **What happens:**
 1. Player 1 moves → sends a compact movement frame on their stream (`#stream-42#1|player1|...`) where IDs/platform refs are URL-encoded to avoid delimiter collisions

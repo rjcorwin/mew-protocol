@@ -86,6 +86,7 @@ export async function runHeadlessSimulation(options: HeadlessSimulationOptions):
       },
       timestamp: Date.now(),
       platformRef: null,
+      platformKind: null,
     };
 
     const payload = encodeMovementFrame({
@@ -95,6 +96,7 @@ export async function runHeadlessSimulation(options: HeadlessSimulationOptions):
       tile: update.tileCoords,
       velocity: update.velocity,
       platformRef: update.platformRef,
+      platformKind: update.platformKind,
     });
 
     client.sendStreamData(streamId, payload);

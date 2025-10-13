@@ -61,6 +61,7 @@ describe('PositionStreamManager', () => {
       velocity: { x: 1.5, y: -0.5 },
       timestamp: Date.now(),
       platformRef: null,
+      platformKind: null,
     };
 
     const encoded = encodeMovementFrame({
@@ -70,6 +71,7 @@ describe('PositionStreamManager', () => {
       tile: validPayload.tileCoords,
       velocity: validPayload.velocity,
       platformRef: validPayload.platformRef,
+      platformKind: validPayload.platformKind,
     });
 
     const parsed = manager.parseFrame({ streamId, payload: encoded });
@@ -82,6 +84,7 @@ describe('PositionStreamManager', () => {
       tile: validPayload.tileCoords,
       velocity: validPayload.velocity,
       platformRef: validPayload.platformRef,
+      platformKind: validPayload.platformKind,
     });
 
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});

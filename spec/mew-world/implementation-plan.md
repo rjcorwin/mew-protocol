@@ -27,9 +27,25 @@ Create Electron app with connection form (URL, port, username, token) that conne
 - Arrow key movement controls
 - README with setup and usage instructions
 
-## Milestone 3: Ship MCP Server
+## Milestone 3: Ship MCP Server ✅
 
 Build a new MCP server that represents a ship entity with tools for controlling movement (`set_sail_direction`, `set_sail_speed`) and querying state (`get_ship_position`, `get_passengers`). Ship publishes position updates to the same stream as players.
+
+**Status:** Complete
+- Lifecycle manager implemented to track heading, speed, deck bounds, and passenger offsets
+- MCP transport server exposes ship tools plus `report_player_position` for automatic boarding logic
+- Ship participant added to template via `mew mcp ship`
+- Headless tests exercise boarding, travel, and disembarking flows
+
+## Milestone 3b: Plane Transport Support ✅
+
+Extend the transport system to support planes using the same lifecycle core. Provide aviation-specific controls (`set_flight_heading`, `set_flight_speed`, `set_altitude`), ensure altitude flows through the position stream, and add a default plane participant to the template for testing.
+
+**Status:** Complete
+- Transport manager now tracks altitude and tags frames with `platformKind`
+- Plane command `mew mcp plane` registered with dedicated MCP tool aliases
+- Template spawns a plane participant alongside the ship for multiplayer trials
+- Headless lifecycle tests cover altitude adjustments and safe disembarking
 
 ## Milestone 4: Platform Coordinate System
 
