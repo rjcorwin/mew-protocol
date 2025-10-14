@@ -17,9 +17,21 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private streamId: string | null = null;
   private lastPositionUpdate = 0;
+  private map!: Phaser.Tilemaps.Tilemap;
+  private groundLayer!: Phaser.Tilemaps.TilemapLayer;
+  private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
+  private waterLayer?: Phaser.Tilemaps.TilemapLayer;
 
   constructor() {
     super({ key: 'GameScene' });
+  }
+
+  preload() {
+    // Generate procedural tileset texture
+    this.generateTilesetTexture();
+
+    // Load Tiled map
+    this.load.tilemapTiledJSON('map', 'assets/maps/example-map.tmj');
   }
 
   create() {
@@ -27,19 +39,15 @@ export class GameScene extends Phaser.Scene {
     this.client = this.registry.get('mewClient') as MEWClient;
     this.playerId = this.registry.get('playerId') as string;
 
-    // Set up camera
-    const camera = this.cameras.main;
-    // Isometric grid extends from negative X to positive X
-    // Leftmost point: (0, WORLD_HEIGHT-1) → screenX = (0 - 19) * 32 = -608
-    // Rightmost point: (WORLD_WIDTH-1, 0) → screenX = (19 - 0) * 32 = 608
-    // Total width: 1216 pixels, centered around X=0
-    const minX = -(WORLD_HEIGHT - 1) * (TILE_WIDTH / 2);
-    const maxX = (WORLD_WIDTH - 1) * (TILE_WIDTH / 2);
-    const maxY = (WORLD_WIDTH + WORLD_HEIGHT - 1) * (TILE_HEIGHT / 2);
-    camera.setBounds(minX, 0, maxX - minX, maxY);
+    // Load Tiled map
+    this.loadTiledMap();
 
-    // Create isometric grid (visual only, for now just a simple ground)
-    this.createIsometricGround();
+    // Set up camera bounds based on map dimensions
+    const camera = this.cameras.main;
+    const minX = -(this.map.height - 1) * (TILE_WIDTH / 2);
+    const maxX = (this.map.width - 1) * (TILE_WIDTH / 2);
+    const maxY = (this.map.width + this.map.height - 1) * (TILE_HEIGHT / 2);
+    camera.setBounds(minX, 0, maxX - minX, maxY);
 
     // Create local player sprite at center of grid
     // Center tile (10, 10) in isometric coordinates
@@ -73,28 +81,86 @@ export class GameScene extends Phaser.Scene {
     console.log(`Game started as ${this.playerId}`);
   }
 
-  private createIsometricGround() {
+  private generateTilesetTexture() {
+    // Generate a simple tileset texture with different colored tiles
+    const tilesetWidth = 512;
+    const tilesetHeight = 128;
     const graphics = this.add.graphics();
 
-    for (let y = 0; y < WORLD_HEIGHT; y++) {
-      for (let x = 0; x < WORLD_WIDTH; x++) {
-        const screenX = (x - y) * (TILE_WIDTH / 2);
-        const screenY = (x + y) * (TILE_HEIGHT / 2);
+    // Tile colors: grass, sand, water, wall, stone
+    const tileColors = [
+      0x3a6e2f, // 0: grass (green)
+      0xc2b280, // 1: sand (tan)
+      0x4a90e2, // 2: water (blue)
+      0x666666, // 3: wall (gray)
+      0x808080  // 4: stone (light gray)
+    ];
 
-        // Draw diamond-shaped tiles
-        graphics.lineStyle(1, 0x333333, 0.5);
-        graphics.fillStyle((x + y) % 2 === 0 ? 0x3a6e2f : 0x4a7e3f, 1);
+    // Draw tiles in a grid (8 columns × 4 rows = 32 tiles)
+    for (let tileId = 0; tileId < 32; tileId++) {
+      const col = tileId % 8;
+      const row = Math.floor(tileId / 8);
+      const x = col * TILE_WIDTH;
+      const y = row * TILE_HEIGHT;
 
-        graphics.beginPath();
-        graphics.moveTo(screenX, screenY);
-        graphics.lineTo(screenX + TILE_WIDTH / 2, screenY + TILE_HEIGHT / 2);
-        graphics.lineTo(screenX, screenY + TILE_HEIGHT);
-        graphics.lineTo(screenX - TILE_WIDTH / 2, screenY + TILE_HEIGHT / 2);
-        graphics.closePath();
-        graphics.fillPath();
-        graphics.strokePath();
+      // Use color for first 5 tiles, then repeat pattern
+      const colorIndex = tileId < 5 ? tileId : tileId % 5;
+      const color = tileColors[colorIndex];
+
+      // Draw isometric diamond tile
+      graphics.fillStyle(color, 1);
+      graphics.lineStyle(1, 0x000000, 0.3);
+
+      graphics.beginPath();
+      graphics.moveTo(x + TILE_WIDTH / 2, y);                              // Top
+      graphics.lineTo(x + TILE_WIDTH, y + TILE_HEIGHT / 2);               // Right
+      graphics.lineTo(x + TILE_WIDTH / 2, y + TILE_HEIGHT);               // Bottom
+      graphics.lineTo(x, y + TILE_HEIGHT / 2);                            // Left
+      graphics.closePath();
+      graphics.fillPath();
+      graphics.strokePath();
+    }
+
+    // Generate texture from graphics
+    graphics.generateTexture('terrain', tilesetWidth, tilesetHeight);
+    graphics.destroy();
+  }
+
+  private loadTiledMap() {
+    // Create tilemap from Tiled JSON
+    this.map = this.make.tilemap({ key: 'map' });
+
+    // Add tileset (name from Tiled must match)
+    const tileset = this.map.addTilesetImage('terrain', 'terrain');
+
+    if (!tileset) {
+      console.error('Failed to load tileset');
+      return;
+    }
+
+    // Create layers
+    const ground = this.map.createLayer('Ground', tileset, 0, 0);
+    if (ground) {
+      this.groundLayer = ground;
+    }
+
+    // Create Obstacles layer if it exists
+    if (this.map.getLayer('Obstacles')) {
+      const obstacles = this.map.createLayer('Obstacles', tileset, 0, 0);
+      if (obstacles) {
+        this.obstacleLayer = obstacles;
       }
     }
+
+    // Create Water layer if it exists
+    if (this.map.getLayer('Water')) {
+      const water = this.map.createLayer('Water', tileset, 0, 0);
+      if (water) {
+        this.waterLayer = water;
+      }
+    }
+
+    console.log(`Map loaded: ${this.map.width}×${this.map.height} tiles`);
   }
 
   private async requestPositionStream() {
