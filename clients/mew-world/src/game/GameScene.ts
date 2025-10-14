@@ -244,8 +244,19 @@ export class GameScene extends Phaser.Scene {
       velocity.normalize();
       velocity.scale(MOVE_SPEED * (delta / 1000));
 
-      this.localPlayer.x += velocity.x;
-      this.localPlayer.y += velocity.y;
+      // Calculate intended new position
+      const newX = this.localPlayer.x + velocity.x;
+      const newY = this.localPlayer.y + velocity.y;
+
+      // Check collision at new position
+      const collision = this.checkTileCollision(newX, newY);
+
+      if (collision.walkable) {
+        // Apply movement with speed modifier
+        this.localPlayer.x += velocity.x * collision.speedModifier;
+        this.localPlayer.y += velocity.y * collision.speedModifier;
+      }
+      // If not walkable, don't move (collision!)
     }
 
     // Publish position update at regular intervals
@@ -267,6 +278,67 @@ export class GameScene extends Phaser.Scene {
         player.sprite.y += dy * factor;
       }
     });
+  }
+
+  private checkTileCollision(worldX: number, worldY: number): {
+    walkable: boolean;
+    speedModifier: number;
+    terrain: string;
+  } {
+    // Convert world coordinates to tile coordinates
+    const tilePos = this.map.worldToTileXY(worldX, worldY);
+
+    if (!tilePos) {
+      // Out of bounds
+      return { walkable: false, speedModifier: 0, terrain: 'boundary' };
+    }
+
+    const { x: tileX, y: tileY } = tilePos;
+
+    // Check map boundaries
+    if (tileX < 0 || tileY < 0 || tileX >= this.map.width || tileY >= this.map.height) {
+      return { walkable: false, speedModifier: 0, terrain: 'boundary' };
+    }
+
+    // Check obstacle layer first (highest priority)
+    if (this.obstacleLayer) {
+      const obstacleTile = this.obstacleLayer.getTileAt(tileX, tileY);
+      if (obstacleTile) {
+        const walkable = obstacleTile.properties.walkable ?? true;
+        if (!walkable) {
+          return {
+            walkable: false,
+            speedModifier: 0,
+            terrain: obstacleTile.properties.terrain || 'wall'
+          };
+        }
+      }
+    }
+
+    // Check water layer (affects speed)
+    if (this.waterLayer) {
+      const waterTile = this.waterLayer.getTileAt(tileX, tileY);
+      if (waterTile) {
+        return {
+          walkable: true,
+          speedModifier: waterTile.properties.speedModifier ?? 0.5,
+          terrain: waterTile.properties.terrain || 'water'
+        };
+      }
+    }
+
+    // Default to ground tile (walkable, normal speed)
+    const groundTile = this.groundLayer.getTileAt(tileX, tileY);
+    if (groundTile) {
+      return {
+        walkable: groundTile.properties.walkable ?? true,
+        speedModifier: groundTile.properties.speedModifier ?? 1.0,
+        terrain: groundTile.properties.terrain || 'grass'
+      };
+    }
+
+    // No tile found - treat as walkable
+    return { walkable: true, speedModifier: 1.0, terrain: 'grass' };
   }
 
   private publishPosition(velocity: Phaser.Math.Vector2) {
