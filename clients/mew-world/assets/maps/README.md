@@ -97,10 +97,18 @@ File → New → New Map:
 - Tile size: **64 × 32**
 - Map size: Your choice (20×20 recommended for testing)
 
-### 3. Import Tileset
+### 3. Create Embedded Tileset
 
-Map → Add External Tileset:
-- Select `tilesets/terrain.tsj`
+**IMPORTANT:** Phaser requires embedded tilesets, not external tileset files.
+
+Map → New Tileset:
+- Name: "terrain"
+- Type: Based on Tileset Image (or Collection of Images)
+- Tile width: 64, Tile height: 32
+- **✓ Check "Embed in map"** (critical!)
+- Image: Use any placeholder (the game generates tiles procedurally)
+
+Then add tile properties for tiles 0-4 (see "Tile Properties Schema" below)
 
 ### 4. Create Layers
 

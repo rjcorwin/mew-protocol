@@ -293,7 +293,9 @@ export class GameScene extends Phaser.Scene {
       return { walkable: false, speedModifier: 0, terrain: 'boundary' };
     }
 
-    const { x: tileX, y: tileY } = tilePos;
+    // Floor the coordinates to ensure integer tile indices
+    const tileX = Math.floor(tilePos.x);
+    const tileY = Math.floor(tilePos.y);
 
     // Check map boundaries
     if (tileX < 0 || tileY < 0 || tileX >= this.map.width || tileY >= this.map.height) {
