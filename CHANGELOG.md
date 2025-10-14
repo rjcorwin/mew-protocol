@@ -6,32 +6,38 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ### MEW World
 
-#### Proposed: Tiled Map Integration (t4m)
-**Status:** Draft - Needs Implementation
+#### Implemented: Tiled Map Integration (t4m)
+**Status:** Complete ✅
 **Proposal:** `spec/mew-world/proposals/t4m-tiled-maps/`
 
 Add support for Tiled Map Editor (.tmj) files with tile-based collision detection and gameplay properties.
 
 **Features:**
-- Load isometric maps from Tiled Map Editor (JSON format)
-- Multiple layer support (Ground, Water, Obstacles, Decorations)
-- Tile-based collision detection (walkable property)
-- Map boundary enforcement (prevent off-map movement)
-- Tile properties for gameplay mechanics (water = 50% speed, walls = blocked)
-- Multiplayer position synchronization with maps
+- ✅ Load isometric maps from Tiled Map Editor (JSON format)
+- ✅ Multiple layer support (Ground, Water, Obstacles)
+- ✅ Tile-based collision detection (O(1) lookups)
+- ✅ Map boundary enforcement (prevent off-map movement)
+- ✅ Tile properties: walkable (bool), speedModifier (float), terrain (string)
+- ✅ Water tiles reduce speed to 50% (swimming mechanics)
+- ✅ Wall tiles block movement completely
+- ✅ Procedural tileset generation (5 terrain types)
+- ✅ Multiplayer position synchronization maintained
 
-**Implementation Plan:** Milestone 3 (phases 3a-3d)
-- Phase 3a: Basic map loading and rendering
-- Phase 3b: Collision detection
-- Phase 3c: Tile properties (speedModifier)
-- Phase 3d: Multiplayer testing and documentation
+**Implementation:**
+- Phase 3a ✅: Tiled map loading with procedural tileset
+- Phase 3b ✅: Tile-based collision with boundary enforcement
+- Phase 3c ✅: Water speed modification and tile properties
+- Phase 3d: Multiplayer testing (ready for testing)
 
-**Related Files:**
-- `spec/mew-world/proposals/t4m-tiled-maps/proposal.md`
-- `spec/mew-world/proposals/t4m-tiled-maps/research.md`
-- `spec/mew-world/proposals/t4m-tiled-maps/decision-t4m-collision-method.md`
-- `spec/mew-world/proposals/t4m-tiled-maps/decision-t4m-tile-properties.md`
-- `spec/mew-world/implementation-plan.md` (updated)
+**Files Added:**
+- `clients/mew-world/assets/maps/example-map.tmj` - Example 20×20 map
+- `clients/mew-world/assets/maps/tilesets/terrain.tsj` - Terrain tileset definition
+- `clients/mew-world/assets/maps/README.md` - Map creation guide
+- `spec/mew-world/proposals/t4m-tiled-maps/` - Complete proposal
+
+**Files Modified:**
+- `clients/mew-world/src/game/GameScene.ts` - Map loading, collision, rendering
+- `spec/mew-world/implementation-plan.md` - Milestone 3 complete
 
 ## [v0.5.1] - 2025-01-06
 
