@@ -33,7 +33,7 @@
         {
          "columns":4,
          "firstgid":1,
-         "image":"..\/Documents\/cubes\/terrain.png",
+         "image":"terrain.png",
          "imageheight":32,
          "imagewidth":128,
          "margin":0,

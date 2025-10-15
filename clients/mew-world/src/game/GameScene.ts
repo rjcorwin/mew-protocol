@@ -27,8 +27,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    // Generate procedural tileset texture
-    this.generateTilesetTexture();
+    // Load actual tileset image
+    this.load.image('terrain', 'assets/maps/terrain.png');
 
     // Load Tiled map
     this.load.tilemapTiledJSON('map', 'assets/maps/map1.tmj');
