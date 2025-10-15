@@ -110,29 +110,40 @@ Replace placeholder circle sprites with animated character sprites supporting 8-
 - Replace placeholder sprites
 - Test visual quality and performance
 
-## Milestone 5: Ship MCP Server
+## Milestone 5: Ship MCP Server & Interactive Controls
 
-Build a new MCP server that represents a ship entity with tools for controlling movement (`set_sail_direction`, `set_sail_speed`) and querying state (`get_ship_position`, `get_passengers`). Ship publishes position updates to the same stream as players. Add `navigable` tile property so ships can only sail on water tiles, not land.
+Build a new MCP server that represents a ship entity with interactive control points. Ships have two interaction zones: a **steering wheel** (player presses interact to grab, then left/right arrows control direction) and **sail ropes** (player presses interact to adjust sails up/down, controlling speed 0-3). Ship publishes position updates to the same stream as players. Add `navigable` tile property so ships can only sail on water tiles, not land.
 
 **Phases:**
 
 ### Phase 5a: Ship MCP Server Foundation
-- Create ship MCP server with basic tools (`get_ship_position`, `get_passengers`)
-- Define ship state (position, velocity, heading, passenger list)
+- Create ship MCP server with basic state and tools
+- Define ship state (position, velocity, heading, speed level, passenger list)
+- Define ship control points: wheel position (relative coords), sail ropes position
 - Add ship as non-AI participant to mew-world template
 - Ship broadcasts position updates on `game/position` stream
+- Implement `get_ship_state` tool (returns position, heading, speed, control point coords)
 
-### Phase 5b: Ship Movement Controls
-- Implement `set_sail_direction` tool (8 directions matching player facing)
-- Implement `set_sail_speed` tool (0-3 speed levels)
-- Add physics loop that updates ship position based on velocity
-- Test manual ship control via MCP inspector
+### Phase 5b: Interaction System & Controls
+- Add interact key binding (E or spacebar) to client input
+- Implement interaction zone detection (player near control point)
+- Add `interaction/request` message type (player → ship: which control point)
+- Add `interaction/grab` and `interaction/release` messages
+- Ship tracks which player is controlling wheel/sails (one player per control point)
+- While grabbed: player's left/right keys send `ship/steer` messages (wheel only)
+- While grabbed: player's up/down keys send `ship/adjust_sails` messages (sails only)
+- Implement `set_heading` tool (called by ship when receiving steer commands)
+- Implement `set_speed` tool (0-3 levels, called when receiving sail adjustment)
 
-### Phase 5c: Navigable Tile Properties
+### Phase 5c: Ship Movement & Navigation
+- Add physics loop that updates ship position based on heading + speed
+- Heading: 8 directions (N, NE, E, SE, S, SW, W, NW)
+- Speed: 0 = stopped, 1 = slow (25 px/s), 2 = medium (50 px/s), 3 = fast (75 px/s)
 - Add `navigable: boolean` property to tile definitions in Tiled
 - Update map1.tmj: water tiles navigable=true, land tiles navigable=false
 - Implement ship collision detection with land (stop at boundaries)
-- Test ship can sail on water but not on grass/sand
+- Test: player boards ship, grabs wheel, steers; grabs sails, adjusts speed
+- Test: ship sails on water but stops at grass/sand boundaries
 
 ## Milestone 6: Platform Coordinate System
 
@@ -157,6 +168,13 @@ Implement the dual coordinate system (world vs platform-relative) and logic for 
 - Adjust player movement to be relative to ship's coordinate frame
 - Ensure players "ride along" as ship moves
 - Test walking around ship deck while ship is moving
+
+### Phase 6d: Visual Feedback & Polish
+- Add visual indicators for interaction zones (glowing outline when player near wheel/sails)
+- Show "Press E to grab wheel" / "Press E to adjust sails" UI prompt
+- Add grab animation or visual feedback (player sprite changes, particles, etc.)
+- Display ship heading and speed on HUD when controlling
+- Add visual for sail state (0 = furled, 1-3 = progressively more unfurled)
 
 ## Milestone 7: Ship Movement & Collision
 
