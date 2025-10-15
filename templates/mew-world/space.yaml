@@ -27,6 +27,34 @@ participants:
     capabilities:
       - kind: "*" # Full capabilities
 
+  # Ship 1 - Interactive sailing vessel
+  ship1:
+    type: local
+    command: "node"
+    args:
+      [
+        "/Users/rjcorwin/Github/rjcorwin/mew-protocol/dist/mcp-servers/ship-server/index.js",
+      ]
+    auto_start: true
+    cwd: "/Users/rjcorwin/Github/rjcorwin/mew-protocol"
+    capabilities:
+      - kind: "game/position" # Ship broadcasts position
+      - kind: "game/interaction" # Ship receives interaction requests
+      - kind: "ship/*" # Ship control messages
+      - kind: "mcp/request"
+        payload:
+          method: "tools/*"
+      - kind: "mcp/response"
+      - kind: "participant/status"
+    env:
+      SHIP_ID: "ship1"
+      SPACE_NAME: "{{SPACE_NAME}}"
+      GATEWAY_URL: "ws://localhost:8080"
+      SHIP_START_X: "200"
+      SHIP_START_Y: "400"
+      SHIP_START_HEADING: "east"
+      TOKEN_PATH: ".mew/tokens/ship1.token"
+
   # AI Game Agent 1
   agent1:
     type: local
