@@ -226,3 +226,268 @@ To test with multiple players:
 - ✅ Water tiles with speed reduction (50% movement speed)
 - ✅ Custom isometric cube artwork (sand, grass, water, concrete)
 - ✅ Multi-player position synchronization with collision
+
+## Milestone 4: Directional Player Sprites with 8-Way Animation
+
+### Overview
+
+Replace the current placeholder circle sprites with animated character sprites that support 8-directional movement. This system is designed to prepare for future game controller support (analog stick input), where players can move in any direction, not just the 4 cardinal directions currently supported by arrow keys.
+
+### Problem Statement
+
+The current implementation uses simple colored circles (green for local player, red for remote players) that provide no visual feedback about:
+- Which direction a player is facing
+- Whether a player is moving or stationary
+- The character's identity or appearance
+
+For a compelling multiplayer experience, players need animated sprites that:
+1. Face the direction they're moving (8 directions: N, NE, E, SE, S, SW, W, NW)
+2. Animate smoothly when walking
+3. Show idle animations when stationary
+4. Support future input methods (game controllers with analog sticks)
+
+### Proposed Solution
+
+#### Sprite Sheet Format
+
+Use a **single sprite sheet per character** with a standard 8-direction layout:
+
+```
+File: player.png (128×256 pixels)
+Format: 4 columns × 8 rows = 32 frames total
+
+Row 0 (frames 0-3):   Walk South (down)
+Row 1 (frames 4-7):   Walk Southwest
+Row 2 (frames 8-11):  Walk West (left)
+Row 3 (frames 12-15): Walk Northwest
+Row 4 (frames 16-19): Walk North (up)
+Row 5 (frames 20-23): Walk Northeast
+Row 6 (frames 24-27): Walk East (right)
+Row 7 (frames 28-31): Walk Southeast
+```
+
+**Frame dimensions:** 32×32 pixels per frame (fits on 32×16 isometric tiles)
+**Animation:** 4 frames per direction (simple walk cycle)
+
+#### Direction Calculation
+
+Convert velocity vector to one of 8 directions using angle quantization:
+
+```typescript
+// Calculate angle from velocity vector
+const angle = Math.atan2(velocity.y, velocity.x);
+
+// Quantize to nearest 45° increment (8 directions)
+const directionIndex = Math.round(angle / (Math.PI / 4)) % 8;
+
+// Map to direction names
+const directions = [
+  'east',      // 0°
+  'southeast', // 45°
+  'south',     // 90°
+  'southwest', // 135°
+  'west',      // 180°
+  'northwest', // 225°
+  'north',     // 270°
+  'northeast'  // 315°
+];
+
+// Play corresponding animation
+player.play(`walk-${directions[directionIndex]}`, true);
+```
+
+#### Animation System
+
+**Walk Animations:**
+- 8 animations (one per direction)
+- 4 frames each, looping at 10 FPS
+- Only play when velocity magnitude > 0
+
+**Idle State:**
+- Use first frame of last walking direction
+- No animation loop (static sprite)
+
+**Implementation in GameScene.ts:**
+
+```typescript
+preload() {
+  this.load.spritesheet('player', 'assets/sprites/player.png', {
+    frameWidth: 32,
+    frameHeight: 32
+  });
+}
+
+create() {
+  // Create 8 directional walk animations
+  const directions = ['south', 'southwest', 'west', 'northwest',
+                      'north', 'northeast', 'east', 'southeast'];
+
+  directions.forEach((dir, i) => {
+    this.anims.create({
+      key: `walk-${dir}`,
+      frames: this.anims.generateFrameNumbers('player', {
+        start: i * 4,
+        end: i * 4 + 3
+      }),
+      frameRate: 10,
+      repeat: -1
+    });
+  });
+}
+
+update() {
+  // Update local player animation based on velocity
+  if (velocity.length() > 0) {
+    const angle = Math.atan2(velocity.y, velocity.x);
+    const dirIndex = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+    const directions = ['east', 'southeast', 'south', 'southwest',
+                        'west', 'northwest', 'north', 'northeast'];
+    this.localPlayer.play(`walk-${directions[dirIndex]}`, true);
+  } else {
+    this.localPlayer.stop();
+  }
+}
+```
+
+#### Position Update Protocol Enhancement
+
+Add `facing` field to position updates to synchronize animation state:
+
+```typescript
+{
+  kind: "game/position",
+  to: [],
+  payload: {
+    participantId: string,
+    worldCoords: { x: number, y: number },
+    tileCoords: { x: number, y: number },
+    velocity: { x: number, y: number },
+    facing: 'north' | 'northeast' | 'east' | 'southeast' |
+            'south' | 'southwest' | 'west' | 'northwest',  // NEW
+    timestamp: number,
+    platformRef: string | null
+  }
+}
+```
+
+Remote players will play the animation corresponding to the `facing` direction received in position updates.
+
+#### Future Controller Support
+
+This 8-direction system is **future-proof for game controllers**:
+
+```typescript
+// Gamepad analog stick (future milestone)
+const gamepad = navigator.getGamepads()[0];
+if (gamepad) {
+  const leftStickX = gamepad.axes[0];  // -1 to 1
+  const leftStickY = gamepad.axes[1];  // -1 to 1
+
+  // Dead zone filtering
+  const deadZone = 0.15;
+  const magnitude = Math.sqrt(leftStickX**2 + leftStickY**2);
+
+  if (magnitude > deadZone) {
+    // Angle calculation works identically for analog input
+    const angle = Math.atan2(leftStickY, leftStickX);
+    const dirIndex = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+    // ... same direction mapping
+  }
+}
+```
+
+The same angle-to-direction logic works for:
+- Arrow keys (4 directions + diagonals)
+- WASD keys (4 directions + diagonals)
+- Analog sticks (360° input quantized to 8 directions)
+- Touch controls (swipe gestures)
+
+### Implementation Plan
+
+#### Phase 4a: Sprite System Foundation
+1. Create `assets/sprites/` directory structure
+2. Generate placeholder 8-direction sprite sheet for testing
+3. Update `GameScene.ts` to load sprite sheet instead of procedural circle
+4. Implement 8-direction animation system
+5. Add direction calculation from velocity
+6. Test with keyboard input (diagonal movement with simultaneous arrow keys)
+
+#### Phase 4b: Animation State Management
+1. Add `facing` field to `PositionUpdate` type
+2. Update local position publishing to include facing direction
+3. Implement remote player animation synchronization
+4. Add idle state handling (stop animation when velocity = 0)
+5. Test with multiple clients to verify animation sync
+
+#### Phase 4c: Sprite Artwork (Optional)
+1. Create or commission proper character sprites
+2. Design walk cycle animations (4 frames per direction)
+3. Export as 128×256 PNG sprite sheet
+4. Replace placeholder sprites
+5. Test visual quality and performance
+
+### Technical Considerations
+
+**Why 8 Directions (Not 16)?**
+- 8 directions provide good visual fidelity without excessive sprite work
+- Each additional direction doubles sprite sheet size
+- 16 directions (22.5° increments) rarely justify the cost
+- Industry standard: most isometric games use 8 directions
+
+**Why Single Sprite Sheet?**
+- Single HTTP request (faster loading)
+- Standard Phaser workflow (`load.spritesheet`)
+- Easier for artists (all animations in one file)
+- Simpler animation management
+
+**Why 32×32 Frame Size?**
+- Matches tile-based grid (32×16 tiles)
+- Large enough for detail, small enough for performance
+- Standard retro game resolution
+
+**Performance:**
+- 32 frames × 32×32px = 32KB uncompressed (negligible)
+- Animation switching is O(1) in Phaser
+- No impact on network (only facing string changes)
+
+### Alternatives Considered
+
+**4 Directions Only:**
+- Simpler sprite work (only 16 frames)
+- Works for keyboard, but breaks with analog input
+- Visually jarring diagonal movement (character faces wrong way)
+- **Rejected:** Not future-proof for controllers
+
+**16 Directions:**
+- More accurate facing (22.5° increments)
+- Requires 64 frames (double sprite work)
+- Minimal visual improvement over 8 directions
+- **Rejected:** Diminishing returns
+
+**Separate Files per Direction:**
+- 8 HTTP requests instead of 1
+- More file management complexity
+- Slightly easier to edit individual directions
+- **Rejected:** Single sprite sheet is industry standard
+
+**Texture Atlas:**
+- Most memory-efficient format
+- Requires build tooling (TexturePacker)
+- Overkill for single character sprite
+- **Rejected:** Unnecessary complexity for now (can migrate later)
+
+### Success Criteria
+
+- ✅ Players face the direction they're moving (8 directions)
+- ✅ Walk animations play smoothly during movement
+- ✅ Players show idle frame when stationary
+- ✅ Remote players' animations synchronize correctly
+- ✅ No visual glitches during direction changes
+- ✅ System is extensible to future controller input
+
+### Future Milestones Enabled
+
+- **Milestone 5+**: Game Controller Support (analog stick input)
+- **Milestone N**: Multiple character types with different sprites
+- **Milestone N**: Character customization (swap sprite sheets)
+- **Milestone N**: Advanced animations (attack, jump, emote)

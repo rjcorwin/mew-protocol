@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MEWClient } from '@mew-protocol/mew/client';
-import { PositionUpdate, Player } from '../types.js';
+import { PositionUpdate, Player, Direction } from '../types.js';
 
 const TILE_WIDTH = 32;
 const TILE_HEIGHT = 16;
@@ -17,6 +17,7 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private streamId: string | null = null;
   private lastPositionUpdate = 0;
+  private lastFacing: Direction = 'south'; // Default facing direction
   private map!: Phaser.Tilemaps.Tilemap;
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
@@ -32,6 +33,12 @@ export class GameScene extends Phaser.Scene {
 
     // Load Tiled map
     this.load.tilemapTiledJSON('map', 'assets/maps/map1.tmj');
+
+    // Load player sprite sheet (8 directions, 4 frames each)
+    this.load.spritesheet('player', 'assets/sprites/player.png', {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
   }
 
   create() {
@@ -41,6 +48,9 @@ export class GameScene extends Phaser.Scene {
 
     // Load Tiled map
     this.loadTiledMap();
+
+    // Create 8-direction walk animations
+    this.createPlayerAnimations();
 
     // Set up camera bounds based on map dimensions
     const camera = this.cameras.main;
@@ -55,16 +65,6 @@ export class GameScene extends Phaser.Scene {
     const centerY = (10 + 10) * (TILE_HEIGHT / 2); // = 320
     this.localPlayer = this.add.sprite(centerX, centerY, 'player');
     this.localPlayer.setOrigin(0.5, 0.8);
-    this.localPlayer.setTint(0x00ff00); // Green for local player
-
-    // Create a simple circle as placeholder sprite
-    const graphics = this.add.graphics();
-    graphics.fillStyle(0xffffff, 1);
-    graphics.fillCircle(16, 24, 12);
-    graphics.lineStyle(2, 0x000000, 1);
-    graphics.strokeCircle(16, 24, 12);
-    graphics.generateTexture('player', 32, 32);
-    graphics.destroy();
 
     // Set up camera to follow player
     camera.startFollow(this.localPlayer, true, 0.1, 0.1);
@@ -169,6 +169,68 @@ export class GameScene extends Phaser.Scene {
     console.log(`Map loaded: ${this.map.width}×${this.map.height} tiles`);
   }
 
+  private createPlayerAnimations() {
+    // Create 8 directional walk animations
+    // Sprite sheet layout: 8 rows (directions) × 4 columns (frames)
+    const directions = [
+      'south',     // Row 0: Walking down
+      'southwest', // Row 1
+      'west',      // Row 2: Walking left
+      'northwest', // Row 3
+      'north',     // Row 4: Walking up
+      'northeast', // Row 5
+      'east',      // Row 6: Walking right
+      'southeast', // Row 7
+    ];
+
+    directions.forEach((dir, row) => {
+      this.anims.create({
+        key: `walk-${dir}`,
+        frames: this.anims.generateFrameNumbers('player', {
+          start: row * 4,
+          end: row * 4 + 3,
+        }),
+        frameRate: 10,
+        repeat: -1, // Loop indefinitely
+      });
+    });
+
+    console.log('Created 8 directional walk animations');
+  }
+
+  private updatePlayerAnimation(sprite: Phaser.GameObjects.Sprite, velocity: Phaser.Math.Vector2): Direction {
+    // Calculate direction from velocity
+    const direction = this.calculateDirection(velocity);
+
+    // Play corresponding walk animation (true = ignore if already playing)
+    sprite.play(`walk-${direction}`, true);
+
+    return direction;
+  }
+
+  private calculateDirection(velocity: Phaser.Math.Vector2): Direction {
+    // Calculate angle from velocity vector
+    const angle = Math.atan2(velocity.y, velocity.x);
+
+    // Quantize to nearest 45° increment (8 directions)
+    // Add 8 and mod 8 to handle negative angles
+    const directionIndex = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+
+    // Map angle to direction name
+    const directions: Direction[] = [
+      'east',      // 0° (right)
+      'southeast', // 45°
+      'south',     // 90° (down)
+      'southwest', // 135°
+      'west',      // 180° (left)
+      'northwest', // 225°
+      'north',     // 270° (up)
+      'northeast', // 315°
+    ];
+
+    return directions[directionIndex];
+  }
+
   private async requestPositionStream() {
     // Use a shared stream name for all players
     this.streamId = 'mew-world-positions';
@@ -226,6 +288,19 @@ export class GameScene extends Phaser.Scene {
       player.lastUpdate = update.timestamp;
       player.velocity = update.velocity;
     }
+
+    // Update remote player animation based on received facing direction
+    const velocityMagnitude = Math.sqrt(
+      update.velocity.x ** 2 + update.velocity.y ** 2
+    );
+
+    if (velocityMagnitude > 0) {
+      // Player is moving - play walk animation in the received direction
+      player.sprite.play(`walk-${update.facing}`, true);
+    } else {
+      // Player is idle - stop animation
+      player.sprite.anims.stop();
+    }
   }
 
   update(time: number, delta: number) {
@@ -263,6 +338,12 @@ export class GameScene extends Phaser.Scene {
         this.localPlayer.y += velocity.y * collision.speedModifier;
       }
       // If not walkable, don't move (collision!)
+
+      // Update animation based on movement direction and store facing
+      this.lastFacing = this.updatePlayerAnimation(this.localPlayer, velocity);
+    } else {
+      // Stop animation when idle
+      this.localPlayer.anims.stop();
     }
 
     // Publish position update at regular intervals
@@ -364,6 +445,7 @@ export class GameScene extends Phaser.Scene {
         x: velocity.x,
         y: velocity.y,
       },
+      facing: this.lastFacing, // Include current facing direction
       timestamp: Date.now(),
       platformRef: null,
     };
