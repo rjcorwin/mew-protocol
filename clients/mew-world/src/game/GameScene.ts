@@ -506,6 +506,10 @@ export class GameScene extends Phaser.Scene {
           }
         });
       }
+
+      // Always redraw control points at their current positions (they move with position updates)
+      this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel);
+      this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails);
     });
 
     // Interpolate remote players toward their target positions
