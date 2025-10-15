@@ -116,15 +116,31 @@ Build a new MCP server that represents a ship entity with interactive control po
 
 **Phases:**
 
-### Phase 5a: Ship MCP Server Foundation
-- Create ship MCP server with basic state and tools
-- Define ship state (position, velocity, heading, speed level, passenger list)
-- Define ship control points: wheel position (relative coords), sail ropes position
-- Add ship as non-AI participant to mew-world template
-- Ship broadcasts position updates on `game/position` stream
-- Implement `get_ship_state` tool (returns position, heading, speed, control point coords)
+### Phase 5a: Ship MCP Server Foundation ✅
+
+**Status:** Complete
+
+- ✅ Created ship MCP server at `src/mcp-servers/ship-server/`
+- ✅ Defined ship state types (position, velocity, heading, speed level, control points)
+- ✅ Implemented ShipServer class with physics simulation (60 Hz update loop)
+- ✅ Implemented ShipParticipant class for MEW protocol integration
+- ✅ Ship tracks position, heading (8 directions), speed level (0-3)
+- ✅ Control points defined: wheel and sails with relative positions
+- ✅ Added ship1 participant to mew-world template
+- ✅ Ship broadcasts position at 10 Hz on `game/position` stream
+- ✅ Ship data includes deck boundary and control point world positions
+- ✅ Comprehensive testing: initialization, physics, broadcasting, error handling
+
+**Implementation Details:**
+
+- `types.ts`: Ship state types, heading enum, control point interfaces
+- `ShipServer.ts`: Core ship logic, physics loop, state management
+- `ShipParticipant.ts`: MEW client integration, position broadcasting
+- `index.ts`: Entry point with environment variable configuration
+- Template integration with full capabilities and environment setup
 
 ### Phase 5b: Interaction System & Controls
+
 - Add interact key binding (E or spacebar) to client input
 - Implement interaction zone detection (player near control point)
 - Add `interaction/request` message type (player → ship: which control point)
@@ -136,6 +152,7 @@ Build a new MCP server that represents a ship entity with interactive control po
 - Implement `set_speed` tool (0-3 levels, called when receiving sail adjustment)
 
 ### Phase 5c: Ship Movement & Navigation
+
 - Add physics loop that updates ship position based on heading + speed
 - Heading: 8 directions (N, NE, E, SE, S, SW, W, NW)
 - Speed: 0 = stopped, 1 = slow (25 px/s), 2 = medium (50 px/s), 3 = fast (75 px/s)
@@ -152,24 +169,28 @@ Implement the dual coordinate system (world vs platform-relative) and logic for 
 **Phases:**
 
 ### Phase 6a: Ship Boundary Detection
+
 - Define ship collision boundary (rectangular area)
 - Define ship deck walkable area (relative tile coordinates)
 - Detect when player enters ship boundary
 - Add `onShip: string | null` state to player (ship participant ID)
 
 ### Phase 6b: Coordinate Transformation
+
 - Implement world-to-platform coordinate conversion
 - Implement platform-to-world coordinate conversion
 - Update player rendering to use ship-relative coords when aboard
 - Test player position updates while standing still on moving ship
 
 ### Phase 6c: Platform Movement
+
 - Update collision detection to use ship deck boundaries when aboard
 - Adjust player movement to be relative to ship's coordinate frame
 - Ensure players "ride along" as ship moves
 - Test walking around ship deck while ship is moving
 
 ### Phase 6d: Visual Feedback & Polish
+
 - Add visual indicators for interaction zones (glowing outline when player near wheel/sails)
 - Show "Press E to grab wheel" / "Press E to adjust sails" UI prompt
 - Add grab animation or visual feedback (player sprite changes, particles, etc.)
