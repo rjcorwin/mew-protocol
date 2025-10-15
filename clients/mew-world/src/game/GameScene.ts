@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { MEWClient } from '@mew-protocol/mew/client';
 import { PositionUpdate, Player } from '../types.js';
 
-const TILE_WIDTH = 64;
-const TILE_HEIGHT = 32;
+const TILE_WIDTH = 32;
+const TILE_HEIGHT = 16;
 const WORLD_WIDTH = 20;
 const WORLD_HEIGHT = 20;
 const MOVE_SPEED = 100; // pixels per second
@@ -31,7 +31,7 @@ export class GameScene extends Phaser.Scene {
     this.generateTilesetTexture();
 
     // Load Tiled map
-    this.load.tilemapTiledJSON('map', 'assets/maps/example-map.tmj');
+    this.load.tilemapTiledJSON('map', 'assets/maps/map1.tmj');
   }
 
   create() {
@@ -87,13 +87,13 @@ export class GameScene extends Phaser.Scene {
     const tilesetHeight = 128;
     const graphics = this.add.graphics();
 
-    // Tile colors: grass, sand, water, wall, stone
+    // Tile colors: Match your actual cube tiles
     const tileColors = [
-      0x3a6e2f, // 0: grass (green)
-      0xc2b280, // 1: sand (tan)
-      0x4a90e2, // 2: water (blue)
-      0x666666, // 3: wall (gray)
-      0x808080  // 4: stone (light gray)
+      0xd4b896, // 0: sand/tan cube
+      0x5a9547, // 1: grass (green cube)
+      0x5ba3d4, // 2: water (blue cube)
+      0x4a4a4a, // 3: concrete/dark cube (wall)
+      0x808080  // 4: stone (light gray) - unused
     ];
 
     // Draw tiles in a grid (8 columns × 4 rows = 32 tiles)
@@ -138,10 +138,16 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Create layers
-    const ground = this.map.createLayer('Ground', tileset, 0, 0);
+    // Create layers - map1.tmj has "Tile Layer 1"
+    const ground = this.map.createLayer('Tile Layer 1', tileset, 0, 0);
     if (ground) {
       this.groundLayer = ground;
+    } else {
+      // Fallback to original layer names if using example map
+      const fallbackGround = this.map.createLayer('Ground', tileset, 0, 0);
+      if (fallbackGround) {
+        this.groundLayer = fallbackGround;
+      }
     }
 
     // Create Obstacles layer if it exists
