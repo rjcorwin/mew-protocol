@@ -139,28 +139,49 @@ Build a new MCP server that represents a ship entity with interactive control po
 - `index.ts`: Entry point with environment variable configuration
 - Template integration with full capabilities and environment setup
 
-### Phase 5b: Interaction System & Controls
+### Phase 5b: Ship Rendering & Basic Interaction
 
-- Add interact key binding (E or spacebar) to client input
-- Implement interaction zone detection (player near control point)
-- Add `interaction/request` message type (player → ship: which control point)
-- Add `interaction/grab` and `interaction/release` messages
-- Ship tracks which player is controlling wheel/sails (one player per control point)
-- While grabbed: player's left/right keys send `ship/steer` messages (wheel only)
-- While grabbed: player's up/down keys send `ship/adjust_sails` messages (sails only)
-- Implement `set_heading` tool (called by ship when receiving steer commands)
-- Implement `set_speed` tool (0-3 levels, called when receiving sail adjustment)
+**Client-side (Phaser):**
+- Render ship sprite at position from `game/position` messages with `shipData`
+- Display ship control points (wheel and sails) on deck
+- Add interact key binding (E key) to client input
+- Implement interaction zone detection (check distance to control points)
+- Add UI prompts when near control points ("Press E to grab wheel")
+
+**Ship Server:**
+- Add message handlers for `ship/grab_control` and `ship/release_control`
+- Track which player controls each control point (wheel/sails)
+- Add message handlers for `ship/steer` (adjust heading) and `ship/adjust_sails` (adjust speed)
+- Call internal `setHeading()` and `setSpeed()` methods from message handlers
+- Broadcast updated state when controls change
+
+**Message Types:**
+- `ship/grab_control`: {controlPoint: 'wheel' | 'sails', playerId: string}
+- `ship/release_control`: {controlPoint: 'wheel' | 'sails', playerId: string}
+- `ship/steer`: {direction: 'left' | 'right', playerId: string}
+- `ship/adjust_sails`: {adjustment: 'up' | 'down', playerId: string}
 
 ### Phase 5c: Ship Movement & Navigation
 
-- Add physics loop that updates ship position based on heading + speed
-- Heading: 8 directions (N, NE, E, SE, S, SW, W, NW)
-- Speed: 0 = stopped, 1 = slow (25 px/s), 2 = medium (50 px/s), 3 = fast (75 px/s)
-- Add `navigable: boolean` property to tile definitions in Tiled
-- Update map1.tmj: water tiles navigable=true, land tiles navigable=false
-- Implement ship collision detection with land (stop at boundaries)
-- Test: player boards ship, grabs wheel, steers; grabs sails, adjusts speed
-- Test: ship sails on water but stops at grass/sand boundaries
+**Movement Activation:**
+
+- Verify physics loop correctly moves ship when speed > 0 (already implemented in Phase 5a)
+- Test ship movement: set speed to 1-3 and verify position updates
+- Test heading changes: set all 8 directions and verify velocity calculations
+
+**Tile-Based Navigation:**
+
+- Add `navigable: boolean` property to tile type definitions in Tiled
+- Update map1.tmj: mark water tiles as navigable=true, land tiles as navigable=false
+- Implement ship collision detection: check tiles ahead, stop at non-navigable boundaries
+- Test: ship sails freely on water but stops at grass/sand boundaries
+
+**End-to-End Testing:**
+
+- Test: player walks to ship, grabs wheel, steers with left/right arrows
+- Test: player grabs sails, adjusts speed with up/down arrows (0→1→2→3→2→1→0)
+- Test: ship navigates around islands, stops at land boundaries
+- Test: multiple players can control different control points simultaneously
 
 ## Milestone 6: Platform Coordinate System
 
