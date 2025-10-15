@@ -334,14 +334,27 @@ export class GameScene extends Phaser.Scene {
     let ship = this.ships.get(update.participantId);
 
     if (!ship) {
-      // Create new ship
+      // Create new ship using graphics (large visible rectangle)
+      const shipGraphics = this.add.graphics();
+      shipGraphics.fillStyle(0x8b4513, 1); // Brown
+      shipGraphics.fillRect(-update.shipData.deckBoundary.width / 2, -update.shipData.deckBoundary.height / 2,
+                            update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
+      shipGraphics.lineStyle(4, 0x000000, 1); // Black outline
+      shipGraphics.strokeRect(-update.shipData.deckBoundary.width / 2, -update.shipData.deckBoundary.height / 2,
+                              update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
+      shipGraphics.setPosition(update.worldCoords.x, update.worldCoords.y);
+
+      // Generate texture from graphics so we can use it as a sprite
+      const key = `ship-${update.participantId}`;
+      shipGraphics.generateTexture(key, update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
+      shipGraphics.destroy();
+
       const shipSprite = this.add.sprite(
         update.worldCoords.x,
         update.worldCoords.y,
-        'player' // TODO: Use actual ship sprite
+        key
       );
-      shipSprite.setOrigin(0.5, 0.8);
-      shipSprite.setTint(0x8b4513); // Brown color for ship
+      shipSprite.setOrigin(0.5, 0.5);
 
       // Create control point indicators
       const wheelGraphics = this.add.graphics();
@@ -403,45 +416,51 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    // Handle local player movement
+    // Handle local player movement (only if not controlling ship)
     const velocity = new Phaser.Math.Vector2(0, 0);
 
-    if (this.cursors.left?.isDown) {
-      velocity.x -= 1;
-    }
-    if (this.cursors.right?.isDown) {
-      velocity.x += 1;
-    }
-    if (this.cursors.up?.isDown) {
-      velocity.y -= 1;
-    }
-    if (this.cursors.down?.isDown) {
-      velocity.y += 1;
-    }
-
-    // Normalize diagonal movement
-    if (velocity.length() > 0) {
-      velocity.normalize();
-      velocity.scale(MOVE_SPEED * (delta / 1000));
-
-      // Calculate intended new position
-      const newX = this.localPlayer.x + velocity.x;
-      const newY = this.localPlayer.y + velocity.y;
-
-      // Check collision at new position
-      const collision = this.checkTileCollision(newX, newY);
-
-      if (collision.walkable) {
-        // Apply movement with speed modifier
-        this.localPlayer.x += velocity.x * collision.speedModifier;
-        this.localPlayer.y += velocity.y * collision.speedModifier;
+    // Only allow player movement if NOT currently controlling ship
+    if (!this.controllingShip) {
+      if (this.cursors.left?.isDown) {
+        velocity.x -= 1;
       }
-      // If not walkable, don't move (collision!)
+      if (this.cursors.right?.isDown) {
+        velocity.x += 1;
+      }
+      if (this.cursors.up?.isDown) {
+        velocity.y -= 1;
+      }
+      if (this.cursors.down?.isDown) {
+        velocity.y += 1;
+      }
 
-      // Update animation based on movement direction and store facing
-      this.lastFacing = this.updatePlayerAnimation(this.localPlayer, velocity);
+      // Normalize diagonal movement
+      if (velocity.length() > 0) {
+        velocity.normalize();
+        velocity.scale(MOVE_SPEED * (delta / 1000));
+
+        // Calculate intended new position
+        const newX = this.localPlayer.x + velocity.x;
+        const newY = this.localPlayer.y + velocity.y;
+
+        // Check collision at new position
+        const collision = this.checkTileCollision(newX, newY);
+
+        if (collision.walkable) {
+          // Apply movement with speed modifier
+          this.localPlayer.x += velocity.x * collision.speedModifier;
+          this.localPlayer.y += velocity.y * collision.speedModifier;
+        }
+        // If not walkable, don't move (collision!)
+
+        // Update animation based on movement direction and store facing
+        this.lastFacing = this.updatePlayerAnimation(this.localPlayer, velocity);
+      } else {
+        // Stop animation when idle
+        this.localPlayer.anims.stop();
+      }
     } else {
-      // Stop animation when idle
+      // Player is controlling ship - stop player animation
       this.localPlayer.anims.stop();
     }
 
