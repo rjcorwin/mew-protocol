@@ -56,10 +56,12 @@ The Electron-based game client (`clients/mew-world`) provides the complete playe
 
 3. **Game Start**: Once connected, Phaser game initializes with:
    - 1280x720 window with resizable viewport
-   - Isometric grid (20x20 tiles, 64x32 tile dimensions)
-   - Local player sprite (green circle at center)
+   - Tiled map loaded from `assets/maps/map1.tmj` (30×30 tiles, 32×16 tile dimensions)
+   - Tileset image loaded from `assets/maps/terrain.png`
+   - Local player sprite (green circle at center of map)
    - Arrow key input binding
    - Position update subscription
+   - Tile-based collision detection active
 
 ### Position Synchronization Protocol
 
@@ -124,22 +126,54 @@ When a remote player's position update arrives:
 - Camera follows player with smooth lerp (0.1 factor)
 - Sprite anchored at (0.5, 0.8) for proper isometric positioning
 
-### Isometric Grid System
+### Tiled Map Integration
 
-**Grid Rendering:**
-- 20x20 tile grid with diamond-shaped tiles
-- Tile dimensions: 64px wide, 32px tall
-- Alternating tile colors for visual clarity (#3a6e2f, #4a7e3f)
-- Screen position calculated via isometric projection:
+**Map Editor:**
+- Maps created in [Tiled Map Editor](https://www.mapeditor.org/) and exported as JSON (.tmj)
+- Embedded tilesets (Phaser doesn't support external .tsx files)
+- Isometric orientation with customizable tile dimensions
+- Current implementation: 32×16 pixel tiles for lower-resolution aesthetic
+
+**Map Structure:**
+- Multiple layers supported: Ground, Obstacles, Water, Decorations
+- Current maps use single "Tile Layer 1" with all terrain data
+- Tileset image loaded from `assets/maps/terrain.png`
+- Tile properties define gameplay behavior:
+  - `walkable` (bool): Can player move onto this tile?
+  - `speedModifier` (float): Movement speed multiplier (0.5 for water, 0.0 for walls, 1.0 for normal)
+  - `terrain` (string): Semantic type (grass, sand, water, wall, concrete, etc.)
+
+**Collision Detection:**
+- Tile-based collision with O(1) lookups
+- `checkTileCollision()` converts world coordinates to tile coordinates
+- Non-walkable tiles (`walkable: false`) block movement
+- Speed modifiers applied during movement (e.g., 50% speed in water)
+- Map boundaries enforced (players cannot walk off grid edges)
+
+**Current Map (map1.tmj):**
+- 30×30 isometric grid
+- 4 tile types with isometric cube artwork:
+  - Tile 0 (sand): walkable, speedModifier 0.8, tan cube
+  - Tile 1 (grass): walkable, speedModifier 1.0, green cube
+  - Tile 2 (water): walkable, speedModifier 0.5, blue cube
+  - Tile 3 (concrete): non-walkable, dark cube (walls)
+
+**Coordinate Conversion:**
+- World coordinates: Pixel positions in game space
+- Tile coordinates: Grid positions (calculated from world coords via `worldToTileXY`)
+- Coordinates floored to integers before tile lookups to prevent precision errors
+- Both included in position updates for future pathfinding use
+
+**Rendering:**
+- Phaser loads tilemap from JSON via `tilemapTiledJSON`
+- Tileset image loaded separately via `load.image`
+- Layers rendered in order: Ground → Water → Obstacles → Decorations
+- Camera bounds calculated from map dimensions to handle isometric projection
+- Isometric projection formula:
   ```
   screenX = (x - y) * (tileWidth / 2)
   screenY = (x + y) * (tileHeight / 2)
   ```
-
-**Coordinate Conversion:**
-- World coordinates: Pixel positions in game space
-- Tile coordinates: Grid positions (calculated from world coords)
-- Both included in position updates for future pathfinding use
 
 ### Build Process
 
@@ -174,10 +208,21 @@ To test with multiple players:
 
 ### Known Limitations (Current Implementation)
 
-- No collision detection (players can overlap)
-- No terrain boundaries (players can move infinitely)
-- Simple circle sprites (no animations)
+- Simple circle sprites (no animations or directional facing)
+- Players can overlap each other (no player-to-player collision)
 - No AI agents yet (requires GameAgent implementation)
 - No ships yet (requires ship MCP server)
 - No platform coordinate system yet (required for ships)
 - Position updates sent continuously at 10 Hz (could optimize to only send when moving)
+- Single layer maps (no multi-layer terrain support yet)
+
+### Completed Features (Milestone 3)
+
+- ✅ Tiled Map Editor integration with JSON export
+- ✅ Embedded tileset support with custom artwork
+- ✅ Tile-based collision detection (walls block movement)
+- ✅ Map boundary enforcement (cannot walk off grid)
+- ✅ Tile properties system (walkable, speedModifier, terrain)
+- ✅ Water tiles with speed reduction (50% movement speed)
+- ✅ Custom isometric cube artwork (sand, grass, water, concrete)
+- ✅ Multi-player position synchronization with collision
