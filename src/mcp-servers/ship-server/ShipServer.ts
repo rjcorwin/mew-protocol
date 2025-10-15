@@ -171,13 +171,6 @@ export class ShipServer {
   /**
    * Public methods for control (called via MEW protocol messages)
    */
-  public setHeadingPublic(heading: ShipHeading) {
-    this.setHeading(heading);
-  }
-
-  public setSpeedPublic(speedLevel: SpeedLevel) {
-    this.setSpeed(speedLevel);
-  }
 
   public grabControlPublic(participantId: string, controlPoint: 'wheel' | 'sails') {
     this.grabControl(participantId, controlPoint);
@@ -185,5 +178,45 @@ export class ShipServer {
 
   public releaseControlPublic(participantId: string) {
     this.releaseControl(participantId);
+  }
+
+  public steer(playerId: string, direction: 'left' | 'right') {
+    // Verify player controls the wheel
+    if (this.state.controlPoints.wheel.controlledBy !== playerId) {
+      console.error(`Player ${playerId} cannot steer - not controlling wheel`);
+      return;
+    }
+
+    // Rotate heading by one step (8 directions, circular)
+    const headings: ShipHeading[] = [
+      'north',
+      'northeast',
+      'east',
+      'southeast',
+      'south',
+      'southwest',
+      'west',
+      'northwest',
+    ];
+
+    const currentIndex = headings.indexOf(this.state.heading);
+    const delta = direction === 'left' ? -1 : 1;
+    const newIndex = (currentIndex + delta + headings.length) % headings.length;
+
+    this.setHeading(headings[newIndex]);
+  }
+
+  public adjustSails(playerId: string, adjustment: 'up' | 'down') {
+    // Verify player controls the sails
+    if (this.state.controlPoints.sails.controlledBy !== playerId) {
+      console.error(`Player ${playerId} cannot adjust sails - not controlling sails`);
+      return;
+    }
+
+    // Adjust speed level (clamped 0-3)
+    const delta = adjustment === 'up' ? 1 : -1;
+    const newSpeed = Math.max(0, Math.min(3, this.state.speedLevel + delta)) as SpeedLevel;
+
+    this.setSpeed(newSpeed);
   }
 }

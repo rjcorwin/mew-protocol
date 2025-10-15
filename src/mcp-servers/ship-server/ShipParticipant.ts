@@ -6,7 +6,13 @@
 
 import { MEWClient } from '../../client/MEWClient.js';
 import { ShipServer } from './ShipServer.js';
-import { ShipState } from './types.js';
+import {
+  ShipState,
+  GrabControlPayload,
+  ReleaseControlPayload,
+  SteerPayload,
+  AdjustSailsPayload,
+} from './types.js';
 
 export interface ShipParticipantConfig {
   gatewayUrl: string;
@@ -44,12 +50,59 @@ export class ShipParticipant {
 
   private setupMessageHandlers() {
     this.client.onMessage((envelope: any) => {
-      // Handle ship-specific messages here
-      // For now, just log them
-      if (envelope.to && Array.isArray(envelope.to) && envelope.to.includes(this.config.participantId)) {
-        console.log(`Ship received message:`, envelope);
+      // Only process messages addressed to this ship
+      if (!envelope.to || !Array.isArray(envelope.to) || !envelope.to.includes(this.config.participantId)) {
+        return;
+      }
+
+      console.log(`Ship received message:`, envelope);
+
+      // Handle different message kinds
+      switch (envelope.kind) {
+        case 'ship/grab_control':
+          this.handleGrabControl(envelope.payload as GrabControlPayload);
+          break;
+
+        case 'ship/release_control':
+          this.handleReleaseControl(envelope.payload as ReleaseControlPayload);
+          break;
+
+        case 'ship/steer':
+          this.handleSteer(envelope.payload as SteerPayload);
+          break;
+
+        case 'ship/adjust_sails':
+          this.handleAdjustSails(envelope.payload as AdjustSailsPayload);
+          break;
+
+        default:
+          console.log(`Unhandled message kind: ${envelope.kind}`);
       }
     });
+  }
+
+  private handleGrabControl(payload: GrabControlPayload) {
+    this.server.grabControlPublic(payload.playerId, payload.controlPoint);
+    // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleReleaseControl(payload: ReleaseControlPayload) {
+    this.server.releaseControlPublic(payload.playerId);
+    // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleSteer(payload: SteerPayload) {
+    this.server.steer(payload.playerId, payload.direction);
+    // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleAdjustSails(payload: AdjustSailsPayload) {
+    this.server.adjustSails(payload.playerId, payload.adjustment);
+    // Immediately broadcast updated state
+    this.broadcastPosition();
   }
 
   /**

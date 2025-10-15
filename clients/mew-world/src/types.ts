@@ -31,6 +31,28 @@ export interface PositionUpdate {
   facing: Direction; // Direction the player is facing (for animation sync)
   timestamp: number;
   platformRef: string | null; // Reference to ship if player is on a ship
+  shipData?: ShipData; // Present if this is a ship position update
+}
+
+/**
+ * Ship-specific data in position updates
+ */
+export interface ShipData {
+  speedLevel: number;
+  deckBoundary: {
+    width: number;
+    height: number;
+  };
+  controlPoints: {
+    wheel: {
+      worldPosition: { x: number; y: number };
+      controlledBy: string | null;
+    };
+    sails: {
+      worldPosition: { x: number; y: number };
+      controlledBy: string | null;
+    };
+  };
 }
 
 /**
@@ -43,6 +65,31 @@ export interface Player {
   lastUpdate: number;
   velocity: { x: number; y: number };
   platformRef: string | null;
+}
+
+/**
+ * Ship entity managed by the game
+ */
+export interface Ship {
+  id: string;
+  sprite: Phaser.GameObjects.Sprite;
+  targetPosition: { x: number; y: number };
+  lastUpdate: number;
+  velocity: { x: number; y: number };
+  controlPoints: {
+    wheel: {
+      sprite: Phaser.GameObjects.Graphics;
+      worldPosition: { x: number; y: number };
+      controlledBy: string | null;
+    };
+    sails: {
+      sprite: Phaser.GameObjects.Graphics;
+      worldPosition: { x: number; y: number };
+      controlledBy: string | null;
+    };
+  };
+  speedLevel: number;
+  deckBoundary: { width: number; height: number };
 }
 
 /**

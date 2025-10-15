@@ -86,3 +86,27 @@ export interface ShipConfig {
     3: number;
   };
 }
+
+/**
+ * Ship control message payloads
+ */
+
+export interface GrabControlPayload {
+  controlPoint: 'wheel' | 'sails';
+  playerId: string;
+}
+
+export interface ReleaseControlPayload {
+  controlPoint: 'wheel' | 'sails';
+  playerId: string;
+}
+
+export interface SteerPayload {
+  direction: 'left' | 'right';
+  playerId: string;
+}
+
+export interface AdjustSailsPayload {
+  adjustment: 'up' | 'down';
+  playerId: string;
+}

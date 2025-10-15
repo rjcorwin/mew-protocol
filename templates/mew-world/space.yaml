@@ -38,14 +38,7 @@ participants:
     auto_start: true
     cwd: "/Users/rjcorwin/Github/rjcorwin/mew-protocol"
     capabilities:
-      - kind: "game/position" # Ship broadcasts position
-      - kind: "game/interaction" # Ship receives interaction requests
-      - kind: "ship/*" # Ship control messages
-      - kind: "mcp/request"
-        payload:
-          method: "tools/*"
-      - kind: "mcp/response"
-      - kind: "participant/status"
+      - kind: "*" # Full capabilities (ship is trusted local participant)
     env:
       SHIP_ID: "ship1"
       SPACE_NAME: "{{SPACE_NAME}}"

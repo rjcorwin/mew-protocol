@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MEWClient } from '@mew-protocol/mew/client';
-import { PositionUpdate, Player, Direction } from '../types.js';
+import { PositionUpdate, Player, Ship, Direction } from '../types.js';
 
 const TILE_WIDTH = 32;
 const TILE_HEIGHT = 16;
@@ -14,7 +14,9 @@ export class GameScene extends Phaser.Scene {
   private playerId!: string;
   private localPlayer!: Phaser.GameObjects.Sprite;
   private remotePlayers: Map<string, Player> = new Map();
+  private ships: Map<string, Ship> = new Map();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private interactKey!: Phaser.Input.Keyboard.Key;
   private streamId: string | null = null;
   private lastPositionUpdate = 0;
   private lastFacing: Direction = 'south'; // Default facing direction
@@ -22,6 +24,9 @@ export class GameScene extends Phaser.Scene {
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
+  private interactionPrompt!: Phaser.GameObjects.Text;
+  private controllingShip: string | null = null;
+  private controllingPoint: 'wheel' | 'sails' | null = null;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -71,6 +76,18 @@ export class GameScene extends Phaser.Scene {
 
     // Set up keyboard input
     this.cursors = this.input.keyboard!.createCursorKeys();
+    this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+
+    // Create interaction prompt (initially hidden)
+    this.interactionPrompt = this.add.text(0, 0, '', {
+      fontSize: '16px',
+      color: '#ffffff',
+      backgroundColor: '#000000aa',
+      padding: { x: 10, y: 5 },
+    });
+    this.interactionPrompt.setOrigin(0.5, 1);
+    this.interactionPrompt.setDepth(1000);
+    this.interactionPrompt.setVisible(false);
 
     // Request stream for position updates
     this.requestPositionStream();
@@ -249,8 +266,13 @@ export class GameScene extends Phaser.Scene {
             return;
           }
 
-          // Update or create remote player
-          this.updateRemotePlayer(update);
+          // Check if this is a ship update
+          if (update.shipData) {
+            this.updateShip(update);
+          } else {
+            // Update or create remote player
+            this.updateRemotePlayer(update);
+          }
         } catch (error) {
           console.error('Failed to parse position update:', error);
         }
@@ -303,6 +325,80 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private updateShip(update: PositionUpdate) {
+    if (!update.shipData) return;
+
+    let ship = this.ships.get(update.participantId);
+
+    if (!ship) {
+      // Create new ship
+      const shipSprite = this.add.sprite(
+        update.worldCoords.x,
+        update.worldCoords.y,
+        'player' // TODO: Use actual ship sprite
+      );
+      shipSprite.setOrigin(0.5, 0.8);
+      shipSprite.setTint(0x8b4513); // Brown color for ship
+
+      // Create control point indicators
+      const wheelGraphics = this.add.graphics();
+      const sailsGraphics = this.add.graphics();
+
+      ship = {
+        id: update.participantId,
+        sprite: shipSprite,
+        targetPosition: { x: update.worldCoords.x, y: update.worldCoords.y },
+        lastUpdate: update.timestamp,
+        velocity: update.velocity,
+        controlPoints: {
+          wheel: {
+            sprite: wheelGraphics,
+            worldPosition: update.shipData.controlPoints.wheel.worldPosition,
+            controlledBy: update.shipData.controlPoints.wheel.controlledBy,
+          },
+          sails: {
+            sprite: sailsGraphics,
+            worldPosition: update.shipData.controlPoints.sails.worldPosition,
+            controlledBy: update.shipData.controlPoints.sails.controlledBy,
+          },
+        },
+        speedLevel: update.shipData.speedLevel,
+        deckBoundary: update.shipData.deckBoundary,
+      };
+
+      this.ships.set(update.participantId, ship);
+      console.log(`Ship joined: ${update.participantId}`);
+    } else {
+      // Update existing ship
+      ship.targetPosition = { x: update.worldCoords.x, y: update.worldCoords.y };
+      ship.lastUpdate = update.timestamp;
+      ship.velocity = update.velocity;
+      ship.speedLevel = update.shipData.speedLevel;
+      ship.controlPoints.wheel.worldPosition = update.shipData.controlPoints.wheel.worldPosition;
+      ship.controlPoints.wheel.controlledBy = update.shipData.controlPoints.wheel.controlledBy;
+      ship.controlPoints.sails.worldPosition = update.shipData.controlPoints.sails.worldPosition;
+      ship.controlPoints.sails.controlledBy = update.shipData.controlPoints.sails.controlledBy;
+    }
+
+    // Draw control point indicators
+    this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel);
+    this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails);
+  }
+
+  private drawControlPoint(
+    graphics: Phaser.GameObjects.Graphics,
+    controlPoint: { worldPosition: { x: number; y: number }; controlledBy: string | null }
+  ) {
+    graphics.clear();
+
+    // Draw a circle at the control point position
+    const color = controlPoint.controlledBy ? 0xff0000 : 0x00ff00; // Red if controlled, green if free
+    graphics.fillStyle(color, 0.5);
+    graphics.fillCircle(controlPoint.worldPosition.x, controlPoint.worldPosition.y, 8);
+    graphics.lineStyle(2, 0xffffff, 1);
+    graphics.strokeCircle(controlPoint.worldPosition.x, controlPoint.worldPosition.y, 8);
+  }
+
   update(time: number, delta: number) {
     // Handle local player movement
     const velocity = new Phaser.Math.Vector2(0, 0);
@@ -351,6 +447,9 @@ export class GameScene extends Phaser.Scene {
       this.publishPosition(velocity);
       this.lastPositionUpdate = time;
     }
+
+    // Check for ship control point interactions
+    this.checkShipInteractions();
 
     // Interpolate remote players toward their target positions
     this.remotePlayers.forEach((player) => {
@@ -456,5 +555,151 @@ export class GameScene extends Phaser.Scene {
       to: [], // Broadcast to all
       payload: update,
     });
+  }
+
+  private checkShipInteractions() {
+    const INTERACTION_DISTANCE = 30; // pixels
+    let nearestControlPoint: {
+      shipId: string;
+      controlPoint: 'wheel' | 'sails';
+      distance: number;
+      label: string;
+    } | null = null;
+
+    // Find closest control point
+    this.ships.forEach((ship) => {
+      // Check wheel
+      const wheelDx = ship.controlPoints.wheel.worldPosition.x - this.localPlayer.x;
+      const wheelDy = ship.controlPoints.wheel.worldPosition.y - this.localPlayer.y;
+      const wheelDistance = Math.sqrt(wheelDx * wheelDx + wheelDy * wheelDy);
+
+      if (wheelDistance < INTERACTION_DISTANCE) {
+        if (!nearestControlPoint || wheelDistance < nearestControlPoint.distance) {
+          nearestControlPoint = {
+            shipId: ship.id,
+            controlPoint: 'wheel',
+            distance: wheelDistance,
+            label: 'Press E to grab wheel'
+          };
+        }
+      }
+
+      // Check sails
+      const sailsDx = ship.controlPoints.sails.worldPosition.x - this.localPlayer.x;
+      const sailsDy = ship.controlPoints.sails.worldPosition.y - this.localPlayer.y;
+      const sailsDistance = Math.sqrt(sailsDx * sailsDx + sailsDy * sailsDy);
+
+      if (sailsDistance < INTERACTION_DISTANCE) {
+        if (!nearestControlPoint || sailsDistance < nearestControlPoint.distance) {
+          nearestControlPoint = {
+            shipId: ship.id,
+            controlPoint: 'sails',
+            distance: sailsDistance,
+            label: 'Press E to adjust sails'
+          };
+        }
+      }
+    });
+
+    // Update UI prompt
+    if (nearestControlPoint) {
+      this.interactionPrompt.setVisible(true);
+      this.interactionPrompt.setText(nearestControlPoint.label);
+      this.interactionPrompt.setPosition(this.localPlayer.x, this.localPlayer.y - 30);
+
+      // Handle E key press
+      if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+        if (this.controllingPoint) {
+          // Release current control
+          this.sendReleaseControl();
+        } else {
+          // Grab new control
+          this.sendGrabControl(nearestControlPoint.shipId, nearestControlPoint.controlPoint);
+        }
+      }
+    } else {
+      this.interactionPrompt.setVisible(false);
+    }
+
+    // Handle ship control inputs (when controlling wheel or sails)
+    if (this.controllingShip && this.controllingPoint) {
+      if (this.controllingPoint === 'wheel') {
+        // Left/right arrows to steer
+        if (Phaser.Input.Keyboard.JustDown(this.cursors.left!)) {
+          this.sendSteer(this.controllingShip, 'left');
+        }
+        if (Phaser.Input.Keyboard.JustDown(this.cursors.right!)) {
+          this.sendSteer(this.controllingShip, 'right');
+        }
+      } else if (this.controllingPoint === 'sails') {
+        // Up/down arrows to adjust speed
+        if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
+          this.sendAdjustSails(this.controllingShip, 'up');
+        }
+        if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
+          this.sendAdjustSails(this.controllingShip, 'down');
+        }
+      }
+    }
+  }
+
+  private sendGrabControl(shipId: string, controlPoint: 'wheel' | 'sails') {
+    this.client.send({
+      kind: 'ship/grab_control',
+      to: [shipId],
+      payload: {
+        controlPoint,
+        playerId: this.playerId,
+      },
+    });
+
+    this.controllingShip = shipId;
+    this.controllingPoint = controlPoint;
+
+    console.log(`Grabbed ${controlPoint} on ship ${shipId}`);
+  }
+
+  private sendReleaseControl() {
+    if (!this.controllingShip || !this.controllingPoint) return;
+
+    this.client.send({
+      kind: 'ship/release_control',
+      to: [this.controllingShip],
+      payload: {
+        controlPoint: this.controllingPoint,
+        playerId: this.playerId,
+      },
+    });
+
+    console.log(`Released ${this.controllingPoint} on ship ${this.controllingShip}`);
+
+    this.controllingShip = null;
+    this.controllingPoint = null;
+  }
+
+  private sendSteer(shipId: string, direction: 'left' | 'right') {
+    this.client.send({
+      kind: 'ship/steer',
+      to: [shipId],
+      payload: {
+        direction,
+        playerId: this.playerId,
+      },
+    });
+
+    console.log(`Steering ${direction}`);
+  }
+
+  private sendAdjustSails(shipId: string, adjustment: 'up' | 'down') {
+    this.client.send({
+      kind: 'ship/adjust_sails',
+      to: [shipId],
+      payload: {
+        adjustment,
+        playerId: this.playerId,
+      },
+    });
+
+    console.log(`Adjusting sails ${adjustment}`);
   }
 }

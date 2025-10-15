@@ -34,6 +34,7 @@ Add support for loading Tiled map editor (.tmj) files with multiple layers (Grou
 **Related Proposal:** `spec/mew-world/proposals/t4m-tiled-maps/`
 
 **Status:** Complete
+
 - Tiled map loading implemented (JSON format .tmj)
 - Procedural tileset generation (5 terrain types with colors)
 - Three-layer rendering: Ground, Obstacles, Water
@@ -46,6 +47,7 @@ Add support for loading Tiled map editor (.tmj) files with multiple layers (Grou
 **Phases:**
 
 ### Phase 3a: Basic Map Loading ✅
+
 - ✅ Create example Tiled map (20×20 isometric) with terrain tileset
 - ✅ Add map loading to Phaser (preload .tmj + tileset images)
 - ✅ Render Ground and Obstacles layers
@@ -53,18 +55,21 @@ Add support for loading Tiled map editor (.tmj) files with multiple layers (Grou
 - ✅ Test single player map rendering
 
 ### Phase 3b: Collision Detection ✅
+
 - ✅ Implement tile-based collision checking (walkable property)
 - ✅ Add map boundary enforcement (clamp to grid edges)
 - ✅ Prevent movement onto non-walkable tiles
 - ✅ Test collision with walls and boundaries
 
 ### Phase 3c: Tile Properties & Mechanics ✅
+
 - ✅ Add Water layer with speedModifier property (0.5 for swimming)
 - ✅ Apply speed modifiers during movement
 - ✅ Test water slowdown mechanics
 - ✅ Decorations layer support (deferred - not needed yet)
 
 ### Phase 3d: Multiplayer & Documentation (Testing)
+
 - Test collision with multiple connected players
 - Verify position synchronization works with maps
 - Document map creation workflow (Tiled setup guide)
@@ -77,6 +82,7 @@ Replace placeholder circle sprites with animated character sprites supporting 8-
 **Related Proposal:** See `spec/mew-world/SPEC.md` Milestone 4 section
 
 **Status:** Complete (Phases 4a & 4b)
+
 - 8-direction sprite sheet system (128×256, 32×32 frames)
 - Placeholder sprite generation script with colored circles and arrows
 - Direction calculation using atan2 and 45° quantization
@@ -89,6 +95,7 @@ Replace placeholder circle sprites with animated character sprites supporting 8-
 **Phases:**
 
 ### Phase 4a: Sprite System Foundation ✅
+
 - ✅ Create `assets/sprites/` directory structure
 - ✅ Generate placeholder 8-direction sprite sheet for testing
 - ✅ Update `GameScene.ts` to load sprite sheet instead of procedural circle
@@ -97,6 +104,7 @@ Replace placeholder circle sprites with animated character sprites supporting 8-
 - ✅ Test with keyboard input (diagonal movement with simultaneous arrow keys)
 
 ### Phase 4b: Animation State Management ✅
+
 - ✅ Add `facing` field to `PositionUpdate` type
 - ✅ Update local position publishing to include facing direction
 - ✅ Implement remote player animation synchronization
@@ -104,6 +112,7 @@ Replace placeholder circle sprites with animated character sprites supporting 8-
 - ✅ Test with multiple clients to verify animation sync
 
 ### Phase 4c: Sprite Artwork (Optional - Deferred)
+
 - Create or commission proper character sprites
 - Design walk cycle animations (4 frames per direction)
 - Export as 128×256 PNG sprite sheet
@@ -142,6 +151,7 @@ Build a new MCP server that represents a ship entity with interactive control po
 ### Phase 5b: Ship Rendering & Basic Interaction
 
 **Client-side (Phaser):**
+
 - Render ship sprite at position from `game/position` messages with `shipData`
 - Display ship control points (wheel and sails) on deck
 - Add interact key binding (E key) to client input
@@ -149,6 +159,7 @@ Build a new MCP server that represents a ship entity with interactive control po
 - Add UI prompts when near control points ("Press E to grab wheel")
 
 **Ship Server:**
+
 - Add message handlers for `ship/grab_control` and `ship/release_control`
 - Track which player controls each control point (wheel/sails)
 - Add message handlers for `ship/steer` (adjust heading) and `ship/adjust_sails` (adjust speed)
@@ -156,6 +167,7 @@ Build a new MCP server that represents a ship entity with interactive control po
 - Broadcast updated state when controls change
 
 **Message Types:**
+
 - `ship/grab_control`: {controlPoint: 'wheel' | 'sails', playerId: string}
 - `ship/release_control`: {controlPoint: 'wheel' | 'sails', playerId: string}
 - `ship/steer`: {direction: 'left' | 'right', playerId: string}
