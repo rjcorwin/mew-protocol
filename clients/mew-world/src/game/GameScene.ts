@@ -27,6 +27,8 @@ export class GameScene extends Phaser.Scene {
   private interactionPrompt!: Phaser.GameObjects.Text;
   private controllingShip: string | null = null;
   private controllingPoint: 'wheel' | 'sails' | null = null;
+  private onShip: string | null = null; // Track if local player is on a ship
+  private shipRelativePosition: { x: number; y: number } | null = null; // Position relative to ship center
 
   constructor() {
     super({ key: 'GameScene' });
@@ -300,6 +302,7 @@ export class GameScene extends Phaser.Scene {
         lastUpdate: update.timestamp,
         velocity: update.velocity,
         platformRef: update.platformRef,
+        onShip: null,
       };
 
       this.remotePlayers.set(update.participantId, player);
@@ -448,8 +451,43 @@ export class GameScene extends Phaser.Scene {
       this.lastPositionUpdate = time;
     }
 
+    // Check for ship boundary detection (Phase 6a)
+    this.checkShipBoundary();
+
     // Check for ship control point interactions
     this.checkShipInteractions();
+
+    // Phase 6c: Update ships and move players on ships
+    this.ships.forEach((ship) => {
+      const dx = ship.targetPosition.x - ship.sprite.x;
+      const dy = ship.targetPosition.y - ship.sprite.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > 1) {
+        // Calculate ship movement delta
+        const factor = Math.min(1, (delta / 1000) * 5);
+        const shipDx = dx * factor;
+        const shipDy = dy * factor;
+
+        // Move ship
+        ship.sprite.x += shipDx;
+        ship.sprite.y += shipDy;
+
+        // Move local player if on this ship
+        if (this.onShip === ship.id && this.shipRelativePosition) {
+          this.localPlayer.x += shipDx;
+          this.localPlayer.y += shipDy;
+        }
+
+        // Move remote players if on this ship
+        this.remotePlayers.forEach((player) => {
+          if (player.onShip === ship.id) {
+            player.sprite.x += shipDx;
+            player.sprite.y += shipDy;
+          }
+        });
+      }
+    });
 
     // Interpolate remote players toward their target positions
     this.remotePlayers.forEach((player) => {
@@ -464,6 +502,43 @@ export class GameScene extends Phaser.Scene {
         player.sprite.y += dy * factor;
       }
     });
+  }
+
+  private checkShipBoundary() {
+    // Check if player is within any ship's deck boundary
+    let foundShip: string | null = null;
+    let shipRelativePos: { x: number; y: number } | null = null;
+
+    this.ships.forEach((ship) => {
+      // Calculate distance from ship center
+      const dx = this.localPlayer.x - ship.sprite.x;
+      const dy = this.localPlayer.y - ship.sprite.y;
+
+      // Check if within deck boundary (rectangular area)
+      const halfWidth = ship.deckBoundary.width / 2;
+      const halfHeight = ship.deckBoundary.height / 2;
+
+      if (Math.abs(dx) <= halfWidth && Math.abs(dy) <= halfHeight) {
+        foundShip = ship.id;
+        shipRelativePos = { x: dx, y: dy }; // Store position relative to ship center
+      }
+    });
+
+    // Update onShip state
+    if (foundShip !== this.onShip) {
+      if (foundShip) {
+        console.log(`Player boarded ship: ${foundShip}`);
+        this.onShip = foundShip;
+        this.shipRelativePosition = shipRelativePos;
+      } else {
+        console.log(`Player left ship: ${this.onShip}`);
+        this.onShip = null;
+        this.shipRelativePosition = null;
+      }
+    } else if (foundShip && shipRelativePos) {
+      // Update relative position if still on same ship
+      this.shipRelativePosition = shipRelativePos;
+    }
   }
 
   private checkTileCollision(worldX: number, worldY: number): {

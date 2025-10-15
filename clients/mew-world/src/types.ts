@@ -65,6 +65,7 @@ export interface Player {
   lastUpdate: number;
   velocity: { x: number; y: number };
   platformRef: string | null;
+  onShip: string | null; // Ship participant ID if player is on a ship
 }
 
 /**

@@ -49,16 +49,21 @@
                          "name":"speedModifier",
                          "type":"float",
                          "value":0.8
-                        }, 
+                        },
                         {
                          "name":"terrain",
                          "type":"string",
                          "value":"sand"
-                        }, 
+                        },
                         {
                          "name":"walkable",
                          "type":"bool",
                          "value":true
+                        },
+                        {
+                         "name":"navigable",
+                         "type":"bool",
+                         "value":false
                         }]
                 }, 
                 {
@@ -68,16 +73,21 @@
                          "name":"speedModifier",
                          "type":"float",
                          "value":1
-                        }, 
+                        },
                         {
                          "name":"terrain",
                          "type":"string",
                          "value":"grass"
-                        }, 
+                        },
                         {
                          "name":"walkable",
                          "type":"bool",
                          "value":true
+                        },
+                        {
+                         "name":"navigable",
+                         "type":"bool",
+                         "value":false
                         }]
                 }, 
                 {
@@ -87,14 +97,19 @@
                          "name":"speedModifier",
                          "type":"float",
                          "value":0.5
-                        }, 
+                        },
                         {
                          "name":"terrain",
                          "type":"string",
                          "value":"water"
-                        }, 
+                        },
                         {
                          "name":"walkable",
+                         "type":"bool",
+                         "value":true
+                        },
+                        {
+                         "name":"navigable",
                          "type":"bool",
                          "value":true
                         }]
@@ -106,14 +121,19 @@
                          "name":"speedModifier",
                          "type":"float",
                          "value":0
-                        }, 
+                        },
                         {
                          "name":"terrain",
                          "type":"string",
                          "value":"concrete"
-                        }, 
+                        },
                         {
                          "name":"walkable",
+                         "type":"bool",
+                         "value":false
+                        },
+                        {
+                         "name":"navigable",
                          "type":"bool",
                          "value":false
                         }]
