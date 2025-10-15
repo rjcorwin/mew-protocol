@@ -323,41 +323,59 @@ player.play(`walk-${directions[directionIndex]}`, true);
 **Implementation in GameScene.ts:**
 
 ```typescript
-preload() {
-  this.load.spritesheet('player', 'assets/sprites/player.png', {
-    frameWidth: 32,
-    frameHeight: 32
-  });
-}
+export class GameScene extends Phaser.Scene {
+  private lastFacing: Direction = 'south'; // Track facing direction
+  private localPlayer!: Phaser.GameObjects.Sprite;
 
-create() {
-  // Create 8 directional walk animations
-  const directions = ['south', 'southwest', 'west', 'northwest',
-                      'north', 'northeast', 'east', 'southeast'];
-
-  directions.forEach((dir, i) => {
-    this.anims.create({
-      key: `walk-${dir}`,
-      frames: this.anims.generateFrameNumbers('player', {
-        start: i * 4,
-        end: i * 4 + 3
-      }),
-      frameRate: 10,
-      repeat: -1
+  preload() {
+    // Load player sprite sheet (8 directions, 4 frames each)
+    this.load.spritesheet('player', 'assets/sprites/player.png', {
+      frameWidth: 32,
+      frameHeight: 32
     });
-  });
-}
+  }
 
-update() {
-  // Update local player animation based on velocity
-  if (velocity.length() > 0) {
+  create() {
+    // Create 8 directional walk animations
+    const directions = ['south', 'southwest', 'west', 'northwest',
+                        'north', 'northeast', 'east', 'southeast'];
+
+    directions.forEach((dir, i) => {
+      this.anims.create({
+        key: `walk-${dir}`,
+        frames: this.anims.generateFrameNumbers('player', {
+          start: i * 4,  // First frame of row i
+          end: i * 4 + 3 // Last frame of row i (4 frames per direction)
+        }),
+        frameRate: 10,
+        repeat: -1 // Loop indefinitely
+      });
+    });
+  }
+
+  update(time: number, delta: number) {
+    // Update local player animation based on velocity
+    if (velocity.length() > 0) {
+      // Player is moving - update animation and track facing
+      this.lastFacing = this.updatePlayerAnimation(this.localPlayer, velocity);
+    } else {
+      // Player is idle - stop animation
+      this.localPlayer.anims.stop();
+    }
+  }
+
+  private updatePlayerAnimation(sprite: Phaser.GameObjects.Sprite, velocity: Phaser.Math.Vector2): Direction {
+    const direction = this.calculateDirection(velocity);
+    sprite.play(`walk-${direction}`, true); // true = ignore if already playing
+    return direction;
+  }
+
+  private calculateDirection(velocity: Phaser.Math.Vector2): Direction {
     const angle = Math.atan2(velocity.y, velocity.x);
     const dirIndex = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
-    const directions = ['east', 'southeast', 'south', 'southwest',
-                        'west', 'northwest', 'north', 'northeast'];
-    this.localPlayer.play(`walk-${directions[dirIndex]}`, true);
-  } else {
-    this.localPlayer.stop();
+    const directions: Direction[] = ['east', 'southeast', 'south', 'southwest',
+                                      'west', 'northwest', 'north', 'northeast'];
+    return directions[dirIndex];
   }
 }
 ```
