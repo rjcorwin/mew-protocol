@@ -208,13 +208,14 @@ To test with multiple players:
 
 ### Known Limitations (Current Implementation)
 
-- Simple circle sprites (no animations or directional facing)
+- Placeholder sprites (colored circles with arrows, not final artwork)
 - Players can overlap each other (no player-to-player collision)
 - No AI agents yet (requires GameAgent implementation)
 - No ships yet (requires ship MCP server)
 - No platform coordinate system yet (required for ships)
 - Position updates sent continuously at 10 Hz (could optimize to only send when moving)
 - Single layer maps (no multi-layer terrain support yet)
+- No game controller support yet (keyboard only)
 
 ### Completed Features (Milestone 3)
 
@@ -226,6 +227,18 @@ To test with multiple players:
 - ✅ Water tiles with speed reduction (50% movement speed)
 - ✅ Custom isometric cube artwork (sand, grass, water, concrete)
 - ✅ Multi-player position synchronization with collision
+
+### Completed Features (Milestone 4)
+
+- ✅ 8-directional sprite sheet system (128×256, 32×32 frames)
+- ✅ Direction calculation from velocity vector (atan2 + 45° quantization)
+- ✅ Walk animations for all 8 directions (N, NE, E, SE, S, SW, W, NW)
+- ✅ Local player animation updates based on movement
+- ✅ Idle state handling (animation stops when not moving)
+- ✅ `facing` field in position updates for animation sync
+- ✅ Remote player animation synchronization
+- ✅ Placeholder sprite generation script for testing
+- ✅ Future-proof architecture for game controller support
 
 ## Milestone 4: Directional Player Sprites with 8-Way Animation
 
@@ -404,22 +417,22 @@ The same angle-to-direction logic works for:
 
 ### Implementation Plan
 
-#### Phase 4a: Sprite System Foundation
-1. Create `assets/sprites/` directory structure
-2. Generate placeholder 8-direction sprite sheet for testing
-3. Update `GameScene.ts` to load sprite sheet instead of procedural circle
-4. Implement 8-direction animation system
-5. Add direction calculation from velocity
-6. Test with keyboard input (diagonal movement with simultaneous arrow keys)
+#### Phase 4a: Sprite System Foundation ✅ COMPLETED
+1. ✅ Create `assets/sprites/` directory structure
+2. ✅ Generate placeholder 8-direction sprite sheet for testing
+3. ✅ Update `GameScene.ts` to load sprite sheet instead of procedural circle
+4. ✅ Implement 8-direction animation system
+5. ✅ Add direction calculation from velocity
+6. ✅ Test with keyboard input (diagonal movement with simultaneous arrow keys)
 
-#### Phase 4b: Animation State Management
-1. Add `facing` field to `PositionUpdate` type
-2. Update local position publishing to include facing direction
-3. Implement remote player animation synchronization
-4. Add idle state handling (stop animation when velocity = 0)
-5. Test with multiple clients to verify animation sync
+#### Phase 4b: Animation State Management ✅ COMPLETED
+1. ✅ Add `facing` field to `PositionUpdate` type
+2. ✅ Update local position publishing to include facing direction
+3. ✅ Implement remote player animation synchronization
+4. ✅ Add idle state handling (stop animation when velocity = 0)
+5. ✅ Test with multiple clients to verify animation sync
 
-#### Phase 4c: Sprite Artwork (Optional)
+#### Phase 4c: Sprite Artwork (Optional) - NOT STARTED
 1. Create or commission proper character sprites
 2. Design walk cycle animations (4 frames per direction)
 3. Export as 128×256 PNG sprite sheet
