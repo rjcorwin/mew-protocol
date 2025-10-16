@@ -72,6 +72,7 @@ export class GameScene extends Phaser.Scene {
     const centerY = (10 + 10) * (TILE_HEIGHT / 2); // = 320
     this.localPlayer = this.add.sprite(centerX, centerY, 'player');
     this.localPlayer.setOrigin(0.5, 0.8);
+    this.localPlayer.setDepth(1); // Render above ships
 
     // Set up camera to follow player
     camera.startFollow(this.localPlayer, true, 0.1, 0.1);
@@ -294,6 +295,7 @@ export class GameScene extends Phaser.Scene {
       );
       sprite.setOrigin(0.5, 0.8);
       sprite.setTint(0xff0000); // Red for remote players
+      sprite.setDepth(1); // Render above ships
 
       player = {
         id: update.participantId,
@@ -337,12 +339,10 @@ export class GameScene extends Phaser.Scene {
       // Create new ship using graphics (large visible rectangle)
       const shipGraphics = this.add.graphics();
       shipGraphics.fillStyle(0x8b4513, 1); // Brown
-      shipGraphics.fillRect(-update.shipData.deckBoundary.width / 2, -update.shipData.deckBoundary.height / 2,
-                            update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
+      // Draw at (0,0) since generateTexture samples from (0,0)
+      shipGraphics.fillRect(0, 0, update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
       shipGraphics.lineStyle(4, 0x000000, 1); // Black outline
-      shipGraphics.strokeRect(-update.shipData.deckBoundary.width / 2, -update.shipData.deckBoundary.height / 2,
-                              update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
-      shipGraphics.setPosition(update.worldCoords.x, update.worldCoords.y);
+      shipGraphics.strokeRect(0, 0, update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
 
       // Generate texture from graphics so we can use it as a sprite
       const key = `ship-${update.participantId}`;
@@ -354,11 +354,32 @@ export class GameScene extends Phaser.Scene {
         update.worldCoords.y,
         key
       );
+      // Origin at center so sprite position matches ship center
       shipSprite.setOrigin(0.5, 0.5);
+      // Set depth below players but above tilemap (players are at default depth 0)
+      shipSprite.setDepth(0);
 
       // Create control point indicators
       const wheelGraphics = this.add.graphics();
       const sailsGraphics = this.add.graphics();
+
+      // Calculate relative positions from world positions
+      const wheelRelative = {
+        x: update.shipData.controlPoints.wheel.worldPosition.x - update.worldCoords.x,
+        y: update.shipData.controlPoints.wheel.worldPosition.y - update.worldCoords.y,
+      };
+      const sailsRelative = {
+        x: update.shipData.controlPoints.sails.worldPosition.x - update.worldCoords.x,
+        y: update.shipData.controlPoints.sails.worldPosition.y - update.worldCoords.y,
+      };
+
+      console.log(`Ship ${update.participantId} created:`);
+      console.log(`  Ship position: (${update.worldCoords.x}, ${update.worldCoords.y})`);
+      console.log(`  Deck boundary: ${update.shipData.deckBoundary.width}x${update.shipData.deckBoundary.height}`);
+      console.log(`  Wheel world: (${update.shipData.controlPoints.wheel.worldPosition.x}, ${update.shipData.controlPoints.wheel.worldPosition.y})`);
+      console.log(`  Wheel relative: (${wheelRelative.x}, ${wheelRelative.y})`);
+      console.log(`  Sails world: (${update.shipData.controlPoints.sails.worldPosition.x}, ${update.shipData.controlPoints.sails.worldPosition.y})`);
+      console.log(`  Sails relative: (${sailsRelative.x}, ${sailsRelative.y})`);
 
       ship = {
         id: update.participantId,
@@ -369,12 +390,12 @@ export class GameScene extends Phaser.Scene {
         controlPoints: {
           wheel: {
             sprite: wheelGraphics,
-            worldPosition: update.shipData.controlPoints.wheel.worldPosition,
+            relativePosition: wheelRelative,
             controlledBy: update.shipData.controlPoints.wheel.controlledBy,
           },
           sails: {
             sprite: sailsGraphics,
-            worldPosition: update.shipData.controlPoints.sails.worldPosition,
+            relativePosition: sailsRelative,
             controlledBy: update.shipData.controlPoints.sails.controlledBy,
           },
         },
@@ -390,29 +411,32 @@ export class GameScene extends Phaser.Scene {
       ship.lastUpdate = update.timestamp;
       ship.velocity = update.velocity;
       ship.speedLevel = update.shipData.speedLevel;
-      ship.controlPoints.wheel.worldPosition = update.shipData.controlPoints.wheel.worldPosition;
       ship.controlPoints.wheel.controlledBy = update.shipData.controlPoints.wheel.controlledBy;
-      ship.controlPoints.sails.worldPosition = update.shipData.controlPoints.sails.worldPosition;
       ship.controlPoints.sails.controlledBy = update.shipData.controlPoints.sails.controlledBy;
     }
 
-    // Draw control point indicators
-    this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel);
-    this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails);
+    // Draw control point indicators at current ship position
+    this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite);
+    this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite);
   }
 
   private drawControlPoint(
     graphics: Phaser.GameObjects.Graphics,
-    controlPoint: { worldPosition: { x: number; y: number }; controlledBy: string | null }
+    controlPoint: { relativePosition: { x: number; y: number }; controlledBy: string | null },
+    shipSprite: Phaser.GameObjects.Sprite
   ) {
     graphics.clear();
+
+    // Calculate world position from ship's current position + relative offset
+    const worldX = shipSprite.x + controlPoint.relativePosition.x;
+    const worldY = shipSprite.y + controlPoint.relativePosition.y;
 
     // Draw a circle at the control point position
     const color = controlPoint.controlledBy ? 0xff0000 : 0x00ff00; // Red if controlled, green if free
     graphics.fillStyle(color, 0.5);
-    graphics.fillCircle(controlPoint.worldPosition.x, controlPoint.worldPosition.y, 8);
+    graphics.fillCircle(worldX, worldY, 8);
     graphics.lineStyle(2, 0xffffff, 1);
-    graphics.strokeCircle(controlPoint.worldPosition.x, controlPoint.worldPosition.y, 8);
+    graphics.strokeCircle(worldX, worldY, 8);
   }
 
   update(time: number, delta: number) {
@@ -507,9 +531,9 @@ export class GameScene extends Phaser.Scene {
         });
       }
 
-      // Always redraw control points at their current positions (they move with position updates)
-      this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel);
-      this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails);
+      // Always redraw control points at their current positions (they move with ship sprite)
+      this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite);
+      this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite);
     });
 
     // Interpolate remote players toward their target positions
@@ -666,9 +690,11 @@ export class GameScene extends Phaser.Scene {
 
     // Find closest control point
     this.ships.forEach((ship) => {
-      // Check wheel
-      const wheelDx = ship.controlPoints.wheel.worldPosition.x - this.localPlayer.x;
-      const wheelDy = ship.controlPoints.wheel.worldPosition.y - this.localPlayer.y;
+      // Calculate wheel world position from ship position + relative offset
+      const wheelWorldX = ship.sprite.x + ship.controlPoints.wheel.relativePosition.x;
+      const wheelWorldY = ship.sprite.y + ship.controlPoints.wheel.relativePosition.y;
+      const wheelDx = wheelWorldX - this.localPlayer.x;
+      const wheelDy = wheelWorldY - this.localPlayer.y;
       const wheelDistance = Math.sqrt(wheelDx * wheelDx + wheelDy * wheelDy);
 
       if (wheelDistance < INTERACTION_DISTANCE) {
@@ -682,9 +708,11 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // Check sails
-      const sailsDx = ship.controlPoints.sails.worldPosition.x - this.localPlayer.x;
-      const sailsDy = ship.controlPoints.sails.worldPosition.y - this.localPlayer.y;
+      // Calculate sails world position from ship position + relative offset
+      const sailsWorldX = ship.sprite.x + ship.controlPoints.sails.relativePosition.x;
+      const sailsWorldY = ship.sprite.y + ship.controlPoints.sails.relativePosition.y;
+      const sailsDx = sailsWorldX - this.localPlayer.x;
+      const sailsDy = sailsWorldY - this.localPlayer.y;
       const sailsDistance = Math.sqrt(sailsDx * sailsDx + sailsDy * sailsDy);
 
       if (sailsDistance < INTERACTION_DISTANCE) {

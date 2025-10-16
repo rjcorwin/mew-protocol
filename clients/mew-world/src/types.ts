@@ -80,12 +80,12 @@ export interface Ship {
   controlPoints: {
     wheel: {
       sprite: Phaser.GameObjects.Graphics;
-      worldPosition: { x: number; y: number };
+      relativePosition: { x: number; y: number }; // Position relative to ship center
       controlledBy: string | null;
     };
     sails: {
       sprite: Phaser.GameObjects.Graphics;
-      worldPosition: { x: number; y: number };
+      relativePosition: { x: number; y: number }; // Position relative to ship center
       controlledBy: string | null;
     };
   };
