@@ -39,7 +39,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image('terrain', 'assets/maps/terrain.png');
 
     // Load Tiled map
-    this.load.tilemapTiledJSON('map', 'assets/maps/map1.tmj');
+    this.load.tilemapTiledJSON('map', 'assets/maps/map2.tmj');
 
     // Load player sprite sheet (8 directions, 4 frames each)
     this.load.spritesheet('player', 'assets/sprites/player.png', {
