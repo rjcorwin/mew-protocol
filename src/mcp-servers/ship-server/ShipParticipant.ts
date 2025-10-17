@@ -12,6 +12,7 @@ import {
   ReleaseControlPayload,
   SteerPayload,
   AdjustSailsPayload,
+  MapDataPayload,
 } from './types.js';
 
 export interface ShipParticipantConfig {
@@ -50,8 +51,11 @@ export class ShipParticipant {
 
   private setupMessageHandlers() {
     this.client.onMessage((envelope: any) => {
-      // Only process messages addressed to this ship
-      if (!envelope.to || !Array.isArray(envelope.to) || !envelope.to.includes(this.config.participantId)) {
+      // Process messages addressed to this ship OR broadcast messages
+      const isAddressedToMe = envelope.to && Array.isArray(envelope.to) && envelope.to.includes(this.config.participantId);
+      const isBroadcast = !envelope.to || (Array.isArray(envelope.to) && envelope.to.length === 0);
+
+      if (!isAddressedToMe && !isBroadcast) {
         return;
       }
 
@@ -59,6 +63,10 @@ export class ShipParticipant {
 
       // Handle different message kinds
       switch (envelope.kind) {
+        case 'ship/map_data':
+          this.handleMapData(envelope.payload as MapDataPayload);
+          break;
+
         case 'ship/grab_control':
           this.handleGrabControl(envelope.payload as GrabControlPayload);
           break;
@@ -79,6 +87,11 @@ export class ShipParticipant {
           console.log(`Unhandled message kind: ${envelope.kind}`);
       }
     });
+  }
+
+  private handleMapData(payload: MapDataPayload) {
+    console.log(`Received map data: ${payload.mapWidth}x${payload.mapHeight} tiles, orientation: ${payload.orientation}`);
+    this.server.setMapData(payload);
   }
 
   private handleGrabControl(payload: GrabControlPayload) {

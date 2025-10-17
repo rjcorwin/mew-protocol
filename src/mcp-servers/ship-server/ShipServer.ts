@@ -17,6 +17,7 @@ import {
   SpeedLevel,
   Position,
   Velocity,
+  MapDataPayload,
 } from './types.js';
 
 /**
@@ -45,6 +46,7 @@ export class ShipServer {
   private state: ShipState;
   private config: ShipConfig;
   private updateInterval: NodeJS.Timeout | null = null;
+  private mapData: MapDataPayload | null = null;
 
   constructor(config: ShipConfig) {
     this.config = config;
@@ -113,11 +115,114 @@ export class ShipServer {
     }
   }
 
+  /**
+   * Convert world coordinates to tile coordinates
+   */
+  private worldToTile(worldX: number, worldY: number): { x: number; y: number } | null {
+    if (!this.mapData) {
+      return null;
+    }
+
+    if (this.mapData.orientation === 'isometric') {
+      // Isometric world-to-tile conversion
+      // For isometric maps: worldX = (tileX - tileY) * (tileWidth / 2)
+      //                     worldY = (tileX + tileY) * (tileHeight / 2)
+      // Solving for tileX and tileY:
+      const tileX = Math.floor((worldX / (this.mapData.tileWidth / 2) + worldY / (this.mapData.tileHeight / 2)) / 2);
+      const tileY = Math.floor((worldY / (this.mapData.tileHeight / 2) - worldX / (this.mapData.tileWidth / 2)) / 2);
+      return { x: tileX, y: tileY };
+    } else {
+      // Orthogonal (simple grid)
+      const tileX = Math.floor(worldX / this.mapData.tileWidth);
+      const tileY = Math.floor(worldY / this.mapData.tileHeight);
+      return { x: tileX, y: tileY };
+    }
+  }
+
+  /**
+   * Check if a position is navigable (on water)
+   */
+  private isNavigable(worldX: number, worldY: number): boolean {
+    if (!this.mapData) {
+      // No map data yet, allow movement
+      return true;
+    }
+
+    const tile = this.worldToTile(worldX, worldY);
+    if (!tile) {
+      return true; // No map data, allow movement
+    }
+
+    const tileX = tile.x;
+    const tileY = tile.y;
+
+    // Check bounds
+    if (tileX < 0 || tileY < 0 || tileX >= this.mapData.mapWidth || tileY >= this.mapData.mapHeight) {
+      console.log(`Out of bounds: tile (${tileX}, ${tileY}) at world (${worldX.toFixed(1)}, ${worldY.toFixed(1)})`);
+      return false;
+    }
+
+    const navigable = this.mapData.navigableTiles[tileY][tileX];
+    if (!navigable) {
+      console.log(`Non-navigable tile at (${tileX}, ${tileY}) - world (${worldX.toFixed(1)}, ${worldY.toFixed(1)})`);
+    }
+
+    return navigable;
+  }
+
+  /**
+   * Check if ship can move to new position
+   * Tests multiple points around ship's perimeter based on heading
+   */
+  private canMoveTo(newX: number, newY: number): boolean {
+    if (!this.mapData) {
+      return true; // Allow movement until map data is received
+    }
+
+    // Test ship center
+    if (!this.isNavigable(newX, newY)) {
+      return false;
+    }
+
+    // Test corners of ship's bounding box
+    const halfWidth = this.state.deckBoundary.width / 2;
+    const halfHeight = this.state.deckBoundary.height / 2;
+
+    const testPoints = [
+      { x: newX - halfWidth, y: newY - halfHeight }, // Top-left
+      { x: newX + halfWidth, y: newY - halfHeight }, // Top-right
+      { x: newX - halfWidth, y: newY + halfHeight }, // Bottom-left
+      { x: newX + halfWidth, y: newY + halfHeight }, // Bottom-right
+    ];
+
+    for (const point of testPoints) {
+      if (!this.isNavigable(point.x, point.y)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   private updatePhysics(deltaTime: number) {
     // Update position based on velocity
     if (this.state.speedLevel > 0) {
-      this.state.position.x += this.state.velocity.x * deltaTime;
-      this.state.position.y += this.state.velocity.y * deltaTime;
+      const newX = this.state.position.x + this.state.velocity.x * deltaTime;
+      const newY = this.state.position.y + this.state.velocity.y * deltaTime;
+
+      // Check if new position is navigable
+      const canMove = this.canMoveTo(newX, newY);
+
+      if (canMove) {
+        this.state.position.x = newX;
+        this.state.position.y = newY;
+      } else {
+        // Hit land - stop ship
+        console.log(`Ship hit land at (${newX.toFixed(1)}, ${newY.toFixed(1)}) - stopping`);
+        console.log(`  Current position: (${this.state.position.x.toFixed(1)}, ${this.state.position.y.toFixed(1)})`);
+        console.log(`  Has map data: ${this.mapData !== null}`);
+        this.setSpeed(0);
+      }
     }
   }
 
@@ -171,6 +276,11 @@ export class ShipServer {
   /**
    * Public methods for control (called via MEW protocol messages)
    */
+
+  public setMapData(mapData: MapDataPayload) {
+    this.mapData = mapData;
+    console.log(`Ship received map data: ${mapData.mapWidth}x${mapData.mapHeight} tiles, orientation: ${mapData.orientation}`);
+  }
 
   public grabControlPublic(participantId: string, controlPoint: 'wheel' | 'sails') {
     this.grabControl(participantId, controlPoint);

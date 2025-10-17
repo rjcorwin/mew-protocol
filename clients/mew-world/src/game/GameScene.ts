@@ -187,6 +187,62 @@ export class GameScene extends Phaser.Scene {
     }
 
     console.log(`Map loaded: ${this.map.width}×${this.map.height} tiles`);
+
+    // Send map navigation data to ships
+    this.sendMapDataToShips();
+  }
+
+  private sendMapDataToShips() {
+    // Extract navigable tile data for ship collision detection
+    const navigableTiles: boolean[][] = [];
+    let navigableCount = 0;
+    let nonNavigableCount = 0;
+
+    for (let y = 0; y < this.map.height; y++) {
+      navigableTiles[y] = [];
+      for (let x = 0; x < this.map.width; x++) {
+        // Check if tile is navigable (for ships - should be water)
+        const tile = this.groundLayer.getTileAt(x, y);
+        const isNavigable = tile?.properties?.navigable === true;
+        navigableTiles[y][x] = isNavigable;
+
+        if (isNavigable) {
+          navigableCount++;
+        } else {
+          nonNavigableCount++;
+        }
+      }
+    }
+
+    console.log(`Map navigation data: ${navigableCount} navigable tiles, ${nonNavigableCount} non-navigable tiles`);
+
+    // Determine map orientation
+    // Phaser uses numeric constants: 0=orthogonal, 1=isometric, 2=staggered, 3=hexagonal
+    const rawOrientation = this.map.orientation;
+    const orientationNum = Number(rawOrientation);
+    const orientation = (orientationNum === 1 || String(rawOrientation).toLowerCase() === 'isometric') ?
+      'isometric' as const :
+      'orthogonal' as const;
+
+    console.log(`Map orientation: ${rawOrientation} -> ${orientation}`);
+
+    const mapData = {
+      tileWidth: TILE_WIDTH,
+      tileHeight: TILE_HEIGHT,
+      mapWidth: this.map.width,
+      mapHeight: this.map.height,
+      navigableTiles,
+      orientation,
+    };
+
+    // Send to all ships (broadcast since we don't know ship IDs yet)
+    this.client.send({
+      kind: 'ship/map_data',
+      to: [], // Broadcast to all participants
+      payload: mapData,
+    });
+
+    console.log(`Sent map navigation data: ${this.map.width}×${this.map.height} tiles, orientation: ${orientation}`);
   }
 
   private createPlayerAnimations() {
@@ -405,6 +461,9 @@ export class GameScene extends Phaser.Scene {
 
       this.ships.set(update.participantId, ship);
       console.log(`Ship joined: ${update.participantId}`);
+
+      // Send map data to newly joined ship
+      this.sendMapDataToShips();
     } else {
       // Update existing ship
       ship.targetPosition = { x: update.worldCoords.x, y: update.worldCoords.y };

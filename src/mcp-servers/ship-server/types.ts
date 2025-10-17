@@ -110,3 +110,15 @@ export interface AdjustSailsPayload {
   adjustment: 'up' | 'down';
   playerId: string;
 }
+
+/**
+ * Map navigation data for collision detection
+ */
+export interface MapDataPayload {
+  tileWidth: number;
+  tileHeight: number;
+  mapWidth: number; // in tiles
+  mapHeight: number; // in tiles
+  navigableTiles: boolean[][]; // [y][x] - true if navigable (water), false if land
+  orientation: 'orthogonal' | 'isometric'; // Map orientation
+}
