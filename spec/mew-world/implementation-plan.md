@@ -173,75 +173,73 @@ Build a new MCP server that represents a ship entity with interactive control po
 - `ship/steer`: {direction: 'left' | 'right', playerId: string}
 - `ship/adjust_sails`: {adjustment: 'up' | 'down', playerId: string}
 
-### Phase 5c: Ship Movement & Navigation
+### Phase 5c: Ship Collision Detection (In Progress)
 
-**Movement Activation:**
+**Goal:** Prevent ships from sailing onto land tiles using tile-based collision detection.
 
-- Verify physics loop correctly moves ship when speed > 0 (already implemented in Phase 5a)
-- Test ship movement: set speed to 1-3 and verify position updates
-- Test heading changes: set all 8 directions and verify velocity calculations
+**Implementation Steps:**
 
-**Tile-Based Navigation:**
+1. **Add MapDataPayload type** (`src/mcp-servers/ship-server/types.ts`)
+   - Add interface with: tileWidth, tileHeight, mapWidth, mapHeight, navigableTiles[][], orientation
+   - Document that navigable=true means water (ships can sail), navigable=false means land
 
-- Add `navigable: boolean` property to tile type definitions in Tiled
-- Update map1.tmj: mark water tiles as navigable=true, land tiles as navigable=false
-- Implement ship collision detection: check tiles ahead, stop at non-navigable boundaries
-- Test: ship sails freely on water but stops at grass/sand boundaries
+2. **Client extracts and sends map data** (`clients/mew-world/src/game/GameScene.ts`)
+   - In `loadTiledMap()`, after map loads, extract navigable property from each tile
+   - Build 2D boolean array: `navigableTiles[y][x] = tile.properties.navigable === true`
+   - Detect map orientation (Phaser uses numeric: 0=orthogonal, 1=isometric)
+   - Send `ship/map_data` message as broadcast to all ships
+   - Also send map data when new ship joins (in `updateShip()` when ship created)
 
-**End-to-End Testing:**
+3. **Ship receives map data** (`src/mcp-servers/ship-server/ShipParticipant.ts` + `ShipServer.ts`)
+   - Add `ship/map_data` handler in ShipParticipant that accepts broadcasts (not just addressed messages)
+   - Pass payload to `ShipServer.setMapData(mapData)`
+   - Store as `private mapData: MapDataPayload | null = null` in ShipServer
 
-- Test: player walks to ship, grabs wheel, steers with left/right arrows
-- Test: player grabs sails, adjusts speed with up/down arrows (0→1→2→3→2→1→0)
-- Test: ship navigates around islands, stops at land boundaries
-- Test: multiple players can control different control points simultaneously
+4. **Ship checks collision before moving** (`src/mcp-servers/ship-server/ShipServer.ts`)
+   - Add `worldToTile(worldX, worldY)` method with isometric coordinate conversion:
+     - `tileX = floor((worldX / (tileWidth/2) + worldY / (tileHeight/2)) / 2)`
+     - `tileY = floor((worldY / (tileHeight/2) - worldX / (tileWidth/2)) / 2)`
+   - Add `isNavigable(worldX, worldY)` method that converts to tile coords and checks `navigableTiles[y][x]`
+   - Add `canMoveTo(newX, newY)` method that checks ship center + 4 deck corners
+   - In `updatePhysics()`, calculate newX/newY, check `canMoveTo()` before updating position
+   - If collision detected, stop ship (set speed to 0, log message)
 
-## Milestone 6: Platform Coordinate System
+**Testing:**
 
-Implement the dual coordinate system (world vs platform-relative) and logic for detecting when players step onto a ship. Handle coordinate transformations and ensure players move correctly relative to the ship's deck when aboard.
+- Use map2.tmj (has navigable:true water tiles in center, navigable:false land around edges)
+- Ship should start on water at (0, 320) and be able to move
+- Ship should stop when it hits land boundaries
+- Test all 8 heading directions
+- Test multiple speed levels
 
-**Phases:**
+**Current Status:**
+- Map data exists in map1.tmj and map2.tmj (navigable property already defined)
+- Need to implement 4 changes above
 
-### Phase 6a: Ship Boundary Detection
+## Milestone 6: Platform Coordinate System ✅
 
-- Define ship collision boundary (rectangular area)
-- Define ship deck walkable area (relative tile coordinates)
-- Detect when player enters ship boundary
-- Add `onShip: string | null` state to player (ship participant ID)
+**Status:** Complete (implemented alongside Phase 5b)
 
-### Phase 6b: Coordinate Transformation
+Implemented the dual coordinate system (world vs platform-relative) and logic for detecting when players step onto a ship. Players correctly "ride along" as ships move.
 
-- Implement world-to-platform coordinate conversion
-- Implement platform-to-world coordinate conversion
-- Update player rendering to use ship-relative coords when aboard
-- Test player position updates while standing still on moving ship
+**Implementation Details:**
 
-### Phase 6c: Platform Movement
+- `onShip: string | null` tracks which ship player is on (GameScene.ts:30)
+- `shipRelativePosition: {x, y}` stores position relative to ship center (GameScene.ts:31)
+- `checkShipBoundary()` detects ship boarding via rectangular deck boundary (GameScene.ts:554-587)
+- Local and remote players move with ship in `update()` loop (GameScene.ts:520-534)
+- Ship deck boundary defined in ship state (width: 64px, height: 96px)
 
-- Update collision detection to use ship deck boundaries when aboard
-- Adjust player movement to be relative to ship's coordinate frame
-- Ensure players "ride along" as ship moves
-- Test walking around ship deck while ship is moving
+**Note:** This milestone was completed during Phase 5b implementation and doesn't require separate work.
 
-### Phase 6d: Visual Feedback & Polish
-
-- Add visual indicators for interaction zones (glowing outline when player near wheel/sails)
-- Show "Press E to grab wheel" / "Press E to adjust sails" UI prompt
-- Add grab animation or visual feedback (player sprite changes, particles, etc.)
-- Display ship heading and speed on HUD when controlling
-- Add visual for sail state (0 = furled, 1-3 = progressively more unfurled)
-
-## Milestone 7: Ship Movement & Collision
-
-Add physics loop to ship server that updates ship position based on velocity, detects collisions with land boundaries, and adjusts passenger positions as the ship moves. Implement boarding/disembarking transitions.
-
-## Milestone 8: GameAgent Base Class
+## Milestone 7: GameAgent Base Class
 
 Extend MEWAgent with a `GameAgent` superclass that adds navigation MCP tools (`get_player_info`, `move_to`, `get_position`). Implement basic AI decision loop that calls tools to move around the world, with pathfinding handled client-side initially.
 
-## Milestone 9: Polish & Performance
+## Milestone 8: Polish & Performance
 
 Add client-side prediction for local player, implement dead reckoning for remote players, optimize network update rates, and add visual feedback for ship boarding. Test with multiple clients and AI agents simultaneously.
 
-## Milestone 10: End-to-End Testing
+## Milestone 9: End-to-End Testing
 
 Create comprehensive test scenarios with multiple humans, AI agents, and ships interacting. Document setup instructions, known limitations, and create demo video showing gameplay.
