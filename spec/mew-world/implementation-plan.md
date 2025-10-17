@@ -119,9 +119,11 @@ Replace placeholder circle sprites with animated character sprites supporting 8-
 - Replace placeholder sprites
 - Test visual quality and performance
 
-## Milestone 5: Ship MCP Server & Interactive Controls
+## Milestone 5: Ship MCP Server & Interactive Controls ✅
 
-Build a new MCP server that represents a ship entity with interactive control points. Ships have two interaction zones: a **steering wheel** (player presses interact to grab, then left/right arrows control direction) and **sail ropes** (player presses interact to adjust sails up/down, controlling speed 0-3). Ship publishes position updates to the same stream as players. Add `navigable` tile property so ships can only sail on water tiles, not land.
+**Status:** Complete
+
+Build a new MCP server that represents a ship entity with interactive control points. Ships have two interaction zones: a **steering wheel** (player presses interact to grab, then left/right arrows control direction) and **sail ropes** (player presses interact to adjust sails up/down, controlling speed 0-3). Ship publishes position updates to the same stream as players. Ships use tile-based collision detection and can only sail on water tiles, not land.
 
 **Phases:**
 
@@ -173,48 +175,44 @@ Build a new MCP server that represents a ship entity with interactive control po
 - `ship/steer`: {direction: 'left' | 'right', playerId: string}
 - `ship/adjust_sails`: {adjustment: 'up' | 'down', playerId: string}
 
-### Phase 5c: Ship Collision Detection (In Progress)
+### Phase 5c: Ship Collision Detection ✅
+
+**Status:** Complete
 
 **Goal:** Prevent ships from sailing onto land tiles using tile-based collision detection.
 
-**Implementation Steps:**
+**Implementation:**
 
-1. **Add MapDataPayload type** (`src/mcp-servers/ship-server/types.ts`)
-   - Add interface with: tileWidth, tileHeight, mapWidth, mapHeight, navigableTiles[][], orientation
-   - Document that navigable=true means water (ships can sail), navigable=false means land
+1. ✅ **MapDataPayload type** (`src/mcp-servers/ship-server/types.ts`)
+   - Added interface with tile dimensions, map size, navigable grid, orientation
+   - navigable=true for water (ships can sail), navigable=false for land
 
-2. **Client extracts and sends map data** (`clients/mew-world/src/game/GameScene.ts`)
-   - In `loadTiledMap()`, after map loads, extract navigable property from each tile
-   - Build 2D boolean array: `navigableTiles[y][x] = tile.properties.navigable === true`
-   - Detect map orientation (Phaser uses numeric: 0=orthogonal, 1=isometric)
-   - Send `ship/map_data` message as broadcast to all ships
-   - Also send map data when new ship joins (in `updateShip()` when ship created)
+2. ✅ **Client sends map data** (`clients/mew-world/src/game/GameScene.ts:195-246`)
+   - Extracts navigable property from each tile in groundLayer
+   - Builds 2D boolean array: `navigableTiles[y][x]`
+   - Detects map orientation (handles Phaser numeric constants: 1=isometric)
+   - Broadcasts `ship/map_data` message on map load
+   - Resends when new ship joins (line 466)
 
-3. **Ship receives map data** (`src/mcp-servers/ship-server/ShipParticipant.ts` + `ShipServer.ts`)
-   - Add `ship/map_data` handler in ShipParticipant that accepts broadcasts (not just addressed messages)
-   - Pass payload to `ShipServer.setMapData(mapData)`
-   - Store as `private mapData: MapDataPayload | null = null` in ShipServer
+3. ✅ **Ship receives map data** (`ShipParticipant.ts:52-95`, `ShipServer.ts:49,177-180`)
+   - Modified message handler to accept broadcast messages
+   - Added `ship/map_data` handler in ShipParticipant
+   - Stores `MapDataPayload` in ShipServer for collision checks
 
-4. **Ship checks collision before moving** (`src/mcp-servers/ship-server/ShipServer.ts`)
-   - Add `worldToTile(worldX, worldY)` method with isometric coordinate conversion:
-     - `tileX = floor((worldX / (tileWidth/2) + worldY / (tileHeight/2)) / 2)`
-     - `tileY = floor((worldY / (tileHeight/2) - worldX / (tileWidth/2)) / 2)`
-   - Add `isNavigable(worldX, worldY)` method that converts to tile coords and checks `navigableTiles[y][x]`
-   - Add `canMoveTo(newX, newY)` method that checks ship center + 4 deck corners
-   - In `updatePhysics()`, calculate newX/newY, check `canMoveTo()` before updating position
-   - If collision detected, stop ship (set speed to 0, log message)
+4. ✅ **Collision detection** (`ShipServer.ts:118-227`)
+   - `worldToTile()`: Converts world coords to tile coords (isometric + orthogonal)
+   - `isNavigable()`: Checks if world position is on navigable tile
+   - `canMoveTo()`: Tests ship center + 4 deck corners
+   - `updatePhysics()`: Checks before moving, stops ship on land hit
 
-**Testing:**
+**Testing Results:**
 
-- Use map2.tmj (has navigable:true water tiles in center, navigable:false land around edges)
-- Ship should start on water at (0, 320) and be able to move
-- Ship should stop when it hits land boundaries
-- Test all 8 heading directions
-- Test multiple speed levels
-
-**Current Status:**
-- Map data exists in map1.tmj and map2.tmj (navigable property already defined)
-- Need to implement 4 changes above
+- ✅ Ship starts on water and can move freely
+- ✅ Ship stops automatically when hitting land boundaries
+- ✅ Works with both orthogonal and isometric maps
+- ✅ Tested with map2.tmj (300×300 isometric)
+- ✅ Collision checks 5 points (center + 4 corners) to prevent edge clipping
+- ✅ Clear debug logging for collision events
 
 ## Milestone 6: Platform Coordinate System ✅
 
