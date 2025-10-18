@@ -618,23 +618,64 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Check if a point is inside a rotated rectangle using OBB (Oriented Bounding Box) collision
+   * @param point Point to test in world coordinates
+   * @param rectCenter Center of rectangle in world coordinates
+   * @param rectSize Size of rectangle (width, height)
+   * @param rotation Rotation angle in radians
+   * @returns true if point is inside rotated rectangle
+   */
+  private isPointInRotatedRect(
+    point: { x: number; y: number },
+    rectCenter: { x: number; y: number },
+    rectSize: { width: number; height: number },
+    rotation: number
+  ): boolean {
+    // Transform point to rectangle's local space
+    const dx = point.x - rectCenter.x;
+    const dy = point.y - rectCenter.y;
+
+    // Rotate point by -rotation to align with rect's axes
+    const cos = Math.cos(-rotation);
+    const sin = Math.sin(-rotation);
+    const localX = dx * cos - dy * sin;
+    const localY = dx * sin + dy * cos;
+
+    // Check if point is inside axis-aligned rect
+    const halfWidth = rectSize.width / 2;
+    const halfHeight = rectSize.height / 2;
+
+    return Math.abs(localX) <= halfWidth && Math.abs(localY) <= halfHeight;
+  }
+
   private checkShipBoundary() {
-    // Check if player is within any ship's deck boundary
+    // Check if player is within any ship's deck boundary (using OBB for rotated ships)
     let foundShip: string | null = null;
     let shipRelativePos: { x: number; y: number } | null = null;
 
     this.ships.forEach((ship) => {
-      // Calculate distance from ship center
-      const dx = this.localPlayer.x - ship.sprite.x;
-      const dy = this.localPlayer.y - ship.sprite.y;
+      // Use OBB collision to check if player is on rotated ship deck
+      const isOnDeck = this.isPointInRotatedRect(
+        { x: this.localPlayer.x, y: this.localPlayer.y },
+        { x: ship.sprite.x, y: ship.sprite.y },
+        ship.deckBoundary,
+        ship.rotation
+      );
 
-      // Check if within deck boundary (rectangular area)
-      const halfWidth = ship.deckBoundary.width / 2;
-      const halfHeight = ship.deckBoundary.height / 2;
+      if (isOnDeck) {
+        // Calculate position relative to ship center (in ship's local space)
+        const dx = this.localPlayer.x - ship.sprite.x;
+        const dy = this.localPlayer.y - ship.sprite.y;
 
-      if (Math.abs(dx) <= halfWidth && Math.abs(dy) <= halfHeight) {
+        // Rotate to ship-local coordinates
+        const cos = Math.cos(-ship.rotation);
+        const sin = Math.sin(-ship.rotation);
+        const localX = dx * cos - dy * sin;
+        const localY = dx * sin + dy * cos;
+
         foundShip = ship.id;
-        shipRelativePos = { x: dx, y: dy }; // Store position relative to ship center
+        shipRelativePos = { x: localX, y: localY }; // Store in ship-local coords
       }
     });
 
