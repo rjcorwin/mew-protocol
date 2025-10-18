@@ -22,7 +22,7 @@ AI agents extend the base MEWAgent class with a new `GameAgent` superclass that 
 
 ## Ship System
 
-Ships are movable platforms implemented as non-AI MEW participants backed by an MCP server that provides rule-based control tools. Each ship has an MCP tool interface including `set_sail_direction` to control heading, `set_sail_speed` to adjust velocity, `get_ship_position` for current location, and `get_passengers` to list players currently on the ship. The ship MCP server maintains the ship's position and broadcasts updates through the same `player/position` stream used by regular players, using a special participant ID. The ship has a defined collision boundary and walkable deck area represented as a set of relative tile coordinates. When a player moves to a tile that intersects with a ship's boundary, the game engine automatically registers them as "on ship" and changes their coordinate reference frame from world-absolute to ship-relative. The ship server runs a simple physics loop that updates the ship's world position based on its velocity vector, checking for collisions with land or other ships.
+Ships are movable platforms implemented as MEW participants backed by a ship server that manages physics and state. Each ship is controlled interactively by players who can grab two control points: the **steering wheel** (steer left/right with arrow keys) and **sail ropes** (adjust speed 0-3 with up/down arrows). Ships broadcast their position through the same `game/position` message stream as players, using a special participant ID (e.g., `ship1`). The ship server runs a 60 Hz physics loop that updates position based on heading and speed, and implements tile-based collision detection to prevent sailing onto land. Ships have a defined rectangular deck boundary (64×96 pixels) that players can board by walking onto the ship. When a player enters a ship's deck boundary, they automatically transition to ship-relative coordinates and "ride along" as the ship moves. Players can walk around the deck while the ship is moving, with the client handling coordinate transformations to keep players positioned correctly relative to the moving platform.
 
 ## Coordinate Systems & Relative Movement
 
@@ -211,11 +211,10 @@ To test with multiple players:
 - Placeholder sprites (colored circles with arrows, not final artwork)
 - Players can overlap each other (no player-to-player collision)
 - No AI agents yet (requires GameAgent implementation)
-- No ships yet (requires ship MCP server)
-- No platform coordinate system yet (required for ships)
 - Position updates sent continuously at 10 Hz (could optimize to only send when moving)
 - Single layer maps (no multi-layer terrain support yet)
 - No game controller support yet (keyboard only)
+- Ships use simplified rectangular collision (only checks 5 points)
 
 ### Completed Features (Milestone 3)
 
@@ -239,6 +238,25 @@ To test with multiple players:
 - ✅ Remote player animation synchronization
 - ✅ Placeholder sprite generation script for testing
 - ✅ Future-proof architecture for game controller support
+
+### Completed Features (Milestone 5)
+
+- ✅ Ship MCP server foundation with physics simulation (60 Hz)
+- ✅ Ship state management (position, heading, speed, control points)
+- ✅ Ship position broadcasting via `game/position` messages
+- ✅ Interactive control points (wheel for steering, sails for speed)
+- ✅ Player-to-ship message protocol (`ship/grab_control`, `ship/steer`, `ship/adjust_sails`)
+- ✅ Ship rendering in Phaser client (brown rectangle sprite)
+- ✅ Control point visualization (green circles when available, red when controlled)
+- ✅ Interaction UI prompts ("Press E to grab wheel")
+- ✅ Platform coordinate system (players "ride along" on ships)
+- ✅ Ship boundary detection (automatic boarding when entering deck area)
+- ✅ Tile-based collision detection for ships
+- ✅ Map data broadcasting from client to ships
+- ✅ Isometric coordinate conversion for navigation
+- ✅ Ships stop automatically when hitting land boundaries
+- ✅ 8-directional ship heading (N, NE, E, SE, S, SW, W, NW)
+- ✅ 4 speed levels (0=stopped, 1=slow, 2=medium, 3=fast)
 
 ## Milestone 4: Directional Player Sprites with 8-Way Animation
 
