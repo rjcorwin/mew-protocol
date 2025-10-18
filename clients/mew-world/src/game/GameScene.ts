@@ -528,9 +528,11 @@ export class GameScene extends Phaser.Scene {
   ) {
     graphics.clear();
 
-    // Calculate world position from ship's current position + relative offset
-    const worldX = shipSprite.x + controlPoint.relativePosition.x;
-    const worldY = shipSprite.y + controlPoint.relativePosition.y;
+    // Phase D: Rotate control point position with ship rotation
+    // Apply ship's rotation to the relative position to get rotated world position
+    const rotatedPos = this.rotatePoint(controlPoint.relativePosition, shipSprite.rotation);
+    const worldX = shipSprite.x + rotatedPos.x;
+    const worldY = shipSprite.y + rotatedPos.y;
 
     // Draw a circle at the control point position
     const color = controlPoint.controlledBy ? 0xff0000 : 0x00ff00; // Red if controlled, green if free
@@ -866,9 +868,10 @@ export class GameScene extends Phaser.Scene {
 
     // Find closest control point
     this.ships.forEach((ship) => {
-      // Calculate wheel world position from ship position + relative offset
-      const wheelWorldX = ship.sprite.x + ship.controlPoints.wheel.relativePosition.x;
-      const wheelWorldY = ship.sprite.y + ship.controlPoints.wheel.relativePosition.y;
+      // Phase D: Calculate wheel world position with rotation
+      const rotatedWheelPos = this.rotatePoint(ship.controlPoints.wheel.relativePosition, ship.rotation);
+      const wheelWorldX = ship.sprite.x + rotatedWheelPos.x;
+      const wheelWorldY = ship.sprite.y + rotatedWheelPos.y;
       const wheelDx = wheelWorldX - this.localPlayer.x;
       const wheelDy = wheelWorldY - this.localPlayer.y;
       const wheelDistance = Math.sqrt(wheelDx * wheelDx + wheelDy * wheelDy);
@@ -884,9 +887,10 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // Calculate sails world position from ship position + relative offset
-      const sailsWorldX = ship.sprite.x + ship.controlPoints.sails.relativePosition.x;
-      const sailsWorldY = ship.sprite.y + ship.controlPoints.sails.relativePosition.y;
+      // Phase D: Calculate sails world position with rotation
+      const rotatedSailsPos = this.rotatePoint(ship.controlPoints.sails.relativePosition, ship.rotation);
+      const sailsWorldX = ship.sprite.x + rotatedSailsPos.x;
+      const sailsWorldY = ship.sprite.y + rotatedSailsPos.y;
       const sailsDx = sailsWorldX - this.localPlayer.x;
       const sailsDy = sailsWorldY - this.localPlayer.y;
       const sailsDistance = Math.sqrt(sailsDx * sailsDx + sailsDy * sailsDy);
