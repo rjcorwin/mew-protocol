@@ -585,12 +585,6 @@ export class GameScene extends Phaser.Scene {
       this.lastPositionUpdate = time;
     }
 
-    // Check for ship boundary detection (Phase 6a)
-    this.checkShipBoundary();
-
-    // Check for ship control point interactions
-    this.checkShipInteractions();
-
     // Phase 6c: Update ships and move players on ships
     this.ships.forEach((ship) => {
       const dx = ship.targetPosition.x - ship.sprite.x;
@@ -635,6 +629,13 @@ export class GameScene extends Phaser.Scene {
       this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite);
       this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite);
     });
+
+    // Check for ship boundary detection AFTER ship position updates
+    // (so player can walk off the ship)
+    this.checkShipBoundary();
+
+    // Check for ship control point interactions
+    this.checkShipInteractions();
 
     // Interpolate remote players toward their target positions
     this.remotePlayers.forEach((player) => {
