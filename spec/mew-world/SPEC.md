@@ -241,22 +241,42 @@ To test with multiple players:
 
 ### Completed Features (Milestone 5)
 
+**Phase 5a - Ship MCP Server Foundation:**
 - ✅ Ship MCP server foundation with physics simulation (60 Hz)
 - ✅ Ship state management (position, heading, speed, control points)
-- ✅ Ship position broadcasting via `game/position` messages
-- ✅ Interactive control points (wheel for steering, sails for speed)
-- ✅ Player-to-ship message protocol (`ship/grab_control`, `ship/steer`, `ship/adjust_sails`)
-- ✅ Ship rendering in Phaser client (brown rectangle sprite)
-- ✅ Control point visualization (green circles when available, red when controlled)
-- ✅ Interaction UI prompts ("Press E to grab wheel")
-- ✅ Platform coordinate system (players "ride along" on ships)
-- ✅ Ship boundary detection (automatic boarding when entering deck area)
-- ✅ Tile-based collision detection for ships
-- ✅ Map data broadcasting from client to ships
-- ✅ Isometric coordinate conversion for navigation
-- ✅ Ships stop automatically when hitting land boundaries
+- ✅ Ship position broadcasting via `game/position` messages (10 Hz)
 - ✅ 8-directional ship heading (N, NE, E, SE, S, SW, W, NW)
 - ✅ 4 speed levels (0=stopped, 1=slow, 2=medium, 3=fast)
+- ✅ Ship added to mew-world template as `ship1` participant
+
+**Phase 5b - Ship Rendering & Interactive Controls:**
+- ✅ Ship rendering in Phaser client (brown rectangle sprite)
+- ✅ Control point visualization (green circles when available, red when controlled)
+- ✅ E key binding for interaction with control points
+- ✅ Interaction zone detection (30 pixel radius around control points)
+- ✅ UI prompts when near control points ("Press E to grab wheel")
+- ✅ Interactive control points (wheel for steering, sails for speed)
+- ✅ Player-to-ship message protocol (`ship/grab_control`, `ship/release_control`, `ship/steer`, `ship/adjust_sails`)
+- ✅ Message handlers on ship server for all control messages
+- ✅ Arrow key steering (left/right when controlling wheel)
+- ✅ Arrow key sail adjustment (up/down when controlling sails)
+- ✅ Control state tracking (which player controls which point)
+- ✅ Immediate state broadcast on control changes
+- ✅ Player movement disabled when controlling ship
+
+**Phase 5c - Ship Collision Detection:**
+- ✅ Tile-based collision detection for ships
+- ✅ Map data broadcasting from client to ships (`ship/map_data` messages)
+- ✅ Isometric coordinate conversion for navigation
+- ✅ Ships stop automatically when hitting land boundaries
+- ✅ Collision detection checks ship center + 4 deck corners
+- ✅ Support for both orthogonal and isometric maps
+
+**Milestone 6 - Platform Coordinate System:**
+- ✅ Platform coordinate system (players "ride along" on ships)
+- ✅ Ship boundary detection (automatic boarding when entering deck area)
+- ✅ Local and remote players move with ship
+- ✅ Dual coordinate system (world vs platform-relative)
 
 ## Milestone 4: Directional Player Sprites with 8-Way Animation
 

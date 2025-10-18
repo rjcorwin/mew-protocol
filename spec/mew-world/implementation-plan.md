@@ -150,30 +150,42 @@ Build a new MCP server that represents a ship entity with interactive control po
 - `index.ts`: Entry point with environment variable configuration
 - Template integration with full capabilities and environment setup
 
-### Phase 5b: Ship Rendering & Basic Interaction
+### Phase 5b: Ship Rendering & Basic Interaction ✅
+
+**Status:** Complete
 
 **Client-side (Phaser):**
 
-- Render ship sprite at position from `game/position` messages with `shipData`
-- Display ship control points (wheel and sails) on deck
-- Add interact key binding (E key) to client input
-- Implement interaction zone detection (check distance to control points)
-- Add UI prompts when near control points ("Press E to grab wheel")
+- ✅ Render ship sprite at position from `game/position` messages with `shipData` (GameScene.ts:389-416)
+- ✅ Display ship control points (wheel and sails) on deck (GameScene.ts:478-499)
+  - Green circles for free control points, red for controlled
+- ✅ Add interact key binding (E key) to client input (GameScene.ts:82)
+- ✅ Implement interaction zone detection (check distance to control points) (GameScene.ts:741-787)
+  - 30 pixel interaction radius
+- ✅ Add UI prompts when near control points ("Press E to grab wheel") (GameScene.ts:790-807)
 
 **Ship Server:**
 
-- Add message handlers for `ship/grab_control` and `ship/release_control`
-- Track which player controls each control point (wheel/sails)
-- Add message handlers for `ship/steer` (adjust heading) and `ship/adjust_sails` (adjust speed)
-- Call internal `setHeading()` and `setSpeed()` methods from message handlers
-- Broadcast updated state when controls change
+- ✅ Add message handlers for `ship/grab_control` and `ship/release_control` (ShipParticipant.ts:70-76)
+- ✅ Track which player controls each control point (wheel/sails) (ShipServer.ts:98-116)
+- ✅ Add message handlers for `ship/steer` (adjust heading) and `ship/adjust_sails` (adjust speed) (ShipParticipant.ts:78-84)
+- ✅ Call internal `setHeading()` and `setSpeed()` methods from message handlers (ShipServer.ts:293-331)
+- ✅ Broadcast updated state when controls change (ShipParticipant.ts:99-118)
 
 **Message Types:**
 
-- `ship/grab_control`: {controlPoint: 'wheel' | 'sails', playerId: string}
-- `ship/release_control`: {controlPoint: 'wheel' | 'sails', playerId: string}
-- `ship/steer`: {direction: 'left' | 'right', playerId: string}
-- `ship/adjust_sails`: {adjustment: 'up' | 'down', playerId: string}
+- ✅ `ship/grab_control`: {controlPoint: 'wheel' | 'sails', playerId: string} (types.ts:94-97)
+- ✅ `ship/release_control`: {controlPoint: 'wheel' | 'sails', playerId: string} (types.ts:99-102)
+- ✅ `ship/steer`: {direction: 'left' | 'right', playerId: string} (types.ts:104-107)
+- ✅ `ship/adjust_sails`: {adjustment: 'up' | 'down', playerId: string} (types.ts:109-112)
+
+**Implementation Details:**
+
+- Ship control state tracked in `controllingShip` and `controllingPoint` (GameScene.ts:28-29)
+- Player movement disabled when controlling ship (GameScene.ts:506)
+- Arrow key inputs routed to ship control when active (GameScene.ts:809-828)
+- Control point world positions calculated from ship position + relative offsets
+- Immediate state broadcast after control changes for responsive feedback
 
 ### Phase 5c: Ship Collision Detection ✅
 
