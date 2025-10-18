@@ -53,6 +53,7 @@ export interface ShipState {
   participantId: string; // Ship's participant ID in MEW space
   position: Position; // World coordinates
   heading: ShipHeading; // Direction ship is facing
+  rotation: number; // Rotation angle in radians (0 = east, PI/2 = south, etc.)
   speedLevel: SpeedLevel; // Current speed setting (0-3)
   velocity: Velocity; // Calculated from heading + speed
   passengers: string[]; // List of participant IDs on the ship

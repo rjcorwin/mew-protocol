@@ -21,21 +21,27 @@ import {
 } from './types.js';
 
 /**
- * Calculate velocity vector from heading and speed
+ * Convert heading to rotation angle in radians
  */
-function calculateVelocity(heading: ShipHeading, speed: number): Velocity {
-  const angles: Record<ShipHeading, number> = {
+function headingToRotation(heading: ShipHeading): number {
+  const rotations: Record<ShipHeading, number> = {
     east: 0,
     southeast: Math.PI / 4,
     south: Math.PI / 2,
     southwest: (3 * Math.PI) / 4,
     west: Math.PI,
-    northwest: (5 * Math.PI) / 4,
-    north: (3 * Math.PI) / 2,
-    northeast: (7 * Math.PI) / 4,
+    northwest: -(3 * Math.PI) / 4, // -135° (equivalent to 225°)
+    north: -Math.PI / 2,             // -90° (equivalent to 270°)
+    northeast: -Math.PI / 4,         // -45° (equivalent to 315°)
   };
+  return rotations[heading];
+}
 
-  const angle = angles[heading];
+/**
+ * Calculate velocity vector from heading and speed
+ */
+function calculateVelocity(heading: ShipHeading, speed: number): Velocity {
+  const angle = headingToRotation(heading);
   return {
     x: Math.cos(angle) * speed,
     y: Math.sin(angle) * speed,
@@ -56,6 +62,7 @@ export class ShipServer {
       participantId: config.participantId,
       position: { ...config.initialPosition },
       heading: config.initialHeading,
+      rotation: headingToRotation(config.initialHeading),
       speedLevel: 0, // Start stopped
       velocity: { x: 0, y: 0 },
       passengers: [],
@@ -80,6 +87,7 @@ export class ShipServer {
 
   private setHeading(heading: ShipHeading) {
     this.state.heading = heading;
+    this.state.rotation = headingToRotation(heading);
     this.updateVelocity();
     this.logState('Heading changed');
   }

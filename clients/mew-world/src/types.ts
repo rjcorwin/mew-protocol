@@ -38,6 +38,7 @@ export interface PositionUpdate {
  * Ship-specific data in position updates
  */
 export interface ShipData {
+  rotation: number; // Rotation angle in radians
   speedLevel: number;
   deckBoundary: {
     width: number;
@@ -75,6 +76,7 @@ export interface Ship {
   id: string;
   sprite: Phaser.GameObjects.Sprite;
   targetPosition: { x: number; y: number };
+  rotation: number; // Current rotation angle in radians
   lastUpdate: number;
   velocity: { x: number; y: number };
   controlPoints: {

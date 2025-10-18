@@ -169,6 +169,7 @@ export class ShipParticipant {
       platformRef: null, // Ships are not on platforms
       shipData: {
         // Additional ship-specific data
+        rotation: state.rotation,
         speedLevel: state.speedLevel,
         deckBoundary: state.deckBoundary,
         controlPoints: {

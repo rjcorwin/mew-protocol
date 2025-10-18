@@ -441,6 +441,7 @@ export class GameScene extends Phaser.Scene {
         id: update.participantId,
         sprite: shipSprite,
         targetPosition: { x: update.worldCoords.x, y: update.worldCoords.y },
+        rotation: update.shipData.rotation,
         lastUpdate: update.timestamp,
         velocity: update.velocity,
         controlPoints: {
@@ -459,6 +460,9 @@ export class GameScene extends Phaser.Scene {
         deckBoundary: update.shipData.deckBoundary,
       };
 
+      // Set initial rotation
+      shipSprite.setRotation(update.shipData.rotation);
+
       this.ships.set(update.participantId, ship);
       console.log(`Ship joined: ${update.participantId}`);
 
@@ -467,11 +471,15 @@ export class GameScene extends Phaser.Scene {
     } else {
       // Update existing ship
       ship.targetPosition = { x: update.worldCoords.x, y: update.worldCoords.y };
+      ship.rotation = update.shipData.rotation;
       ship.lastUpdate = update.timestamp;
       ship.velocity = update.velocity;
       ship.speedLevel = update.shipData.speedLevel;
       ship.controlPoints.wheel.controlledBy = update.shipData.controlPoints.wheel.controlledBy;
       ship.controlPoints.sails.controlledBy = update.shipData.controlPoints.sails.controlledBy;
+
+      // Update ship sprite rotation
+      ship.sprite.setRotation(update.shipData.rotation);
     }
 
     // Draw control point indicators at current ship position
