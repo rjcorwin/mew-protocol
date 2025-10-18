@@ -1,9 +1,9 @@
 # Decision: Ship Rotation Implementation
 
 **Proposal:** r8s-ship-rotation
-**Status:** Proposed
+**Status:** Implemented (Phases A-D Complete)
 **Date:** 2025-10-18
-**Decider:** TBD
+**Decider:** rjcorwin
 
 ## Context
 
@@ -49,32 +49,37 @@ Implement full 8-directional ship rotation with the following approach:
 
 ### Implementation Phases
 
-**Phase A: Visual Rotation (Low Risk)**
+**Phase A: Visual Rotation (Low Risk)** ✅ **COMPLETED**
 - Add `rotation` field to ship state
 - Render ship sprite with rotation
 - No gameplay changes
+- Commit: db8c893
 
-**Phase B: Rotating Collision (Medium Risk)**
+**Phase B: Rotating Collision (Medium Risk)** ✅ **COMPLETED**
 - Implement OBB collision detection
 - Update boarding detection for rotated ships
 - Test thoroughly from all angles
+- Commit: 4ce0cdb
 
-**Phase C: Player Rotation (High Risk)**
+**Phase C: Player Rotation (High Risk)** ✅ **COMPLETED**
 - Rotate players when ship turns
 - Synchronize across all clients
 - Most complex phase, requires careful testing
+- Commits: 2a28bfb, 8c45164, ec1047b, 915adf6
 
-**Phase D: Control Points (Low Risk)**
-- Convert to scene graph children
-- Automatic rotation with ship
+**Phase D: Control Points (Low Risk)** ✅ **COMPLETED**
+- Rotate control points with ship rotation
+- Update interaction detection for rotated positions
+- Commit: 0eb0348
 
-**Phase E: Ship-Relative Movement (Optional/Future)**
+**Phase E: Ship-Relative Movement (Optional/Future)** ⏭️ **DEFERRED**
 - Transform player input to ship-local space
 - Deferred to future milestone
 
-**Phase F: Interpolation Polish (Low Risk)**
+**Phase F: Interpolation Polish (Low Risk)** ❌ **CANCELLED**
 - Smooth rotation animation
 - Visual improvement only
+- **Reason:** Replaced by w3l-wheel-steering proposal for realistic wheel-based steering
 
 ## Consequences
 
@@ -164,16 +169,16 @@ Implement full 8-directional ship rotation with the following approach:
 
 ### Testing Checklist
 
-- [ ] Ship sprite rotates visually for all 8 headings
-- [ ] Players can board ship from all 8 directions
-- [ ] Players on deck rotate when ship turns
-- [ ] Multiple players rotate together correctly
-- [ ] Control points stay in correct positions
-- [ ] No visual glitches during rotation
-- [ ] Position synchronization works across clients
-- [ ] Players can't walk outside rotated deck boundary
-- [ ] Smooth interpolation (if enabled) looks good
-- [ ] Performance acceptable with 10+ players on rotating ship
+- [x] Ship sprite rotates visually for all 8 headings
+- [x] Players can board ship from all 8 directions
+- [x] Players on deck rotate when ship turns
+- [x] Multiple players rotate together correctly
+- [x] Control points stay in correct positions
+- [x] No visual glitches during rotation
+- [x] Position synchronization works across clients
+- [x] Players can't walk outside rotated deck boundary
+- [ ] Smooth interpolation (if enabled) looks good - CANCELLED, see w3l-wheel-steering
+- [ ] Performance acceptable with 10+ players on rotating ship - NOT TESTED YET
 
 ## Success Metrics
 
@@ -204,21 +209,24 @@ Implement full 8-directional ship rotation with the following approach:
 
 ## Decision
 
-**Status:** Proposed - awaiting approval
+**Status:** ✅ Implemented (Phases A-D Complete, Phase F Cancelled)
 
-**Recommendation:** Approve with phased implementation (A → B → D → C → F)
+**Implementation Order:** A → B → C → D
+
+**Completion Date:** 2025-10-18
+
+**Actual Timeline:** ~4 hours (faster than 19-28 hour estimate due to focused scope)
 
 **Next Steps:**
-1. Review proposal with team
-2. Create implementation plan in `spec/mew-world/implementation-plan.md`
-3. Begin Phase A implementation
-4. Test and iterate through phases
-5. Mark complete when all success criteria met
+1. ✅ Phase A-D implementation complete
+2. ⏭️ Phase E (ship-relative movement) deferred
+3. ❌ Phase F cancelled - replaced by w3l-wheel-steering proposal
+4. ➡️ See proposal w3l-wheel-steering for realistic wheel-based steering mechanics
 
 ---
 
 **Approval Signatures:**
 
-- [ ] Product Owner: _________________ Date: _______
-- [ ] Technical Lead: _________________ Date: _______
-- [ ] QA Lead: _______________________ Date: _______
+- [x] Product Owner: rjcorwin - Date: 2025-10-18
+- [x] Technical Lead: rjcorwin - Date: 2025-10-18
+- [x] QA Lead: Tested manually - Date: 2025-10-18
