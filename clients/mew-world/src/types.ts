@@ -39,6 +39,7 @@ export interface PositionUpdate {
  */
 export interface ShipData {
   rotation: number; // Rotation angle in radians
+  rotationDelta?: number; // Change in rotation since last update (for rotating players on deck)
   speedLevel: number;
   deckBoundary: {
     width: number;

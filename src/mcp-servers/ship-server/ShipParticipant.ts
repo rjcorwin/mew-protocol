@@ -147,6 +147,7 @@ export class ShipParticipant {
    */
   private broadcastPosition() {
     const state = this.server.getState();
+    const rotationDelta = this.server.getRotationDelta(); // Get and clear rotation delta
 
     // Convert ship state to game/position message format
     // (matches the format used by player clients)
@@ -170,6 +171,7 @@ export class ShipParticipant {
       shipData: {
         // Additional ship-specific data
         rotation: state.rotation,
+        rotationDelta: rotationDelta, // Include rotation change for player rotation
         speedLevel: state.speedLevel,
         deckBoundary: state.deckBoundary,
         controlPoints: {

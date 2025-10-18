@@ -53,16 +53,19 @@ export class ShipServer {
   private config: ShipConfig;
   private updateInterval: NodeJS.Timeout | null = null;
   private mapData: MapDataPayload | null = null;
+  private lastRotation: number = 0; // Track rotation for calculating delta
+  private rotationDelta: number = 0; // Change since last broadcast
 
   constructor(config: ShipConfig) {
     this.config = config;
 
     // Initialize ship state
+    const initialRotation = headingToRotation(config.initialHeading);
     this.state = {
       participantId: config.participantId,
       position: { ...config.initialPosition },
       heading: config.initialHeading,
-      rotation: headingToRotation(config.initialHeading),
+      rotation: initialRotation,
       speedLevel: 0, // Start stopped
       velocity: { x: 0, y: 0 },
       passengers: [],
@@ -83,11 +86,19 @@ export class ShipServer {
         height: config.deckHeight,
       },
     };
+    this.lastRotation = initialRotation; // Initialize lastRotation to match
   }
 
   private setHeading(heading: ShipHeading) {
+    const oldRotation = this.state.rotation;
+    const newRotation = headingToRotation(heading);
+
     this.state.heading = heading;
-    this.state.rotation = headingToRotation(heading);
+    this.state.rotation = newRotation;
+
+    // Calculate rotation delta for player rotation
+    this.rotationDelta = newRotation - oldRotation;
+
     this.updateVelocity();
     this.logState('Heading changed');
   }
@@ -279,6 +290,16 @@ export class ShipServer {
    */
   getState(): ShipState {
     return { ...this.state };
+  }
+
+  /**
+   * Get rotation delta since last call (for broadcasting to clients)
+   * Returns the delta and clears it
+   */
+  getRotationDelta(): number {
+    const delta = this.rotationDelta;
+    this.rotationDelta = 0; // Clear after reading
+    return delta;
   }
 
   /**

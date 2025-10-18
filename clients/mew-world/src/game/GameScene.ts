@@ -480,6 +480,30 @@ export class GameScene extends Phaser.Scene {
 
       // Update ship sprite rotation
       ship.sprite.setRotation(update.shipData.rotation);
+
+      // Phase C: Rotate players on deck when ship turns
+      if (update.shipData.rotationDelta && Math.abs(update.shipData.rotationDelta) > 0.001) {
+        const rotationDelta = update.shipData.rotationDelta;
+        console.log(`Ship ${ship.id} rotated by ${(rotationDelta * 180 / Math.PI).toFixed(1)}°`);
+
+        // Rotate local player if on this ship
+        if (this.onShip === ship.id && this.shipRelativePosition) {
+          this.shipRelativePosition = this.rotatePoint(
+            this.shipRelativePosition,
+            rotationDelta
+          );
+          console.log(`Rotated local player position to (${this.shipRelativePosition.x.toFixed(1)}, ${this.shipRelativePosition.y.toFixed(1)})`);
+        }
+
+        // Rotate remote players on this ship
+        this.remotePlayers.forEach((player) => {
+          if (player.onShip === ship.id) {
+            // Note: We need to add shipRelativePosition to Player type
+            // For now, this will handle future implementation
+            console.log(`Remote player ${player.id} should rotate on ship ${ship.id}`);
+          }
+        });
+      }
     }
 
     // Draw control point indicators at current ship position
@@ -583,10 +607,12 @@ export class GameScene extends Phaser.Scene {
         ship.sprite.x += shipDx;
         ship.sprite.y += shipDy;
 
-        // Move local player if on this ship
+        // Move local player if on this ship - use rotated relative position
         if (this.onShip === ship.id && this.shipRelativePosition) {
-          this.localPlayer.x += shipDx;
-          this.localPlayer.y += shipDy;
+          // Transform ship-local position to world coordinates considering rotation
+          const rotatedPos = this.rotatePoint(this.shipRelativePosition, ship.rotation);
+          this.localPlayer.x = ship.sprite.x + rotatedPos.x;
+          this.localPlayer.y = ship.sprite.y + rotatedPos.y;
         }
 
         // Move remote players if on this ship
@@ -596,6 +622,13 @@ export class GameScene extends Phaser.Scene {
             player.sprite.y += shipDy;
           }
         });
+      } else {
+        // Ship not moving, but still update player positions from rotated offsets
+        if (this.onShip === ship.id && this.shipRelativePosition) {
+          const rotatedPos = this.rotatePoint(this.shipRelativePosition, ship.rotation);
+          this.localPlayer.x = ship.sprite.x + rotatedPos.x;
+          this.localPlayer.y = ship.sprite.y + rotatedPos.y;
+        }
       }
 
       // Always redraw control points at their current positions (they move with ship sprite)
@@ -616,6 +649,21 @@ export class GameScene extends Phaser.Scene {
         player.sprite.y += dy * factor;
       }
     });
+  }
+
+  /**
+   * Rotate a point by the given angle
+   * @param point Point to rotate
+   * @param angle Rotation angle in radians
+   * @returns Rotated point
+   */
+  private rotatePoint(point: { x: number; y: number }, angle: number): { x: number; y: number } {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return {
+      x: point.x * cos - point.y * sin,
+      y: point.x * sin + point.y * cos,
+    };
   }
 
   /**
