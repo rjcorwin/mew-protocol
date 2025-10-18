@@ -534,8 +534,8 @@ export class GameScene extends Phaser.Scene {
     // Handle local player movement (only if not controlling ship)
     const velocity = new Phaser.Math.Vector2(0, 0);
 
-    // Only allow player movement if NOT currently controlling ship
-    if (!this.controllingShip) {
+    // Only allow player movement if NOT currently controlling ship AND not on a ship
+    if (!this.controllingShip && !this.onShip) {
       if (this.cursors.left?.isDown) {
         velocity.x -= 1;
       }
@@ -575,7 +575,7 @@ export class GameScene extends Phaser.Scene {
         this.localPlayer.anims.stop();
       }
     } else {
-      // Player is controlling ship - stop player animation
+      // Player is controlling ship or on a ship - stop player animation
       this.localPlayer.anims.stop();
     }
 
@@ -738,10 +738,9 @@ export class GameScene extends Phaser.Scene {
         this.onShip = null;
         this.shipRelativePosition = null;
       }
-    } else if (foundShip && shipRelativePos) {
-      // Update relative position if still on same ship
-      this.shipRelativePosition = shipRelativePos;
     }
+    // DON'T update shipRelativePosition while on ship - it gets rotated when ship turns
+    // and recalculated from world position each frame in the update loop
   }
 
   private checkTileCollision(worldX: number, worldY: number): {
