@@ -29,6 +29,7 @@ export class GameScene extends Phaser.Scene {
   private controllingPoint: 'wheel' | 'sails' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
   private shipRelativePosition: { x: number; y: number } | null = null; // Position relative to ship center
+  private applyingShipRotation = false; // Flag to prevent overwriting rotated position
 
   constructor() {
     super({ key: 'GameScene' });
@@ -488,11 +489,20 @@ export class GameScene extends Phaser.Scene {
 
         // Rotate local player if on this ship
         if (this.onShip === ship.id && this.shipRelativePosition) {
+          // Flag that we're applying rotation (don't recalculate shipRelativePosition this frame)
+          this.applyingShipRotation = true;
+
+          // Rotate the relative position
           this.shipRelativePosition = this.rotatePoint(
             this.shipRelativePosition,
             rotationDelta
           );
           console.log(`Rotated local player position to (${this.shipRelativePosition.x.toFixed(1)}, ${this.shipRelativePosition.y.toFixed(1)})`);
+
+          // Apply rotation to player's world position
+          const rotatedWorldPos = this.rotatePoint(this.shipRelativePosition, ship.rotation);
+          this.localPlayer.x = ship.sprite.x + rotatedWorldPos.x;
+          this.localPlayer.y = ship.sprite.y + rotatedWorldPos.y;
         }
 
         // Rotate remote players on this ship
@@ -534,8 +544,8 @@ export class GameScene extends Phaser.Scene {
     // Handle local player movement (only if not controlling ship)
     const velocity = new Phaser.Math.Vector2(0, 0);
 
-    // Only allow player movement if NOT currently controlling ship AND not on a ship
-    if (!this.controllingShip && !this.onShip) {
+    // Only allow player movement if NOT currently controlling ship
+    if (!this.controllingShip) {
       if (this.cursors.left?.isDown) {
         velocity.x -= 1;
       }
@@ -575,7 +585,7 @@ export class GameScene extends Phaser.Scene {
         this.localPlayer.anims.stop();
       }
     } else {
-      // Player is controlling ship or on a ship - stop player animation
+      // Player is controlling ship - stop player animation
       this.localPlayer.anims.stop();
     }
 
@@ -601,12 +611,10 @@ export class GameScene extends Phaser.Scene {
         ship.sprite.x += shipDx;
         ship.sprite.y += shipDy;
 
-        // Move local player if on this ship - use rotated relative position
-        if (this.onShip === ship.id && this.shipRelativePosition) {
-          // Transform ship-local position to world coordinates considering rotation
-          const rotatedPos = this.rotatePoint(this.shipRelativePosition, ship.rotation);
-          this.localPlayer.x = ship.sprite.x + rotatedPos.x;
-          this.localPlayer.y = ship.sprite.y + rotatedPos.y;
+        // Move local player if on this ship (move with ship delta)
+        if (this.onShip === ship.id) {
+          this.localPlayer.x += shipDx;
+          this.localPlayer.y += shipDy;
         }
 
         // Move remote players if on this ship
@@ -616,19 +624,31 @@ export class GameScene extends Phaser.Scene {
             player.sprite.y += shipDy;
           }
         });
-      } else {
-        // Ship not moving, but still update player positions from rotated offsets
-        if (this.onShip === ship.id && this.shipRelativePosition) {
-          const rotatedPos = this.rotatePoint(this.shipRelativePosition, ship.rotation);
-          this.localPlayer.x = ship.sprite.x + rotatedPos.x;
-          this.localPlayer.y = ship.sprite.y + rotatedPos.y;
-        }
+      }
+
+      // Update shipRelativePosition from current player world position
+      // This needs to happen every frame so player movement updates the relative position
+      // BUT skip this frame if we just applied a rotation (to avoid overwriting the rotated position)
+      if (this.onShip === ship.id && !this.applyingShipRotation) {
+        const dx = this.localPlayer.x - ship.sprite.x;
+        const dy = this.localPlayer.y - ship.sprite.y;
+
+        // Rotate to ship-local coordinates
+        const cos = Math.cos(-ship.rotation);
+        const sin = Math.sin(-ship.rotation);
+        this.shipRelativePosition = {
+          x: dx * cos - dy * sin,
+          y: dx * sin + dy * cos,
+        };
       }
 
       // Always redraw control points at their current positions (they move with ship sprite)
       this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite);
       this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite);
     });
+
+    // Clear the rotation flag after all ships are processed
+    this.applyingShipRotation = false;
 
     // Check for ship boundary detection AFTER ship position updates
     // (so player can walk off the ship)
