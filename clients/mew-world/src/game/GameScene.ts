@@ -607,15 +607,22 @@ export class GameScene extends Phaser.Scene {
         const newX = this.localPlayer.x + velocity.x;
         const newY = this.localPlayer.y + velocity.y;
 
-        // Check collision at new position
-        const collision = this.checkTileCollision(newX, newY);
+        // If on ship, use full speed (no tile speed modifier)
+        if (this.onShip) {
+          // Player is on ship deck - move at full speed
+          this.localPlayer.x += velocity.x;
+          this.localPlayer.y += velocity.y;
+        } else {
+          // Player is on land - check tile collision and apply speed modifier
+          const collision = this.checkTileCollision(newX, newY);
 
-        if (collision.walkable) {
-          // Apply movement with speed modifier
-          this.localPlayer.x += velocity.x * collision.speedModifier;
-          this.localPlayer.y += velocity.y * collision.speedModifier;
+          if (collision.walkable) {
+            // Apply movement with speed modifier from terrain
+            this.localPlayer.x += velocity.x * collision.speedModifier;
+            this.localPlayer.y += velocity.y * collision.speedModifier;
+          }
+          // If not walkable, don't move (collision!)
         }
-        // If not walkable, don't move (collision!)
 
         // Update animation based on movement direction and store facing
         this.lastFacing = this.updatePlayerAnimation(this.localPlayer, velocity);
