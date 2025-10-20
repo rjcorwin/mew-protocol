@@ -287,6 +287,15 @@ export class ShipServer {
     // Update wheel and ship rotation (w3l-wheel-steering)
     this.updateWheelPhysics(deltaTime);
 
+    // Update velocity to match current rotation angle (not discrete heading)
+    if (this.state.speedLevel > 0) {
+      const speed = this.config.speedValues[this.state.speedLevel];
+      this.state.velocity = {
+        x: Math.cos(this.state.rotation) * speed,
+        y: Math.sin(this.state.rotation) * speed,
+      };
+    }
+
     // Update position based on velocity
     if (this.state.speedLevel > 0) {
       const newX = this.state.position.x + this.state.velocity.x * deltaTime;

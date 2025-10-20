@@ -35,7 +35,7 @@ const shipConfig: ShipConfig = {
   participantId,
   initialPosition: {
     x: parseFloat(process.env.SHIP_START_X || '0'),
-    y: parseFloat(process.env.SHIP_START_Y || '400'),
+    y: parseFloat(process.env.SHIP_START_Y || '800'),
   },
   initialHeading: (process.env.SHIP_START_HEADING || 'east') as any,
   wheelPosition: {

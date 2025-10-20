@@ -1,9 +1,10 @@
 # Decision: Realistic Wheel-Based Ship Steering
 
 **Proposal:** w3l-wheel-steering
-**Status:** Proposed
+**Status:** Implemented
 **Date:** 2025-10-18
-**Decider:** TBD
+**Implemented:** 2025-10-20
+**Decider:** rjcorwin
 
 ## Context
 
@@ -360,20 +361,26 @@ const TURN_RATE_THRESHOLD = 0.001; // ignore tiny turn rates
 
 ---
 
-**Status:** Proposed - awaiting review and approval
+## Implementation Notes
 
-**Recommendation:** Approve for implementation
+**Status:** Implemented (2025-10-20)
 
-**Reviewer Notes:**
+All phases completed successfully:
+- ✅ Phase 1: Wheel state & position locking
+- ✅ Phase 2: Continuous ship rotation
+- ✅ Phase 3: New input system
+- ✅ Phase 4: Tuning & polish
 
-- [ ] Mechanics design sound?
-- [ ] Implementation plan feasible?
-- [ ] Constants seem reasonable?
-- [ ] Risks adequately addressed?
-- [ ] Timeline realistic?
+**Bug Fixes:**
+- Fixed velocity calculation disconnect (see `bug-velocity-disconnect.md`)
+  - Ship now moves in direction of rotation, not old discrete heading
 
-**Approval Signatures:**
+**Final Implementation:**
+- `ShipServer.ts`: Wheel physics, continuous rotation, velocity sync
+- `ShipParticipant.ts`: Message handlers for wheel control
+- `GameScene.ts`: Client input handling and wheel visualization
+- `types.ts`: Updated ShipState with wheel fields
 
-- [ ] Product Owner: _________________ Date: _______
-- [ ] Technical Lead: _________________ Date: _______
-- [ ] UX Designer: ___________________ Date: _______
+**Commits:**
+- 8c68199: Implement realistic wheel-based ship steering (w3l-wheel-steering)
+- [pending]: Fix ship velocity to match rotation angle
