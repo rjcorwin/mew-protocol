@@ -66,6 +66,10 @@ export interface ShipState {
     width: number;
     height: number;
   };
+  // Wheel steering state (w3l-wheel-steering proposal)
+  wheelAngle: number; // Current wheel angle in radians (-PI to PI, 0 = centered)
+  turnRate: number; // Current rotation rate in radians/second
+  wheelTurningDirection: 'left' | 'right' | null; // Active player input direction
 }
 
 /**
@@ -104,6 +108,15 @@ export interface ReleaseControlPayload {
 
 export interface SteerPayload {
   direction: 'left' | 'right';
+  playerId: string;
+}
+
+export interface WheelTurnStartPayload {
+  direction: 'left' | 'right';
+  playerId: string;
+}
+
+export interface WheelTurnStopPayload {
   playerId: string;
 }
 

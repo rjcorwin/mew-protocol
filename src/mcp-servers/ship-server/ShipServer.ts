@@ -85,6 +85,10 @@ export class ShipServer {
         width: config.deckWidth,
         height: config.deckHeight,
       },
+      // Wheel steering state (w3l-wheel-steering)
+      wheelAngle: 0, // Start centered (straight ahead)
+      turnRate: 0, // Not turning initially
+      wheelTurningDirection: null, // No input
     };
     this.lastRotation = initialRotation; // Initialize lastRotation to match
   }
@@ -131,6 +135,62 @@ export class ShipServer {
         console.log(`${participantId} released ${controlPoint.type}`);
         controlPoint.controlledBy = null;
       }
+    }
+  }
+
+  /**
+   * Normalize angle to range -PI to PI
+   */
+  private normalizeAngle(angle: number): number {
+    while (angle > Math.PI) angle -= 2 * Math.PI;
+    while (angle < -Math.PI) angle += 2 * Math.PI;
+    return angle;
+  }
+
+  /**
+   * Clamp value between min and max
+   */
+  private clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  /**
+   * Update wheel physics and ship rotation (w3l-wheel-steering)
+   * Called every physics tick (60 Hz)
+   */
+  private updateWheelPhysics(deltaTime: number) {
+    const WHEEL_TURN_RATE = Math.PI / 2; // 90°/sec - how fast player can rotate wheel
+    const RUDDER_EFFICIENCY = 0.1; // turn rate per radian of wheel angle
+    const MIN_TURN_RATE = 0.001; // ignore tiny turn rates (radians/sec)
+
+    // Update wheel angle based on player input
+    if (this.state.wheelTurningDirection) {
+      // Player is actively turning wheel
+      const delta = this.state.wheelTurningDirection === 'right' ?
+        WHEEL_TURN_RATE * deltaTime :
+        -WHEEL_TURN_RATE * deltaTime;
+
+      this.state.wheelAngle = this.clamp(
+        this.state.wheelAngle + delta,
+        -Math.PI, // -180°
+        Math.PI   // +180°
+      );
+    }
+    // Note: When not turning, wheel stays at current angle (locked)
+
+    // Calculate turn rate from wheel angle
+    this.state.turnRate = this.state.wheelAngle * RUDDER_EFFICIENCY;
+
+    // Apply turn rate to ship rotation
+    if (Math.abs(this.state.turnRate) > MIN_TURN_RATE) {
+      const oldRotation = this.state.rotation;
+      this.state.rotation += this.state.turnRate * deltaTime;
+
+      // Normalize rotation to -PI to PI
+      this.state.rotation = this.normalizeAngle(this.state.rotation);
+
+      // Track rotation delta for player rotation
+      this.rotationDelta = this.state.rotation - oldRotation;
     }
   }
 
@@ -224,6 +284,9 @@ export class ShipServer {
   }
 
   private updatePhysics(deltaTime: number) {
+    // Update wheel and ship rotation (w3l-wheel-steering)
+    this.updateWheelPhysics(deltaTime);
+
     // Update position based on velocity
     if (this.state.speedLevel > 0) {
       const newX = this.state.position.x + this.state.velocity.x * deltaTime;
@@ -343,6 +406,36 @@ export class ShipServer {
     const newIndex = (currentIndex + delta + headings.length) % headings.length;
 
     this.setHeading(headings[newIndex]);
+  }
+
+  /**
+   * Start turning wheel (w3l-wheel-steering)
+   * Player holds left/right to continuously rotate wheel
+   */
+  public startTurningWheel(playerId: string, direction: 'left' | 'right') {
+    // Verify player controls the wheel
+    if (this.state.controlPoints.wheel.controlledBy !== playerId) {
+      console.error(`Player ${playerId} cannot turn wheel - not controlling wheel`);
+      return;
+    }
+
+    this.state.wheelTurningDirection = direction;
+    console.log(`Player ${playerId} started turning wheel ${direction}`);
+  }
+
+  /**
+   * Stop turning wheel (w3l-wheel-steering)
+   * Wheel locks at current angle, ship continues turning
+   */
+  public stopTurningWheel(playerId: string) {
+    // Verify player controls the wheel
+    if (this.state.controlPoints.wheel.controlledBy !== playerId) {
+      console.error(`Player ${playerId} cannot stop turning wheel - not controlling wheel`);
+      return;
+    }
+
+    this.state.wheelTurningDirection = null; // Wheel locks at current angle
+    console.log(`Player ${playerId} stopped turning wheel (locked at ${(this.state.wheelAngle * 180 / Math.PI).toFixed(1)}°)`);
   }
 
   public adjustSails(playerId: string, adjustment: 'up' | 'down') {

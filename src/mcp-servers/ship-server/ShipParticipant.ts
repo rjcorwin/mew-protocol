@@ -11,6 +11,8 @@ import {
   GrabControlPayload,
   ReleaseControlPayload,
   SteerPayload,
+  WheelTurnStartPayload,
+  WheelTurnStopPayload,
   AdjustSailsPayload,
   MapDataPayload,
 } from './types.js';
@@ -79,6 +81,14 @@ export class ShipParticipant {
           this.handleSteer(envelope.payload as SteerPayload);
           break;
 
+        case 'ship/wheel_turn_start':
+          this.handleWheelTurnStart(envelope.payload as WheelTurnStartPayload);
+          break;
+
+        case 'ship/wheel_turn_stop':
+          this.handleWheelTurnStop(envelope.payload as WheelTurnStopPayload);
+          break;
+
         case 'ship/adjust_sails':
           this.handleAdjustSails(envelope.payload as AdjustSailsPayload);
           break;
@@ -109,6 +119,18 @@ export class ShipParticipant {
   private handleSteer(payload: SteerPayload) {
     this.server.steer(payload.playerId, payload.direction);
     // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleWheelTurnStart(payload: WheelTurnStartPayload) {
+    this.server.startTurningWheel(payload.playerId, payload.direction);
+    // Broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleWheelTurnStop(payload: WheelTurnStopPayload) {
+    this.server.stopTurningWheel(payload.playerId);
+    // Broadcast updated state
     this.broadcastPosition();
   }
 
@@ -174,6 +196,9 @@ export class ShipParticipant {
         rotationDelta: rotationDelta, // Include rotation change for player rotation
         speedLevel: state.speedLevel,
         deckBoundary: state.deckBoundary,
+        // Wheel steering state (w3l-wheel-steering)
+        wheelAngle: state.wheelAngle,
+        turnRate: state.turnRate,
         controlPoints: {
           wheel: {
             worldPosition: {

@@ -31,7 +31,7 @@ Player Input (tap left) → Ship Heading (instant -45°)
 ```
 Player Input (hold left) → Wheel Angle → Turn Rate → Ship Rotation (continuous)
                            ↓ (release)
-                           Wheel Centers → Turn Rate → 0° → Ship Stops Turning
+                           Wheel Locked → Turn Rate Constant → Ship Continues Turning
 ```
 
 ### Key Design Decisions
@@ -51,10 +51,10 @@ Player Input (hold left) → Wheel Angle → Turn Rate → Ship Rotation (contin
    - Wheel at 180° → maximum turn rate
    - Formula: `turnRate = wheelAngle * RUDDER_EFFICIENCY`
 
-4. **Auto-Centering When Released**
-   - Wheel gradually returns to 0° when player releases controls
-   - Ship continues turning during centering (decreasing rate)
-   - Ship stops turning when wheel reaches center
+4. **Wheel Position Locks When Released**
+   - Wheel stays at current angle when player releases controls
+   - Ship continues turning at constant rate
+   - Player must manually return wheel to center to stop turning
 
 5. **New Control Messages**
    - Replace: `ship/steer {direction: 'left'|'right'}` (instant)
@@ -62,7 +62,7 @@ Player Input (hold left) → Wheel Angle → Turn Rate → Ship Rotation (contin
 
 ## Implementation Plan
 
-### Phase 1: Wheel State & Centering (Foundation)
+### Phase 1: Wheel State & Position Locking (Foundation)
 
 **Server Changes:**
 ```typescript
@@ -92,7 +92,7 @@ drawControlPoint() {
 
 **Success Criteria:**
 - [ ] Wheel angle state persists in ShipServer
-- [ ] Wheel centers when no input (45°/sec)
+- [ ] Wheel holds position when no input (locked)
 - [ ] Wheel angle broadcast to clients
 - [ ] Wheel visual rotates on screen
 
@@ -127,7 +127,7 @@ ship.sprite.setRotation(update.shipData.rotation);
 - [ ] Ship rotation is continuous (not snapping to 45° increments)
 - [ ] Turn rate calculated from wheel angle
 - [ ] Ship turns while wheel is off-center
-- [ ] Ship stops turning when wheel centered
+- [ ] Ship continues turning at constant rate when wheel locked at angle
 
 ### Phase 3: New Input System
 
@@ -165,7 +165,7 @@ public startTurningWheel(playerId: string, direction: 'left' | 'right') {
 
 public stopTurningWheel(playerId: string) {
   if (this.controlPoints.wheel.controlledBy !== playerId) return;
-  this.wheelTurningDirection = null; // Wheel will start centering
+  this.wheelTurningDirection = null; // Wheel locks at current angle
 }
 ```
 
@@ -203,8 +203,7 @@ if (this.controllingPoint === 'wheel') {
 
 **Constants to Tune:**
 ```typescript
-const WHEEL_TURN_RATE = Math.PI / 2; // 90°/sec - how fast wheel turns
-const WHEEL_CENTER_RATE = Math.PI / 4; // 45°/sec - how fast wheel returns to center
+const WHEEL_TURN_RATE = Math.PI / 2; // 90°/sec - how fast player can rotate wheel
 const RUDDER_EFFICIENCY = 0.1; // turn rate multiplier
 const WHEEL_MAX_ANGLE = Math.PI; // 180° max
 const TURN_RATE_THRESHOLD = 0.001; // ignore tiny turn rates
@@ -230,7 +229,7 @@ const TURN_RATE_THRESHOLD = 0.001; // ignore tiny turn rates
 
 - **Realistic Sailing:** Ship steering feels like actual sailing mechanics
 - **Skill Expression:** Players must anticipate momentum and overshoot
-- **Active Helmsman:** Steering requires continuous attention (can't tap and leave)
+- **Set and Forget:** Helmsman can set a turn and attend to other ship tasks
 - **Smooth Motion:** Continuous rotation looks much better than 45° snaps
 - **Foundation for Advanced Physics:** Sets up for wind, currents, ship momentum
 
@@ -252,7 +251,7 @@ const TURN_RATE_THRESHOLD = 0.001; // ignore tiny turn rates
 |------|-----------|--------|------------|
 | Players find steering too difficult | Medium | High | Extensive playtesting, tunable constants |
 | Wheel desync across clients | Low | Medium | Server authoritative, client prediction |
-| Constant overshooting/spinning | Medium | Medium | Add turn rate indicators, tune centering speed |
+| Ship turns unexpectedly (forgot wheel angle) | Medium | Medium | Add turn rate indicators, wheel angle UI |
 | Network lag makes steering unresponsive | Low | Medium | Client-side prediction for local player |
 | Breaking existing muscle memory | High | Low | Tutorial/onboarding, in-game instructions |
 
@@ -276,11 +275,11 @@ const TURN_RATE_THRESHOLD = 0.001; // ignore tiny turn rates
 - Want to establish basic wheel mechanics first
 - Complexity vs value tradeoff
 
-### 4. Wheel Momentum (Doesn't Auto-Center)
+### 4. Wheel Auto-Centers When Released
 **Why Rejected:**
-- Less intuitive for players
-- Wheel state becomes unclear
-- Real ship wheels do have friction that centers them
+- Reduces gameplay value - can't set a course
+- Forces player to constantly hold wheel for sustained turns
+- Less flexible for single-player ship operation
 
 ## Open Questions
 
@@ -299,10 +298,10 @@ const TURN_RATE_THRESHOLD = 0.001; // ignore tiny turn rates
    - **Alternative:** ±90° (quarter turn)
    - **Recommendation:** Start with ±180°, can tune down if feels wrong
 
-4. **Should wheel position persist after player releases control?**
-   - **Current:** Wheel centers when released
-   - **Alternative:** Wheel locks at current angle when released
-   - **Recommendation:** Auto-center for better gameplay
+4. **Should we add a "center wheel" quick-key?**
+   - **Option A:** Player must manually rotate back to center
+   - **Option B:** Dedicated key to auto-center wheel quickly
+   - **Recommendation:** Start without, add if playtesters request it
 
 ## Success Metrics
 
@@ -319,7 +318,7 @@ const TURN_RATE_THRESHOLD = 0.001; // ignore tiny turn rates
 - **Phase 3:** 2-3 hours (new input messages)
 - **Phase 4:** 2-3 hours (tuning & polish)
 
-**Total:** 9-13 hours (~1.5-2 days of focused work)
+**Total:** 8-12 hours (~1-2 days of focused work)
 
 ## Testing Plan
 

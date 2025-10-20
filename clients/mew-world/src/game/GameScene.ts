@@ -30,6 +30,7 @@ export class GameScene extends Phaser.Scene {
   private onShip: string | null = null; // Track if local player is on a ship
   private shipRelativePosition: { x: number; y: number } | null = null; // Position relative to ship center
   private applyingShipRotation = false; // Flag to prevent overwriting rotated position
+  private currentWheelDirection: 'left' | 'right' | null = null; // Track wheel turning state (w3l-wheel-steering)
 
   constructor() {
     super({ key: 'GameScene' });
@@ -930,12 +931,23 @@ export class GameScene extends Phaser.Scene {
     // Handle ship control inputs (when controlling wheel or sails)
     if (this.controllingShip && this.controllingPoint) {
       if (this.controllingPoint === 'wheel') {
-        // Left/right arrows to steer
-        if (Phaser.Input.Keyboard.JustDown(this.cursors.left!)) {
-          this.sendSteer(this.controllingShip, 'left');
-        }
-        if (Phaser.Input.Keyboard.JustDown(this.cursors.right!)) {
-          this.sendSteer(this.controllingShip, 'right');
+        // w3l-wheel-steering: Use isDown for continuous wheel turning
+        if (this.cursors.left?.isDown) {
+          if (!this.currentWheelDirection || this.currentWheelDirection !== 'left') {
+            this.sendWheelTurnStart(this.controllingShip, 'left');
+            this.currentWheelDirection = 'left';
+          }
+        } else if (this.cursors.right?.isDown) {
+          if (!this.currentWheelDirection || this.currentWheelDirection !== 'right') {
+            this.sendWheelTurnStart(this.controllingShip, 'right');
+            this.currentWheelDirection = 'right';
+          }
+        } else {
+          // Neither key pressed - stop turning if we were turning
+          if (this.currentWheelDirection) {
+            this.sendWheelTurnStop(this.controllingShip);
+            this.currentWheelDirection = null;
+          }
         }
       } else if (this.controllingPoint === 'sails') {
         // Up/down arrows to adjust speed
@@ -994,6 +1006,39 @@ export class GameScene extends Phaser.Scene {
     });
 
     console.log(`Steering ${direction}`);
+  }
+
+  /**
+   * Start turning wheel (w3l-wheel-steering)
+   * Player holds left/right to continuously rotate wheel
+   */
+  private sendWheelTurnStart(shipId: string, direction: 'left' | 'right') {
+    this.client.send({
+      kind: 'ship/wheel_turn_start',
+      to: [shipId],
+      payload: {
+        direction,
+        playerId: this.playerId,
+      },
+    });
+
+    console.log(`Started turning wheel ${direction}`);
+  }
+
+  /**
+   * Stop turning wheel (w3l-wheel-steering)
+   * Wheel locks at current angle, ship continues turning
+   */
+  private sendWheelTurnStop(shipId: string) {
+    this.client.send({
+      kind: 'ship/wheel_turn_stop',
+      to: [shipId],
+      payload: {
+        playerId: this.playerId,
+      },
+    });
+
+    console.log(`Stopped turning wheel`);
   }
 
   private sendAdjustSails(shipId: string, adjustment: 'up' | 'down') {
