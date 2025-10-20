@@ -22,11 +22,13 @@ AI agents extend the base MEWAgent class with a new `GameAgent` superclass that 
 
 ## Ship System
 
-Ships are movable platforms implemented as MEW participants backed by a ship server that manages physics and state. Each ship is controlled interactively by players who can grab two control points: the **steering wheel** (steer left/right with arrow keys) and **sail ropes** (adjust speed 0-3 with up/down arrows). Ships broadcast their position through the same `game/position` message stream as players, using a special participant ID (e.g., `ship1`). The ship server runs a 60 Hz physics loop that updates position based on heading and speed, and implements tile-based collision detection to prevent sailing onto land. Ships have a defined rectangular deck boundary (64×96 pixels) that players can board by walking onto the ship. When a player enters a ship's deck boundary, they automatically transition to ship-relative coordinates and "ride along" as the ship moves. Players can walk around the deck while the ship is moving, with the client handling coordinate transformations to keep players positioned correctly relative to the moving platform.
+Ships are movable platforms implemented as MEW participants backed by a ship server that manages physics and state. Each ship is controlled interactively by players who can grab two control points: the **steering wheel** (continuous rotation via wheel angle) and **sail ropes** (adjust speed 0-3 with up/down arrows). Ships use realistic wheel-based steering where holding left/right turns the wheel continuously, and releasing the wheel **locks** it at the current position (ship keeps turning). The wheel angle determines the turn rate, creating smooth, realistic ship rotation. Ships broadcast their position and rotation through the same `game/position` message stream as players, using a special participant ID (e.g., `ship1`). The ship server runs a 60 Hz physics loop that updates position and rotation, and implements tile-based collision detection to prevent sailing onto land. Ships have a defined rectangular deck boundary (200×100 pixels) that players can board by walking onto the ship. When a player enters a ship's deck boundary, they automatically transition to ship-relative coordinates and "ride along" as the ship moves and rotates. Players can walk around the deck while the ship is moving and turning, with the client using isometric coordinate transformations to keep players positioned correctly relative to the rotating platform.
 
 ## Coordinate Systems & Relative Movement
 
-The game implements a dual coordinate system to handle players moving on moving platforms. World coordinates are absolute positions in the game world, while platform coordinates are relative offsets from a platform's origin point (used when standing on a ship). Each player's state includes a `platform_ref` field that is null when on solid ground or references a ship participant ID when aboard. When a player is on a ship, their world position is calculated as `ship.world_position + player.platform_offset`, recalculated every frame as the ship moves. Movement commands from players on ships are interpreted as relative movements within the ship's coordinate frame, with collision detection checking against the ship's deck boundaries rather than world terrain. The rendering system transforms ship-relative coordinates to screen space by first applying the ship's world transform, then the player's relative offset, ensuring players appear to move correctly both when walking on a stationary ship and when walking on a moving ship.
+The game implements a hybrid coordinate system combining Cartesian physics with isometric rendering. **Server-side physics** use Cartesian coordinates (simple, proven approach used by industry-standard isometric games like StarCraft and Age of Empires). **Client-side rendering** uses isometric transforms for all visual elements, collision detection, and player movement input. This "cosmetic isometric" approach provides visual consistency while keeping physics simple.
+
+**Platform Coordinates:** The game also implements platform-relative coordinates to handle players on moving ships. World coordinates are absolute positions in the game world, while platform coordinates are relative offsets from a platform's origin point (used when standing on a ship). Each player's state includes a `platform_ref` field that is null when on solid ground or references a ship participant ID when aboard. When a player is on a ship, their world position is calculated as `ship.world_position + player.platform_offset` (using isometric rotation), recalculated every frame as the ship moves and rotates. Movement commands from players on ships are interpreted as relative movements within the ship's coordinate frame, with collision detection checking against the ship's deck boundaries (using isometric OBB) rather than world terrain. The rendering system uses isometric transforms to position players correctly on rotating platforms, ensuring players stay within visual ship bounds during rotation.
 
 ## Current Client Implementation
 
@@ -560,3 +562,101 @@ The same angle-to-direction logic works for:
 - **Milestone N**: Multiple character types with different sprites
 - **Milestone N**: Character customization (swap sprite sheets)
 - **Milestone N**: Advanced animations (attack, jump, emote)
+
+## Milestone 7: Ship Rotation & Isometric Coordinate System
+
+### Overview
+
+Implement realistic ship rotation physics with wheel-based steering and convert the coordinate system to true isometric throughout all game systems. Ships now rotate continuously using wheel angle instead of discrete heading changes, and all rendering, collision detection, and player movement uses isometric transforms.
+
+### Ship Rotation (r8s-ship-rotation, w3l-wheel-steering)
+
+**Continuous Rotation Physics:**
+- Ships rotate based on wheel angle, not discrete headings
+- Turn rate calculated as: `turnRate = wheelAngle * RUDDER_EFFICIENCY`
+- Wheel angle ranges from -π to +π radians (180° left/right)
+- Physics update at 60 Hz for smooth rotation
+
+**Wheel Steering Controls:**
+- Hold left/right arrow to continuously turn the wheel
+- Wheel position **locks** when released (ship keeps turning at constant rate)
+- Maximum wheel turn rate: π/2 radians per second (90°/sec)
+- Rudder efficiency: 0.1 (ship turn rate = 10% of wheel angle)
+
+**State Tracking:**
+- `wheelAngle`: Current wheel position in radians
+- `turnRate`: Current ship rotation rate in radians/second
+- `wheelTurningDirection`: 'left' | 'right' | null (player input)
+- `rotationDelta`: Change in rotation since last update (for rotating players on deck)
+
+**Player-on-Ship Rotation (Phase C/D):**
+- Players rotate with the ship when it turns
+- Control points (wheel/sails) rotate with the ship
+- All rotation uses isometric transforms (not Cartesian)
+- Players stay within ship visual bounds during rotation
+
+### Isometric Coordinate System (i2m-true-isometric)
+
+**Architecture Decision:**
+- **Physics:** Cartesian (server-side, simple and proven)
+- **Rendering:** Isometric (client-side, visual consistency)
+- **Industry Standard:** StarCraft, Age of Empires, Command & Conquer use this approach
+
+**Phase 1: Isometric Player Movement**
+- Arrow keys move along isometric tile axes (NE, SE, SW, NW)
+- Basis vectors calculated from tile dimensions (32×16 pixels)
+- Player movement aligns with isometric tile grid
+- Normalized vectors ensure consistent movement speed
+
+**Phase 3: Isometric Player-on-Ship Rotation**
+- `isometricToCartesian()` and `cartesianToIsometric()` transform helpers
+- `rotatePointIsometric()` rotates points in isometric space
+- Players stay within ship bounds during rotation
+- OBB collision detection uses isometric rotation
+- Boarding position calculation uses isometric rotation
+
+**Phase 4: Isometric Control Point Positioning**
+- Wheel and sails control points use isometric rotation
+- Control point interaction detection uses isometric transforms
+- Visual position matches interaction hotspot
+
+**Ship Boundary Visualization:**
+- Ships rendered as 4 colored corner dots (not filled rectangle)
+- Dots rotate using isometric transforms every frame
+- Colors: Red (top-left), Green (top-right), Blue (bottom-right), Yellow (bottom-left)
+- Boundaries match exactly what collision detection uses
+- No sprite rotation - dots redrawn dynamically like control points
+
+**Coordinate Transform Formulas:**
+```typescript
+// Isometric to Cartesian
+cartesian.x = (iso.x + iso.y * 2) / 2
+cartesian.y = (iso.y * 2 - iso.x) / 2
+
+// Cartesian to Isometric
+iso.x = cart.x - cart.y
+iso.y = (cart.x + cart.y) / 2
+
+// Isometric Rotation
+1. Convert point from isometric to Cartesian
+2. Apply standard 2D rotation matrix
+3. Convert result back to isometric
+```
+
+**Implementation Status:**
+- ✅ Phase 1: Isometric player movement
+- ✅ Phase 3: Isometric player-on-ship rotation
+- ✅ Phase 4: Isometric control point positioning
+- ✅ Isometric OBB collision detection
+- ✅ Isometric ship boundary visualization
+- ⏭️ Phase 2: Pre-rendered ship sprites (32 angles) - deferred to future milestone
+
+### Related Proposals
+
+- `r8s-ship-rotation`: Continuous rotation physics system
+- `w3l-wheel-steering`: Wheel-based steering with position locking
+- `i2m-true-isometric`: Complete isometric coordinate system implementation
+
+See detailed specifications in:
+- `spec/mew-world/proposals/w3l-wheel-steering/`
+- `spec/mew-world/proposals/i2m-true-isometric/`
