@@ -76,6 +76,7 @@ export interface Player {
 export interface Ship {
   id: string;
   sprite: Phaser.GameObjects.Sprite;
+  boundaryGraphics: Phaser.GameObjects.Graphics; // Graphics for drawing isometric boundary dots
   targetPosition: { x: number; y: number };
   rotation: number; // Current rotation angle in radians
   lastUpdate: number;

@@ -9,6 +9,17 @@ const WORLD_HEIGHT = 20;
 const MOVE_SPEED = 100; // pixels per second
 const POSITION_UPDATE_RATE = 100; // ms between position updates
 
+// Isometric movement basis vectors (i2m-true-isometric Phase 1)
+// Calculated from tile dimensions and normalized for consistent movement speed
+const ISO_X_AXIS = { x: TILE_WIDTH / 2, y: TILE_HEIGHT / 2 }; // Southeast direction
+const ISO_Y_AXIS = { x: TILE_WIDTH / 2, y: -TILE_HEIGHT / 2 }; // Northeast direction
+const isoXLength = Math.sqrt(ISO_X_AXIS.x ** 2 + ISO_X_AXIS.y ** 2);
+const isoYLength = Math.sqrt(ISO_Y_AXIS.x ** 2 + ISO_Y_AXIS.y ** 2);
+const ISO_NORTHEAST = { x: ISO_Y_AXIS.x / isoYLength, y: ISO_Y_AXIS.y / isoYLength };
+const ISO_SOUTHEAST = { x: ISO_X_AXIS.x / isoXLength, y: ISO_X_AXIS.y / isoXLength };
+const ISO_SOUTHWEST = { x: -ISO_NORTHEAST.x, y: -ISO_NORTHEAST.y };
+const ISO_NORTHWEST = { x: -ISO_SOUTHEAST.x, y: -ISO_SOUTHEAST.y };
+
 export class GameScene extends Phaser.Scene {
   private client!: MEWClient;
   private playerId!: string;
@@ -394,28 +405,20 @@ export class GameScene extends Phaser.Scene {
     let ship = this.ships.get(update.participantId);
 
     if (!ship) {
-      // Create new ship using graphics (large visible rectangle)
+      // Create ship as a simple container with boundary dots drawn dynamically (i2m-true-isometric)
+      // No sprite texture - just a graphics object that we'll redraw each frame
       const shipGraphics = this.add.graphics();
-      shipGraphics.fillStyle(0x8b4513, 1); // Brown
-      // Draw at (0,0) since generateTexture samples from (0,0)
-      shipGraphics.fillRect(0, 0, update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
-      shipGraphics.lineStyle(4, 0x000000, 1); // Black outline
-      shipGraphics.strokeRect(0, 0, update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
+      shipGraphics.setDepth(0); // Below players
 
-      // Generate texture from graphics so we can use it as a sprite
-      const key = `ship-${update.participantId}`;
-      shipGraphics.generateTexture(key, update.shipData.deckBoundary.width, update.shipData.deckBoundary.height);
-      shipGraphics.destroy();
-
+      // Create a dummy sprite for position/rotation tracking
+      // We don't actually render this, but we need it for the Ship interface
       const shipSprite = this.add.sprite(
         update.worldCoords.x,
         update.worldCoords.y,
-        key
+        '' // No texture
       );
-      // Origin at center so sprite position matches ship center
+      shipSprite.setVisible(false); // Hide the sprite, we'll draw with graphics
       shipSprite.setOrigin(0.5, 0.5);
-      // Set depth below players but above tilemap (players are at default depth 0)
-      shipSprite.setDepth(0);
 
       // Create control point indicators
       const wheelGraphics = this.add.graphics();
@@ -442,6 +445,7 @@ export class GameScene extends Phaser.Scene {
       ship = {
         id: update.participantId,
         sprite: shipSprite,
+        boundaryGraphics: shipGraphics, // Graphics object for drawing boundary dots
         targetPosition: { x: update.worldCoords.x, y: update.worldCoords.y },
         rotation: update.shipData.rotation,
         lastUpdate: update.timestamp,
@@ -493,15 +497,15 @@ export class GameScene extends Phaser.Scene {
           // Flag that we're applying rotation (don't recalculate shipRelativePosition this frame)
           this.applyingShipRotation = true;
 
-          // Rotate the relative position
-          this.shipRelativePosition = this.rotatePoint(
+          // Rotate the relative position using isometric rotation (i2m-true-isometric Phase 3)
+          this.shipRelativePosition = this.rotatePointIsometric(
             this.shipRelativePosition,
             rotationDelta
           );
           console.log(`Rotated local player position to (${this.shipRelativePosition.x.toFixed(1)}, ${this.shipRelativePosition.y.toFixed(1)})`);
 
-          // Apply rotation to player's world position
-          const rotatedWorldPos = this.rotatePoint(this.shipRelativePosition, ship.rotation);
+          // Apply rotation to player's world position using isometric rotation
+          const rotatedWorldPos = this.rotatePointIsometric(this.shipRelativePosition, ship.rotation);
           this.localPlayer.x = ship.sprite.x + rotatedWorldPos.x;
           this.localPlayer.y = ship.sprite.y + rotatedWorldPos.y;
         }
@@ -517,7 +521,8 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Draw control point indicators at current ship position
+    // Draw ship boundary and control point indicators at current ship position
+    this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
     this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite);
     this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite);
   }
@@ -529,9 +534,9 @@ export class GameScene extends Phaser.Scene {
   ) {
     graphics.clear();
 
-    // Phase D: Rotate control point position with ship rotation
+    // Phase D: Rotate control point position with ship rotation using isometric rotation (i2m-true-isometric Phase 4)
     // Apply ship's rotation to the relative position to get rotated world position
-    const rotatedPos = this.rotatePoint(controlPoint.relativePosition, shipSprite.rotation);
+    const rotatedPos = this.rotatePointIsometric(controlPoint.relativePosition, shipSprite.rotation);
     const worldX = shipSprite.x + rotatedPos.x;
     const worldY = shipSprite.y + rotatedPos.y;
 
@@ -543,23 +548,57 @@ export class GameScene extends Phaser.Scene {
     graphics.strokeCircle(worldX, worldY, 8);
   }
 
+  private drawShipBoundary(
+    graphics: Phaser.GameObjects.Graphics,
+    shipSprite: Phaser.GameObjects.Sprite,
+    deckBoundary: { width: number; height: number },
+    rotation: number
+  ) {
+    graphics.clear();
+
+    // Define the 4 corners of the deck in local ship space (relative to center)
+    const halfW = deckBoundary.width / 2;
+    const halfH = deckBoundary.height / 2;
+    const corners = [
+      { x: -halfW, y: -halfH, color: 0xff0000 }, // Top-left: Red
+      { x: halfW, y: -halfH, color: 0x00ff00 },  // Top-right: Green
+      { x: halfW, y: halfH, color: 0x0000ff },   // Bottom-right: Blue
+      { x: -halfW, y: halfH, color: 0xffff00 },  // Bottom-left: Yellow
+    ];
+
+    // Draw each corner dot using isometric rotation (i2m-true-isometric)
+    corners.forEach((corner) => {
+      const rotatedPos = this.rotatePointIsometric({ x: corner.x, y: corner.y }, rotation);
+      const worldX = shipSprite.x + rotatedPos.x;
+      const worldY = shipSprite.y + rotatedPos.y;
+
+      graphics.fillStyle(corner.color, 1);
+      graphics.fillCircle(worldX, worldY, 6);
+    });
+  }
+
   update(time: number, delta: number) {
     // Handle local player movement (only if not controlling ship)
     const velocity = new Phaser.Math.Vector2(0, 0);
 
     // Only allow player movement if NOT currently controlling ship
     if (!this.controllingShip) {
-      if (this.cursors.left?.isDown) {
-        velocity.x -= 1;
-      }
-      if (this.cursors.right?.isDown) {
-        velocity.x += 1;
-      }
+      // Isometric movement: arrow keys move along isometric tile axes (i2m-true-isometric Phase 1)
       if (this.cursors.up?.isDown) {
-        velocity.y -= 1;
+        velocity.x += ISO_NORTHEAST.x;
+        velocity.y += ISO_NORTHEAST.y;
       }
       if (this.cursors.down?.isDown) {
-        velocity.y += 1;
+        velocity.x += ISO_SOUTHWEST.x;
+        velocity.y += ISO_SOUTHWEST.y;
+      }
+      if (this.cursors.left?.isDown) {
+        velocity.x += ISO_NORTHWEST.x;
+        velocity.y += ISO_NORTHWEST.y;
+      }
+      if (this.cursors.right?.isDown) {
+        velocity.x += ISO_SOUTHEAST.x;
+        velocity.y += ISO_SOUTHEAST.y;
       }
 
       // Normalize diagonal movement
@@ -636,16 +675,13 @@ export class GameScene extends Phaser.Scene {
         const dx = this.localPlayer.x - ship.sprite.x;
         const dy = this.localPlayer.y - ship.sprite.y;
 
-        // Rotate to ship-local coordinates
-        const cos = Math.cos(-ship.rotation);
-        const sin = Math.sin(-ship.rotation);
-        this.shipRelativePosition = {
-          x: dx * cos - dy * sin,
-          y: dx * sin + dy * cos,
-        };
+        // Rotate to ship-local coordinates using isometric rotation (i2m-true-isometric Phase 3)
+        const offset = { x: dx, y: dy };
+        this.shipRelativePosition = this.rotatePointIsometric(offset, -ship.rotation);
       }
 
-      // Always redraw control points at their current positions (they move with ship sprite)
+      // Always redraw control points and ship boundary at their current positions (they move with ship sprite)
+      this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
       this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite);
       this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite);
     });
@@ -676,7 +712,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Rotate a point by the given angle
+   * Rotate a point by the given angle (Cartesian rotation)
    * @param point Point to rotate
    * @param angle Rotation angle in radians
    * @returns Rotated point
@@ -691,7 +727,55 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Convert isometric coordinates to Cartesian coordinates (i2m-true-isometric Phase 3)
+   * @param isoPoint Point in isometric space
+   * @returns Point in Cartesian space
+   */
+  private isometricToCartesian(isoPoint: { x: number; y: number }): { x: number; y: number } {
+    return {
+      x: (isoPoint.x + isoPoint.y * 2) / 2,
+      y: (isoPoint.y * 2 - isoPoint.x) / 2,
+    };
+  }
+
+  /**
+   * Convert Cartesian coordinates to isometric coordinates (i2m-true-isometric Phase 3)
+   * @param cartPoint Point in Cartesian space
+   * @returns Point in isometric space
+   */
+  private cartesianToIsometric(cartPoint: { x: number; y: number }): { x: number; y: number } {
+    return {
+      x: cartPoint.x - cartPoint.y,
+      y: (cartPoint.x + cartPoint.y) / 2,
+    };
+  }
+
+  /**
+   * Rotate a point in isometric space (i2m-true-isometric Phase 3)
+   * This ensures rotation appears correct in isometric projection
+   * @param point Point to rotate in isometric space
+   * @param angle Rotation angle in radians
+   * @returns Rotated point in isometric space
+   */
+  private rotatePointIsometric(point: { x: number; y: number }, angle: number): { x: number; y: number } {
+    // Transform to Cartesian
+    const cart = this.isometricToCartesian(point);
+
+    // Apply Cartesian rotation
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const rotatedCart = {
+      x: cart.x * cos - cart.y * sin,
+      y: cart.x * sin + cart.y * cos,
+    };
+
+    // Transform back to isometric
+    return this.cartesianToIsometric(rotatedCart);
+  }
+
+  /**
    * Check if a point is inside a rotated rectangle using OBB (Oriented Bounding Box) collision
+   * Uses isometric rotation to match how players rotate on ships (i2m-true-isometric)
    * @param point Point to test in world coordinates
    * @param rectCenter Center of rectangle in world coordinates
    * @param rectSize Size of rectangle (width, height)
@@ -708,17 +792,15 @@ export class GameScene extends Phaser.Scene {
     const dx = point.x - rectCenter.x;
     const dy = point.y - rectCenter.y;
 
-    // Rotate point by -rotation to align with rect's axes
-    const cos = Math.cos(-rotation);
-    const sin = Math.sin(-rotation);
-    const localX = dx * cos - dy * sin;
-    const localY = dx * sin + dy * cos;
+    // Rotate point by -rotation using isometric rotation to align with rect's axes
+    const offset = { x: dx, y: dy };
+    const localPos = this.rotatePointIsometric(offset, -rotation);
 
     // Check if point is inside axis-aligned rect
     const halfWidth = rectSize.width / 2;
     const halfHeight = rectSize.height / 2;
 
-    return Math.abs(localX) <= halfWidth && Math.abs(localY) <= halfHeight;
+    return Math.abs(localPos.x) <= halfWidth && Math.abs(localPos.y) <= halfHeight;
   }
 
   private checkShipBoundary() {
@@ -740,14 +822,12 @@ export class GameScene extends Phaser.Scene {
         const dx = this.localPlayer.x - ship.sprite.x;
         const dy = this.localPlayer.y - ship.sprite.y;
 
-        // Rotate to ship-local coordinates
-        const cos = Math.cos(-ship.rotation);
-        const sin = Math.sin(-ship.rotation);
-        const localX = dx * cos - dy * sin;
-        const localY = dx * sin + dy * cos;
+        // Rotate to ship-local coordinates using isometric rotation (i2m-true-isometric)
+        const offset = { x: dx, y: dy };
+        const localPos = this.rotatePointIsometric(offset, -ship.rotation);
 
         foundShip = ship.id;
-        shipRelativePos = { x: localX, y: localY }; // Store in ship-local coords
+        shipRelativePos = { x: localPos.x, y: localPos.y }; // Store in ship-local coords
       }
     });
 
@@ -869,8 +949,8 @@ export class GameScene extends Phaser.Scene {
 
     // Find closest control point
     this.ships.forEach((ship) => {
-      // Phase D: Calculate wheel world position with rotation
-      const rotatedWheelPos = this.rotatePoint(ship.controlPoints.wheel.relativePosition, ship.rotation);
+      // Phase D: Calculate wheel world position with isometric rotation (i2m-true-isometric)
+      const rotatedWheelPos = this.rotatePointIsometric(ship.controlPoints.wheel.relativePosition, ship.rotation);
       const wheelWorldX = ship.sprite.x + rotatedWheelPos.x;
       const wheelWorldY = ship.sprite.y + rotatedWheelPos.y;
       const wheelDx = wheelWorldX - this.localPlayer.x;
@@ -888,8 +968,8 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // Phase D: Calculate sails world position with rotation
-      const rotatedSailsPos = this.rotatePoint(ship.controlPoints.sails.relativePosition, ship.rotation);
+      // Phase D: Calculate sails world position with isometric rotation (i2m-true-isometric)
+      const rotatedSailsPos = this.rotatePointIsometric(ship.controlPoints.sails.relativePosition, ship.rotation);
       const sailsWorldX = ship.sprite.x + rotatedSailsPos.x;
       const sailsWorldY = ship.sprite.y + rotatedSailsPos.y;
       const sailsDx = sailsWorldX - this.localPlayer.x;
