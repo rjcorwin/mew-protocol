@@ -580,22 +580,27 @@ export class GameScene extends Phaser.Scene {
 
     // Only allow player movement if NOT currently controlling ship
     if (!this.controllingShip) {
-      // Isometric movement: arrow keys move along isometric tile axes (i2m-true-isometric Phase 1)
+      // Isometric movement: screen-aligned controls (cardinal screen directions)
+      // Each arrow key moves straight in its screen direction by combining two diamond axes
+      // UP = north (straight up) = northwest + northeast
+      // RIGHT = east (straight right) = northeast + southeast
+      // DOWN = south (straight down) = southeast + southwest
+      // LEFT = west (straight left) = southwest + northwest
       if (this.cursors.up?.isDown) {
-        velocity.x += ISO_NORTHEAST.x;
-        velocity.y += ISO_NORTHEAST.y;
-      }
-      if (this.cursors.down?.isDown) {
-        velocity.x += ISO_SOUTHWEST.x;
-        velocity.y += ISO_SOUTHWEST.y;
-      }
-      if (this.cursors.left?.isDown) {
-        velocity.x += ISO_NORTHWEST.x;
-        velocity.y += ISO_NORTHWEST.y;
+        velocity.x += ISO_NORTHWEST.x + ISO_NORTHEAST.x;
+        velocity.y += ISO_NORTHWEST.y + ISO_NORTHEAST.y;
       }
       if (this.cursors.right?.isDown) {
-        velocity.x += ISO_SOUTHEAST.x;
-        velocity.y += ISO_SOUTHEAST.y;
+        velocity.x += ISO_NORTHEAST.x + ISO_SOUTHEAST.x;
+        velocity.y += ISO_NORTHEAST.y + ISO_SOUTHEAST.y;
+      }
+      if (this.cursors.down?.isDown) {
+        velocity.x += ISO_SOUTHEAST.x + ISO_SOUTHWEST.x;
+        velocity.y += ISO_SOUTHEAST.y + ISO_SOUTHWEST.y;
+      }
+      if (this.cursors.left?.isDown) {
+        velocity.x += ISO_SOUTHWEST.x + ISO_NORTHWEST.x;
+        velocity.y += ISO_SOUTHWEST.y + ISO_NORTHWEST.y;
       }
 
       // Normalize diagonal movement
