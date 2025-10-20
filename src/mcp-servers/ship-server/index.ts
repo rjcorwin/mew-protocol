@@ -37,17 +37,17 @@ const shipConfig: ShipConfig = {
     x: parseFloat(process.env.SHIP_START_X || '0'),
     y: parseFloat(process.env.SHIP_START_Y || '800'),
   },
-  initialHeading: (process.env.SHIP_START_HEADING || 'east') as any,
+  initialHeading: (process.env.SHIP_START_HEADING || 'south') as any,
   wheelPosition: {
-    x: 0, // Center of ship (stern)
-    y: 32, // Back of ship
+    x: -54, // Stern (back) - ship local coordinates, negative X when facing east
+    y: 0, // Centered on ship's beam
   },
   sailsPosition: {
-    x: -16, // Left side of ship
-    y: 0, // Middle of ship
+    x: 44, // Bow (front) - ship local coordinates, positive X when facing east
+    y: 0, // Centered on ship's beam
   },
-  deckWidth: 64, // 2 tiles wide
-  deckHeight: 96, // 3 tiles tall
+  deckLength: 128, // Ship length (bow to stern) - extends along ship's local X-axis
+  deckBeam: 48, // Ship beam (port to starboard) - extends along ship's local Y-axis
   speedValues: {
     0: 0, // Stopped
     1: 25, // Slow (pixels per second)

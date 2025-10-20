@@ -81,8 +81,8 @@ export interface ShipConfig {
   initialHeading: ShipHeading;
   wheelPosition: Position; // Relative to ship origin
   sailsPosition: Position; // Relative to ship origin
-  deckWidth: number;
-  deckHeight: number;
+  deckLength: number; // Ship length (bow to stern) in pixels
+  deckBeam: number;   // Ship beam (port to starboard) in pixels
   speedValues: {
     // Pixels per second for each speed level
     0: number;

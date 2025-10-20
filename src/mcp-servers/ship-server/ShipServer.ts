@@ -82,8 +82,8 @@ export class ShipServer {
         },
       },
       deckBoundary: {
-        width: config.deckWidth,
-        height: config.deckHeight,
+        width: config.deckLength,   // Length (bow to stern) maps to width in local coords
+        height: config.deckBeam,    // Beam (port to starboard) maps to height in local coords
       },
       // Wheel steering state (w3l-wheel-steering)
       wheelAngle: 0, // Start centered (straight ahead)
