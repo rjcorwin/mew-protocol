@@ -497,17 +497,14 @@ export class GameScene extends Phaser.Scene {
           // Flag that we're applying rotation (don't recalculate shipRelativePosition this frame)
           this.applyingShipRotation = true;
 
-          // Rotate the relative position using isometric rotation (i2m-true-isometric Phase 3)
-          this.shipRelativePosition = this.rotatePointIsometric(
-            this.shipRelativePosition,
-            rotationDelta
-          );
-          console.log(`Rotated local player position to (${this.shipRelativePosition.x.toFixed(1)}, ${this.shipRelativePosition.y.toFixed(1)})`);
-
           // Apply rotation to player's world position using isometric rotation
+          // Note: We use ship.rotation (total angle), NOT rotationDelta
+          // This matches how ship boundary corners are calculated (no accumulated error)
           const rotatedWorldPos = this.rotatePointIsometric(this.shipRelativePosition, ship.rotation);
           this.localPlayer.x = ship.sprite.x + rotatedWorldPos.x;
           this.localPlayer.y = ship.sprite.y + rotatedWorldPos.y;
+
+          console.log(`Player rotated to world pos (${this.localPlayer.x.toFixed(1)}, ${this.localPlayer.y.toFixed(1)})`);
         }
 
         // Rotate remote players on this ship
