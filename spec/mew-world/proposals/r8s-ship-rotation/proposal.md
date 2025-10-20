@@ -189,23 +189,30 @@ updateShip(update: PositionUpdate) {
 
   if (update.shipData.rotationDelta && Math.abs(update.shipData.rotationDelta) > 0.001) {
     // Ship rotated - update all players on deck
-    const rotationDelta = update.shipData.rotationDelta;
+    // IMPORTANT: Use ship.rotation (final angle), NOT rotationDelta
+    // Accumulating rotationDelta causes floating-point drift over time
 
     // Rotate local player if on this ship
     if (this.onShip === ship.id && this.shipRelativePosition) {
-      this.shipRelativePosition = rotatePoint(
+      // Calculate world position using final ship rotation
+      // This matches how ship boundary corners are calculated (no accumulated error)
+      const rotatedWorldPos = rotatePoint(
         this.shipRelativePosition,
-        rotationDelta
+        ship.rotation  // Use final rotation, not delta
       );
+      this.localPlayer.x = ship.sprite.x + rotatedWorldPos.x;
+      this.localPlayer.y = ship.sprite.y + rotatedWorldPos.y;
     }
 
     // Rotate remote players on this ship
     this.remotePlayers.forEach((player) => {
       if (player.onShip === ship.id && player.shipRelativePosition) {
-        player.shipRelativePosition = rotatePoint(
+        const rotatedWorldPos = rotatePoint(
           player.shipRelativePosition,
-          rotationDelta
+          ship.rotation  // Use final rotation, not delta
         );
+        player.sprite.x = ship.sprite.x + rotatedWorldPos.x;
+        player.sprite.y = ship.sprite.y + rotatedWorldPos.y;
       }
     });
   }
