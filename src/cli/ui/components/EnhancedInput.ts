@@ -45,7 +45,7 @@ function EnhancedInput({
   prompt = '> ',
   slashContext = null,
   theme = null
-}) {
+}): React.ReactElement {
   // Text buffer for managing input
   const bufferRef = useRef(new TextBuffer());
   const buffer = bufferRef.current;

@@ -45,7 +45,7 @@ function createSignalBoardSummary(ackCount, statusCount, pauseState, includeAck 
 /**
  * Main Advanced Interactive UI Component
  */
-function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-pulse', defaultChatTargets = {} }) {
+function AdvancedInteractiveUI({ ws, participantId, spaceId, themeName = 'neon-pulse', defaultChatTargets = {} }): React.ReactElement | null {
   // Load theme
   const theme = getTheme(themeName);
 

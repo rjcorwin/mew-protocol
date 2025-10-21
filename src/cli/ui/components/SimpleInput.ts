@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-function SimpleInput({ onSubmit, disabled = false, prompt = '> ', theme = null }) {
+function SimpleInput({ onSubmit, disabled = false, prompt = '> ', theme = null }): React.ReactElement {
   const [value, setValue] = useState('');
 
   useInput((input, key) => {
