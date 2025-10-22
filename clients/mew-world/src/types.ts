@@ -92,6 +92,11 @@ export interface Ship {
       relativePosition: { x: number; y: number }; // Position relative to ship center
       controlledBy: string | null;
     };
+    mast: {
+      sprite: Phaser.GameObjects.Graphics;
+      relativePosition: { x: number; y: number }; // Position relative to ship center (center of ship)
+      controlledBy: string | null; // Local-only, for camera zoom
+    };
   };
   speedLevel: number;
   deckBoundary: { width: number; height: number };

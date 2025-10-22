@@ -36,7 +36,7 @@ export class GameScene extends Phaser.Scene {
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
   private controllingShip: string | null = null;
-  private controllingPoint: 'wheel' | 'sails' | null = null;
+  private controllingPoint: 'wheel' | 'sails' | 'mast' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
   private shipRelativePosition: { x: number; y: number } | null = null; // Position relative to ship center
   private applyingShipRotation = false; // Flag to prevent overwriting rotated position
@@ -415,6 +415,7 @@ export class GameScene extends Phaser.Scene {
       // Create control point indicators
       const wheelGraphics = this.add.graphics();
       const sailsGraphics = this.add.graphics();
+      const mastGraphics = this.add.graphics();
 
       // Calculate relative positions from world positions
       const wheelRelative = {
@@ -425,6 +426,8 @@ export class GameScene extends Phaser.Scene {
         x: update.shipData.controlPoints.sails.worldPosition.x - update.worldCoords.x,
         y: update.shipData.controlPoints.sails.worldPosition.y - update.worldCoords.y,
       };
+      // Mast is at center of ship (crow's nest for better view)
+      const mastRelative = { x: 0, y: 0 };
 
       console.log(`Ship ${update.participantId} created:`);
       console.log(`  Ship position: (${update.worldCoords.x}, ${update.worldCoords.y})`);
@@ -452,6 +455,11 @@ export class GameScene extends Phaser.Scene {
             sprite: sailsGraphics,
             relativePosition: sailsRelative,
             controlledBy: update.shipData.controlPoints.sails.controlledBy,
+          },
+          mast: {
+            sprite: mastGraphics,
+            relativePosition: mastRelative,
+            controlledBy: null, // Client-side only, not synced
           },
         },
         speedLevel: update.shipData.speedLevel,
@@ -514,13 +522,15 @@ export class GameScene extends Phaser.Scene {
     this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
     this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`));
     this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`));
+    this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast');
   }
 
   private drawControlPoint(
     graphics: Phaser.GameObjects.Graphics,
     controlPoint: { relativePosition: { x: number; y: number }; controlledBy: string | null },
     shipSprite: Phaser.GameObjects.Sprite,
-    isPlayerNear: boolean = false
+    isPlayerNear: boolean = false,
+    type: 'wheel' | 'sails' | 'mast' = 'wheel'
   ) {
     graphics.clear();
 
@@ -531,7 +541,7 @@ export class GameScene extends Phaser.Scene {
     const worldY = shipSprite.y + rotatedPos.y;
 
     // Draw a circle at the control point position
-    // Yellow if player is near and can interact, red if controlled by other, green if free
+    // Yellow if player is near and can interact, red if controlled by other, green/brown if free
     let color: number;
     let opacity: number;
     if (isPlayerNear) {
@@ -541,7 +551,8 @@ export class GameScene extends Phaser.Scene {
       color = 0xff0000; // Red if controlled by someone
       opacity = 0.5;
     } else {
-      color = 0x00ff00; // Green if free
+      // Different color for mast (brown) vs other controls (green)
+      color = type === 'mast' ? 0x8b4513 : 0x00ff00; // Brown for mast, green for others
       opacity = 0.5;
     }
 
@@ -776,6 +787,7 @@ export class GameScene extends Phaser.Scene {
       this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
       this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`));
       this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`));
+      this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast');
     });
 
     // Clear the rotation flag after all ships are processed
@@ -1034,7 +1046,7 @@ export class GameScene extends Phaser.Scene {
     const INTERACTION_DISTANCE = 30; // pixels
     let nearestControlPoint: {
       shipId: string;
-      controlPoint: 'wheel' | 'sails';
+      controlPoint: 'wheel' | 'sails' | 'mast';
       distance: number;
     } | null = null;
 
@@ -1086,6 +1098,29 @@ export class GameScene extends Phaser.Scene {
               shipId: ship.id,
               controlPoint: 'sails',
               distance: sailsDistance,
+            };
+          }
+        }
+      }
+
+      // Check mast (crow's nest at center of ship for zooming out view)
+      const rotatedMastPos = this.rotatePointIsometric(ship.controlPoints.mast.relativePosition, ship.rotation);
+      const mastWorldX = ship.sprite.x + rotatedMastPos.x;
+      const mastWorldY = ship.sprite.y + rotatedMastPos.y;
+      const mastDx = mastWorldX - this.localPlayer.x;
+      const mastDy = mastWorldY - this.localPlayer.y;
+      const mastDistance = Math.sqrt(mastDx * mastDx + mastDy * mastDy);
+
+      if (mastDistance < INTERACTION_DISTANCE) {
+        const isControlledByUs = this.controllingShip === ship.id && this.controllingPoint === 'mast';
+
+        // Mast is client-side only, always available (no isControlledByOther check)
+        if (isControlledByUs || true) {
+          if (!nearestControlPoint || mastDistance < nearestControlPoint.distance) {
+            nearestControlPoint = {
+              shipId: ship.id,
+              controlPoint: 'mast',
+              distance: mastDistance,
             };
           }
         }
@@ -1150,35 +1185,61 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private sendGrabControl(shipId: string, controlPoint: 'wheel' | 'sails') {
-    this.client.send({
-      kind: 'ship/grab_control',
-      to: [shipId],
-      payload: {
-        controlPoint,
-        playerId: this.playerId,
-      },
-    });
+  private sendGrabControl(shipId: string, controlPoint: 'wheel' | 'sails' | 'mast') {
+    // Mast is client-side only (for camera zoom), don't send to ship server
+    if (controlPoint !== 'mast') {
+      this.client.send({
+        kind: 'ship/grab_control',
+        to: [shipId],
+        payload: {
+          controlPoint,
+          playerId: this.playerId,
+        },
+      });
+    }
 
     this.controllingShip = shipId;
     this.controllingPoint = controlPoint;
 
-    console.log(`Grabbed ${controlPoint} on ship ${shipId}`);
+    // If grabbing mast, zoom camera out for better view
+    if (controlPoint === 'mast') {
+      const ship = this.ships.get(shipId);
+      if (ship) {
+        ship.controlPoints.mast.controlledBy = this.playerId;
+      }
+      this.cameras.main.zoomTo(0.8, 500); // Zoom out to 0.8x over 500ms
+      console.log(`Climbed mast on ship ${shipId} - zooming out for better view`);
+    } else {
+      console.log(`Grabbed ${controlPoint} on ship ${shipId}`);
+    }
   }
 
   private sendReleaseControl() {
     if (!this.controllingShip || !this.controllingPoint) return;
 
-    this.client.send({
-      kind: 'ship/release_control',
-      to: [this.controllingShip],
-      payload: {
-        controlPoint: this.controllingPoint,
-        playerId: this.playerId,
-      },
-    });
+    // Mast is client-side only, don't send to ship server
+    if (this.controllingPoint !== 'mast') {
+      this.client.send({
+        kind: 'ship/release_control',
+        to: [this.controllingShip],
+        payload: {
+          controlPoint: this.controllingPoint,
+          playerId: this.playerId,
+        },
+      });
+    }
 
-    console.log(`Released ${this.controllingPoint} on ship ${this.controllingShip}`);
+    // If releasing mast, zoom camera back to normal
+    if (this.controllingPoint === 'mast') {
+      const ship = this.ships.get(this.controllingShip);
+      if (ship) {
+        ship.controlPoints.mast.controlledBy = null;
+      }
+      this.cameras.main.zoomTo(1.5, 500); // Zoom back to 1.5x over 500ms
+      console.log(`Climbed down mast - zooming back to normal view`);
+    } else {
+      console.log(`Released ${this.controllingPoint} on ship ${this.controllingShip}`);
+    }
 
     this.controllingShip = null;
     this.controllingPoint = null;
