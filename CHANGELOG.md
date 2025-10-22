@@ -4,6 +4,14 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **[u7k] Upgrade ink to v6** - Updated ink from v3.2.0 to v6.3.1 and React from v18 to v19
+  - Proposal: `spec/cli/proposals/u7k-upgrade-ink-v6/`
+  - Status: ✅ Implemented
+  - Benefits: Latest features, bug fixes, and security updates
+  - Breaking changes: Requires React 19, pure ESM (already using ESM)
+  - Code changes: Added explicit return type annotations to React components
+
 ## [v0.5.1] - 2025-01-06
 
 ### Fixed
