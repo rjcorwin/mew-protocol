@@ -42,6 +42,7 @@ export class GameScene extends Phaser.Scene {
   private applyingShipRotation = false; // Flag to prevent overwriting rotated position
   private currentWheelDirection: 'left' | 'right' | null = null; // Track wheel turning state (w3l-wheel-steering)
   private nearControlPoints: Set<string> = new Set(); // Track which control points player is near (format: "shipId:wheel" or "shipId:sails")
+  private lastPlayerWaveOffset: number = 0; // Track last wave offset for smooth bobbing
 
   constructor() {
     super({ key: 'GameScene' });
@@ -366,6 +367,7 @@ export class GameScene extends Phaser.Scene {
         velocity: update.velocity,
         platformRef: update.platformRef,
         onShip: null,
+        lastWaveOffset: 0, // Initialize wave offset tracking
       };
 
       this.remotePlayers.set(update.participantId, player);
@@ -464,6 +466,7 @@ export class GameScene extends Phaser.Scene {
         },
         speedLevel: update.shipData.speedLevel,
         deckBoundary: update.shipData.deckBoundary,
+        lastWaveOffset: 0, // Initialize wave offset tracking
       };
 
       // Set initial rotation
@@ -589,6 +592,37 @@ export class GameScene extends Phaser.Scene {
       graphics.fillStyle(corner.color, 1);
       graphics.fillCircle(worldX, worldY, 6);
     });
+  }
+
+  private calculateWaveHeightAtPosition(x: number, y: number, time: number): number {
+    // Convert world position to tile coordinates for wave calculation
+    const tilePos = this.map.worldToTileXY(x, y);
+    if (!tilePos) return 0;
+
+    const waveSpeed = 0.001;
+    const waveFrequency = 0.2;
+    const waveAmplitude = 12;
+
+    // Calculate wave using same formula as water tiles
+    const tileX = Math.floor(tilePos.x);
+    const tileY = Math.floor(tilePos.y);
+
+    // Primary wave - travels east-west
+    const wavePhase1 = (tileX * waveFrequency - tileY * waveFrequency * 0.3) + (time * waveSpeed);
+    const wave1 = Math.sin(wavePhase1);
+
+    // Secondary wave - different frequency and direction (more north-south)
+    const wavePhase2 = (tileX * waveFrequency * 0.5 + tileY * waveFrequency * 0.7) + (time * waveSpeed * 1.3);
+    const wave2 = Math.sin(wavePhase2) * 0.5;
+
+    // Tertiary wave - high frequency ripples
+    const wavePhase3 = (tileX * waveFrequency * 2 - tileY * waveFrequency * 0.5) + (time * waveSpeed * 0.7);
+    const wave3 = Math.sin(wavePhase3) * 0.3;
+
+    // Combine all waves
+    const combinedWave = wave1 + wave2 + wave3;
+
+    return combinedWave * waveAmplitude;
   }
 
   private animateVisibleWaterTiles(time: number) {
@@ -734,6 +768,31 @@ export class GameScene extends Phaser.Scene {
       this.localPlayer.anims.stop();
     }
 
+    // Apply wave bobbing to local player if in water (not on ship)
+    if (!this.onShip) {
+      // Check if player is standing in water
+      const tilePos = this.map.worldToTileXY(this.localPlayer.x, this.localPlayer.y);
+      if (tilePos) {
+        const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
+        if (tile && tile.properties?.navigable === true) {
+          // Player is in water, apply wave offset delta
+          const currentWaveOffset = this.calculateWaveHeightAtPosition(this.localPlayer.x, this.localPlayer.y, time);
+          const waveDelta = currentWaveOffset - this.lastPlayerWaveOffset;
+          this.localPlayer.y += waveDelta;
+          this.lastPlayerWaveOffset = currentWaveOffset;
+        } else {
+          // Player is not in water, reset wave offset
+          this.lastPlayerWaveOffset = 0;
+        }
+      } else {
+        // Out of bounds, reset wave offset
+        this.lastPlayerWaveOffset = 0;
+      }
+    } else {
+      // Player is on ship, reset wave offset (ship handles bobbing)
+      this.lastPlayerWaveOffset = 0;
+    }
+
     // Publish position update at regular intervals
     if (time - this.lastPositionUpdate > POSITION_UPDATE_RATE) {
       this.publishPosition(velocity);
@@ -770,6 +829,24 @@ export class GameScene extends Phaser.Scene {
           }
         });
       }
+
+      // Apply wave bobbing to ship at its current position
+      const currentWaveOffset = this.calculateWaveHeightAtPosition(ship.sprite.x, ship.sprite.y, time);
+      const waveYDelta = currentWaveOffset - ship.lastWaveOffset;
+      ship.sprite.y += waveYDelta;
+      ship.lastWaveOffset = currentWaveOffset;
+
+      // Move local player with wave delta if on this ship
+      if (this.onShip === ship.id) {
+        this.localPlayer.y += waveYDelta;
+      }
+
+      // Move remote players with wave delta if on this ship
+      this.remotePlayers.forEach((player) => {
+        if (player.onShip === ship.id) {
+          player.sprite.y += waveYDelta;
+        }
+      });
 
       // Update shipRelativePosition from current player world position
       // This needs to happen every frame so player movement updates the relative position
@@ -811,6 +888,30 @@ export class GameScene extends Phaser.Scene {
         const factor = Math.min(1, (delta / 1000) * 5); // Adjust speed as needed
         player.sprite.x += dx * factor;
         player.sprite.y += dy * factor;
+      }
+
+      // Apply wave bobbing if remote player is in water (not on ship)
+      if (!player.onShip) {
+        const tilePos = this.map.worldToTileXY(player.sprite.x, player.sprite.y);
+        if (tilePos) {
+          const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
+          if (tile && tile.properties?.navigable === true) {
+            // Remote player is in water, apply wave offset delta
+            const currentWaveOffset = this.calculateWaveHeightAtPosition(player.sprite.x, player.sprite.y, time);
+            const waveDelta = currentWaveOffset - player.lastWaveOffset;
+            player.sprite.y += waveDelta;
+            player.lastWaveOffset = currentWaveOffset;
+          } else {
+            // Remote player is not in water, reset wave offset
+            player.lastWaveOffset = 0;
+          }
+        } else {
+          // Out of bounds, reset wave offset
+          player.lastWaveOffset = 0;
+        }
+      } else {
+        // Remote player is on ship, reset wave offset (ship handles bobbing)
+        player.lastWaveOffset = 0;
       }
     });
   }

@@ -68,6 +68,7 @@ export interface Player {
   velocity: { x: number; y: number };
   platformRef: string | null;
   onShip: string | null; // Ship participant ID if player is on a ship
+  lastWaveOffset: number; // Track wave offset for smooth bobbing in water
 }
 
 /**
@@ -100,6 +101,7 @@ export interface Ship {
   };
   speedLevel: number;
   deckBoundary: { width: number; height: number };
+  lastWaveOffset: number; // Track wave offset for smooth bobbing
 }
 
 /**
