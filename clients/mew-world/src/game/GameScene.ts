@@ -577,7 +577,77 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private animateVisibleWaterTiles(time: number) {
+    const camera = this.cameras.main;
+
+    // Get camera center in world coordinates
+    const cameraCenterX = camera.worldView.x + camera.worldView.width / 2;
+    const cameraCenterY = camera.worldView.y + camera.worldView.height / 2;
+
+    // Estimate tile range to check (for isometric, we need a larger range)
+    // This is approximate but much faster than checking every tile
+    const tileBuffer = 100; // Check tiles within ~100 tile radius of camera center
+
+    // Convert camera center to approximate tile coords
+    const centerTile = this.map.worldToTileXY(cameraCenterX, cameraCenterY);
+    if (!centerTile) return;
+
+    const minX = Math.max(0, Math.floor(centerTile.x) - tileBuffer);
+    const maxX = Math.min(this.map.width - 1, Math.ceil(centerTile.x) + tileBuffer);
+    const minY = Math.max(0, Math.floor(centerTile.y) - tileBuffer);
+    const maxY = Math.min(this.map.height - 1, Math.ceil(centerTile.y) + tileBuffer);
+
+    // Get camera bounds in world coordinates with buffer
+    const bufferPixels = 100;
+    const viewLeft = camera.worldView.x - bufferPixels;
+    const viewRight = camera.worldView.x + camera.worldView.width + bufferPixels;
+    const viewTop = camera.worldView.y - bufferPixels;
+    const viewBottom = camera.worldView.y + camera.worldView.height + bufferPixels;
+
+    // Wave parameters
+    const waveSpeed = 0.002;
+    const waveFrequency = 0.2;
+
+    // Only iterate through tiles near the camera
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const tile = this.groundLayer.getTileAt(x, y);
+
+        // Only process water tiles
+        if (tile && tile.properties?.navigable === true) {
+          // Get tile's world position
+          const worldPos = this.map.tileToWorldXY(x, y);
+          if (!worldPos) continue;
+
+          // Check if tile is actually within camera view
+          if (worldPos.x >= viewLeft && worldPos.x <= viewRight &&
+              worldPos.y >= viewTop && worldPos.y <= viewBottom) {
+
+            // Create a traveling wave effect based on position and time
+            const wavePhase = (x * waveFrequency + y * waveFrequency) + (time * waveSpeed);
+            const waveValue = Math.sin(wavePhase);
+
+            // Map wave to brightness (0.85 to 1.15)
+            const brightness = 1.0 + (waveValue * 0.15);
+
+            // Apply blue-ish tint that pulses with the wave
+            const baseColor = 0xaaddff; // Light blue
+            const r = Math.floor(((baseColor >> 16) & 0xff) * brightness);
+            const g = Math.floor(((baseColor >> 8) & 0xff) * brightness);
+            const b = Math.floor((baseColor & 0xff) * brightness);
+            const tint = (Math.min(255, r) << 16) | (Math.min(255, g) << 8) | Math.min(255, b);
+
+            tile.tint = tint;
+          }
+        }
+      }
+    }
+  }
+
   update(time: number, delta: number) {
+    // Animate water tiles (only those visible on screen)
+    this.animateVisibleWaterTiles(time);
+
     // Handle local player movement (only if not controlling ship)
     const velocity = new Phaser.Math.Vector2(0, 0);
 
