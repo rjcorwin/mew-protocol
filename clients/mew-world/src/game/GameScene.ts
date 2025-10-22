@@ -530,15 +530,19 @@ export class GameScene extends Phaser.Scene {
     // Draw a circle at the control point position
     // Yellow if player is near and can interact, red if controlled by other, green if free
     let color: number;
+    let opacity: number;
     if (isPlayerNear) {
-      color = 0xffff00; // Yellow when player is close enough to interact
+      color = 0xffcc00; // Bright amber-yellow when player is close enough to interact
+      opacity = 0.8; // Higher opacity for better visibility
     } else if (controlPoint.controlledBy) {
       color = 0xff0000; // Red if controlled by someone
+      opacity = 0.5;
     } else {
       color = 0x00ff00; // Green if free
+      opacity = 0.5;
     }
 
-    graphics.fillStyle(color, 0.5);
+    graphics.fillStyle(color, opacity);
     graphics.fillCircle(worldX, worldY, 8);
     graphics.lineStyle(2, 0xffffff, 1);
     graphics.strokeCircle(worldX, worldY, 8);
