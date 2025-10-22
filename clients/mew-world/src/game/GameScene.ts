@@ -35,13 +35,13 @@ export class GameScene extends Phaser.Scene {
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
-  private interactionPrompt!: Phaser.GameObjects.Text;
   private controllingShip: string | null = null;
   private controllingPoint: 'wheel' | 'sails' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
   private shipRelativePosition: { x: number; y: number } | null = null; // Position relative to ship center
   private applyingShipRotation = false; // Flag to prevent overwriting rotated position
   private currentWheelDirection: 'left' | 'right' | null = null; // Track wheel turning state (w3l-wheel-steering)
+  private nearControlPoints: Set<string> = new Set(); // Track which control points player is near (format: "shipId:wheel" or "shipId:sails")
 
   constructor() {
     super({ key: 'GameScene' });
@@ -93,17 +93,6 @@ export class GameScene extends Phaser.Scene {
     // Set up keyboard input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-
-    // Create interaction prompt (initially hidden)
-    this.interactionPrompt = this.add.text(0, 0, '', {
-      fontSize: '16px',
-      color: '#ffffff',
-      backgroundColor: '#000000aa',
-      padding: { x: 10, y: 5 },
-    });
-    this.interactionPrompt.setOrigin(0.5, 1);
-    this.interactionPrompt.setDepth(1000);
-    this.interactionPrompt.setVisible(false);
 
     // Request stream for position updates
     this.requestPositionStream();
@@ -520,14 +509,15 @@ export class GameScene extends Phaser.Scene {
 
     // Draw ship boundary and control point indicators at current ship position
     this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
-    this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite);
-    this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite);
+    this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`));
+    this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`));
   }
 
   private drawControlPoint(
     graphics: Phaser.GameObjects.Graphics,
     controlPoint: { relativePosition: { x: number; y: number }; controlledBy: string | null },
-    shipSprite: Phaser.GameObjects.Sprite
+    shipSprite: Phaser.GameObjects.Sprite,
+    isPlayerNear: boolean = false
   ) {
     graphics.clear();
 
@@ -538,7 +528,16 @@ export class GameScene extends Phaser.Scene {
     const worldY = shipSprite.y + rotatedPos.y;
 
     // Draw a circle at the control point position
-    const color = controlPoint.controlledBy ? 0xff0000 : 0x00ff00; // Red if controlled, green if free
+    // Yellow if player is near and can interact, red if controlled by other, green if free
+    let color: number;
+    if (isPlayerNear) {
+      color = 0xffff00; // Yellow when player is close enough to interact
+    } else if (controlPoint.controlledBy) {
+      color = 0xff0000; // Red if controlled by someone
+    } else {
+      color = 0x00ff00; // Green if free
+    }
+
     graphics.fillStyle(color, 0.5);
     graphics.fillCircle(worldX, worldY, 8);
     graphics.lineStyle(2, 0xffffff, 1);
@@ -691,8 +690,8 @@ export class GameScene extends Phaser.Scene {
 
       // Always redraw control points and ship boundary at their current positions (they move with ship sprite)
       this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
-      this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite);
-      this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite);
+      this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`));
+      this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`));
     });
 
     // Clear the rotation flag after all ships are processed
@@ -953,8 +952,10 @@ export class GameScene extends Phaser.Scene {
       shipId: string;
       controlPoint: 'wheel' | 'sails';
       distance: number;
-      label: string;
     } | null = null;
+
+    // Clear previous near control points
+    this.nearControlPoints.clear();
 
     // Find closest control point
     this.ships.forEach((ship) => {
@@ -967,13 +968,18 @@ export class GameScene extends Phaser.Scene {
       const wheelDistance = Math.sqrt(wheelDx * wheelDx + wheelDy * wheelDy);
 
       if (wheelDistance < INTERACTION_DISTANCE) {
-        if (!nearestControlPoint || wheelDistance < nearestControlPoint.distance) {
-          nearestControlPoint = {
-            shipId: ship.id,
-            controlPoint: 'wheel',
-            distance: wheelDistance,
-            label: 'Press E to grab wheel'
-          };
+        const isControlledByUs = this.controllingShip === ship.id && this.controllingPoint === 'wheel';
+        const isControlledByOther = ship.controlPoints.wheel.controlledBy && ship.controlPoints.wheel.controlledBy !== this.playerId;
+
+        // Track as interactable for E key (can grab if free, or release if we're controlling)
+        if (isControlledByUs || !isControlledByOther) {
+          if (!nearestControlPoint || wheelDistance < nearestControlPoint.distance) {
+            nearestControlPoint = {
+              shipId: ship.id,
+              controlPoint: 'wheel',
+              distance: wheelDistance,
+            };
+          }
         }
       }
 
@@ -986,35 +992,45 @@ export class GameScene extends Phaser.Scene {
       const sailsDistance = Math.sqrt(sailsDx * sailsDx + sailsDy * sailsDy);
 
       if (sailsDistance < INTERACTION_DISTANCE) {
-        if (!nearestControlPoint || sailsDistance < nearestControlPoint.distance) {
-          nearestControlPoint = {
-            shipId: ship.id,
-            controlPoint: 'sails',
-            distance: sailsDistance,
-            label: 'Press E to adjust sails'
-          };
+        const isControlledByUs = this.controllingShip === ship.id && this.controllingPoint === 'sails';
+        const isControlledByOther = ship.controlPoints.sails.controlledBy && ship.controlPoints.sails.controlledBy !== this.playerId;
+
+        // Track as interactable for E key (can grab if free, or release if we're controlling)
+        if (isControlledByUs || !isControlledByOther) {
+          if (!nearestControlPoint || sailsDistance < nearestControlPoint.distance) {
+            nearestControlPoint = {
+              shipId: ship.id,
+              controlPoint: 'sails',
+              distance: sailsDistance,
+            };
+          }
         }
       }
     });
 
-    // Update UI prompt
+    // Only add the nearest control point to the yellow indicator set (if not controlled)
     if (nearestControlPoint) {
-      this.interactionPrompt.setVisible(true);
-      this.interactionPrompt.setText(nearestControlPoint.label);
-      this.interactionPrompt.setPosition(this.localPlayer.x, this.localPlayer.y - 30);
+      // Check if the nearest control point is controlled by us
+      const ship = this.ships.get(nearestControlPoint.shipId);
+      if (ship) {
+        const isControlledByUs = this.controllingShip === nearestControlPoint.shipId && this.controllingPoint === nearestControlPoint.controlPoint;
 
-      // Handle E key press
-      if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
-        if (this.controllingPoint) {
-          // Release current control
-          this.sendReleaseControl();
-        } else {
-          // Grab new control
-          this.sendGrabControl(nearestControlPoint.shipId, nearestControlPoint.controlPoint);
+        // Only show yellow if we're not controlling it (otherwise it will show red)
+        if (!isControlledByUs) {
+          this.nearControlPoints.add(`${nearestControlPoint.shipId}:${nearestControlPoint.controlPoint}`);
         }
       }
-    } else {
-      this.interactionPrompt.setVisible(false);
+    }
+
+    // Handle E key press
+    if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      if (this.controllingPoint) {
+        // Release current control (no distance check - always allow disengagement)
+        this.sendReleaseControl();
+      } else if (nearestControlPoint) {
+        // Grab nearest control point (only if within range)
+        this.sendGrabControl(nearestControlPoint.shipId, nearestControlPoint.controlPoint);
+      }
     }
 
     // Handle ship control inputs (when controlling wheel or sails)
