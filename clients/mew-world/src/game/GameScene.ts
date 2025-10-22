@@ -90,6 +90,9 @@ export class GameScene extends Phaser.Scene {
     // Set up camera to follow player
     camera.startFollow(this.localPlayer, true, 0.1, 0.1);
 
+    // Zoom in camera for closer view
+    camera.setZoom(1.5);
+
     // Set up keyboard input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
@@ -605,8 +608,9 @@ export class GameScene extends Phaser.Scene {
     const viewBottom = camera.worldView.y + camera.worldView.height + bufferPixels;
 
     // Wave parameters
-    const waveSpeed = 0.002;
+    const waveSpeed = 0.001; // Slower wave movement
     const waveFrequency = 0.2;
+    const waveAmplitude = 12; // Vertical movement in pixels (big dramatic waves!)
 
     // Only iterate through tiles near the camera
     for (let y = minY; y <= maxY; y++) {
@@ -623,21 +627,27 @@ export class GameScene extends Phaser.Scene {
           if (worldPos.x >= viewLeft && worldPos.x <= viewRight &&
               worldPos.y >= viewTop && worldPos.y <= viewBottom) {
 
-            // Create a traveling wave effect based on position and time
-            const wavePhase = (x * waveFrequency + y * waveFrequency) + (time * waveSpeed);
-            const waveValue = Math.sin(wavePhase);
+            // Create a more varied wave effect by combining multiple sine waves
+            // This creates interference patterns like real ocean waves
 
-            // Map wave to brightness (0.85 to 1.15)
-            const brightness = 1.0 + (waveValue * 0.15);
+            // Primary wave - travels east-west
+            const wavePhase1 = (x * waveFrequency - y * waveFrequency * 0.3) + (time * waveSpeed);
+            const wave1 = Math.sin(wavePhase1);
 
-            // Apply blue-ish tint that pulses with the wave
-            const baseColor = 0xaaddff; // Light blue
-            const r = Math.floor(((baseColor >> 16) & 0xff) * brightness);
-            const g = Math.floor(((baseColor >> 8) & 0xff) * brightness);
-            const b = Math.floor((baseColor & 0xff) * brightness);
-            const tint = (Math.min(255, r) << 16) | (Math.min(255, g) << 8) | Math.min(255, b);
+            // Secondary wave - different frequency and direction (more north-south)
+            const wavePhase2 = (x * waveFrequency * 0.5 + y * waveFrequency * 0.7) + (time * waveSpeed * 1.3);
+            const wave2 = Math.sin(wavePhase2) * 0.5; // Smaller amplitude
 
-            tile.tint = tint;
+            // Tertiary wave - high frequency ripples
+            const wavePhase3 = (x * waveFrequency * 2 - y * waveFrequency * 0.5) + (time * waveSpeed * 0.7);
+            const wave3 = Math.sin(wavePhase3) * 0.3; // Even smaller
+
+            // Combine all waves
+            const combinedWave = wave1 + wave2 + wave3;
+
+            // Move tile vertically based on combined wave (bob up and down)
+            const yOffset = combinedWave * waveAmplitude;
+            tile.pixelY = worldPos.y + yOffset;
           }
         }
       }
