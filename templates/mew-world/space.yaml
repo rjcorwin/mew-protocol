@@ -44,7 +44,7 @@ participants:
       SPACE_NAME: "{{SPACE_NAME}}"
       GATEWAY_URL: "ws://localhost:8080"
       SHIP_START_X: "0"
-      SHIP_START_Y: "200"
+      SHIP_START_Y: "120"
       SHIP_START_HEADING: "south"
       TOKEN_PATH: ".mew/tokens/ship1.token"
 

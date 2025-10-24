@@ -33,8 +33,10 @@ export class GameScene extends Phaser.Scene {
   private lastFacing: Direction = 'south'; // Default facing direction
   private map!: Phaser.Tilemaps.Tilemap;
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
+  private secondLayer?: Phaser.Tilemaps.TilemapLayer;
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
+  private shallowWaterGraphics!: Phaser.GameObjects.Graphics; // Semi-transparent water overlay for sand tiles
   private controllingShip: string | null = null;
   private controllingPoint: 'wheel' | 'sails' | 'mast' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
@@ -53,7 +55,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image('terrain', 'assets/maps/terrain.png');
 
     // Load Tiled map
-    this.load.tilemapTiledJSON('map', 'assets/maps/map1.tmj');
+    this.load.tilemapTiledJSON('map', 'assets/maps/small-map.tmj');
 
     // Load player sprite sheet (8 directions, 4 frames each)
     this.load.spritesheet('player', 'assets/sprites/player.png', {
@@ -69,6 +71,10 @@ export class GameScene extends Phaser.Scene {
 
     // Load Tiled map
     this.loadTiledMap();
+
+    // Create graphics for shallow water overlay (renders on top of sand)
+    this.shallowWaterGraphics = this.add.graphics();
+    this.shallowWaterGraphics.setDepth(0.5); // Between ground (0) and ships (0)
 
     // Create 8-direction walk animations
     this.createPlayerAnimations();
@@ -173,6 +179,14 @@ export class GameScene extends Phaser.Scene {
       const fallbackGround = this.map.createLayer('Ground', tileset, 0, 0);
       if (fallbackGround) {
         this.groundLayer = fallbackGround;
+      }
+    }
+
+    // Create "Tile Layer 2" if it exists
+    if (this.map.getLayer('Tile Layer 2')) {
+      const layer2 = this.map.createLayer('Tile Layer 2', tileset, 0, 0);
+      if (layer2) {
+        this.secondLayer = layer2;
       }
     }
 
@@ -599,7 +613,7 @@ export class GameScene extends Phaser.Scene {
     const tilePos = this.map.worldToTileXY(x, y);
     if (!tilePos) return 0;
 
-    const waveSpeed = 0.001;
+    const waveSpeed = 0.0005;
     const waveFrequency = 0.2;
     const waveAmplitude = 12;
 
@@ -628,6 +642,9 @@ export class GameScene extends Phaser.Scene {
   private animateVisibleWaterTiles(time: number) {
     const camera = this.cameras.main;
 
+    // Clear previous frame's shallow water overlay
+    this.shallowWaterGraphics.clear();
+
     // Get camera center in world coordinates
     const cameraCenterX = camera.worldView.x + camera.worldView.width / 2;
     const cameraCenterY = camera.worldView.y + camera.worldView.height / 2;
@@ -653,7 +670,7 @@ export class GameScene extends Phaser.Scene {
     const viewBottom = camera.worldView.y + camera.worldView.height + bufferPixels;
 
     // Wave parameters
-    const waveSpeed = 0.001; // Slower wave movement
+    const waveSpeed = 0.0005; // Slower wave movement
     const waveFrequency = 0.2;
     const waveAmplitude = 12; // Vertical movement in pixels (big dramatic waves!)
 
@@ -662,8 +679,7 @@ export class GameScene extends Phaser.Scene {
       for (let x = minX; x <= maxX; x++) {
         const tile = this.groundLayer.getTileAt(x, y);
 
-        // Only process water tiles
-        if (tile && tile.properties?.navigable === true) {
+        if (tile) {
           // Get tile's world position
           const worldPos = this.map.tileToWorldXY(x, y);
           if (!worldPos) continue;
@@ -692,7 +708,28 @@ export class GameScene extends Phaser.Scene {
 
             // Move tile vertically based on combined wave (bob up and down)
             const yOffset = combinedWave * waveAmplitude;
-            tile.pixelY = worldPos.y + yOffset;
+
+            const isNavigable = tile.properties?.navigable === true;
+            const isSand = tile.properties?.terrain === 'shallow-sand' || tile.properties?.terrain === 'water';
+
+            if (isNavigable) {
+              // This is a water tile - animate it
+              tile.pixelY = worldPos.y + yOffset;
+            } else if (isSand) {
+              // This is a sand tile - render semi-transparent water on top
+              // Draw an isometric diamond overlay that follows the wave
+              const tileX = worldPos.x + TILE_WIDTH / 2;
+              const tileY = worldPos.y + yOffset;
+
+              this.shallowWaterGraphics.fillStyle(0x6fdaf0, 0.3); // Blue water at 30% opacity
+              this.shallowWaterGraphics.beginPath();
+              this.shallowWaterGraphics.moveTo(tileX, tileY);                              // Top
+              this.shallowWaterGraphics.lineTo(tileX + TILE_WIDTH / 2, tileY + TILE_HEIGHT / 2);   // Right
+              this.shallowWaterGraphics.lineTo(tileX, tileY + TILE_HEIGHT);               // Bottom
+              this.shallowWaterGraphics.lineTo(tileX - TILE_WIDTH / 2, tileY + TILE_HEIGHT / 2);   // Left
+              this.shallowWaterGraphics.closePath();
+              this.shallowWaterGraphics.fillPath();
+            }
           }
         }
       }
@@ -1084,6 +1121,23 @@ export class GameScene extends Phaser.Scene {
             walkable: false,
             speedModifier: 0,
             terrain: obstacleTile.properties.terrain || 'wall'
+          };
+        }
+      }
+    }
+
+    // Check Tile Layer 2 (blocks movement by default if tile exists)
+    if (this.secondLayer) {
+      const tile = this.secondLayer.getTileAt(tileX, tileY);
+      if (tile) {
+        // Default to blocking (false) if tile exists, unless explicitly set to walkable
+        const walkable = tile.properties.walkable ?? false;
+        if (!walkable) {
+          console.log(`Blocked at tile (${tileX}, ${tileY}), world (${worldX.toFixed(1)}, ${worldY.toFixed(1)})`);
+          return {
+            walkable: false,
+            speedModifier: 0,
+            terrain: tile.properties.terrain || 'obstacle'
           };
         }
       }
