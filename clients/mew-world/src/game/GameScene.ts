@@ -4,6 +4,7 @@ import { PositionUpdate, Player, Ship, Direction } from '../types.js';
 
 const TILE_WIDTH = 32;
 const TILE_HEIGHT = 16;
+const TILE_VISUAL_HEIGHT = 32; // Actual height of tiles with 3D depth in tileset
 const WORLD_WIDTH = 20;
 const WORLD_HEIGHT = 20;
 const MOVE_SPEED = 100; // pixels per second
@@ -34,6 +35,7 @@ export class GameScene extends Phaser.Scene {
   private map!: Phaser.Tilemaps.Tilemap;
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private secondLayer?: Phaser.Tilemaps.TilemapLayer;
+  private secondLayerSprites: Phaser.GameObjects.Sprite[] = []; // Individual sprites for depth sorting
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
   private shallowWaterGraphics!: Phaser.GameObjects.Graphics; // Semi-transparent water overlay for sand tiles
@@ -92,7 +94,7 @@ export class GameScene extends Phaser.Scene {
     const centerY = (10 + 10) * (TILE_HEIGHT / 2); // = 320
     this.localPlayer = this.add.sprite(centerX, centerY, 'player');
     this.localPlayer.setOrigin(0.5, 0.8);
-    this.localPlayer.setDepth(1); // Render above ships
+    // Depth is set dynamically in update() based on Y position
 
     // Set up camera to follow player
     camera.startFollow(this.localPlayer, true, 0.1, 0.1);
@@ -183,10 +185,64 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Create "Tile Layer 2" if it exists
+    // Convert to individual sprites for per-tile depth sorting
     if (this.map.getLayer('Tile Layer 2')) {
       const layer2 = this.map.createLayer('Tile Layer 2', tileset, 0, 0);
       if (layer2) {
         this.secondLayer = layer2;
+
+        // Create individual sprites for each tile using render texture approach
+        for (let tileY = 0; tileY < this.map.height; tileY++) {
+          for (let tileX = 0; tileX < this.map.width; tileX++) {
+            const tile = layer2.getTileAt(tileX, tileY);
+            if (tile) {
+              const worldPos = this.map.tileToWorldXY(tileX, tileY);
+              if (worldPos) {
+                // Use Phaser's tile texture data directly
+                const tileTexture = tile.tileset?.image;
+                if (!tileTexture) continue;
+
+                // Get the tile's source position from Phaser's tileset
+                const tileData = tile.tileset?.getTileTextureCoordinates(tile.index) as { x: number; y: number } | null;
+                if (!tileData) continue;
+
+                // Create a unique frame for this tile
+                const frameName = `tile_layer2_${tileX}_${tileY}`;
+                const terrainTexture = this.textures.get('terrain');
+
+                if (!terrainTexture.has(frameName)) {
+                  // Extract tile with extra height for 3D appearance
+                  terrainTexture.add(
+                    frameName,
+                    0,
+                    tileData.x,
+                    tileData.y,
+                    TILE_WIDTH,
+                    TILE_VISUAL_HEIGHT
+                  );
+                }
+
+                // Create sprite at exact position where tilemap would render it
+                // Position at full visual height (32px) to align bottom with ground
+                const sprite = this.add.sprite(
+                  worldPos.x + TILE_WIDTH / 2,
+                  worldPos.y + TILE_VISUAL_HEIGHT,
+                  'terrain',
+                  frameName
+                );
+                sprite.setOrigin(0.5, 1); // Center-bottom origin
+
+                // Layer 2 renders above or below player dynamically
+                sprite.setDepth(10000);
+
+                this.secondLayerSprites.push(sprite);
+              }
+            }
+          }
+        }
+
+        // Hide original layer
+        layer2.setVisible(false);
       }
     }
 
@@ -371,7 +427,7 @@ export class GameScene extends Phaser.Scene {
       );
       sprite.setOrigin(0.5, 0.8);
       sprite.setTint(0xff0000); // Red for remote players
-      sprite.setDepth(1); // Render above ships
+      // Depth is set dynamically in update() based on Y position
 
       player = {
         id: update.participantId,
@@ -740,6 +796,24 @@ export class GameScene extends Phaser.Scene {
     // Animate water tiles (only those visible on screen)
     this.animateVisibleWaterTiles(time);
 
+    // Update player depth dynamically based on Y position
+    // Check if player is south of any Layer 2 tiles (should render on top)
+    const playerTilePos = this.map.worldToTileXY(this.localPlayer.x, this.localPlayer.y);
+    let renderAboveLayer2 = false;
+
+    if (playerTilePos && this.secondLayer) {
+      // Check tile one row north of player
+      const tileNorth = this.secondLayer.getTileAt(
+        Math.floor(playerTilePos.x),
+        Math.floor(playerTilePos.y) - 1
+      );
+      if (tileNorth) {
+        renderAboveLayer2 = true; // Player is south of a Layer 2 tile
+      }
+    }
+
+    this.localPlayer.setDepth(renderAboveLayer2 ? 20000 : 1000); // Above or below Layer 2
+
     // Handle local player movement (only if not controlling ship)
     const velocity = new Phaser.Math.Vector2(0, 0);
 
@@ -916,6 +990,22 @@ export class GameScene extends Phaser.Scene {
 
     // Interpolate remote players toward their target positions
     this.remotePlayers.forEach((player) => {
+      // Update depth dynamically - check if south of Layer 2 tiles
+      const remoteTilePos = this.map.worldToTileXY(player.sprite.x, player.sprite.y);
+      let remoteRenderAbove = false;
+
+      if (remoteTilePos && this.secondLayer) {
+        const tileNorth = this.secondLayer.getTileAt(
+          Math.floor(remoteTilePos.x),
+          Math.floor(remoteTilePos.y) - 1
+        );
+        if (tileNorth) {
+          remoteRenderAbove = true;
+        }
+      }
+
+      player.sprite.setDepth(remoteRenderAbove ? 20000 : 1000);
+
       const dx = player.targetPosition.x - player.sprite.x;
       const dy = player.targetPosition.y - player.sprite.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1094,8 +1184,11 @@ export class GameScene extends Phaser.Scene {
     speedModifier: number;
     terrain: string;
   } {
-    // Convert world coordinates to tile coordinates
-    const tilePos = this.map.worldToTileXY(worldX, worldY);
+    // Offset collision check northward (negative Y) to account for 3D tile height
+    // This prevents north-side penetration and allows south-side approach
+    // Players can get close from south (appear in front), but blocked earlier from north
+    const collisionOffsetY = -TILE_HEIGHT; // Check one full tile north
+    const tilePos = this.map.worldToTileXY(worldX, worldY + collisionOffsetY);
 
     if (!tilePos) {
       // Out of bounds
@@ -1133,7 +1226,6 @@ export class GameScene extends Phaser.Scene {
         // Default to blocking (false) if tile exists, unless explicitly set to walkable
         const walkable = tile.properties.walkable ?? false;
         if (!walkable) {
-          console.log(`Blocked at tile (${tileX}, ${tileY}), world (${worldX.toFixed(1)}, ${worldY.toFixed(1)})`);
           return {
             walkable: false,
             speedModifier: 0,
