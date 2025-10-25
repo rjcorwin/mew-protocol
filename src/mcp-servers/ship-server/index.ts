@@ -46,6 +46,16 @@ const shipConfig: ShipConfig = {
     x: 44, // Bow (front) - ship local coordinates, positive X when facing east
     y: 0, // Centered on ship's beam
   },
+  cannonPositions: {
+    port: [
+      { x: -10, y: -24 }, // Mid-ship port cannon
+      { x: 20, y: -24 },  // Forward port cannon
+    ],
+    starboard: [
+      { x: -10, y: 24 },  // Mid-ship starboard cannon
+      { x: 20, y: 24 },   // Forward starboard cannon
+    ],
+  },
   deckLength: 128, // Ship length (bow to stern) - extends along ship's local X-axis
   deckBeam: 48, // Ship beam (port to starboard) - extends along ship's local Y-axis
   speedValues: {
@@ -54,6 +64,8 @@ const shipConfig: ShipConfig = {
     2: 50, // Medium
     3: 75, // Fast
   },
+  maxHealth: 100,
+  cannonCooldownMs: 4000, // 4 seconds
 };
 
 // Create ship server

@@ -55,6 +55,21 @@ export interface ShipData {
       controlledBy: string | null;
     };
   };
+  // c5x-ship-combat: Cannon data
+  cannons?: {
+    port: Array<{
+      worldPosition: { x: number; y: number };
+      controlledBy: string | null;
+      aimAngle: number;
+      cooldownRemaining: number;
+    }>;
+    starboard: Array<{
+      worldPosition: { x: number; y: number };
+      controlledBy: string | null;
+      aimAngle: number;
+      cooldownRemaining: number;
+    }>;
+  };
 }
 
 /**
@@ -98,6 +113,23 @@ export interface Ship {
       relativePosition: { x: number; y: number }; // Position relative to ship center (center of ship)
       controlledBy: string | null; // Local-only, for camera zoom
     };
+  };
+  // c5x-ship-combat: Cannon control points
+  cannons?: {
+    port: Array<{
+      sprite: Phaser.GameObjects.Graphics;
+      relativePosition: { x: number; y: number };
+      controlledBy: string | null;
+      aimAngle: number;
+      cooldownRemaining: number;
+    }>;
+    starboard: Array<{
+      sprite: Phaser.GameObjects.Graphics;
+      relativePosition: { x: number; y: number };
+      controlledBy: string | null;
+      aimAngle: number;
+      cooldownRemaining: number;
+    }>;
   };
   speedLevel: number;
   deckBoundary: { width: number; height: number };

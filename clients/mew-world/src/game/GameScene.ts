@@ -29,6 +29,7 @@ export class GameScene extends Phaser.Scene {
   private ships: Map<string, Ship> = new Map();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private interactKey!: Phaser.Input.Keyboard.Key;
+  private spaceKey!: Phaser.Input.Keyboard.Key;
   private streamId: string | null = null;
   private lastPositionUpdate = 0;
   private lastFacing: Direction = 'south'; // Default facing direction
@@ -40,12 +41,14 @@ export class GameScene extends Phaser.Scene {
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
   private shallowWaterGraphics!: Phaser.GameObjects.Graphics; // Semi-transparent water overlay for sand tiles
   private controllingShip: string | null = null;
-  private controllingPoint: 'wheel' | 'sails' | 'mast' | null = null;
+  private controllingPoint: 'wheel' | 'sails' | 'mast' | 'cannon' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
   private shipRelativePosition: { x: number; y: number } | null = null; // Position relative to ship center
   private applyingShipRotation = false; // Flag to prevent overwriting rotated position
   private currentWheelDirection: 'left' | 'right' | null = null; // Track wheel turning state (w3l-wheel-steering)
-  private nearControlPoints: Set<string> = new Set(); // Track which control points player is near (format: "shipId:wheel" or "shipId:sails")
+  private controllingCannon: { side: 'port' | 'starboard', index: number } | null = null; // Track cannon control (c5x-ship-combat)
+  private currentCannonAim: number = 0; // Track cannon aim angle in radians (c5x-ship-combat)
+  private nearControlPoints: Set<string> = new Set(); // Track which control points player is near (format: "shipId:wheel" or "shipId:sails" or "shipId:cannon-port-0")
   private lastPlayerWaveOffset: number = 0; // Track last wave offset for smooth bobbing
 
   constructor() {
@@ -105,6 +108,7 @@ export class GameScene extends Phaser.Scene {
     // Set up keyboard input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     // Request stream for position updates
     this.requestPositionStream();
@@ -534,6 +538,29 @@ export class GameScene extends Phaser.Scene {
             controlledBy: null, // Client-side only, not synced
           },
         },
+        // c5x-ship-combat: Initialize cannons if present
+        cannons: update.shipData.cannons ? {
+          port: update.shipData.cannons.port.map((cannonData) => ({
+            sprite: this.add.graphics(),
+            relativePosition: {
+              x: cannonData.worldPosition.x - update.worldCoords.x,
+              y: cannonData.worldPosition.y - update.worldCoords.y,
+            },
+            controlledBy: cannonData.controlledBy,
+            aimAngle: cannonData.aimAngle,
+            cooldownRemaining: cannonData.cooldownRemaining,
+          })),
+          starboard: update.shipData.cannons.starboard.map((cannonData) => ({
+            sprite: this.add.graphics(),
+            relativePosition: {
+              x: cannonData.worldPosition.x - update.worldCoords.x,
+              y: cannonData.worldPosition.y - update.worldCoords.y,
+            },
+            controlledBy: cannonData.controlledBy,
+            aimAngle: cannonData.aimAngle,
+            cooldownRemaining: cannonData.cooldownRemaining,
+          })),
+        } : undefined,
         speedLevel: update.shipData.speedLevel,
         deckBoundary: update.shipData.deckBoundary,
         lastWaveOffset: 0, // Initialize wave offset tracking
@@ -556,6 +583,32 @@ export class GameScene extends Phaser.Scene {
       ship.speedLevel = update.shipData.speedLevel;
       ship.controlPoints.wheel.controlledBy = update.shipData.controlPoints.wheel.controlledBy;
       ship.controlPoints.sails.controlledBy = update.shipData.controlPoints.sails.controlledBy;
+
+      // c5x-ship-combat: Update cannon state
+      if (update.shipData.cannons && ship.cannons) {
+        ship.cannons.port.forEach((cannon, index) => {
+          if (update.shipData.cannons!.port[index]) {
+            const serverCannon = update.shipData.cannons!.port[index];
+            cannon.controlledBy = serverCannon.controlledBy;
+            cannon.aimAngle = serverCannon.aimAngle;
+            cannon.cooldownRemaining = serverCannon.cooldownRemaining;
+            if (serverCannon.cooldownRemaining > 0) {
+              console.log(`Port cannon ${index} cooldown update: ${serverCannon.cooldownRemaining}ms`);
+            }
+          }
+        });
+        ship.cannons.starboard.forEach((cannon, index) => {
+          if (update.shipData.cannons!.starboard[index]) {
+            const serverCannon = update.shipData.cannons!.starboard[index];
+            cannon.controlledBy = serverCannon.controlledBy;
+            cannon.aimAngle = serverCannon.aimAngle;
+            cannon.cooldownRemaining = serverCannon.cooldownRemaining;
+            if (serverCannon.cooldownRemaining > 0) {
+              console.log(`Starboard cannon ${index} cooldown update: ${serverCannon.cooldownRemaining}ms`);
+            }
+          }
+        });
+      }
 
       // Update ship sprite rotation
       ship.sprite.setRotation(update.shipData.rotation);
@@ -596,6 +649,26 @@ export class GameScene extends Phaser.Scene {
     this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`));
     this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`));
     this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast');
+
+    // c5x-ship-combat: Draw cannon control points
+    if (ship.cannons) {
+      ship.cannons.port.forEach((cannon, index) => {
+        const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-port-${index}`);
+        const isControlledByUs = this.controllingShip === ship.id &&
+                                  this.controllingPoint === 'cannon' &&
+                                  this.controllingCannon?.side === 'port' &&
+                                  this.controllingCannon?.index === index;
+        this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
+      });
+      ship.cannons.starboard.forEach((cannon, index) => {
+        const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
+        const isControlledByUs = this.controllingShip === ship.id &&
+                                  this.controllingPoint === 'cannon' &&
+                                  this.controllingCannon?.side === 'starboard' &&
+                                  this.controllingCannon?.index === index;
+        this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
+      });
+    }
   }
 
   private drawControlPoint(
@@ -633,6 +706,101 @@ export class GameScene extends Phaser.Scene {
     graphics.fillCircle(worldX, worldY, 8);
     graphics.lineStyle(2, 0xffffff, 1);
     graphics.strokeCircle(worldX, worldY, 8);
+  }
+
+  /**
+   * Draw cannon control point with aim arc (c5x-ship-combat)
+   */
+  private drawCannon(
+    graphics: Phaser.GameObjects.Graphics,
+    cannon: { relativePosition: { x: number; y: number }; controlledBy: string | null; aimAngle: number; cooldownRemaining: number },
+    shipSprite: Phaser.GameObjects.Sprite,
+    shipRotation: number,
+    isPlayerNear: boolean = false,
+    isControlledByUs: boolean = false
+  ) {
+    graphics.clear();
+
+    // Calculate cannon world position with isometric rotation
+    const rotatedPos = this.rotatePointIsometric(cannon.relativePosition, shipRotation);
+    const worldX = shipSprite.x + rotatedPos.x;
+    const worldY = shipSprite.y + rotatedPos.y;
+
+    // Determine cannon color based on state
+    let color: number;
+    let opacity: number;
+
+    if (isPlayerNear) {
+      color = 0xffff00; // Yellow if player is near
+      opacity = 0.8;
+    } else if (cannon.controlledBy) {
+      color = 0xff0000; // Red if controlled by someone
+      opacity = 0.5;
+    } else {
+      color = 0xff8800; // Orange for cannons (distinct from green controls)
+      opacity = 0.5;
+    }
+
+    // Draw cannon control point
+    graphics.fillStyle(color, opacity);
+    graphics.fillCircle(worldX, worldY, 8);
+    graphics.lineStyle(2, 0xffffff, 1);
+    graphics.strokeCircle(worldX, worldY, 8);
+
+    // If controlled by us, draw aim arc and aim line
+    if (isControlledByUs) {
+      const maxAim = Math.PI / 4; // ±45°
+      const aimLength = 60; // Length of aim indicator line
+
+      // Determine which side cannon is on (port = left, starboard = right)
+      // Port cannons aim to the left (negative Y in ship space)
+      // Starboard cannons aim to the right (positive Y in ship space)
+      const isPort = cannon.relativePosition.y < 0;
+      const perpendicularAngle = isPort ? shipRotation - Math.PI / 2 : shipRotation + Math.PI / 2;
+
+      // Draw aim arc (±45° from perpendicular)
+      graphics.lineStyle(2, 0x00ffff, 0.5); // Cyan arc
+      graphics.beginPath();
+      graphics.arc(
+        worldX,
+        worldY,
+        aimLength,
+        perpendicularAngle - maxAim,
+        perpendicularAngle + maxAim,
+        false
+      );
+      graphics.strokePath();
+
+      // Draw current aim line (use local aim for immediate feedback if we're controlling)
+      const aimAngle = isControlledByUs ? this.currentCannonAim : cannon.aimAngle;
+      const currentAimAngle = perpendicularAngle + aimAngle;
+      const aimEndX = worldX + Math.cos(currentAimAngle) * aimLength;
+      const aimEndY = worldY + Math.sin(currentAimAngle) * aimLength;
+
+      graphics.lineStyle(3, 0xff00ff, 1); // Bright magenta aim line
+      graphics.beginPath();
+      graphics.moveTo(worldX, worldY);
+      graphics.lineTo(aimEndX, aimEndY);
+      graphics.strokePath();
+
+      // Draw crosshair at end of aim line
+      const crosshairSize = 8;
+      graphics.lineStyle(2, 0xff00ff, 1);
+      graphics.beginPath();
+      graphics.moveTo(aimEndX - crosshairSize, aimEndY);
+      graphics.lineTo(aimEndX + crosshairSize, aimEndY);
+      graphics.moveTo(aimEndX, aimEndY - crosshairSize);
+      graphics.lineTo(aimEndX, aimEndY + crosshairSize);
+      graphics.strokePath();
+    }
+
+    // Draw cooldown indicator if reloading
+    if (cannon.cooldownRemaining > 0) {
+      const cooldownProgress = cannon.cooldownRemaining / 4000; // Assume 4s cooldown
+      console.log(`Drawing cooldown: ${cannon.cooldownRemaining}ms remaining (${(cooldownProgress * 100).toFixed(0)}%)`);
+      graphics.fillStyle(0x888888, 0.7);
+      graphics.fillCircle(worldX, worldY, 12 * cooldownProgress);
+    }
   }
 
   private drawShipBoundary(
@@ -976,6 +1144,26 @@ export class GameScene extends Phaser.Scene {
       this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`));
       this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`));
       this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast');
+
+      // c5x-ship-combat: Draw cannon control points
+      if (ship.cannons) {
+        ship.cannons.port.forEach((cannon, index) => {
+          const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-port-${index}`);
+          const isControlledByUs = this.controllingShip === ship.id &&
+                                    this.controllingPoint === 'cannon' &&
+                                    this.controllingCannon?.side === 'port' &&
+                                    this.controllingCannon?.index === index;
+          this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
+        });
+        ship.cannons.starboard.forEach((cannon, index) => {
+          const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
+          const isControlledByUs = this.controllingShip === ship.id &&
+                                    this.controllingPoint === 'cannon' &&
+                                    this.controllingCannon?.side === 'starboard' &&
+                                    this.controllingCannon?.index === index;
+          this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
+        });
+      }
     });
 
     // Clear the rotation flag after all ships are processed
@@ -1293,7 +1481,9 @@ export class GameScene extends Phaser.Scene {
     const INTERACTION_DISTANCE = 30; // pixels
     let nearestControlPoint: {
       shipId: string;
-      controlPoint: 'wheel' | 'sails' | 'mast';
+      controlPoint: 'wheel' | 'sails' | 'mast' | 'cannon';
+      cannonSide?: 'port' | 'starboard';
+      cannonIndex?: number;
       distance: number;
     } | null = null;
 
@@ -1372,6 +1562,69 @@ export class GameScene extends Phaser.Scene {
           }
         }
       }
+
+      // Check cannons (c5x-ship-combat)
+      if (ship.cannons) {
+        // Check port cannons
+        ship.cannons.port.forEach((cannon, index) => {
+          const rotatedCannonPos = this.rotatePointIsometric(cannon.relativePosition, ship.rotation);
+          const cannonWorldX = ship.sprite.x + rotatedCannonPos.x;
+          const cannonWorldY = ship.sprite.y + rotatedCannonPos.y;
+          const cannonDx = cannonWorldX - this.localPlayer.x;
+          const cannonDy = cannonWorldY - this.localPlayer.y;
+          const cannonDistance = Math.sqrt(cannonDx * cannonDx + cannonDy * cannonDy);
+
+          if (cannonDistance < INTERACTION_DISTANCE) {
+            const isControlledByUs = this.controllingShip === ship.id &&
+                                      this.controllingPoint === 'cannon' &&
+                                      this.controllingCannon?.side === 'port' &&
+                                      this.controllingCannon?.index === index;
+            const isControlledByOther = cannon.controlledBy && cannon.controlledBy !== this.playerId;
+
+            if (isControlledByUs || !isControlledByOther) {
+              if (!nearestControlPoint || cannonDistance < nearestControlPoint.distance) {
+                nearestControlPoint = {
+                  shipId: ship.id,
+                  controlPoint: 'cannon',
+                  cannonSide: 'port',
+                  cannonIndex: index,
+                  distance: cannonDistance,
+                };
+              }
+            }
+          }
+        });
+
+        // Check starboard cannons
+        ship.cannons.starboard.forEach((cannon, index) => {
+          const rotatedCannonPos = this.rotatePointIsometric(cannon.relativePosition, ship.rotation);
+          const cannonWorldX = ship.sprite.x + rotatedCannonPos.x;
+          const cannonWorldY = ship.sprite.y + rotatedCannonPos.y;
+          const cannonDx = cannonWorldX - this.localPlayer.x;
+          const cannonDy = cannonWorldY - this.localPlayer.y;
+          const cannonDistance = Math.sqrt(cannonDx * cannonDx + cannonDy * cannonDy);
+
+          if (cannonDistance < INTERACTION_DISTANCE) {
+            const isControlledByUs = this.controllingShip === ship.id &&
+                                      this.controllingPoint === 'cannon' &&
+                                      this.controllingCannon?.side === 'starboard' &&
+                                      this.controllingCannon?.index === index;
+            const isControlledByOther = cannon.controlledBy && cannon.controlledBy !== this.playerId;
+
+            if (isControlledByUs || !isControlledByOther) {
+              if (!nearestControlPoint || cannonDistance < nearestControlPoint.distance) {
+                nearestControlPoint = {
+                  shipId: ship.id,
+                  controlPoint: 'cannon',
+                  cannonSide: 'starboard',
+                  cannonIndex: index,
+                  distance: cannonDistance,
+                };
+              }
+            }
+          }
+        });
+      }
     });
 
     // Only add the nearest control point to the yellow indicator set (if not controlled)
@@ -1395,7 +1648,19 @@ export class GameScene extends Phaser.Scene {
         this.sendReleaseControl();
       } else if (nearestControlPoint) {
         // Grab nearest control point (only if within range)
-        this.sendGrabControl(nearestControlPoint.shipId, nearestControlPoint.controlPoint);
+        if (nearestControlPoint.controlPoint === 'cannon' &&
+            nearestControlPoint.cannonSide !== undefined &&
+            nearestControlPoint.cannonIndex !== undefined) {
+          // Grab cannon
+          this.sendGrabCannon(
+            nearestControlPoint.shipId,
+            nearestControlPoint.cannonSide,
+            nearestControlPoint.cannonIndex
+          );
+        } else {
+          // Grab wheel, sails, or mast
+          this.sendGrabControl(nearestControlPoint.shipId, nearestControlPoint.controlPoint as 'wheel' | 'sails' | 'mast');
+        }
       }
     }
 
@@ -1427,6 +1692,39 @@ export class GameScene extends Phaser.Scene {
         }
         if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
           this.sendAdjustSails(this.controllingShip, 'down');
+        }
+      } else if (this.controllingPoint === 'cannon' && this.controllingCannon) {
+        // c5x-ship-combat: Left/right arrows to aim cannon
+        const aimSpeed = 0.02; // radians per frame (about 1.15 degrees)
+        const maxAim = Math.PI / 4; // ±45°
+        let aimChanged = false;
+
+        if (this.cursors.left?.isDown) {
+          this.currentCannonAim = Math.max(-maxAim, this.currentCannonAim - aimSpeed);
+          aimChanged = true;
+        } else if (this.cursors.right?.isDown) {
+          this.currentCannonAim = Math.min(maxAim, this.currentCannonAim + aimSpeed);
+          aimChanged = true;
+        }
+
+        // Send aim update to server if changed
+        if (aimChanged) {
+          console.log(`Aiming cannon: ${(this.currentCannonAim * 180 / Math.PI).toFixed(1)}°`);
+          this.sendAimCannon(
+            this.controllingShip,
+            this.controllingCannon.side,
+            this.controllingCannon.index,
+            this.currentCannonAim
+          );
+        }
+
+        // Space bar to fire cannon
+        if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+          this.sendFireCannon(
+            this.controllingShip,
+            this.controllingCannon.side,
+            this.controllingCannon.index
+          );
         }
       }
     }
@@ -1464,27 +1762,35 @@ export class GameScene extends Phaser.Scene {
   private sendReleaseControl() {
     if (!this.controllingShip || !this.controllingPoint) return;
 
-    // Mast is client-side only, don't send to ship server
-    if (this.controllingPoint !== 'mast') {
-      this.client.send({
-        kind: 'ship/release_control',
-        to: [this.controllingShip],
-        payload: {
-          controlPoint: this.controllingPoint,
-          playerId: this.playerId,
-        },
-      });
+    // Handle cannon release separately (c5x-ship-combat)
+    if (this.controllingPoint === 'cannon' && this.controllingCannon) {
+      this.sendReleaseCannon(
+        this.controllingShip,
+        this.controllingCannon.side,
+        this.controllingCannon.index
+      );
+      this.controllingCannon = null;
+      this.currentCannonAim = 0;
     }
-
-    // If releasing mast, zoom camera back to normal
-    if (this.controllingPoint === 'mast') {
+    // Mast is client-side only, don't send to ship server
+    else if (this.controllingPoint === 'mast') {
       const ship = this.ships.get(this.controllingShip);
       if (ship) {
         ship.controlPoints.mast.controlledBy = null;
       }
       this.cameras.main.zoomTo(1.5, 500); // Zoom back to 1.5x over 500ms
       console.log(`Climbed down mast - zooming back to normal view`);
-    } else {
+    }
+    // Wheel or sails
+    else {
+      this.client.send({
+        kind: 'ship/release_control',
+        to: [this.controllingShip],
+        payload: {
+          controlPoint: this.controllingPoint as 'wheel' | 'sails',
+          playerId: this.playerId,
+        },
+      });
       console.log(`Released ${this.controllingPoint} on ship ${this.controllingShip}`);
     }
 
@@ -1549,5 +1855,68 @@ export class GameScene extends Phaser.Scene {
     });
 
     console.log(`Adjusting sails ${adjustment}`);
+  }
+
+  /**
+   * Cannon control methods (c5x-ship-combat)
+   */
+  private sendGrabCannon(shipId: string, side: 'port' | 'starboard', index: number) {
+    this.client.send({
+      kind: 'ship/grab_cannon',
+      to: [shipId],
+      payload: {
+        side,
+        index,
+        playerId: this.playerId,
+      },
+    });
+
+    this.controllingShip = shipId;
+    this.controllingPoint = 'cannon';
+    this.controllingCannon = { side, index };
+    this.currentCannonAim = 0; // Reset aim when grabbing
+
+    console.log(`Grabbed ${side} cannon ${index} on ship ${shipId}`);
+  }
+
+  private sendReleaseCannon(shipId: string, side: 'port' | 'starboard', index: number) {
+    this.client.send({
+      kind: 'ship/release_cannon',
+      to: [shipId],
+      payload: {
+        side,
+        index,
+        playerId: this.playerId,
+      },
+    });
+
+    console.log(`Released ${side} cannon ${index}`);
+  }
+
+  private sendAimCannon(shipId: string, side: 'port' | 'starboard', index: number, aimAngle: number) {
+    this.client.send({
+      kind: 'ship/aim_cannon',
+      to: [shipId],
+      payload: {
+        side,
+        index,
+        aimAngle,
+        playerId: this.playerId,
+      },
+    });
+  }
+
+  private sendFireCannon(shipId: string, side: 'port' | 'starboard', index: number) {
+    this.client.send({
+      kind: 'ship/fire_cannon',
+      to: [shipId],
+      payload: {
+        side,
+        index,
+        playerId: this.playerId,
+      },
+    });
+
+    console.log(`Fired ${side} cannon ${index}!`);
   }
 }

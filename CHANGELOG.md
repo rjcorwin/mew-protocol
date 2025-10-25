@@ -6,6 +6,41 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ### MEW World
 
+#### Proposed: Ship-to-Ship Combat (c5x-ship-combat)
+**Status:** Implementation Started 🚧 (Phase 1 in progress)
+**Proposal:** `spec/mew-world/proposals/c5x-ship-combat/`
+
+Add cannon-based ship combat for multiplayer PvP and cooperative multi-crew gameplay.
+
+**Proposed Features:**
+- 🎯 Cannon control points (port/starboard sides)
+- 🎯 Manual aiming system (±45° arc adjustment)
+- 🎯 Physics-based projectiles (gravity, momentum inheritance)
+- 🎯 Damage/health system (100 HP, sinking at 0)
+- 🎯 Client prediction with server validation
+- 🎯 Visual/audio effects (blasts, splashes, impacts, smoke)
+- 🎯 Multi-crew coordination required
+
+**Implementation Plan:**
+- Phase 1: Control points & aiming (Week 1)
+- Phase 2: Firing & projectiles (Week 1)
+- Phase 3: Collision & damage (Week 2)
+- Phase 4: Sinking & respawn (Week 2)
+- Phase 5: Polish & sounds (Week 3)
+
+**New Protocol Messages:**
+- `ship/aim_cannon` - Adjust cannon aim angle
+- `ship/fire_cannon` - Fire cannonball
+- `game/projectile_spawn` - Broadcast projectile creation
+- `game/projectile_hit` - Client hit claim
+- `ship/damage` - Damage notification
+- `ship/respawn` - Ship respawn after sinking
+
+**Open Questions:**
+- Friendly fire enabled?
+- Respawn location strategy?
+- Speed penalty for damaged ships?
+
 #### Implemented: Tiled Map Integration (t4m)
 **Status:** Complete ✅
 **Proposal:** `spec/mew-world/proposals/t4m-tiled-maps/`

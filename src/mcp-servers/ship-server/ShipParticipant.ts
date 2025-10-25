@@ -15,6 +15,10 @@ import {
   WheelTurnStopPayload,
   AdjustSailsPayload,
   MapDataPayload,
+  GrabCannonPayload,
+  ReleaseCannonPayload,
+  AimCannonPayload,
+  FireCannonPayload,
 } from './types.js';
 
 export interface ShipParticipantConfig {
@@ -61,7 +65,10 @@ export class ShipParticipant {
         return;
       }
 
-      console.log(`Ship received message:`, envelope);
+      // Only log non-position messages to reduce noise
+      if (envelope.kind !== 'game/position') {
+        console.log(`[ShipParticipant] Ship received message:`, envelope);
+      }
 
       // Handle different message kinds
       switch (envelope.kind) {
@@ -91,6 +98,26 @@ export class ShipParticipant {
 
         case 'ship/adjust_sails':
           this.handleAdjustSails(envelope.payload as AdjustSailsPayload);
+          break;
+
+        case 'ship/grab_cannon':
+          this.handleGrabCannon(envelope.payload as GrabCannonPayload);
+          break;
+
+        case 'ship/release_cannon':
+          this.handleReleaseCannon(envelope.payload as ReleaseCannonPayload);
+          break;
+
+        case 'ship/aim_cannon':
+          this.handleAimCannon(envelope.payload as AimCannonPayload);
+          break;
+
+        case 'ship/fire_cannon':
+          this.handleFireCannon(envelope.payload as FireCannonPayload);
+          break;
+
+        case 'game/position':
+          // Ignore position updates from players (we only care about ship control messages)
           break;
 
         default:
@@ -137,6 +164,31 @@ export class ShipParticipant {
   private handleAdjustSails(payload: AdjustSailsPayload) {
     this.server.adjustSails(payload.playerId, payload.adjustment);
     // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleGrabCannon(payload: GrabCannonPayload) {
+    this.server.grabCannon(payload.playerId, payload.side, payload.index);
+    // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleReleaseCannon(payload: ReleaseCannonPayload) {
+    this.server.releaseCannon(payload.playerId, payload.side, payload.index);
+    // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleAimCannon(payload: AimCannonPayload) {
+    this.server.aimCannon(payload.playerId, payload.side, payload.index, payload.aimAngle);
+    // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
+  private handleFireCannon(payload: FireCannonPayload) {
+    console.log(`[ShipParticipant] Received fire_cannon message:`, payload);
+    this.server.fireCannon(payload.playerId, payload.side, payload.index);
+    // Broadcast updated state (includes new projectile if fired)
     this.broadcastPosition();
   }
 
@@ -214,6 +266,27 @@ export class ShipParticipant {
             },
             controlledBy: state.controlPoints.sails.controlledBy,
           },
+        },
+        // Cannon state (c5x-ship-combat)
+        cannons: {
+          port: state.cannons.port.map(cannon => ({
+            worldPosition: {
+              x: state.position.x + cannon.relativePosition.x,
+              y: state.position.y + cannon.relativePosition.y,
+            },
+            controlledBy: cannon.controlledBy,
+            aimAngle: cannon.aimAngle,
+            cooldownRemaining: cannon.cooldownRemaining,
+          })),
+          starboard: state.cannons.starboard.map(cannon => ({
+            worldPosition: {
+              x: state.position.x + cannon.relativePosition.x,
+              y: state.position.y + cannon.relativePosition.y,
+            },
+            controlledBy: cannon.controlledBy,
+            aimAngle: cannon.aimAngle,
+            cooldownRemaining: cannon.cooldownRemaining,
+          })),
         },
       },
     };

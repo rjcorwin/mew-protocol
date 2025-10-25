@@ -47,6 +47,20 @@ export interface ControlPoint {
 }
 
 /**
+ * Cannon control point with aiming
+ */
+export interface CannonControlPoint {
+  type: 'cannon';
+  side: 'port' | 'starboard';
+  index: number; // 0, 1, etc for multiple cannons per side
+  relativePosition: Position; // Offset from ship origin
+  controlledBy: string | null; // Player controlling this cannon
+  aimAngle: number; // Aim angle in radians, relative to perpendicular (±π/4)
+  cooldownRemaining: number; // ms until can fire again
+  lastFired: number; // Timestamp of last fire
+}
+
+/**
  * Complete ship state
  */
 export interface ShipState {
@@ -61,6 +75,10 @@ export interface ShipState {
     wheel: ControlPoint;
     sails: ControlPoint;
   };
+  cannons: {
+    port: CannonControlPoint[];
+    starboard: CannonControlPoint[];
+  };
   deckBoundary: {
     // Rectangular boundary for ship deck (relative coords)
     width: number;
@@ -70,6 +88,10 @@ export interface ShipState {
   wheelAngle: number; // Current wheel angle in radians (-PI to PI, 0 = centered)
   turnRate: number; // Current rotation rate in radians/second
   wheelTurningDirection: 'left' | 'right' | null; // Active player input direction
+  // Combat state (c5x-ship-combat)
+  health: number; // Current health (0-maxHealth)
+  maxHealth: number; // Maximum health
+  sinking: boolean; // true if health <= 0
 }
 
 /**
@@ -81,6 +103,10 @@ export interface ShipConfig {
   initialHeading: ShipHeading;
   wheelPosition: Position; // Relative to ship origin
   sailsPosition: Position; // Relative to ship origin
+  cannonPositions: {
+    port: Position[]; // Array of cannon positions on port side
+    starboard: Position[]; // Array of cannon positions on starboard side
+  };
   deckLength: number; // Ship length (bow to stern) in pixels
   deckBeam: number;   // Ship beam (port to starboard) in pixels
   speedValues: {
@@ -90,6 +116,9 @@ export interface ShipConfig {
     2: number;
     3: number;
   };
+  // Combat config (c5x-ship-combat)
+  maxHealth: number; // Starting health
+  cannonCooldownMs: number; // Reload time in milliseconds
 }
 
 /**
@@ -122,6 +151,34 @@ export interface WheelTurnStopPayload {
 
 export interface AdjustSailsPayload {
   adjustment: 'up' | 'down';
+  playerId: string;
+}
+
+/**
+ * Cannon control payloads (c5x-ship-combat)
+ */
+export interface GrabCannonPayload {
+  side: 'port' | 'starboard';
+  index: number;
+  playerId: string;
+}
+
+export interface ReleaseCannonPayload {
+  side: 'port' | 'starboard';
+  index: number;
+  playerId: string;
+}
+
+export interface AimCannonPayload {
+  side: 'port' | 'starboard';
+  index: number;
+  aimAngle: number; // Radians, will be clamped to ±π/4
+  playerId: string;
+}
+
+export interface FireCannonPayload {
+  side: 'port' | 'starboard';
+  index: number;
   playerId: string;
 }
 

@@ -81,6 +81,28 @@ export class ShipServer {
           controlledBy: null,
         },
       },
+      cannons: {
+        port: config.cannonPositions.port.map((pos, index) => ({
+          type: 'cannon' as const,
+          side: 'port' as const,
+          index,
+          relativePosition: { ...pos },
+          controlledBy: null,
+          aimAngle: 0, // Perpendicular to ship
+          cooldownRemaining: 0,
+          lastFired: 0,
+        })),
+        starboard: config.cannonPositions.starboard.map((pos, index) => ({
+          type: 'cannon' as const,
+          side: 'starboard' as const,
+          index,
+          relativePosition: { ...pos },
+          controlledBy: null,
+          aimAngle: 0, // Perpendicular to ship
+          cooldownRemaining: 0,
+          lastFired: 0,
+        })),
+      },
       deckBoundary: {
         width: config.deckLength,   // Length (bow to stern) maps to width in local coords
         height: config.deckBeam,    // Beam (port to starboard) maps to height in local coords
@@ -89,6 +111,10 @@ export class ShipServer {
       wheelAngle: 0, // Start centered (straight ahead)
       turnRate: 0, // Not turning initially
       wheelTurningDirection: null, // No input
+      // Combat state (c5x-ship-combat)
+      health: config.maxHealth,
+      maxHealth: config.maxHealth,
+      sinking: false,
     };
     this.lastRotation = initialRotation; // Initialize lastRotation to match
   }
@@ -287,6 +313,16 @@ export class ShipServer {
     // Update wheel and ship rotation (w3l-wheel-steering)
     this.updateWheelPhysics(deltaTime);
 
+    // Update cannon cooldowns (c5x-ship-combat)
+    const deltaMs = deltaTime * 1000;
+    for (const cannons of [this.state.cannons.port, this.state.cannons.starboard]) {
+      for (const cannon of cannons) {
+        if (cannon.cooldownRemaining > 0) {
+          cannon.cooldownRemaining = Math.max(0, cannon.cooldownRemaining - deltaMs);
+        }
+      }
+    }
+
     // Update velocity to match current rotation angle (not discrete heading)
     if (this.state.speedLevel > 0) {
       const speed = this.config.speedValues[this.state.speedLevel];
@@ -459,5 +495,122 @@ export class ShipServer {
     const newSpeed = Math.max(0, Math.min(3, this.state.speedLevel + delta)) as SpeedLevel;
 
     this.setSpeed(newSpeed);
+  }
+
+  /**
+   * Cannon control methods (c5x-ship-combat)
+   */
+
+  public grabCannon(playerId: string, side: 'port' | 'starboard', index: number) {
+    const cannons = this.state.cannons[side];
+    if (index < 0 || index >= cannons.length) {
+      console.error(`Invalid cannon index: ${side} ${index}`);
+      return;
+    }
+
+    const cannon = cannons[index];
+
+    // Check if already controlled
+    if (cannon.controlledBy) {
+      console.error(`Cannon ${side} ${index} already controlled by ${cannon.controlledBy}`);
+      return;
+    }
+
+    // Release any other control point this player has
+    this.releaseControlByPlayer(playerId);
+
+    cannon.controlledBy = playerId;
+    console.log(`Player ${playerId} grabbed cannon ${side} ${index}`);
+  }
+
+  public releaseCannon(playerId: string, side: 'port' | 'starboard', index: number) {
+    const cannons = this.state.cannons[side];
+    if (index < 0 || index >= cannons.length) {
+      console.error(`Invalid cannon index: ${side} ${index}`);
+      return;
+    }
+
+    const cannon = cannons[index];
+
+    if (cannon.controlledBy !== playerId) {
+      console.error(`Player ${playerId} does not control cannon ${side} ${index}`);
+      return;
+    }
+
+    cannon.controlledBy = null;
+    console.log(`Player ${playerId} released cannon ${side} ${index}`);
+  }
+
+  public aimCannon(playerId: string, side: 'port' | 'starboard', index: number, aimAngle: number) {
+    const cannons = this.state.cannons[side];
+    if (index < 0 || index >= cannons.length) {
+      console.error(`Invalid cannon index: ${side} ${index}`);
+      return;
+    }
+
+    const cannon = cannons[index];
+
+    if (cannon.controlledBy !== playerId) {
+      console.error(`Player ${playerId} cannot aim cannon ${side} ${index} - not controlling`);
+      return;
+    }
+
+    // Clamp aim angle to ±45°
+    const maxAim = Math.PI / 4;
+    cannon.aimAngle = Math.max(-maxAim, Math.min(maxAim, aimAngle));
+
+    console.log(`Player ${playerId} aimed cannon ${side} ${index} to ${(cannon.aimAngle * 180 / Math.PI).toFixed(1)}°`);
+  }
+
+  public fireCannon(playerId: string, side: 'port' | 'starboard', index: number) {
+    const cannons = this.state.cannons[side];
+    if (index < 0 || index >= cannons.length) {
+      console.error(`Invalid cannon index: ${side} ${index}`);
+      return;
+    }
+
+    const cannon = cannons[index];
+
+    if (cannon.controlledBy !== playerId) {
+      console.error(`Player ${playerId} cannot fire cannon ${side} ${index} - not controlling`);
+      return;
+    }
+
+    // Check cooldown
+    const now = Date.now();
+    if (cannon.cooldownRemaining > 0) {
+      console.error(`Cannon ${side} ${index} on cooldown (${cannon.cooldownRemaining}ms remaining)`);
+      return;
+    }
+
+    // Fire the cannon!
+    cannon.lastFired = now;
+    cannon.cooldownRemaining = this.config.cannonCooldownMs;
+
+    console.log(`Player ${playerId} fired cannon ${side} ${index}!`);
+    console.log(`  Cooldown set to: ${cannon.cooldownRemaining}ms`);
+    console.log(`  Will broadcast in next position update`);
+    // TODO: Broadcast projectile spawn event (Phase 2)
+  }
+
+  private releaseControlByPlayer(playerId: string) {
+    // Release wheel if controlled
+    if (this.state.controlPoints.wheel.controlledBy === playerId) {
+      this.state.controlPoints.wheel.controlledBy = null;
+    }
+
+    // Release sails if controlled
+    if (this.state.controlPoints.sails.controlledBy === playerId) {
+      this.state.controlPoints.sails.controlledBy = null;
+    }
+
+    // Release any cannons
+    for (const cannons of [this.state.cannons.port, this.state.cannons.starboard]) {
+      for (const cannon of cannons) {
+        if (cannon.controlledBy === playerId) {
+          cannon.controlledBy = null;
+        }
+      }
+    }
   }
 }
