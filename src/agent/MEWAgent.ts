@@ -792,7 +792,11 @@ Return a JSON object:
         return 'Reasoning cancelled.';
       }
 
-      // Reason phase
+      //
+      //
+      // 🧠 Reason phase
+      //
+      //
       const thought = await this.reason(input, thoughts);
 
       // Generate tool call ID if not provided (for non-native format)
@@ -814,7 +818,11 @@ Return a JSON object:
       this.recordContextUsage({ tokens: this.estimateTokens(`[Reasoning] ${thought.reasoning}`), messages: 1 });
       this.ensureContextHeadroom();
 
-      // Act phase
+      //
+      //
+      // 🤖 Act phase
+      //
+      //
       if (thought.action === 'cancelled') {
         // Reasoning was cancelled during stream
         await this.emitReasoning('reasoning/conclusion', { cancelled: true, reason: thought.actionInput?.reason || 'cancelled by user' });
@@ -824,6 +832,7 @@ Return a JSON object:
       }
 
       if (thought.action === 'respond') {
+        // action input is a string containing the final response text
         return thought.actionInput;
       }
 
@@ -913,6 +922,7 @@ Return a JSON object:
     };
 
     if (tools.length > 0) {
+      // @TODO I'm so confused how the respond/cancel/tool part gets figured out.
       params.tools = this.convertToOpenAITools(tools);
       params.tool_choice = 'auto';
     }
@@ -1255,6 +1265,7 @@ Return a JSON object:
         });
 
         // Also add to conversation history for persistence
+        // @TODO Is this a bad place to do this? Maybe we should do this in the handleChat() method?
         this.conversationHistory.push({
           role: 'user',
           content: queued.payload.text,
