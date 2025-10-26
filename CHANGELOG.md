@@ -7,8 +7,9 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 ### MEW World
 
 #### Proposed: Ship-to-Ship Combat (c5x-ship-combat)
-**Status:** Implementation Started 🚧 (Phase 1 in progress)
+**Status:** Implementation In Progress 🚧 (Phase 1 ✅ COMPLETE, Phase 2 next)
 **Proposal:** `spec/mew-world/proposals/c5x-ship-combat/`
+**Implementation Plan:** `spec/integration-plans/c5x-ship-combat.md`
 
 Add cannon-based ship combat for multiplayer PvP and cooperative multi-crew gameplay.
 
@@ -21,12 +22,24 @@ Add cannon-based ship combat for multiplayer PvP and cooperative multi-crew game
 - 🎯 Visual/audio effects (blasts, splashes, impacts, smoke)
 - 🎯 Multi-crew coordination required
 
-**Implementation Plan:**
-- Phase 1: Control points & aiming (Week 1)
-- Phase 2: Firing & projectiles (Week 1)
-- Phase 3: Collision & damage (Week 2)
-- Phase 4: Sinking & respawn (Week 2)
-- Phase 5: Polish & sounds (Week 3)
+**Implementation Progress:**
+- Phase 1 (Control points & aiming): ✅ COMPLETE
+  - ✅ Ship server initialization (2 port, 2 starboard cannons)
+  - ✅ Cannon config with 4s cooldown
+  - ✅ Grab/release implementation (server + client)
+  - ✅ Aim system (±45° clamping, isometric rotation)
+  - ✅ Fire method (cooldown enforcement)
+  - ✅ Client interaction detection (30px proximity)
+  - ✅ Input handling (E key grab/release, arrows aim, space fire)
+  - ✅ Visual rendering (orange/yellow/red circles)
+  - ✅ Aim arc visualization (cyan arc, magenta aim line, crosshair)
+  - ✅ Cooldown indicator (gray shrinking circle)
+  - ✅ Message handlers (all 4 cannon messages implemented)
+- Phase 2 (Firing & projectiles): 🔲 Not started
+  - Next: Projectile spawn on fire, physics simulation, trail effects
+- Phase 3 (Collision & damage): 🔲 Not started
+- Phase 4 (Sinking & respawn): 🔲 Not started
+- Phase 5 (Polish & sounds): 🔲 Not started
 
 **New Protocol Messages:**
 - `ship/aim_cannon` - Adjust cannon aim angle
