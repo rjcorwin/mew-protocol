@@ -61,12 +61,40 @@ mcp
   });
 
 mcp
+  .command('ship-server')
+  .description('Run MCP ship server for MEW World game')
+  .action(async () => {
+    // __dirname is dist/cli/commands, ship-server is at dist/mcp-servers/ship-server/
+    const serverPath = resolve(__dirname, '../../mcp-servers/ship-server/index.js');
+
+    const child = spawn('node', [serverPath], {
+      stdio: 'inherit',
+      cwd: process.cwd(),
+      env: process.env  // Pass through all env vars (SHIP_ID, GATEWAY_URL, etc.)
+    });
+
+    child.on('exit', (code) => {
+      process.exit(code || 0);
+    });
+
+    // Handle termination signals
+    process.on('SIGINT', () => {
+      child.kill('SIGINT');
+    });
+
+    process.on('SIGTERM', () => {
+      child.kill('SIGTERM');
+    });
+  });
+
+mcp
   .command('list')
   .description('List available MCP servers')
   .action(() => {
     console.log('\nAvailable MCP servers:\n');
     console.log('  filesystem <path>  - Filesystem MCP server for file operations');
     console.log('  cat-maze           - Interactive maze game for AI agents');
+    console.log('  ship-server        - Ship entity server for MEW World game');
     console.log('');
   });
 

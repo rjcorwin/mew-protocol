@@ -30,13 +30,11 @@ participants:
   # Ship 1 - Interactive sailing vessel
   ship1:
     type: local
-    command: "node"
+    command: "mew"
     args:
-      [
-        "/Users/rjcorwin/Github/rjcorwin/mew-protocol/dist/mcp-servers/ship-server/index.js",
-      ]
+      - "mcp"
+      - "ship-server"
     auto_start: true
-    cwd: "/Users/rjcorwin/Github/rjcorwin/mew-protocol"
     capabilities:
       - kind: "*" # Full capabilities (ship is trusted local participant)
     env:
