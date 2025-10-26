@@ -1,9 +1,45 @@
 # Implementation Plan: c5x-ship-combat (Ship-to-Ship Combat)
 
 **Proposal:** `spec/mew-world/proposals/c5x-ship-combat/`
-**Status:** Phase 1 - In Progress 🚧
+**Status:** Phase 1 ✅ COMPLETE, Phase 2 next
 **Started:** 2025-01-24
 **Target Completion:** 3 weeks from start
+
+---
+
+## 🚀 Quick Start for Phase 2 (New Contributors)
+
+**What's Already Working (Phase 1):**
+- ✅ Players can walk to ship cannons and grab them (E key)
+- ✅ Aim cannons left/right with arrow keys (±45° arc)
+- ✅ Fire cannons with space bar (4-second cooldown enforced)
+- ✅ Visual feedback: aim arc (cyan), aim line (magenta), cooldown indicator (gray circle)
+
+**What You're Building (Phase 2):**
+Get cannonballs flying through the air with realistic physics after firing.
+
+**Where to Start:**
+1. **Read the proposal:** `spec/mew-world/proposals/c5x-ship-combat/proposal.md` (understand the vision)
+2. **Test Phase 1:** Run mew-world client, grab cannon, aim, fire → see cooldown indicator
+3. **Find the TODO:** `src/mcp-servers/ship-server/ShipServer.ts:593` says "TODO: Broadcast projectile spawn event"
+4. **Follow Phase 2a below:** Start with server-side projectile spawning
+
+**Key Files You'll Modify:**
+- Server: `src/mcp-servers/ship-server/ShipServer.ts` (add spawn calculation in `fireCannon()`)
+- Server: `src/mcp-servers/ship-server/ShipParticipant.ts` (broadcast spawn message)
+- Server: `src/mcp-servers/ship-server/types.ts` (add Projectile type)
+- Client: `clients/mew-world/src/game/GameScene.ts` (render projectiles, physics simulation)
+- Client: `clients/mew-world/src/types.ts` (add Projectile interface)
+
+**Phase 2 Success = Fire cannon → see black cannonball fly in parabolic arc → despawn after 2s**
+
+**Important Gotchas:**
+- Ships use **isometric rotation** - client has `rotatePointIsometric()`, server needs same function
+- Projectiles must **inherit ship velocity** (moving platform physics)
+- Constants must **match exactly** between server/client (gravity, speed) for deterministic physics
+- Fire from **moving ship** to test velocity inheritance is working
+
+---
 
 ## Overview
 
