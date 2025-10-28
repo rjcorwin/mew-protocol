@@ -51,12 +51,22 @@ export class GameScene extends Phaser.Scene {
   private currentCannonAim: number = 0; // Track cannon aim angle in radians (c5x-ship-combat)
   private nearControlPoints: Set<string> = new Set(); // Track which control points player is near (format: "shipId:wheel" or "shipId:sails" or "shipId:cannon-port-0")
   private lastPlayerWaveOffset: number = 0; // Track last wave offset for smooth bobbing
+  // Phase 5: Sound effect instances (c5x-ship-combat)
+  private sounds!: {
+    cannonFire: Phaser.Sound.BaseSound;
+    hitImpact: Phaser.Sound.BaseSound;
+    waterSplash: Phaser.Sound.BaseSound;
+    shipSinking: Phaser.Sound.BaseSound;
+    shipRespawn: Phaser.Sound.BaseSound;
+  };
 
   constructor() {
     super({ key: 'GameScene' });
   }
 
   preload() {
+    console.log('[GameScene] Starting preload...');
+
     // Load actual tileset image
     this.load.image('terrain', 'assets/maps/terrain.png');
 
@@ -71,10 +81,41 @@ export class GameScene extends Phaser.Scene {
 
     // Load ship sprite sheet (s6r-ship-sprite-rendering)
     // 64 rotation frames (5.625° per frame) in 8×8 grid
+    // NOTE: This file doesn't exist yet - Phaser will warn but continue with fallback rendering
     this.load.spritesheet('ship1', 'assets/sprites/ship1.png', {
       frameWidth: 128,
       frameHeight: 128,
     });
+
+    // Phase 5: Load combat sound effects (c5x-ship-combat)
+    // TEMPORARILY DISABLED - Causing crashes in Electron
+    console.log('[GameScene] Audio loading temporarily disabled');
+    // this.load.audio('cannon-fire', 'assets/sounds/cannon-fire.mp3');
+    // this.load.audio('hit-impact', 'assets/sounds/hit-impact.mp3');
+    // this.load.audio('water-splash', 'assets/sounds/water-splash.mp3');
+    // this.load.audio('ship-sinking', 'assets/sounds/ship-sinking.mp3');
+    // this.load.audio('ship-respawn', 'assets/sounds/ship-respawn.mp3');
+    // console.log('[GameScene] Audio files queued for loading');
+
+    // Handle load errors for optional assets (don't crash the game)
+    this.load.on('loaderror', (fileObj: any) => {
+      if (fileObj.key === 'ship1') {
+        console.warn('⚠ Ship sprite sheet not found, will use fallback rectangle rendering');
+      } else if (fileObj.type === 'audio') {
+        console.warn(`⚠ Failed to load audio: ${fileObj.key} - sounds will be disabled`);
+      } else {
+        console.error(`[GameScene] Load error for ${fileObj.key}:`, fileObj);
+      }
+    });
+
+    // Track successfully loaded audio files
+    this.load.on('filecomplete', (key: string) => {
+      if (key.includes('fire') || key.includes('impact') || key.includes('splash') || key.includes('sinking') || key.includes('respawn')) {
+        console.log(`[GameScene] Audio loaded: ${key}`);
+      }
+    });
+
+    console.log('[GameScene] Preload complete');
   }
 
   create() {
@@ -131,6 +172,46 @@ export class GameScene extends Phaser.Scene {
 
     // Subscribe to position updates from other players
     this.subscribeToPositionUpdates();
+
+    // Phase 5: Create sound instances (c5x-ship-combat)
+    // TEMPORARILY DISABLED - Audio is causing crashes in Electron
+    // TODO: Debug audio loading issue and re-enable
+    console.warn('⚠ Audio temporarily disabled - investigating Electron compatibility issue');
+
+    // Check if audio files loaded before creating sound instances
+    // const audioLoaded = this.cache.audio.exists('cannon-fire') &&
+    //                     this.cache.audio.exists('hit-impact') &&
+    //                     this.cache.audio.exists('water-splash') &&
+    //                     this.cache.audio.exists('ship-sinking') &&
+    //                     this.cache.audio.exists('ship-respawn');
+
+    // if (audioLoaded) {
+    //   try {
+    //     this.sounds = {
+    //       cannonFire: this.sound.add('cannon-fire', { volume: 0.5 }),
+    //       hitImpact: this.sound.add('hit-impact', { volume: 0.6 }),
+    //       waterSplash: this.sound.add('water-splash', { volume: 0.4 }),
+    //       shipSinking: this.sound.add('ship-sinking', { volume: 0.5, loop: true }),
+    //       shipRespawn: this.sound.add('ship-respawn', { volume: 0.7 })
+    //     };
+    //     console.log('✓ Combat sound effects loaded (Phase 5)');
+    //   } catch (err) {
+    //     console.warn('⚠ Failed to create sound instances:', err);
+    //   }
+    // } else {
+    //   console.warn('⚠ Some audio files failed to load - combat will have no sound');
+    //   console.warn('  See assets/sounds/README.md for download instructions');
+    // }
+
+    // Phase 5: Resume audio context on first user interaction (required by browsers/Electron)
+    this.input.once('pointerdown', () => {
+      const soundManager = this.sound as any;
+      if (soundManager.context && soundManager.context.state === 'suspended') {
+        soundManager.context.resume().then(() => {
+          console.log('[GameScene] Audio context resumed');
+        });
+      }
+    });
 
     console.log(`Game started as ${this.playerId}`);
   }
@@ -650,6 +731,9 @@ export class GameScene extends Phaser.Scene {
         ship.sinkStartTime = Date.now();
         console.log(`Ship ${ship.id} is sinking!`);
 
+        // Phase 5: Play sinking sound (looped) (c5x-ship-combat)
+        this.sounds?.shipSinking?.play();
+
         // Teleport players off ship to water
         if (this.onShip === ship.id) {
           this.onShip = null;
@@ -670,6 +754,10 @@ export class GameScene extends Phaser.Scene {
         console.log(`Ship ${ship.id} respawned!`);
         ship.sinking = false;
         ship.sinkStartTime = 0;
+
+        // Phase 5: Stop sinking sound, play respawn sound (c5x-ship-combat)
+        this.sounds?.shipSinking?.stop();
+        this.sounds?.shipRespawn?.play();
 
         // Reset visual state
         ship.sprite.setAlpha(1.0);
@@ -786,6 +874,14 @@ export class GameScene extends Phaser.Scene {
 
     this.projectiles.set(id, projectile);
     console.log(`[GameScene] Projectile ${id} spawned successfully. Total projectiles: ${this.projectiles.size}`);
+
+    // Phase 5: Play cannon fire sound (c5x-ship-combat)
+    this.sounds?.cannonFire?.play();
+
+    // Phase 5: Camera shake if local player is on the firing ship (c5x-ship-combat)
+    if (sourceShip === this.onShip) {
+      this.cameras.main.shake(100, 0.005); // 100ms duration, 0.005 intensity
+    }
 
     // Show cannon blast effect at spawn position (Phase 2c)
     this.createCannonBlast(position.x, position.y);
@@ -922,18 +1018,23 @@ export class GameScene extends Phaser.Scene {
    * Phase 3: Create hit effect when cannonball hits ship
    */
   private createHitEffect(x: number, y: number) {
-    // Wood splinters (brown particles, radial burst)
-    for (let i = 0; i < 20; i++) {
+    // Phase 5: Enhanced wood splinters (brown particles, radial burst) (c5x-ship-combat)
+    // Increased from 20 to 30 particles with rotation animation
+    for (let i = 0; i < 30; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 50 + Math.random() * 100;
       const particle = this.add.circle(x, y, 2 + Math.random() * 3, 0x8B4513, 0.8);
       particle.setDepth(100);
+
+      // Phase 5: Add rotation speed for spinning particles
+      const rotationSpeed = (Math.random() - 0.5) * 0.2;
 
       this.tweens.add({
         targets: particle,
         x: x + Math.cos(angle) * speed,
         y: y + Math.sin(angle) * speed,
         alpha: 0,
+        angle: rotationSpeed * 360, // Rotate while flying
         duration: 800,
         onComplete: () => particle.destroy()
       });
@@ -1659,6 +1760,9 @@ export class GameScene extends Phaser.Scene {
           // HIT! Show effect immediately (client prediction)
           this.createHitEffect(proj.sprite.x, proj.sprite.y);
 
+          // Phase 5: Play hit impact sound (c5x-ship-combat)
+          this.sounds?.hitImpact?.play();
+
           // Send hit claim to target ship for validation (include target's position/boundary for server validation)
           this.sendProjectileHitClaim(
             ship.id,
@@ -1701,6 +1805,10 @@ export class GameScene extends Phaser.Scene {
             if (proj.sprite.y >= waterSurfaceY - 5) {
               // HIT WATER! Show splash and despawn
               this.createWaterSplash(proj.sprite.x, proj.sprite.y);
+
+              // Phase 5: Play water splash sound (c5x-ship-combat)
+              this.sounds?.waterSplash?.play();
+
               proj.sprite.destroy();
               this.projectiles.delete(id);
               console.log(`[GameScene] Projectile ${id} hit water at (${proj.sprite.x.toFixed(1)}, ${proj.sprite.y.toFixed(1)}). Total: ${this.projectiles.size}`);

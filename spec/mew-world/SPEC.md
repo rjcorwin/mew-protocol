@@ -1033,20 +1033,30 @@ Add cannon-based ship combat enabling multiplayer PvP and cooperative multi-crew
 - See detailed documentation in `spec/mew-world/proposals/c5x-ship-combat/`
 - Integration plan: `spec/integration-plans/c5x-ship-combat.md`
 
-### Future Enhancements (Phase 5: Polish)
+### Phase 5: Polish & Sound Effects ⚠️ PARTIAL
 
-1. **Sound Effects:**
-   - Cannon fire boom (low frequency)
-   - Wood crack on hit impact
-   - Water splash on miss
-   - Creaking wood during sinking
-   - Magical chime on respawn
+**Implementation:** `clients/mew-world/src/game/GameScene.ts`
 
-2. **Enhanced Visual Effects:**
-   - Camera shake on cannon fire
-   - Larger explosion effects (30+ splinter particles)
-   - Damage smoke emitters on ships <50% health
-   - Muzzle flash sprite animation
+1. **Enhanced Visual Effects:** ✅ WORKING
+   - ✅ Camera shake on cannon fire (100ms, 0.005 intensity) - local player only - `GameScene.ts:824-827`
+   - ✅ Larger explosion effects (30 splinter particles, up from 20) - `GameScene.ts:964-984`
+   - ✅ Rotating splinters (360° animation during flight)
+   - ⏳ Damage smoke emitters on ships <50% health (planned for future)
+
+2. **Sound Effects System:** ⚠️ IMPLEMENTED BUT DISABLED
+   - ⚠️ Cannon fire boom (`cannon-fire.mp3`) - hook ready at `GameScene.ts:837`
+   - ⚠️ Wood crack on hit impact (`hit-impact.mp3`) - hook ready at `GameScene.ts:1722`
+   - ⚠️ Water splash on miss (`water-splash.mp3`) - hook ready at `GameScene.ts:1768`
+   - ⚠️ Creaking wood during sinking (`ship-sinking.mp3`) - hook ready at `GameScene.ts:693`
+   - ⚠️ Magical chime on respawn (`ship-respawn.mp3`) - hook ready at `GameScene.ts:718`
+   - All audio loading code commented out due to Electron/Phaser compatibility issue
+   - MP3 files present and valid in `clients/mew-world/assets/sounds/`
+   - Phaser audio loader crashes Electron on startup (file:// protocol issue suspected)
+
+**Known Issue - Audio Disabled:**
+Phaser's `this.load.audio()` crashes Electron when loading MP3 files. All audio infrastructure is in place but temporarily disabled (commented out). Needs investigation using Electron-native audio APIs or alternative loaders. See `spec/integration-plans/c5x-ship-combat.md` Phase 5 for details.
+
+### Future Enhancements (Phase 6+)
 
 3. **Combat UI:**
    - "You sank [ShipName]!" kill messages
