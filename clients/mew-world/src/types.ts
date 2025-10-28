@@ -61,15 +61,21 @@ export interface ShipData {
       worldPosition: { x: number; y: number };
       controlledBy: string | null;
       aimAngle: number;
+      elevationAngle: number;
       cooldownRemaining: number;
     }>;
     starboard: Array<{
       worldPosition: { x: number; y: number };
       controlledBy: string | null;
       aimAngle: number;
+      elevationAngle: number;
       cooldownRemaining: number;
     }>;
   };
+  // Phase 3: Health tracking
+  health?: number;
+  maxHealth?: number;
+  sinking?: boolean;
 }
 
 /**
@@ -121,6 +127,7 @@ export interface Ship {
       relativePosition: { x: number; y: number };
       controlledBy: string | null;
       aimAngle: number;
+      elevationAngle: number;
       cooldownRemaining: number;
     }>;
     starboard: Array<{
@@ -128,12 +135,31 @@ export interface Ship {
       relativePosition: { x: number; y: number };
       controlledBy: string | null;
       aimAngle: number;
+      elevationAngle: number;
       cooldownRemaining: number;
     }>;
   };
   speedLevel: number;
   deckBoundary: { width: number; height: number };
   lastWaveOffset: number; // Track wave offset for smooth bobbing
+  // Phase 3: Health tracking
+  health: number;
+  maxHealth: number;
+  // Phase 4: Sinking state tracking
+  sinking: boolean;
+  sinkStartTime: number;
+}
+
+/**
+ * Projectile entity managed by the game (c5x-ship-combat Phase 2)
+ */
+export interface Projectile {
+  id: string;
+  sprite: Phaser.GameObjects.Arc;
+  velocity: { x: number; y: number };
+  spawnTime: number;
+  sourceShip: string;
+  minFlightTime: number; // Minimum ms before water collision can trigger (prevents instant despawn from deck-level firing)
 }
 
 /**

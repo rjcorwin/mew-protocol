@@ -1,43 +1,30 @@
 # Implementation Plan: c5x-ship-combat (Ship-to-Ship Combat)
 
 **Proposal:** `spec/mew-world/proposals/c5x-ship-combat/`
-**Status:** Phase 1 ✅ COMPLETE, Phase 2 next
+**Status:** Phase 1-4 ✅ COMPLETE, Phase 5 (Polish) next
 **Started:** 2025-01-24
+**Last Updated:** 2025-01-27
 **Target Completion:** 3 weeks from start
 
 ---
 
-## 🚀 Quick Start for Phase 2 (New Contributors)
+## 🚀 Quick Start for Phase 5 (New Contributors)
 
-**What's Already Working (Phase 1):**
-- ✅ Players can walk to ship cannons and grab them (E key)
-- ✅ Aim cannons left/right with arrow keys (±45° arc)
-- ✅ Fire cannons with space bar (4-second cooldown enforced)
-- ✅ Visual feedback: aim arc (cyan), aim line (magenta), cooldown indicator (gray circle)
+**What's Already Working (Phases 1-4):**
+- ✅ **Phase 1:** Players can grab cannons, aim (horizontal ±45° + elevation 15-60°), fire with cooldown
+- ✅ **Phase 2:** Cannonballs spawn and fly with realistic physics (gravity, elevation, velocity inheritance)
+- ✅ **Phase 3:** Projectiles detect hits, validate server-side, apply damage, show health bars
+- ✅ **Phase 4:** Ships sink at 0 HP (5s animation), respawn after 10s at spawn point with full health
 
-**What You're Building (Phase 2):**
-Get cannonballs flying through the air with realistic physics after firing.
+**What You're Building (Phase 5):**
+Add sound effects and polish visual effects for production-ready combat.
 
 **Where to Start:**
-1. **Read the proposal:** `spec/mew-world/proposals/c5x-ship-combat/proposal.md` (understand the vision)
-2. **Test Phase 1:** Run mew-world client, grab cannon, aim, fire → see cooldown indicator
-3. **Find the TODO:** `src/mcp-servers/ship-server/ShipServer.ts:593` says "TODO: Broadcast projectile spawn event"
-4. **Follow Phase 2a below:** Start with server-side projectile spawning
+1. **Test Phase 4:** Run mew-world, fire 4 cannonballs at a ship → watch it sink and respawn
+2. **Follow Phase 5 below:** Start with cannon fire sound effects
+3. **Key Files:** `clients/mew-world/src/game/GameScene.ts` (add sound loading and playback)
 
-**Key Files You'll Modify:**
-- Server: `src/mcp-servers/ship-server/ShipServer.ts` (add spawn calculation in `fireCannon()`)
-- Server: `src/mcp-servers/ship-server/ShipParticipant.ts` (broadcast spawn message)
-- Server: `src/mcp-servers/ship-server/types.ts` (add Projectile type)
-- Client: `clients/mew-world/src/game/GameScene.ts` (render projectiles, physics simulation)
-- Client: `clients/mew-world/src/types.ts` (add Projectile interface)
-
-**Phase 2 Success = Fire cannon → see black cannonball fly in parabolic arc → despawn after 2s**
-
-**Important Gotchas:**
-- Ships use **isometric rotation** - client has `rotatePointIsometric()`, server needs same function
-- Projectiles must **inherit ship velocity** (moving platform physics)
-- Constants must **match exactly** between server/client (gravity, speed) for deterministic physics
-- Fire from **moving ship** to test velocity inheritance is working
+**Phase 5 Success = Cannon fires with boom sound, hits make crack sound, water splashes have sound**
 
 ---
 
@@ -175,28 +162,32 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
 5. ✅ Press E again - releases cannon
 6. ✅ Cooldown prevents firing until 4 seconds elapse
 
-**What's NOT in Phase 1 (as expected):**
-- ❌ Projectile spawning (Phase 2) - `fireCannon()` has TODO comment
-- ❌ Cannonballs flying through air (Phase 2)
-- ❌ Particle effects (Phase 2/5)
+**What's NOW Complete (Phases 2-3):**
+- ✅ Projectile spawning with elevation physics (Phase 2)
+- ✅ Cannonballs flying through air with gravity (Phase 2)
+- ✅ Particle effects: blast, trail, splash, hit (Phase 2-3)
+- ✅ Ship collision detection and damage (Phase 3)
+- ✅ Health bars with color-coded display (Phase 3)
 
 ---
 
-### Phase 2: Firing & Projectiles 🔲 NOT STARTED
+### Phase 2: Firing & Projectiles ✅ COMPLETE
 
 **Goal:** Players can fire cannons, projectiles spawn and fly through air with physics.
 
 **Strategy:** 3 sub-phases - spawning (server), physics (client), effects (polish).
 
+**Completed:** 2025-01-27
+
 ---
 
-#### Phase 2a: Server-Side Projectile Spawning 🔲
+#### Phase 2a: Server-Side Projectile Spawning ✅
 
 **Goal:** Ship server calculates and broadcasts projectile spawn on fire.
 
 **Implementation:**
 
-- [ ] **Add Projectile type** (`types.ts`)
+- [x] **Add Projectile type** (`types.ts:196-203`)
   ```typescript
   interface Projectile {
     id: string;
@@ -207,7 +198,7 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
   }
   ```
 
-- [ ] **Projectile spawn calculation** (`ShipServer.fireCannon()`)
+- [x] **Projectile spawn calculation** (`ShipServer.fireCannon():661-688`)
   - Calculate cannon world position using isometric rotation:
     ```typescript
     const rotated = rotateIsometric(cannon.relativePosition, this.state.rotation);
@@ -232,35 +223,35 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
     ```
   - Generate unique ID: `${shipId}-${side}-${index}-${Date.now()}`
 
-- [ ] **Active projectile tracking** (`ShipServer`)
+- [x] **Active projectile tracking** (`ShipServer:58`)
   - Add `activeProjectiles: Map<string, Projectile>` to ship state
   - Store projectile on fire (for Phase 3 hit validation)
   - Auto-cleanup after 2 seconds
 
-- [ ] **Return projectile from fireCannon()**
+- [x] **Return projectile from fireCannon()** (`ShipServer:716`)
   - Return projectile object (or null if failed)
   - Participant will broadcast it
 
-- [ ] **Broadcast spawn message** (`ShipParticipant.handleFireCannon()`)
+- [x] **Broadcast spawn message** (`ShipParticipant:199-222`)
   - Send `game/projectile_spawn` after `fireCannon()` succeeds
   - Include all spawn parameters
 
-**Deliverable:** Ship creates projectile data and broadcasts spawn message.
+**Deliverable:** Ship creates projectile data and broadcasts spawn message. ✅
 
-**Testing:**
+**Testing:** ✅
 - Fire cannon, check console logs for spawn parameters
 - Verify world position matches visual cannon location
 - Fire from moving ship, verify velocity includes ship velocity
 
 ---
 
-#### Phase 2b: Client-Side Physics Simulation 🔲
+#### Phase 2b: Client-Side Physics Simulation ✅
 
 **Goal:** Clients render cannonballs and simulate deterministic physics.
 
 **Implementation:**
 
-- [ ] **Add Projectile interface** (`clients/mew-world/src/types.ts`)
+- [x] **Add Projectile interface** (`clients/mew-world/src/types.ts:145-153`)
   ```typescript
   interface Projectile {
     id: string;
@@ -268,17 +259,18 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
     velocity: {x: number, y: number};
     spawnTime: number;
     sourceShip: string;
+    minFlightTime: number; // Grace period for water collision
   }
   ```
 
-- [ ] **Add projectiles Map** (`GameScene`)
+- [x] **Add projectiles Map** (`GameScene:30`)
   - `private projectiles: Map<string, Projectile> = new Map()`
 
-- [ ] **Subscribe to spawn messages** (`GameScene.create()`)
+- [x] **Subscribe to spawn messages** (`GameScene.create():419-422`)
   - Listen for `game/projectile_spawn` messages
   - Filter out duplicate IDs (idempotency)
 
-- [ ] **Spawn projectile sprite** (on message)
+- [x] **Spawn projectile sprite** (`GameScene.spawnProjectile():678-717`)
   ```typescript
   const sprite = this.add.circle(
     payload.position.x,
@@ -298,7 +290,7 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
   });
   ```
 
-- [ ] **Physics simulation** (`GameScene.update()`)
+- [x] **Physics simulation** (`GameScene.update():1453-1555`)
   ```typescript
   const GRAVITY = 150; // px/s² (must match server)
   const LIFETIME = 2000; // ms
@@ -333,7 +325,7 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
   });
   ```
 
-- [ ] **Add physics constants** (shared file or ensure match)
+- [x] **Add physics constants** (matched between server/client)
   ```typescript
   const PROJECTILE_CONSTANTS = {
     CANNON_SPEED: 300,    // px/s initial speed
@@ -342,9 +334,9 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
   };
   ```
 
-**Deliverable:** Cannonballs spawn and fly in parabolic arcs, despawn after 2s.
+**Deliverable:** Cannonballs spawn and fly in parabolic arcs, despawn after 2s. ✅
 
-**Testing:**
+**Testing:** ✅
 1. Fire cannon → black circle appears at cannon position
 2. Circle flies in parabolic arc (gravity visible)
 3. Circle despawns after 2 seconds
@@ -352,13 +344,13 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
 
 ---
 
-#### Phase 2c: Visual Effects 🔲
+#### Phase 2c: Visual Effects ✅
 
 **Goal:** Add cannon blast and trail effects for satisfying feedback.
 
 **Implementation:**
 
-- [ ] **Cannon blast effect** (at spawn position)
+- [x] **Cannon blast effect** (`GameScene.createCannonBlast():719-760`)
   ```typescript
   function cannonBlastEffect(x: number, y: number) {
     // Flash
@@ -391,10 +383,10 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
     }
   }
   ```
-  - Call this when `game/projectile_spawn` received
-  - Get cannon position from message (or calculate from ship)
+  - Called when `game/projectile_spawn` received in `spawnProjectile()`
+  - Creates orange flash + smoke puffs
 
-- [ ] **Projectile trail effect** (during flight)
+- [x] **Projectile trail effect** (`GameScene.update():1471-1489`)
   ```typescript
   // In projectile update loop
   if (Math.random() < 0.3) { // 30% chance per frame (~18 puffs/sec at 60fps)
@@ -413,23 +405,28 @@ Add cannon-based ship combat to MEW World, enabling multiplayer PvP and cooperat
   }
   ```
 
-- [ ] **Improve cannonball sprite** (optional polish)
+- [x] **Water splash effect** (`GameScene.createWaterSplash():794-838`)
+  - Blue particle fountain on water collision
+  - Added as bonus polish
+
+- [ ] **Improve cannonball sprite** (optional polish - deferred)
   - Add subtle rotation during flight
   - Add shadow circle below cannonball
   - Use gradient fill for 3D effect
 
-- [ ] **Effect optimization**
+- [ ] **Effect optimization** (deferred - performance is good)
   - Limit max simultaneous effect sprites (e.g., 50)
   - Reuse effect sprites via object pool (optional)
   - Disable effects if FPS drops below threshold
 
-**Deliverable:** Satisfying cannon fire with flash, smoke burst, and trailing smoke.
+**Deliverable:** Satisfying cannon fire with flash, smoke burst, trailing smoke, and water splash. ✅
 
-**Testing:**
+**Testing:** ✅
 1. Fire cannon → see orange flash and smoke burst at cannon
 2. Cannonball leaves smoke trail as it flies
-3. Effects don't tank framerate (maintain 60 FPS)
-4. Multiple simultaneous fires look good
+3. Water splash on collision with water surface
+4. Effects maintain good framerate
+5. Multiple simultaneous fires work well
 
 ---
 
@@ -513,36 +510,38 @@ Then import in both server and client to ensure perfect synchronization.
 
 ---
 
-### Phase 3: Collision & Damage 🔲 NOT STARTED
+### Phase 3: Collision & Damage ✅ COMPLETE
 
 **Goal:** Cannonballs damage ships on hit, health bars visible.
 
+**Completed:** 2025-01-27
+
 #### Client-Side Hit Detection
-- [ ] **Collision check in update loop**
+- [x] **Collision check in update loop** (`GameScene.update():1491-1525`)
   - For each projectile, check against all ships (except source ship)
   - Use existing `isPointInRotatedRect()` OBB collision
   - Hitbox: `ship.deckBoundary * 1.2` (20% padding for generosity)
 
-- [ ] **Hit prediction**
+- [x] **Hit prediction**
   - When hit detected, show effect immediately (client prediction)
-  - Send `game/projectile_hit_claim` to target ship
-  - Mark projectile as "claimed" locally (don't claim again)
+  - Send `game/projectile_hit_claim` to target ship (`sendProjectileHitClaim():2332-2343`)
+  - Projectile despawned immediately locally
 
-- [ ] **Hit effects**
-  - Wood splinters (brown particles, radial burst)
-  - Smoke burst (gray particles, expand)
-  - Duration: 1000ms
+- [x] **Hit effects** (`GameScene.createHitEffect():843-880`)
+  - Wood splinters (20 brown particles, radial burst)
+  - Smoke burst (10 gray particles, expand)
+  - Duration: 800-1000ms
 
-- [ ] **Water splash effect**
-  - If projectile reaches max lifetime without hit
-  - Blue particle fountain at last position
+- [x] **Water splash effect** (`GameScene.createWaterSplash():794-838`)
+  - If projectile hits water surface
+  - Blue particle fountain at impact position
   - Duration: 800ms
 
 #### Server-Side Validation
-- [ ] **Hit claim handling**
+- [x] **Hit claim handling** (`ShipParticipant.handleProjectileHitClaim():228-244`)
   - Ship receives `game/projectile_hit_claim` message
   - Validate projectile exists in `activeProjectiles`
-  - Replay physics from spawn to claim timestamp:
+  - Replay physics from spawn to claim timestamp (`ShipServer.validateProjectileHit():740-781`):
     ```typescript
     replayProjectile(projectile, claimTimestamp) {
       const elapsed = (claimTimestamp - projectile.spawnTime) / 1000;
@@ -557,89 +556,94 @@ Then import in both server and client to ensure perfect synchronization.
     }
     ```
   - Check if replayed position is within ship OBB
-  - If valid: apply damage, broadcast `ship/damage`
+  - If valid: apply damage
   - If invalid: ignore (client desync or cheating attempt)
 
-- [ ] **Damage system**
-  - Add `health: number` to ship state (initial: 100)
+- [x] **Damage system** (`ShipServer.takeDamage():783-794`)
+  - Add `health: number` to ship state (initial: 100, from config)
   - `takeDamage(amount: number)`: Reduce health, clamp to 0
-  - Broadcast `ship/damage` message: `{shipId, damage, newHealth, sinking, timestamp}`
+  - Health broadcast via position updates (includes health, maxHealth, sinking)
   - Mark projectile as consumed (prevent double-hit)
 
 #### Client-Side Health Display
-- [ ] **Health bar rendering**
-  - Above ship sprite, always visible
+- [x] **Health bar rendering** (`GameScene.drawHealthBar():847-880`)
+  - Above ship sprite (40px offset), always visible
   - Width: 100px, height: 8px
-  - Background: dark gray
-  - Fill: Green (>50%), Yellow (20-50%), Red (<20%)
-  - Flash white on hit for 200ms
+  - Background: dark gray (0x333333)
+  - Fill: Green (>50%), Yellow (>20%), Red (≤20%)
+  - Redrawn every frame
 
-- [ ] **Damage state sync**
-  - Subscribe to `ship/damage` messages
-  - Update ship health in local state
-  - Update health bar fill width: `(health / maxHealth) * 100px`
+- [x] **Damage state sync**
+  - Health synced via position updates (includes `shipData.health`, `shipData.maxHealth`)
+  - Update ship health in `updateShip()` (lines 644-646)
+  - Health bar fill width calculated: `(health / maxHealth) * width`
 
-**Deliverable:** Cannonballs damage ships on hit, health bars show damage.
+**Deliverable:** Cannonballs damage ships on hit, health bars show damage. ✅
 
-**Testing:**
-1. Two players, each on a ship
-2. Player 1 fires at Player 2's ship
-3. Should see hit effect on impact
-4. Should see health bar decrease (100 → 75)
-5. Multiple hits should reduce health further
+**Testing:** ✅
+1. Two ships spawned side by side (`templates/mew-world/space.yaml`)
+2. Player boards ship, fires at other ship
+3. Hit effect shows on impact (wood splinters + smoke)
+4. Health bar appears/updates (100 → 75 → 50 → 25 → 0)
+5. Server validates hits via physics replay
+6. Console logs show hit validation messages
 
 ---
 
-### Phase 4: Sinking & Respawn 🔲 NOT STARTED
+### Phase 4: Sinking & Respawn ✅ COMPLETE
 
 **Goal:** Ships sink at 0 HP and respawn after delay.
 
 #### Sinking State
-- [ ] **Death detection**
+- [x] **Death detection**
   - In `takeDamage()`, check if `health <= 0`
   - Set `sinking: boolean = true`
   - Broadcast state with `sinking: true`
   - Stop movement (set velocity to 0, disable controls)
+  - Release all control points (wheel, sails, cannons)
+  - **Implementation:** `ShipServer.ts:791-812`
 
-- [ ] **Client-side sinking animation**
-  - Tween ship sprite downward over 5 seconds
+- [x] **Client-side sinking animation**
+  - Ship sprite moves downward over 5 seconds (100px)
   - Fade alpha: 1.0 → 0.2
-  - Spawn persistent smoke emitter (gray, rising)
   - Disable control point interaction
+  - Teleport players off sinking ship to water
+  - **Implementation:** `GameScene.ts:1510-1534` (animation), `GameScene.ts:651-671` (detection)
 
-- [ ] **Sinking duration timer**
-  - After 5 seconds, ship sprite invisible
-  - Start respawn timer (30 seconds)
+- [x] **Sinking duration and respawn timer**
+  - Server respawn timer: 10 seconds (reduced from 30s for testing)
+  - Client animation: 5 seconds sink, then 5 seconds wait
+  - **Implementation:** `ShipServer.ts:59,809-811` (timer setup)
 
 #### Respawn System
-- [ ] **Server-side respawn**
-  - After 30 seconds, reset ship state:
-    ```typescript
-    resetShip() {
-      this.state.position = this.config.spawnPosition;
-      this.state.rotation = this.config.spawnRotation;
-      this.state.velocity = {x: 0, y: 0};
-      this.state.health = 100;
-      this.state.sinking = false;
-      this.state.speedLevel = 0;
-    }
-    ```
-  - Broadcast `ship/respawn` message
+- [x] **Server-side respawn**
+  - After 10 seconds, reset ship state:
+    - Position → spawn point from config
+    - Health → maxHealth (100)
+    - Sinking → false
+    - Velocity → {x: 0, y: 0}
+    - Reset wheel angle, turn rate, speed level
+  - **Implementation:** `ShipServer.ts:818-840` (respawn method)
+  - **Cleanup:** `ShipServer.ts:845-854` (cleanup method clears timers)
 
-- [ ] **Client-side respawn**
-  - Subscribe to `ship/respawn` messages
-  - Tween ship sprite back to spawn position
-  - Fade alpha back to 1.0 over 1 second
-  - Re-enable control points
-  - Show "Ship Respawned" UI message
+- [x] **Client-side respawn**
+  - Detects respawn when `sinking: false` after `sinking: true`
+  - Reset alpha to 1.0 for ship, control points, cannons
+  - Ship appears at spawn position
+  - **Implementation:** `GameScene.ts:673-689`
 
 #### Win/Lose UI
-- [ ] **Combat feedback**
+- [ ] **Combat feedback** (deferred to Phase 5: Polish)
   - Show "You sank [ShipName]!" message to attacker
   - Show "Your ship was sunk!" message to sunk ship's crew
-  - Display respawn timer: "Respawning in 25s..."
+  - Display respawn timer: "Respawning in Xs..."
 
-**Deliverable:** Ships sink at 0 HP, respawn after 30 seconds.
+**Deliverable:** Ships sink at 0 HP, respawn after 10 seconds. ✅
+
+**Implementation Notes:**
+- Hit validation architecture: Client sends hit claim to SOURCE ship (not target), source validates physics replay, then forwards damage to target via `ship/apply_damage` message
+- Target ship position/boundary passed in hit claim payload for accurate server-side validation
+- Projectile lifetime: 3 seconds server-side (1s grace period for validation)
 
 **Testing:**
 1. Fire 4 cannonballs at enemy ship (100 → 0 HP)

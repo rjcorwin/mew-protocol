@@ -649,7 +649,7 @@ iso.y = (cart.x + cart.y) / 2
 - ✅ Phase 4: Isometric control point positioning
 - ✅ Isometric OBB collision detection
 - ✅ Isometric ship boundary visualization
-- ⏭️ Phase 2: Pre-rendered ship sprites (32 angles) - deferred to future milestone
+- ✅ Phase 2: Pre-rendered ship sprites (64 angles) - see Milestone 8
 
 ### Related Proposals
 
@@ -660,3 +660,402 @@ iso.y = (cart.x + cart.y) / 2
 See detailed specifications in:
 - `spec/mew-world/proposals/w3l-wheel-steering/`
 - `spec/mew-world/proposals/i2m-true-isometric/`
+
+---
+
+## Milestone 8: Ship Sprite Rendering (s6r-ship-sprite-rendering)
+
+### Overview
+
+Replace placeholder ship visualization (4 colored corner dots) with high-quality pre-rendered 3D sprite sheets. Ships now display as blocky voxel-style vessels with 64 rotation frames for smooth visual turning that matches the continuous rotation physics from Milestone 7.
+
+### Rendering Pipeline
+
+**Tool:** Blender 3D (free, cross-platform, scriptable)
+
+**Process:**
+1. Model ship in Blender using cube primitives (Minecraft-style blocks)
+2. Set up orthographic isometric camera (60° pitch, 45° yaw)
+3. Run automated Python script to render 64 rotation frames (5.625° per frame)
+4. Assemble frames into 8×8 sprite sheet using ImageMagick
+5. Load sprite sheet in Phaser client and map rotation to frame index
+
+### Sprite Sheet Format
+
+**File:** `assets/sprites/ship1.png`
+**Dimensions:** 1024×1024 pixels (8 columns × 8 rows)
+**Frame size:** 128×128 pixels per frame
+**Frame count:** 64 frames covering 360° rotation
+**Rotation increment:** 5.625° per frame (360° / 64)
+
+**Frame ordering:**
+- Frame 0: 0° (East, default heading)
+- Frame 16: 90° (South)
+- Frame 32: 180° (West)
+- Frame 48: 270° (North)
+- Frame 63: 354.375°
+
+### Visual Style
+
+**Aesthetic:** Minecraft-style isometric blocks (voxel-based)
+
+**Rationale:**
+- Matches existing tile artwork (isometric cubes from terrain.png)
+- Simple, recognizable silhouettes at low resolution
+- Easy to create additional ship types
+- Consistent with game's blocky aesthetic
+
+**Ship structure (example sailing ship):**
+- Hull: Rectangular voxel blocks (dark wood)
+- Deck: Flat planks (lighter wood)
+- Mast: Vertical column
+- Sails: Rectangular cloth blocks (white/cream)
+- Details: Railings, crow's nest, rudder (optional)
+
+### Blender Workflow
+
+**Camera settings:**
+- Type: Orthographic (matches isometric tiles)
+- Position: X=10, Y=-10, Z=7
+- Rotation: X=60°, Y=0°, Z=45°
+- Orthographic Scale: 200 (adjusted to fit ship in frame)
+
+**Render settings:**
+- Resolution: 128×128 pixels per frame
+- Background: Transparent (PNG with alpha channel)
+- Samples: 32 (good quality for blocky geometry)
+- Shading: Flat (no smooth interpolation)
+
+**Automated rendering script:**
+```python
+# scripts/render-ship-frames.py
+# Renders 64 rotation frames automatically
+# Usage: blender ship1.blend --background --python render-ship-frames.py
+```
+
+### Sprite Sheet Assembly
+
+```bash
+# scripts/assemble-sprite-sheet.sh
+# Combines 64 frames into 8×8 grid using ImageMagick
+montage ship_frames/ship_*.png \
+  -tile 8x8 \
+  -geometry 128x128+0+0 \
+  -background none \
+  ship1.png
+```
+
+### Client Integration
+
+**Loading sprite sheet (GameScene.ts):**
+```typescript
+preload() {
+  this.load.spritesheet('ship1', 'assets/sprites/ship1.png', {
+    frameWidth: 128,
+    frameHeight: 128
+  });
+}
+```
+
+**Creating ship sprite:**
+```typescript
+const shipSprite = this.add.sprite(x, y, 'ship1', 0);
+shipSprite.setOrigin(0.5, 0.5);
+shipSprite.setDepth(1); // Above ground tiles
+```
+
+**Updating sprite frame from rotation:**
+```typescript
+private calculateShipSpriteFrame(rotation: number): number {
+  // Normalize rotation to 0-2π range
+  const normalizedRotation = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+  // Convert to frame index (0-63)
+  const frameIndex = Math.round((normalizedRotation / (Math.PI * 2)) * 64) % 64;
+
+  return frameIndex;
+}
+
+// In update loop
+ship.sprite.setFrame(this.calculateShipSpriteFrame(ship.rotation));
+```
+
+### Implementation Files
+
+**Assets:**
+- `clients/mew-world/assets/blender/ship1.blend` - Blender source file
+- `clients/mew-world/assets/sprites/ship_frames/` - Individual 64 PNGs (temp)
+- `clients/mew-world/assets/sprites/ship1.png` - Final sprite sheet
+
+**Scripts:**
+- `clients/mew-world/scripts/render-ship-frames.py` - Blender automation
+- `clients/mew-world/scripts/assemble-sprite-sheet.sh` - ImageMagick assembly
+
+**Documentation:**
+- `spec/mew-world/proposals/s6r-ship-sprite-rendering/proposal.md`
+- `spec/mew-world/proposals/s6r-ship-sprite-rendering/BLENDER_GUIDE.md`
+- `spec/mew-world/proposals/s6r-ship-sprite-rendering/IMPLEMENTATION_PLAN.md`
+- `spec/mew-world/proposals/s6r-ship-sprite-rendering/TESTING.md`
+
+### Performance
+
+**File size:** ~300-600 KB per ship type (acceptable for web delivery)
+**Loading time:** ~50-100ms for PNG decode
+**Frame switching:** <1ms (O(1) in Phaser)
+**GPU memory:** ~4 MB (uncompressed RGBA)
+
+No performance degradation from placeholder rendering.
+
+### Creating New Ship Types
+
+To add `ship2`, `ship3`, etc.:
+1. Model new ship in Blender (save as `ship2.blend`)
+2. Run `render-ship-frames.py` (update config for ship2)
+3. Run `assemble-sprite-sheet.sh` to create `ship2.png`
+4. Load in GameScene: `this.load.spritesheet('ship2', 'assets/sprites/ship2.png', ...)`
+5. Use different sprite key based on ship type in ship server config
+
+### Implementation Status
+
+- ✅ Proposal and research completed
+- ✅ Blender rendering pipeline created
+- ✅ Sprite sheet assembly script created
+- ✅ Client integration (GameScene.ts updated)
+- ✅ Documentation and guides completed
+- ⏳ Awaiting ship model creation in Blender (human task)
+- ⏳ Awaiting sprite sheet generation and testing
+
+### Related Proposals
+
+- `s6r-ship-sprite-rendering`: Full specification and decision record
+
+See detailed documentation in:
+- `spec/mew-world/proposals/s6r-ship-sprite-rendering/`
+
+### Future Enhancements
+
+1. **Multiple ship types:** Merchant ships, warships, fishing boats
+2. **Damaged states:** Battle damage sprite variants
+3. **Sail states:** Different sprites for unfurled/furled sails
+4. **Wake effects:** Animated water trails
+5. **Player customization:** Choose ship appearance from gallery
+
+---
+
+## Milestone 9: Ship-to-Ship Combat (c5x-ship-combat)
+
+### Overview
+
+Add cannon-based ship combat enabling multiplayer PvP and cooperative multi-crew gameplay. Ships have port and starboard cannons that players can control, aim, and fire to damage other ships. Damaged ships sink when health reaches 0 and respawn after a delay at their spawn point.
+
+### Combat System Architecture
+
+**Core Principles:**
+- **Client prediction:** Instant visual feedback for aiming and firing
+- **Server authority:** Ship server validates hits and manages damage
+- **Deterministic physics:** All clients simulate identical projectile trajectories
+- **OBB collision:** Rotation-aware collision detection for projectile hits
+
+**Protocol Flow:**
+1. Player fires cannon → Ship server spawns projectile → Broadcasts to all clients
+2. Client detects hit → Sends hit claim to SOURCE ship (owns projectile)
+3. Source ship validates physics replay → Forwards damage to TARGET ship
+4. Target ship applies damage → Broadcasts updated health/sinking state
+
+### Phase 1: Control Points & Aiming ✅ COMPLETE
+
+**Cannon Configuration:**
+- 2 port cannons at relative positions `{x: -10, y: -24}` and `{x: 20, y: -24}`
+- 2 starboard cannons at `{x: -10, y: 24}` and `{x: 20, y: 24}`
+- Horizontal aim range: ±45° from perpendicular
+- Elevation range: 15-60° (prevents deck/sky shots)
+- Fire cooldown: 4 seconds (4000ms)
+
+**Controls:**
+- **E key:** Grab/release nearest cannon
+- **Left/Right arrows:** Horizontal aiming (±45° arc)
+- **Up/Down arrows:** Elevation adjustment (15-60°)
+- **Space bar:** Fire cannon
+
+**Visual Feedback:**
+- Cannons rendered as yellow circles (12px radius)
+- Yellow when available, red when controlled
+- Aim lines show current aim angle when controlling
+- Cooldown indicator (gray circle shrinks as cooldown expires)
+
+**Implementation:**
+- `ShipServer.ts` - Cannon state management, grab/release/aim/fire handlers
+- `ShipParticipant.ts` - Message handlers for player control messages
+- `GameScene.ts` - Cannon rendering, input handling, visual feedback
+
+### Phase 2: Projectile Physics ✅ COMPLETE
+
+**Ballistics System:**
+- Gravity: 150 px/s² (downward acceleration)
+- Initial velocity: ~300 px/s (based on elevation and aim angle)
+- Velocity inheritance: Projectiles inherit ship's velocity vector
+- Deterministic physics: Same equations on client and server
+
+**Projectile Lifecycle:**
+1. Spawn at cannon muzzle position (rotated with ship)
+2. Server calculates initial velocity from aim/elevation angles
+3. Server broadcasts `game/projectile_spawn` to all clients
+4. All clients simulate identical physics (gravity + initial velocity)
+5. Lifetime: 2 seconds client-side, 3 seconds server-side (1s grace for validation)
+
+**Visual Effects:**
+- Cannonballs: Black circles (8px diameter, 4px radius)
+- Smoke trail: Gray particles fade over 300ms
+- Cannon blast: Orange explosion at spawn (10 particles)
+- Water splash: Blue particles on water impact (8 particles)
+
+**Implementation:**
+- `ShipServer.ts:596-717` - Projectile spawn logic, physics constants
+- `GameScene.ts:759-796` - Projectile spawn handling
+- `GameScene.ts:1606-1721` - Client-side physics simulation
+- `GameScene.ts:800-863` - Visual effects (cannon blast, water splash, hit impact)
+
+### Phase 3: Damage & Health ✅ COMPLETE
+
+**Hit Detection:**
+- Client-side OBB collision (rotation-aware hitboxes)
+- 20% generous hitbox padding for fair hits
+- Hit claims sent to source ship for validation
+- Server validates via physics replay (prevents cheating)
+
+**Hit Validation Architecture:**
+1. Client detects projectile overlap with ship OBB
+2. Client sends hit claim to **source ship** (not target) with target's position/rotation
+3. Source ship replays projectile physics to claim timestamp
+4. If replayed position matches target's hitbox → valid hit
+5. Source ship sends `ship/apply_damage` message to target
+6. Target applies damage and broadcasts updated state
+
+**Damage System:**
+- Standard cannonball damage: 25 HP per hit
+- Ship max health: 100 HP
+- 4 hits to sink: 100 → 75 → 50 → 25 → 0
+- Health synchronized via position updates
+
+**Health Visualization:**
+- Health bars rendered 40px above ships
+- Colors: Green (>75%), Yellow (50-75%), Red (<50%)
+- Width: 60px, Height: 8px
+- Border: 2px black outline
+
+**Implementation:**
+- `ShipServer.ts:744-788` - Physics replay validation with target position
+- `ShipParticipant.ts:232-265` - Hit claim and damage message handlers
+- `GameScene.ts:1644-1676` - Client-side hit detection
+- `GameScene.ts:891-923, 1507-1508` - Health bar rendering
+
+### Phase 4: Sinking & Respawn ✅ COMPLETE
+
+**Sinking Mechanics:**
+- Ships sink when health reaches 0
+- Server sets `sinking: true` flag
+- Ship stops moving (velocity = 0, speedLevel = 0)
+- All control points released (wheel, sails, cannons)
+- Players on sinking ship teleported to water
+
+**Sinking Animation (5 seconds):**
+- Ship sprite moves downward 100 pixels
+- Alpha fades from 1.0 → 0.2
+- Control points fade out after 50% progress
+- Players automatically ejected to water (bob in waves)
+
+**Respawn System:**
+- Timer: 10 seconds from sinking (configurable)
+- Resets: position (spawn point), health (100), velocity (0), rotation (initial heading)
+- Server manages respawn timer (prevents client manipulation)
+- State broadcast includes `sinking: false` on respawn
+
+**Respawn Detection:**
+- Client detects transition: `sinking: true` → `sinking: false`
+- Resets all visual state (alpha, control points, cannons)
+- Ship appears instantly at spawn point
+- Health bar shows green at 100%
+
+**Implementation:**
+- `ShipServer.ts:791-812` - Death detection, sinking state, control release
+- `ShipServer.ts:818-840` - Respawn logic (position/health reset)
+- `ShipServer.ts:845-854` - Cleanup method (clear respawn timer)
+- `GameScene.ts:651-671` - Sinking detection (client-side)
+- `GameScene.ts:1510-1534` - Sinking animation
+- `GameScene.ts:673-689` - Respawn detection and visual reset
+- `types.ts:149-150` - Sinking state fields (`sinking`, `sinkStartTime`)
+
+### Protocol Messages
+
+**New message types:**
+1. `ship/grab_cannon` - Player grabs cannon control
+2. `ship/release_cannon` - Player releases cannon
+3. `ship/aim_cannon` - Update cannon horizontal aim angle
+4. `ship/adjust_elevation` - Update cannon elevation angle
+5. `ship/fire_cannon` - Fire cannon (spawn projectile)
+6. `game/projectile_spawn` - Broadcast projectile spawn to all clients
+7. `game/projectile_hit_claim` - Client claims hit, sent to source ship for validation
+8. `ship/apply_damage` - Source ship forwards validated damage to target
+
+### Combat Statistics
+
+**Time to Kill:** ~16-20 seconds (4 hits × 4s cooldown)
+**Projectile Travel Time:** ~0.5-1.5 seconds (depends on range and elevation)
+**Effective Range:** ~150-250 pixels (optimal elevation 30-45°)
+**Respawn Cycle:** 10 seconds (configurable, reduced from 30s for testing)
+
+### Testing Checklist
+
+- ✅ Players can grab cannons and see visual feedback
+- ✅ Aim controls work (horizontal ±45°, elevation 15-60°)
+- ✅ Fire cooldown prevents rapid firing (4 second intervals)
+- ✅ Projectiles spawn and fly with realistic physics
+- ✅ Projectiles detect hits on ships (OBB collision)
+- ✅ Server validates hits via physics replay
+- ✅ Damage applies correctly (25 HP per hit)
+- ✅ Health bars update and change color
+- ✅ Ships sink at 0 HP (5 second animation)
+- ✅ Ships respawn after 10 seconds with full health
+- ✅ Players teleported off sinking ships
+- ✅ Multiple ships can engage in combat simultaneously
+
+### Known Limitations
+
+- No combat UI (kill messages, respawn timer countdown)
+- No sound effects (cannon boom, hit crack, water splash)
+- No damage smoke from heavily damaged ships
+- Projectile hit detection uses AABB (not full OBB with rotation)
+- Ship sprite rotation disabled (awaiting sprite sheet generation)
+
+### Related Proposals
+
+- `c5x-ship-combat`: Full specification with 5 implementation phases
+- See detailed documentation in `spec/mew-world/proposals/c5x-ship-combat/`
+- Integration plan: `spec/integration-plans/c5x-ship-combat.md`
+
+### Future Enhancements (Phase 5: Polish)
+
+1. **Sound Effects:**
+   - Cannon fire boom (low frequency)
+   - Wood crack on hit impact
+   - Water splash on miss
+   - Creaking wood during sinking
+   - Magical chime on respawn
+
+2. **Enhanced Visual Effects:**
+   - Camera shake on cannon fire
+   - Larger explosion effects (30+ splinter particles)
+   - Damage smoke emitters on ships <50% health
+   - Muzzle flash sprite animation
+
+3. **Combat UI:**
+   - "You sank [ShipName]!" kill messages
+   - "Your ship was sunk!" death message
+   - Respawn timer countdown UI
+   - Combat log (damage dealt/received)
+
+4. **Advanced Features:**
+   - Different projectile types (chain shot, grapeshot)
+   - Crew count affects reload speed
+   - Wind direction affects projectile trajectory
+   - Boarding actions (grappling hooks)

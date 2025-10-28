@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MEWClient } from '@mew-protocol/mew/client';
-import { PositionUpdate, Player, Ship, Direction } from '../types.js';
+import { PositionUpdate, Player, Ship, Direction, Projectile } from '../types.js';
 
 const TILE_WIDTH = 32;
 const TILE_HEIGHT = 16;
@@ -27,6 +27,7 @@ export class GameScene extends Phaser.Scene {
   private localPlayer!: Phaser.GameObjects.Sprite;
   private remotePlayers: Map<string, Player> = new Map();
   private ships: Map<string, Ship> = new Map();
+  private projectiles: Map<string, Projectile> = new Map(); // c5x-ship-combat Phase 2
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private interactKey!: Phaser.Input.Keyboard.Key;
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -67,12 +68,27 @@ export class GameScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32,
     });
+
+    // Load ship sprite sheet (s6r-ship-sprite-rendering)
+    // 64 rotation frames (5.625° per frame) in 8×8 grid
+    this.load.spritesheet('ship1', 'assets/sprites/ship1.png', {
+      frameWidth: 128,
+      frameHeight: 128,
+    });
   }
 
   create() {
     // Get client and player ID from registry
     this.client = this.registry.get('mewClient') as MEWClient;
     this.playerId = this.registry.get('playerId') as string;
+
+    // Verify ship sprite sheet loaded (s6r-ship-sprite-rendering)
+    if (this.textures.exists('ship1')) {
+      console.log('✓ Ship sprite sheet loaded: ship1.png (64 frames)');
+    } else {
+      console.warn('⚠ Ship sprite sheet not found: assets/sprites/ship1.png');
+      console.warn('  Ships will use fallback placeholder rendering');
+    }
 
     // Load Tiled map
     this.loadTiledMap();
@@ -415,6 +431,9 @@ export class GameScene extends Phaser.Scene {
         } catch (error) {
           console.error('Failed to parse position update:', error);
         }
+      } else if (envelope.kind === 'game/projectile_spawn') {
+        // c5x-ship-combat Phase 2: Handle projectile spawn
+        this.spawnProjectile(envelope.payload);
       }
     });
   }
@@ -478,15 +497,21 @@ export class GameScene extends Phaser.Scene {
       const shipGraphics = this.add.graphics();
       shipGraphics.setDepth(0); // Below players
 
-      // Create a dummy sprite for position/rotation tracking
-      // We don't actually render this, but we need it for the Ship interface
+      // Create ship sprite (s6r-ship-sprite-rendering)
+      // Use ship1 sprite sheet with 64 rotation frames
       const shipSprite = this.add.sprite(
         update.worldCoords.x,
         update.worldCoords.y,
-        '' // No texture
+        'ship1',
+        0 // Start with frame 0 (0° rotation, facing east)
       );
-      shipSprite.setVisible(false); // Hide the sprite, we'll draw with graphics
       shipSprite.setOrigin(0.5, 0.5);
+      shipSprite.setDepth(1); // Above ground tiles
+
+      // Set initial sprite frame based on ship rotation
+      // TEMP: Disabled until sprite sheet is generated
+      // const initialFrameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
+      // shipSprite.setFrame(initialFrameIndex);
 
       // Create control point indicators
       const wheelGraphics = this.add.graphics();
@@ -548,6 +573,7 @@ export class GameScene extends Phaser.Scene {
             },
             controlledBy: cannonData.controlledBy,
             aimAngle: cannonData.aimAngle,
+            elevationAngle: cannonData.elevationAngle || Math.PI / 6, // Default 30° if not present
             cooldownRemaining: cannonData.cooldownRemaining,
           })),
           starboard: update.shipData.cannons.starboard.map((cannonData) => ({
@@ -558,12 +584,19 @@ export class GameScene extends Phaser.Scene {
             },
             controlledBy: cannonData.controlledBy,
             aimAngle: cannonData.aimAngle,
+            elevationAngle: cannonData.elevationAngle || Math.PI / 6, // Default 30° if not present
             cooldownRemaining: cannonData.cooldownRemaining,
           })),
         } : undefined,
         speedLevel: update.shipData.speedLevel,
         deckBoundary: update.shipData.deckBoundary,
         lastWaveOffset: 0, // Initialize wave offset tracking
+        // Phase 3: Initialize health
+        health: update.shipData.health || 100,
+        maxHealth: update.shipData.maxHealth || 100,
+        // Phase 4: Initialize sinking state
+        sinking: update.shipData.sinking || false,
+        sinkStartTime: 0,
       };
 
       // Set initial rotation
@@ -591,10 +624,8 @@ export class GameScene extends Phaser.Scene {
             const serverCannon = update.shipData.cannons!.port[index];
             cannon.controlledBy = serverCannon.controlledBy;
             cannon.aimAngle = serverCannon.aimAngle;
+            cannon.elevationAngle = serverCannon.elevationAngle || cannon.elevationAngle; // Update if present
             cannon.cooldownRemaining = serverCannon.cooldownRemaining;
-            if (serverCannon.cooldownRemaining > 0) {
-              console.log(`Port cannon ${index} cooldown update: ${serverCannon.cooldownRemaining}ms`);
-            }
           }
         });
         ship.cannons.starboard.forEach((cannon, index) => {
@@ -602,16 +633,63 @@ export class GameScene extends Phaser.Scene {
             const serverCannon = update.shipData.cannons!.starboard[index];
             cannon.controlledBy = serverCannon.controlledBy;
             cannon.aimAngle = serverCannon.aimAngle;
+            cannon.elevationAngle = serverCannon.elevationAngle || cannon.elevationAngle; // Update if present
             cannon.cooldownRemaining = serverCannon.cooldownRemaining;
-            if (serverCannon.cooldownRemaining > 0) {
-              console.log(`Starboard cannon ${index} cooldown update: ${serverCannon.cooldownRemaining}ms`);
-            }
           }
         });
       }
 
-      // Update ship sprite rotation
+      // Phase 3: Sync health from server
+      ship.health = update.shipData.health || ship.health || 100;
+      ship.maxHealth = update.shipData.maxHealth || ship.maxHealth || 100;
+
+      // Phase 4: Detect sinking transition
+      if (update.shipData.sinking && !ship.sinking) {
+        // Ship just started sinking
+        ship.sinking = true;
+        ship.sinkStartTime = Date.now();
+        console.log(`Ship ${ship.id} is sinking!`);
+
+        // Teleport players off ship to water
+        if (this.onShip === ship.id) {
+          this.onShip = null;
+          this.shipRelativePosition = null;
+          // Player will fall into water and bob
+        }
+
+        // Teleport remote players off ship
+        this.remotePlayers.forEach((player) => {
+          if (player.onShip === ship.id) {
+            player.onShip = null;
+          }
+        });
+      }
+
+      // Phase 4: Detect respawn (sinking → not sinking)
+      if (!update.shipData.sinking && ship.sinking) {
+        console.log(`Ship ${ship.id} respawned!`);
+        ship.sinking = false;
+        ship.sinkStartTime = 0;
+
+        // Reset visual state
+        ship.sprite.setAlpha(1.0);
+        ship.boundaryGraphics.setAlpha(1.0);
+        ship.controlPoints.wheel.sprite.setAlpha(1.0);
+        ship.controlPoints.sails.sprite.setAlpha(1.0);
+        ship.controlPoints.mast.sprite.setAlpha(1.0);
+        if (ship.cannons) {
+          ship.cannons.port.forEach(c => c.sprite.setAlpha(1.0));
+          ship.cannons.starboard.forEach(c => c.sprite.setAlpha(1.0));
+        }
+      }
+
+      // Update ship sprite rotation (stores rotation for other calculations)
       ship.sprite.setRotation(update.shipData.rotation);
+
+      // Update ship sprite frame to match rotation (s6r-ship-sprite-rendering)
+      // TEMP: Disabled until sprite sheet is generated
+      // const frameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
+      // ship.sprite.setFrame(frameIndex);
 
       // Phase C: Rotate players on deck when ship turns
       if (update.shipData.rotationDelta && Math.abs(update.shipData.rotationDelta) > 0.001) {
@@ -671,6 +749,214 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Spawn a projectile from a cannon (c5x-ship-combat Phase 2)
+   */
+  private spawnProjectile(payload: any) {
+    const { id, position, velocity, timestamp, sourceShip } = payload;
+
+    // Check for duplicate (idempotency)
+    if (this.projectiles.has(id)) {
+      console.log(`Projectile ${id} already exists, ignoring duplicate spawn`);
+      return;
+    }
+
+    console.log(`[GameScene] Spawning projectile ${id} at (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
+    console.log(`  Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) px/s`);
+
+    // Create cannonball sprite (black circle, 8px diameter)
+    const sprite = this.add.circle(
+      position.x,
+      position.y,
+      4, // radius = 4px (8px diameter)
+      0x222222, // Dark gray/black
+      1.0 // Full opacity
+    );
+    sprite.setDepth(100); // Above ships and players
+
+    // Store projectile
+    const projectile: Projectile = {
+      id,
+      sprite,
+      velocity: { ...velocity }, // Copy velocity
+      spawnTime: timestamp,
+      sourceShip,
+      minFlightTime: 200, // 200ms grace period before water collision check (prevents instant despawn from deck-level shots)
+    };
+
+    this.projectiles.set(id, projectile);
+    console.log(`[GameScene] Projectile ${id} spawned successfully. Total projectiles: ${this.projectiles.size}`);
+
+    // Show cannon blast effect at spawn position (Phase 2c)
+    this.createCannonBlast(position.x, position.y);
+  }
+
+  /**
+   * Create cannon blast effect when cannon fires (c5x-ship-combat Phase 2c)
+   */
+  private createCannonBlast(x: number, y: number) {
+    // Orange flash
+    const flash = this.add.circle(x, y, 15, 0xFFAA00, 0.9);
+    flash.setDepth(100);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      scale: 2,
+      duration: 150,
+      ease: 'Cubic.easeOut',
+      onComplete: () => flash.destroy()
+    });
+
+    // Smoke puffs expanding outward
+    const smokeCount = 5;
+    for (let i = 0; i < smokeCount; i++) {
+      const angle = (Math.PI * 2 / smokeCount) * i;
+      const smoke = this.add.circle(
+        x + Math.cos(angle) * 10,
+        y + Math.sin(angle) * 10,
+        6,
+        0x666666,
+        0.6
+      );
+      smoke.setDepth(100);
+
+      this.tweens.add({
+        targets: smoke,
+        x: smoke.x + Math.cos(angle) * 20,
+        y: smoke.y + Math.sin(angle) * 20,
+        alpha: 0,
+        scale: 1.5,
+        duration: 400,
+        ease: 'Cubic.easeOut',
+        onComplete: () => smoke.destroy()
+      });
+    }
+  }
+
+  /**
+   * Create water splash effect when cannonball hits water (c5x-ship-combat Phase 2c)
+   */
+  private createWaterSplash(x: number, y: number) {
+    // Create blue particle fountain effect
+    const particleCount = 8;
+    const splashRadius = 20;
+    const splashDuration = 800; // ms
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (Math.PI * 2 / particleCount) * i;
+      const distance = Math.random() * splashRadius;
+
+      const particle = this.add.circle(
+        x + Math.cos(angle) * 5,
+        y + Math.sin(angle) * 5,
+        3 + Math.random() * 2, // Random size 3-5px
+        0x4488ff, // Blue water color
+        0.7
+      );
+      particle.setDepth(100); // Same as projectiles
+
+      // Animate particle outward and fade
+      this.tweens.add({
+        targets: particle,
+        x: x + Math.cos(angle) * distance,
+        y: y + Math.sin(angle) * distance - 10, // Slight upward arc
+        alpha: 0,
+        scale: 1.5,
+        duration: splashDuration,
+        ease: 'Cubic.easeOut',
+        onComplete: () => particle.destroy()
+      });
+    }
+
+    // Add a central splash circle that expands
+    const splashCircle = this.add.circle(x, y, 5, 0x6699ff, 0.5);
+    splashCircle.setDepth(100);
+
+    this.tweens.add({
+      targets: splashCircle,
+      scale: 3,
+      alpha: 0,
+      duration: 400,
+      ease: 'Cubic.easeOut',
+      onComplete: () => splashCircle.destroy()
+    });
+  }
+
+  /**
+   * Phase 3: Draw health bar above ship
+   */
+  private drawHealthBar(x: number, y: number, health: number, maxHealth: number) {
+    const width = 100;
+    const height = 8;
+    const healthPercent = health / maxHealth;
+
+    // Background (dark gray)
+    const bg = this.add.rectangle(x, y, width, height, 0x333333, 0.8);
+    bg.setDepth(200);
+
+    // Health fill (color based on health)
+    let color: number;
+    if (healthPercent > 0.5) color = 0x00ff00; // Green
+    else if (healthPercent > 0.2) color = 0xffff00; // Yellow
+    else color = 0xff0000; // Red
+
+    const fill = this.add.rectangle(
+      x - (width / 2) + (width * healthPercent / 2),
+      y,
+      width * healthPercent,
+      height,
+      color,
+      0.9
+    );
+    fill.setDepth(201);
+
+    // Destroy after this frame (will be redrawn next frame)
+    this.time.delayedCall(0, () => {
+      bg.destroy();
+      fill.destroy();
+    });
+  }
+
+  /**
+   * Phase 3: Create hit effect when cannonball hits ship
+   */
+  private createHitEffect(x: number, y: number) {
+    // Wood splinters (brown particles, radial burst)
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 50 + Math.random() * 100;
+      const particle = this.add.circle(x, y, 2 + Math.random() * 3, 0x8B4513, 0.8);
+      particle.setDepth(100);
+
+      this.tweens.add({
+        targets: particle,
+        x: x + Math.cos(angle) * speed,
+        y: y + Math.sin(angle) * speed,
+        alpha: 0,
+        duration: 800,
+        onComplete: () => particle.destroy()
+      });
+    }
+
+    // Smoke burst (gray particles)
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const particle = this.add.circle(x, y, 4, 0x666666, 0.6);
+      particle.setDepth(100);
+
+      this.tweens.add({
+        targets: particle,
+        x: x + Math.cos(angle) * 30,
+        y: y + Math.sin(angle) * 30,
+        alpha: 0,
+        scale: 2,
+        duration: 1000,
+        onComplete: () => particle.destroy()
+      });
+    }
+  }
+
   private drawControlPoint(
     graphics: Phaser.GameObjects.Graphics,
     controlPoint: { relativePosition: { x: number; y: number }; controlledBy: string | null },
@@ -713,7 +999,7 @@ export class GameScene extends Phaser.Scene {
    */
   private drawCannon(
     graphics: Phaser.GameObjects.Graphics,
-    cannon: { relativePosition: { x: number; y: number }; controlledBy: string | null; aimAngle: number; cooldownRemaining: number },
+    cannon: { relativePosition: { x: number; y: number }; controlledBy: string | null; aimAngle: number; elevationAngle: number; cooldownRemaining: number },
     shipSprite: Phaser.GameObjects.Sprite,
     shipRotation: number,
     isPlayerNear: boolean = false,
@@ -792,12 +1078,45 @@ export class GameScene extends Phaser.Scene {
       graphics.moveTo(aimEndX, aimEndY - crosshairSize);
       graphics.lineTo(aimEndX, aimEndY + crosshairSize);
       graphics.strokePath();
+
+      // Draw elevation indicator (Option 3: Show elevation angle)
+      const elevationDegrees = Math.round(cannon.elevationAngle * 180 / Math.PI);
+      const elevationText = `${elevationDegrees}°`;
+
+      // Create text above cannon (elevation display)
+      const textStyle = {
+        fontSize: '14px',
+        color: '#00ffff',
+        fontFamily: 'monospace',
+        backgroundColor: '#000000',
+        padding: { x: 4, y: 2 }
+      };
+
+      // Note: We'll use the graphics to draw simple text representation
+      // Draw a small elevation bar indicator instead (3 segments for 15°/30°/45°/60°)
+      const elevBarX = worldX - 20;
+      const elevBarY = worldY - 25;
+      const segmentHeight = 4;
+      const numSegments = Math.round((cannon.elevationAngle - Math.PI/12) / (Math.PI/36)); // 0-9 segments (15°-60° in 5° steps)
+
+      for (let i = 0; i < 9; i++) {
+        const alpha = i < numSegments ? 0.8 : 0.2;
+        const segColor = i < numSegments ? 0x00ff00 : 0x333333;
+        graphics.fillStyle(segColor, alpha);
+        graphics.fillRect(elevBarX, elevBarY - (i * segmentHeight), 40, segmentHeight - 1);
+      }
+
+      // Draw elevation number
+      graphics.fillStyle(0x000000, 0.8);
+      graphics.fillRect(elevBarX - 2, elevBarY - 42, 44, 14);
+      // Note: Phaser Graphics doesn't support text, we'd need a Text object for actual numbers
+      // For now, the bar indicator shows elevation visually
     }
 
     // Draw cooldown indicator if reloading
     if (cannon.cooldownRemaining > 0) {
       const cooldownProgress = cannon.cooldownRemaining / 4000; // Assume 4s cooldown
-      console.log(`Drawing cooldown: ${cannon.cooldownRemaining}ms remaining (${(cooldownProgress * 100).toFixed(0)}%)`);
+      // console.log(`Drawing cooldown: ${cannon.cooldownRemaining}ms remaining (${(cooldownProgress * 100).toFixed(0)}%)`);
       graphics.fillStyle(0x888888, 0.7);
       graphics.fillCircle(worldX, worldY, 12 * cooldownProgress);
     }
@@ -830,6 +1149,22 @@ export class GameScene extends Phaser.Scene {
       graphics.fillStyle(corner.color, 1);
       graphics.fillCircle(worldX, worldY, 6);
     });
+  }
+
+  /**
+   * Calculate sprite sheet frame index from ship rotation (s6r-ship-sprite-rendering)
+   * @param rotation Ship rotation in radians
+   * @returns Frame index (0-63) corresponding to rotation angle
+   */
+  private calculateShipSpriteFrame(rotation: number): number {
+    // Normalize rotation to 0-2π range
+    const normalizedRotation = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+    // Convert to frame index (0-63)
+    // 64 frames cover 360° (2π radians), so each frame is 5.625° (π/32 radians)
+    const frameIndex = Math.round((normalizedRotation / (Math.PI * 2)) * 64) % 64;
+
+    return frameIndex;
   }
 
   private calculateWaveHeightAtPosition(x: number, y: number, time: number): number {
@@ -1164,6 +1499,35 @@ export class GameScene extends Phaser.Scene {
           this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
         });
       }
+
+      // Phase 3: Draw health bar above ship
+      this.drawHealthBar(ship.sprite.x, ship.sprite.y - 40, ship.health, ship.maxHealth);
+
+      // Phase 4: Apply sinking animation
+      if (ship.sinking && ship.sinkStartTime > 0) {
+        const SINK_DURATION = 5000; // 5 seconds
+        const elapsed = Date.now() - ship.sinkStartTime;
+        const sinkProgress = Math.min(elapsed / SINK_DURATION, 1.0);
+
+        // Sink downward (move sprite Y down)
+        const SINK_DISTANCE = 100; // pixels below water surface
+        ship.sprite.y = ship.targetPosition.y + (sinkProgress * SINK_DISTANCE);
+
+        // Fade out
+        ship.sprite.setAlpha(1.0 - (sinkProgress * 0.8)); // Fade to 0.2 alpha
+
+        // Optionally hide control points and boundary during sinking
+        if (sinkProgress > 0.5) {
+          ship.boundaryGraphics.setAlpha(0);
+          ship.controlPoints.wheel.sprite.setAlpha(0);
+          ship.controlPoints.sails.sprite.setAlpha(0);
+          ship.controlPoints.mast.sprite.setAlpha(0);
+          if (ship.cannons) {
+            ship.cannons.port.forEach(c => c.sprite.setAlpha(0));
+            ship.cannons.starboard.forEach(c => c.sprite.setAlpha(0));
+          }
+        }
+      }
     });
 
     // Clear the rotation flag after all ships are processed
@@ -1227,6 +1591,136 @@ export class GameScene extends Phaser.Scene {
       } else {
         // Remote player is on ship, reset wave offset (ship handles bobbing)
         player.lastWaveOffset = 0;
+      }
+    });
+
+    // c5x-ship-combat Phase 2: Update projectile physics
+    const GRAVITY = 150; // px/s² (must match server)
+    const LIFETIME = 2000; // ms
+    const deltaS = delta / 1000; // Convert to seconds
+
+    this.projectiles.forEach((proj, id) => {
+      // Check lifetime (safety net)
+      const age = Date.now() - proj.spawnTime;
+      if (age > LIFETIME) {
+        proj.sprite.destroy();
+        this.projectiles.delete(id);
+        console.log(`[GameScene] Projectile ${id} despawned (lifetime expired). Total: ${this.projectiles.size}`);
+        return;
+      }
+
+      // Apply gravity (downward acceleration)
+      proj.velocity.y += GRAVITY * deltaS;
+
+      // Update position (Euler integration)
+      proj.sprite.x += proj.velocity.x * deltaS;
+      proj.sprite.y += proj.velocity.y * deltaS;
+
+      // Phase 2c: Add smoke trail effect (30% chance per frame ~18 puffs/sec at 60fps)
+      if (Math.random() < 0.3) {
+        const trail = this.add.circle(
+          proj.sprite.x,
+          proj.sprite.y,
+          3,
+          0x888888,
+          0.5
+        );
+        trail.setDepth(100);
+
+        this.tweens.add({
+          targets: trail,
+          alpha: 0,
+          scale: 1.5,
+          duration: 300,
+          ease: 'Cubic.easeOut',
+          onComplete: () => trail.destroy()
+        });
+      }
+
+      // Phase 3: Check collision with ships (except source ship)
+      let hitShip = false;
+      this.ships.forEach((ship) => {
+        if (ship.id === proj.sourceShip) return; // Don't hit own ship
+        if (hitShip) return; // Already hit a ship this frame
+
+        // Use existing OBB collision with generous hitbox
+        const hitboxPadding = 1.2; // 20% generous hitbox
+        const paddedBoundary = {
+          width: ship.deckBoundary.width * hitboxPadding,
+          height: ship.deckBoundary.height * hitboxPadding
+        };
+
+        if (this.isPointInRotatedRect(
+          { x: proj.sprite.x, y: proj.sprite.y },
+          { x: ship.sprite.x, y: ship.sprite.y },
+          paddedBoundary,
+          ship.rotation
+        )) {
+          // HIT! Show effect immediately (client prediction)
+          this.createHitEffect(proj.sprite.x, proj.sprite.y);
+
+          // Send hit claim to target ship for validation (include target's position/boundary for server validation)
+          this.sendProjectileHitClaim(
+            ship.id,
+            proj.id,
+            Date.now(),
+            ship.sprite.x,
+            ship.sprite.y,
+            ship.rotation,
+            ship.deckBoundary
+          );
+
+          // Despawn projectile locally
+          proj.sprite.destroy();
+          this.projectiles.delete(id);
+          console.log(`[GameScene] Projectile ${id} hit ship ${ship.id}. Total: ${this.projectiles.size}`);
+          hitShip = true;
+          return;
+        }
+      });
+
+      if (hitShip) return; // Skip water check if we hit a ship
+
+      // Phase 2c: Check for water surface collision
+      // ONLY check if: (1) past grace period AND (2) descending
+      // Grace period prevents instant despawn from deck-level downward shots
+      if (age > proj.minFlightTime && proj.velocity.y > 0) {
+        const tilePos = this.map.worldToTileXY(proj.sprite.x, proj.sprite.y);
+        if (tilePos) {
+          const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
+
+        if (tile && tile.properties?.navigable === true) {
+          // Projectile is over water - calculate water surface Y coordinate
+          const worldPos = this.map.tileToWorldXY(Math.floor(tilePos.x), Math.floor(tilePos.y));
+          if (worldPos) {
+            // Water surface is at the tile's world Y position
+            // Add half tile visual height to get the center/surface of the water tile
+            const waterSurfaceY = worldPos.y + (TILE_VISUAL_HEIGHT / 2);
+
+            // Check if cannonball has hit the water (with small margin for cannonball radius)
+            if (proj.sprite.y >= waterSurfaceY - 5) {
+              // HIT WATER! Show splash and despawn
+              this.createWaterSplash(proj.sprite.x, proj.sprite.y);
+              proj.sprite.destroy();
+              this.projectiles.delete(id);
+              console.log(`[GameScene] Projectile ${id} hit water at (${proj.sprite.x.toFixed(1)}, ${proj.sprite.y.toFixed(1)}). Total: ${this.projectiles.size}`);
+              return;
+            }
+          }
+        }
+        }
+      }
+
+      // Check if off-screen (optimization)
+      const bounds = this.cameras.main.worldView;
+      const margin = 100;
+      if (proj.sprite.x < bounds.x - margin ||
+          proj.sprite.x > bounds.right + margin ||
+          proj.sprite.y < bounds.y - margin ||
+          proj.sprite.y > bounds.bottom + margin) {
+        proj.sprite.destroy();
+        this.projectiles.delete(id);
+        console.log(`[GameScene] Projectile ${id} despawned (off-screen). Total: ${this.projectiles.size}`);
       }
     });
   }
@@ -1718,6 +2212,23 @@ export class GameScene extends Phaser.Scene {
           );
         }
 
+        // Up/down arrows to adjust elevation (Option 3: True elevation control)
+        if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
+          this.sendAdjustElevation(
+            this.controllingShip,
+            this.controllingCannon.side,
+            this.controllingCannon.index,
+            'up'
+          );
+        } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
+          this.sendAdjustElevation(
+            this.controllingShip,
+            this.controllingCannon.side,
+            this.controllingCannon.index,
+            'down'
+          );
+        }
+
         // Space bar to fire cannon
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
           this.sendFireCannon(
@@ -1906,6 +2417,19 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private sendAdjustElevation(shipId: string, side: 'port' | 'starboard', index: number, adjustment: 'up' | 'down') {
+    this.client.send({
+      kind: 'ship/adjust_elevation',
+      to: [shipId],
+      payload: {
+        side,
+        index,
+        adjustment,
+        playerId: this.playerId,
+      },
+    });
+  }
+
   private sendFireCannon(shipId: string, side: 'port' | 'starboard', index: number) {
     this.client.send({
       kind: 'ship/fire_cannon',
@@ -1918,5 +2442,38 @@ export class GameScene extends Phaser.Scene {
     });
 
     console.log(`Fired ${side} cannon ${index}!`);
+  }
+
+  /**
+   * Phase 3: Send projectile hit claim to SOURCE ship for validation
+   * The source ship owns the projectile and can validate physics.
+   * If valid, it will apply damage to the target ship.
+   */
+  private sendProjectileHitClaim(
+    targetShipId: string,
+    projectileId: string,
+    timestamp: number,
+    targetX: number,
+    targetY: number,
+    targetRotation: number,
+    targetBoundary: { width: number; height: number }
+  ) {
+    // Extract source ship from projectile ID (format: "ship1-port-0-timestamp")
+    const sourceShipId = projectileId.split('-')[0];
+
+    this.client.send({
+      kind: 'game/projectile_hit_claim',
+      to: [sourceShipId], // Send to SOURCE ship (not target!)
+      payload: {
+        projectileId,
+        targetShipId, // Include target so source knows who got hit
+        targetPosition: { x: targetX, y: targetY },
+        targetRotation,
+        targetBoundary,
+        claimedDamage: 25, // Standard cannonball damage
+        timestamp,
+      },
+    });
+    console.log(`Claimed hit on ${targetShipId} with projectile ${projectileId} (sent to ${sourceShipId})`);
   }
 }

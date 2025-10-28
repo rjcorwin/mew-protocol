@@ -18,6 +18,7 @@ import {
   GrabCannonPayload,
   ReleaseCannonPayload,
   AimCannonPayload,
+  AdjustElevationPayload,
   FireCannonPayload,
 } from './types.js';
 
@@ -112,8 +113,20 @@ export class ShipParticipant {
           this.handleAimCannon(envelope.payload as AimCannonPayload);
           break;
 
+        case 'ship/adjust_elevation':
+          this.handleAdjustElevation(envelope.payload as AdjustElevationPayload);
+          break;
+
         case 'ship/fire_cannon':
           this.handleFireCannon(envelope.payload as FireCannonPayload);
+          break;
+
+        case 'game/projectile_hit_claim':
+          this.handleProjectileHitClaim(envelope.payload);
+          break;
+
+        case 'ship/apply_damage':
+          this.handleApplyDamage(envelope.payload);
           break;
 
         case 'game/position':
@@ -185,10 +198,75 @@ export class ShipParticipant {
     this.broadcastPosition();
   }
 
+  private handleAdjustElevation(payload: AdjustElevationPayload) {
+    this.server.adjustElevation(payload.playerId, payload.side, payload.index, payload.adjustment);
+    // Immediately broadcast updated state
+    this.broadcastPosition();
+  }
+
   private handleFireCannon(payload: FireCannonPayload) {
     console.log(`[ShipParticipant] Received fire_cannon message:`, payload);
-    this.server.fireCannon(payload.playerId, payload.side, payload.index);
-    // Broadcast updated state (includes new projectile if fired)
+    const projectile = this.server.fireCannon(payload.playerId, payload.side, payload.index);
+
+    // Broadcast projectile spawn if cannon was successfully fired (Phase 2)
+    if (projectile) {
+      this.client.send({
+        kind: 'game/projectile_spawn',
+        to: [], // Broadcast to all
+        payload: {
+          id: projectile.id,
+          type: 'cannonball',
+          sourceShip: projectile.sourceShip,
+          position: projectile.spawnPosition,
+          velocity: projectile.initialVelocity,
+          timestamp: projectile.spawnTime,
+        },
+      });
+      console.log(`[ShipParticipant] Broadcasted projectile spawn: ${projectile.id}`);
+    }
+
+    // Broadcast updated state (includes updated cooldown)
+    this.broadcastPosition();
+  }
+
+  private handleProjectileHitClaim(payload: any) {
+    const { projectileId, targetShipId, targetPosition, targetRotation, targetBoundary, claimedDamage, timestamp } = payload;
+
+    console.log(`[ShipParticipant] Received hit claim for projectile ${projectileId} on target ${targetShipId}`);
+
+    // Validate hit server-side (this ship owns the projectile)
+    const isValid = this.server.validateProjectileHit(
+      projectileId,
+      timestamp,
+      targetPosition,
+      targetRotation,
+      targetBoundary
+    );
+
+    if (isValid) {
+      console.log(`[ShipParticipant] Hit validated! Forwarding ${claimedDamage} damage to ${targetShipId}`);
+
+      // Send damage message to target ship
+      this.client.send({
+        kind: 'ship/apply_damage',
+        to: [targetShipId],
+        payload: {
+          amount: claimedDamage,
+          sourceProjectile: projectileId,
+        },
+      });
+    } else {
+      console.log(`[ShipParticipant] Rejected invalid hit claim for projectile ${projectileId}`);
+    }
+  }
+
+  private handleApplyDamage(payload: any) {
+    const { amount, sourceProjectile } = payload;
+
+    console.log(`[ShipParticipant] Applying ${amount} damage from ${sourceProjectile}`);
+
+    this.server.takeDamage(amount);
+    // Broadcast updated state (includes updated health, sinking flag)
     this.broadcastPosition();
   }
 
@@ -276,6 +354,7 @@ export class ShipParticipant {
             },
             controlledBy: cannon.controlledBy,
             aimAngle: cannon.aimAngle,
+            elevationAngle: cannon.elevationAngle,
             cooldownRemaining: cannon.cooldownRemaining,
           })),
           starboard: state.cannons.starboard.map(cannon => ({
@@ -285,9 +364,14 @@ export class ShipParticipant {
             },
             controlledBy: cannon.controlledBy,
             aimAngle: cannon.aimAngle,
+            elevationAngle: cannon.elevationAngle,
             cooldownRemaining: cannon.cooldownRemaining,
           })),
         },
+        // Phase 3: Health data
+        health: state.health,
+        maxHealth: state.maxHealth,
+        sinking: state.sinking,
       },
     };
 

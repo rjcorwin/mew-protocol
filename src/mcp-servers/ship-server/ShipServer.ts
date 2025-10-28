@@ -55,6 +55,8 @@ export class ShipServer {
   private mapData: MapDataPayload | null = null;
   private lastRotation: number = 0; // Track rotation for calculating delta
   private rotationDelta: number = 0; // Change since last broadcast
+  private activeProjectiles: Map<string, import('./types.js').Projectile> = new Map(); // c5x-ship-combat Phase 2
+  private respawnTimer: NodeJS.Timeout | null = null; // Phase 4: Respawn timer
 
   constructor(config: ShipConfig) {
     this.config = config;
@@ -88,7 +90,8 @@ export class ShipServer {
           index,
           relativePosition: { ...pos },
           controlledBy: null,
-          aimAngle: 0, // Perpendicular to ship
+          aimAngle: 0, // Perpendicular to ship (horizontal)
+          elevationAngle: Math.PI / 6, // 30° default elevation (0.52 rad)
           cooldownRemaining: 0,
           lastFired: 0,
         })),
@@ -98,7 +101,8 @@ export class ShipServer {
           index,
           relativePosition: { ...pos },
           controlledBy: null,
-          aimAngle: 0, // Perpendicular to ship
+          aimAngle: 0, // Perpendicular to ship (horizontal)
+          elevationAngle: Math.PI / 6, // 30° default elevation (0.52 rad)
           cooldownRemaining: 0,
           lastFired: 0,
         })),
@@ -117,6 +121,44 @@ export class ShipServer {
       sinking: false,
     };
     this.lastRotation = initialRotation; // Initialize lastRotation to match
+  }
+
+  /**
+   * Convert isometric coordinates to Cartesian (c5x-ship-combat Phase 2)
+   */
+  private isometricToCartesian(point: Position): Position {
+    const cartX = (point.x + point.y * 2) / 2;
+    const cartY = (point.y * 2 - point.x) / 2;
+    return { x: cartX, y: cartY };
+  }
+
+  /**
+   * Convert Cartesian coordinates to isometric (c5x-ship-combat Phase 2)
+   */
+  private cartesianToIsometric(point: Position): Position {
+    const isoX = point.x - point.y;
+    const isoY = (point.x + point.y) / 2;
+    return { x: isoX, y: isoY };
+  }
+
+  /**
+   * Rotate a point in isometric space (c5x-ship-combat Phase 2)
+   * Matches client's rotatePointIsometric function
+   */
+  private rotatePointIsometric(point: Position, angle: number): Position {
+    // Transform to Cartesian
+    const cart = this.isometricToCartesian(point);
+
+    // Apply Cartesian rotation
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const rotatedCart = {
+      x: cart.x * cos - cart.y * sin,
+      y: cart.x * sin + cart.y * cos,
+    };
+
+    // Transform back to isometric
+    return this.cartesianToIsometric(rotatedCart);
   }
 
   private setHeading(heading: ShipHeading) {
@@ -562,7 +604,7 @@ export class ShipServer {
     console.log(`Player ${playerId} aimed cannon ${side} ${index} to ${(cannon.aimAngle * 180 / Math.PI).toFixed(1)}°`);
   }
 
-  public fireCannon(playerId: string, side: 'port' | 'starboard', index: number) {
+  public adjustElevation(playerId: string, side: 'port' | 'starboard', index: number, adjustment: 'up' | 'down') {
     const cannons = this.state.cannons[side];
     if (index < 0 || index >= cannons.length) {
       console.error(`Invalid cannon index: ${side} ${index}`);
@@ -572,15 +614,42 @@ export class ShipServer {
     const cannon = cannons[index];
 
     if (cannon.controlledBy !== playerId) {
-      console.error(`Player ${playerId} cannot fire cannon ${side} ${index} - not controlling`);
+      console.error(`Player ${playerId} cannot adjust elevation for cannon ${side} ${index} - not controlling`);
       return;
+    }
+
+    // Adjust elevation by 5° (0.087 radians) per key press
+    const elevationStep = Math.PI / 36; // 5° = π/36
+    const delta = adjustment === 'up' ? elevationStep : -elevationStep;
+    const newElevation = cannon.elevationAngle + delta;
+
+    // Clamp to 15°-60° (0.26-1.05 radians)
+    const minElevation = Math.PI / 12; // 15°
+    const maxElevation = Math.PI / 3;  // 60°
+    cannon.elevationAngle = Math.max(minElevation, Math.min(maxElevation, newElevation));
+
+    console.log(`Player ${playerId} adjusted elevation for cannon ${side} ${index} to ${(cannon.elevationAngle * 180 / Math.PI).toFixed(1)}°`);
+  }
+
+  public fireCannon(playerId: string, side: 'port' | 'starboard', index: number): import('./types.js').Projectile | null {
+    const cannons = this.state.cannons[side];
+    if (index < 0 || index >= cannons.length) {
+      console.error(`Invalid cannon index: ${side} ${index}`);
+      return null;
+    }
+
+    const cannon = cannons[index];
+
+    if (cannon.controlledBy !== playerId) {
+      console.error(`Player ${playerId} cannot fire cannon ${side} ${index} - not controlling`);
+      return null;
     }
 
     // Check cooldown
     const now = Date.now();
     if (cannon.cooldownRemaining > 0) {
       console.error(`Cannon ${side} ${index} on cooldown (${cannon.cooldownRemaining}ms remaining)`);
-      return;
+      return null;
     }
 
     // Fire the cannon!
@@ -589,8 +658,63 @@ export class ShipServer {
 
     console.log(`Player ${playerId} fired cannon ${side} ${index}!`);
     console.log(`  Cooldown set to: ${cannon.cooldownRemaining}ms`);
-    console.log(`  Will broadcast in next position update`);
-    // TODO: Broadcast projectile spawn event (Phase 2)
+
+    // Phase 2: Calculate projectile spawn parameters
+    // 1. Calculate cannon world position using isometric rotation
+    const rotated = this.rotatePointIsometric(cannon.relativePosition, this.state.rotation);
+    const spawnPos: Position = {
+      x: this.state.position.x + rotated.x,
+      y: this.state.position.y + rotated.y,
+    };
+
+    // 2. Calculate fire direction (horizontal component)
+    const isPort = side === 'port';
+    const perpendicular = this.state.rotation + (isPort ? -Math.PI / 2 : Math.PI / 2);
+    const fireAngle = perpendicular + cannon.aimAngle;
+
+    // 3. Calculate velocity with elevation (Option 3: True 3D ballistics)
+    const CANNON_SPEED = 300; // px/s total muzzle velocity
+    const elevation = cannon.elevationAngle;
+
+    // Horizontal speed (in the XY plane) = CANNON_SPEED * cos(elevation)
+    const horizontalSpeed = CANNON_SPEED * Math.cos(elevation);
+
+    // Vertical component (upward, negative Y in screen space) = CANNON_SPEED * sin(elevation)
+    const verticalComponent = CANNON_SPEED * Math.sin(elevation);
+
+    // Inherit ship velocity (moving platform physics)
+    const vel: Velocity = {
+      x: Math.cos(fireAngle) * horizontalSpeed + this.state.velocity.x,
+      y: Math.sin(fireAngle) * horizontalSpeed + this.state.velocity.y - verticalComponent,
+    };
+
+    // 4. Generate unique projectile ID
+    const projectileId = `${this.state.participantId}-${side}-${index}-${now}`;
+
+    // 5. Create projectile object
+    const projectile: import('./types.js').Projectile = {
+      id: projectileId,
+      sourceShip: this.state.participantId,
+      spawnTime: now,
+      spawnPosition: spawnPos,
+      initialVelocity: vel,
+    };
+
+    // 6. Store in active projectiles for Phase 3 hit validation
+    this.activeProjectiles.set(projectileId, projectile);
+
+    // 7. Auto-cleanup after 3 seconds (gives clients 1s grace period for validation)
+    setTimeout(() => {
+      this.activeProjectiles.delete(projectileId);
+      console.log(`Projectile ${projectileId} expired (3s lifetime)`);
+    }, 3000);
+
+    console.log(`  Projectile spawned at (${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)})`);
+    console.log(`  Fire angle (horiz): ${(fireAngle * 180 / Math.PI).toFixed(1)}°, Elevation: ${(elevation * 180 / Math.PI).toFixed(1)}°`);
+    console.log(`  Initial velocity: (${vel.x.toFixed(1)}, ${vel.y.toFixed(1)}) px/s`);
+    console.log(`  Ship velocity: (${this.state.velocity.x.toFixed(1)}, ${this.state.velocity.y.toFixed(1)}) px/s`);
+
+    return projectile;
   }
 
   private releaseControlByPlayer(playerId: string) {
@@ -611,6 +735,127 @@ export class ShipServer {
           cannon.controlledBy = null;
         }
       }
+    }
+  }
+
+  /**
+   * Phase 3: Validate projectile hit using physics replay
+   */
+  public validateProjectileHit(
+    projectileId: string,
+    claimTimestamp: number,
+    targetPosition: { x: number; y: number },
+    targetRotation: number,
+    targetBoundary: { width: number; height: number }
+  ): boolean {
+    const projectile = this.activeProjectiles.get(projectileId);
+
+    if (!projectile) {
+      console.log(`Projectile ${projectileId} not found (already expired or consumed)`);
+      return false;
+    }
+
+    // Replay physics from spawn to claim timestamp
+    const elapsed = (claimTimestamp - projectile.spawnTime) / 1000; // seconds
+    const GRAVITY = 150; // Must match client
+
+    const pos = {
+      x: projectile.spawnPosition.x + projectile.initialVelocity.x * elapsed,
+      y: projectile.spawnPosition.y + projectile.initialVelocity.y * elapsed + (0.5 * GRAVITY * elapsed * elapsed)
+    };
+
+    // Check if replayed position is within TARGET ship's OBB
+    const hitboxPadding = 1.2;
+    const paddedBoundary = {
+      width: targetBoundary.width * hitboxPadding,
+      height: targetBoundary.height * hitboxPadding
+    };
+
+    // Simple AABB check (good enough for validation)
+    const dx = Math.abs(pos.x - targetPosition.x);
+    const dy = Math.abs(pos.y - targetPosition.y);
+    const isHit = dx < paddedBoundary.width / 2 && dy < paddedBoundary.height / 2;
+
+    if (isHit) {
+      // Mark projectile as consumed (prevent double-hit)
+      this.activeProjectiles.delete(projectileId);
+      console.log(`Validated hit: projectile ${projectileId} at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) on target at (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)})`);
+    } else {
+      console.log(`Rejected hit claim: projectile ${projectileId} at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) vs target at (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)})`);
+    }
+
+    return isHit;
+  }
+
+  /**
+   * Phase 3: Apply damage to ship
+   */
+  public takeDamage(amount: number) {
+    this.state.health = Math.max(0, this.state.health - amount);
+    console.log(`Ship took ${amount} damage. Health: ${this.state.health}/${this.state.maxHealth}`);
+
+    if (this.state.health <= 0 && !this.state.sinking) {
+      this.state.sinking = true;
+      console.log(`Ship sinking!`);
+
+      // Stop movement
+      this.state.velocity = { x: 0, y: 0 };
+      this.state.speedLevel = 0;
+
+      // Release all controls
+      this.state.controlPoints.wheel.controlledBy = null;
+      this.state.controlPoints.sails.controlledBy = null;
+      for (const cannons of [this.state.cannons.port, this.state.cannons.starboard]) {
+        for (const cannon of cannons) {
+          cannon.controlledBy = null;
+        }
+      }
+
+      // Schedule respawn after 10 seconds
+      this.respawnTimer = setTimeout(() => {
+        this.respawn();
+      }, 10000);
+    }
+  }
+
+  /**
+   * Phase 4: Respawn ship at spawn point with full health
+   */
+  private respawn() {
+    console.log(`Ship respawning at spawn point...`);
+
+    // Reset position to spawn point (from config)
+    this.state.position = { ...this.config.initialPosition };
+    this.state.heading = this.config.initialHeading;
+    this.state.rotation = headingToRotation(this.config.initialHeading);
+
+    // Reset health
+    this.state.health = this.state.maxHealth;
+    this.state.sinking = false;
+
+    // Reset movement
+    this.state.velocity = { x: 0, y: 0 };
+    this.state.speedLevel = 0;
+    this.state.wheelAngle = 0;
+    this.state.turnRate = 0;
+    this.state.wheelTurningDirection = null;
+
+    console.log(`Ship respawned with ${this.state.health} HP at (${this.state.position.x}, ${this.state.position.y})`);
+
+    this.respawnTimer = null;
+  }
+
+  /**
+   * Phase 4: Cleanup respawn timer
+   */
+  public cleanup() {
+    if (this.respawnTimer) {
+      clearTimeout(this.respawnTimer);
+      this.respawnTimer = null;
+    }
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+      this.updateInterval = null;
     }
   }
 }
