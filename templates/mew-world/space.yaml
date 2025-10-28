@@ -41,10 +41,29 @@ participants:
       SHIP_ID: "ship1"
       SPACE_NAME: "{{SPACE_NAME}}"
       GATEWAY_URL: "ws://localhost:8080"
-      SHIP_START_X: "0"
-      SHIP_START_Y: "120"
-      SHIP_START_HEADING: "south"
+      SHIP_START_X: "200"
+      SHIP_START_Y: "200"
+      SHIP_START_HEADING: "east"
       TOKEN_PATH: ".mew/tokens/ship1.token"
+
+  # Ship 2 - Second ship for combat testing (Phase 3)
+  ship2:
+    type: local
+    command: "mew"
+    args:
+      - "mcp"
+      - "ship-server"
+    auto_start: true
+    capabilities:
+      - kind: "*" # Full capabilities (ship is trusted local participant)
+    env:
+      SHIP_ID: "ship2"
+      SPACE_NAME: "{{SPACE_NAME}}"
+      GATEWAY_URL: "ws://localhost:8080"
+      SHIP_START_X: "400"
+      SHIP_START_Y: "200"
+      SHIP_START_HEADING: "west"
+      TOKEN_PATH: ".mew/tokens/ship2.token"
 
   # AI Game Agent 1
   agent1:

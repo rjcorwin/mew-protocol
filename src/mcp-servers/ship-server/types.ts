@@ -55,7 +55,8 @@ export interface CannonControlPoint {
   index: number; // 0, 1, etc for multiple cannons per side
   relativePosition: Position; // Offset from ship origin
   controlledBy: string | null; // Player controlling this cannon
-  aimAngle: number; // Aim angle in radians, relative to perpendicular (±π/4)
+  aimAngle: number; // Horizontal aim angle in radians, relative to perpendicular (±π/4)
+  elevationAngle: number; // Vertical elevation in radians (15° to 60° = 0.26-1.05 rad)
   cooldownRemaining: number; // ms until can fire again
   lastFired: number; // Timestamp of last fire
 }
@@ -176,10 +177,28 @@ export interface AimCannonPayload {
   playerId: string;
 }
 
+export interface AdjustElevationPayload {
+  side: 'port' | 'starboard';
+  index: number;
+  adjustment: 'up' | 'down'; // Increase or decrease elevation
+  playerId: string;
+}
+
 export interface FireCannonPayload {
   side: 'port' | 'starboard';
   index: number;
   playerId: string;
+}
+
+/**
+ * Projectile data (c5x-ship-combat Phase 2)
+ */
+export interface Projectile {
+  id: string;
+  sourceShip: string;
+  spawnTime: number;
+  spawnPosition: Position;
+  initialVelocity: Velocity;
 }
 
 /**
