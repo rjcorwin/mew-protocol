@@ -702,18 +702,23 @@ Then import in both server and client to ensure perfect synchronization.
 - Phaser's `this.load.audio()` in Electron environment causes crash
 - MP3 files are valid (verified with `file` command)
 - Files load in browser but not in Electron/bundled context
-- Suspected issue: Electron's file:// protocol incompatibility with Phaser's XHR audio loader
+- Issue: Electron's file:// protocol incompatibility with Phaser's XHR audio loader
 
-**Potential Fixes** (for future work):
-1. Use Electron's native audio APIs instead of Phaser audio loader
-2. Bundle audio as base64 data URIs in the build
-3. Use Howler.js or other Electron-compatible audio library
-4. Implement custom audio loader using Electron's file system APIs
-5. Convert to OGG Vorbis format (better web audio support)
+**Solution Implemented** ✅:
+Replaced Phaser audio with **Howler.js v2.2.3**:
+1. Installed `howler` and `@types/howler` packages
+2. Changed sound type from `Phaser.Sound.BaseSound` to `Howl`
+3. Removed all `this.load.audio()` calls from `preload()` method
+4. Create `Howl` instances in `create()` with:
+   - **Absolute paths**: `window.location.href + 'assets/sounds/*.mp3'`
+   - **html5: true**: Uses HTML5 Audio instead of Web Audio API (Electron-compatible)
+   - **preload: false**: Lazy loading on first `.play()` call prevents startup crashes
+5. Playback code unchanged (`.play()` works for both Phaser and Howler)
 
-**Files Modified for Audio** (currently commented out):
-- `clients/mew-world/src/game/GameScene.ts` - All audio code present with `//` or `?.` safety
-- `clients/mew-world/assets/sounds/*.mp3` - 5 sound files ready to use
+**Files Modified**:
+- `clients/mew-world/src/game/GameScene.ts` - Howler.js implementation (lines 2, 56-62, 168-215, 880)
+- `clients/mew-world/package.json` - Added Howler.js dependencies
+- `clients/mew-world/assets/sounds/*.mp3` - 5 sound files (working)
 
 - [ ] **Damage smoke**
   - Persistent emitter on damaged ships (health < 50%)

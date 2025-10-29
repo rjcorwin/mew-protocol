@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { Howl } from 'howler';
 import { MEWClient } from '@mew-protocol/mew/client';
 import { PositionUpdate, Player, Ship, Direction, Projectile } from '../types.js';
 
@@ -51,13 +52,13 @@ export class GameScene extends Phaser.Scene {
   private currentCannonAim: number = 0; // Track cannon aim angle in radians (c5x-ship-combat)
   private nearControlPoints: Set<string> = new Set(); // Track which control points player is near (format: "shipId:wheel" or "shipId:sails" or "shipId:cannon-port-0")
   private lastPlayerWaveOffset: number = 0; // Track last wave offset for smooth bobbing
-  // Phase 5: Sound effect instances (c5x-ship-combat)
+  // Phase 5: Sound effect instances using Howler.js (c5x-ship-combat)
   private sounds!: {
-    cannonFire: Phaser.Sound.BaseSound;
-    hitImpact: Phaser.Sound.BaseSound;
-    waterSplash: Phaser.Sound.BaseSound;
-    shipSinking: Phaser.Sound.BaseSound;
-    shipRespawn: Phaser.Sound.BaseSound;
+    cannonFire: Howl;
+    hitImpact: Howl;
+    waterSplash: Howl;
+    shipSinking: Howl;
+    shipRespawn: Howl;
   };
 
   constructor() {
@@ -86,16 +87,6 @@ export class GameScene extends Phaser.Scene {
       frameWidth: 128,
       frameHeight: 128,
     });
-
-    // Phase 5: Load combat sound effects (c5x-ship-combat)
-    // TEMPORARILY DISABLED - Causing crashes in Electron
-    console.log('[GameScene] Audio loading temporarily disabled');
-    // this.load.audio('cannon-fire', 'assets/sounds/cannon-fire.mp3');
-    // this.load.audio('hit-impact', 'assets/sounds/hit-impact.mp3');
-    // this.load.audio('water-splash', 'assets/sounds/water-splash.mp3');
-    // this.load.audio('ship-sinking', 'assets/sounds/ship-sinking.mp3');
-    // this.load.audio('ship-respawn', 'assets/sounds/ship-respawn.mp3');
-    // console.log('[GameScene] Audio files queued for loading');
 
     // Handle load errors for optional assets (don't crash the game)
     this.load.on('loaderror', (fileObj: any) => {
@@ -173,45 +164,54 @@ export class GameScene extends Phaser.Scene {
     // Subscribe to position updates from other players
     this.subscribeToPositionUpdates();
 
-    // Phase 5: Create sound instances (c5x-ship-combat)
-    // TEMPORARILY DISABLED - Audio is causing crashes in Electron
-    // TODO: Debug audio loading issue and re-enable
-    console.warn('⚠ Audio temporarily disabled - investigating Electron compatibility issue');
+    // Phase 5: Create sound instances using Howler.js (c5x-ship-combat)
+    // Howler.js works in Electron where Phaser's audio loader crashes
+    // Key fix: absolute paths via window.location (relative paths fail in Electron)
+    const basePath = window.location.href.replace('index.html', '');
 
-    // Check if audio files loaded before creating sound instances
-    // const audioLoaded = this.cache.audio.exists('cannon-fire') &&
-    //                     this.cache.audio.exists('hit-impact') &&
-    //                     this.cache.audio.exists('water-splash') &&
-    //                     this.cache.audio.exists('ship-sinking') &&
-    //                     this.cache.audio.exists('ship-respawn');
-
-    // if (audioLoaded) {
-    //   try {
-    //     this.sounds = {
-    //       cannonFire: this.sound.add('cannon-fire', { volume: 0.5 }),
-    //       hitImpact: this.sound.add('hit-impact', { volume: 0.6 }),
-    //       waterSplash: this.sound.add('water-splash', { volume: 0.4 }),
-    //       shipSinking: this.sound.add('ship-sinking', { volume: 0.5, loop: true }),
-    //       shipRespawn: this.sound.add('ship-respawn', { volume: 0.7 })
-    //     };
-    //     console.log('✓ Combat sound effects loaded (Phase 5)');
-    //   } catch (err) {
-    //     console.warn('⚠ Failed to create sound instances:', err);
-    //   }
-    // } else {
-    //   console.warn('⚠ Some audio files failed to load - combat will have no sound');
-    //   console.warn('  See assets/sounds/README.md for download instructions');
-    // }
-
-    // Phase 5: Resume audio context on first user interaction (required by browsers/Electron)
-    this.input.once('pointerdown', () => {
-      const soundManager = this.sound as any;
-      if (soundManager.context && soundManager.context.state === 'suspended') {
-        soundManager.context.resume().then(() => {
-          console.log('[GameScene] Audio context resumed');
-        });
-      }
-    });
+    try {
+      this.sounds = {
+        cannonFire: new Howl({
+          src: [basePath + 'assets/sounds/cannon-fire.mp3'],
+          volume: 0.5,
+          html5: true,
+          preload: true,
+          onloaderror: (id, err) => console.error('Failed to load cannon-fire.mp3:', err)
+        }),
+        hitImpact: new Howl({
+          src: [basePath + 'assets/sounds/hit-impact.mp3'],
+          volume: 0.6,
+          html5: true,
+          preload: true,
+          onloaderror: (id, err) => console.error('Failed to load hit-impact.mp3:', err)
+        }),
+        waterSplash: new Howl({
+          src: [basePath + 'assets/sounds/water-splash.mp3'],
+          volume: 0.4,
+          html5: true,
+          preload: true,
+          onloaderror: (id, err) => console.error('Failed to load water-splash.mp3:', err)
+        }),
+        shipSinking: new Howl({
+          src: [basePath + 'assets/sounds/ship-sinking.mp3'],
+          volume: 0.5,
+          loop: true,
+          html5: true,
+          preload: true,
+          onloaderror: (id, err) => console.error('Failed to load ship-sinking.mp3:', err)
+        }),
+        shipRespawn: new Howl({
+          src: [basePath + 'assets/sounds/ship-respawn.mp3'],
+          volume: 0.7,
+          html5: true,
+          preload: true,
+          onloaderror: (id, err) => console.error('Failed to load ship-respawn.mp3:', err)
+        })
+      };
+      console.log('✓ Combat sound effects loaded via Howler.js (Phase 5)');
+    } catch (err) {
+      console.error('Failed to initialize Howler audio:', err);
+    }
 
     console.log(`Game started as ${this.playerId}`);
   }
@@ -821,17 +821,17 @@ export class GameScene extends Phaser.Scene {
       ship.cannons.port.forEach((cannon, index) => {
         const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-port-${index}`);
         const isControlledByUs = this.controllingShip === ship.id &&
-                                  this.controllingPoint === 'cannon' &&
-                                  this.controllingCannon?.side === 'port' &&
-                                  this.controllingCannon?.index === index;
+          this.controllingPoint === 'cannon' &&
+          this.controllingCannon?.side === 'port' &&
+          this.controllingCannon?.index === index;
         this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
       });
       ship.cannons.starboard.forEach((cannon, index) => {
         const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
         const isControlledByUs = this.controllingShip === ship.id &&
-                                  this.controllingPoint === 'cannon' &&
-                                  this.controllingCannon?.side === 'starboard' &&
-                                  this.controllingCannon?.index === index;
+          this.controllingPoint === 'cannon' &&
+          this.controllingCannon?.side === 'starboard' &&
+          this.controllingCannon?.index === index;
         this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
       });
     }
@@ -1198,7 +1198,7 @@ export class GameScene extends Phaser.Scene {
       const elevBarX = worldX - 20;
       const elevBarY = worldY - 25;
       const segmentHeight = 4;
-      const numSegments = Math.round((cannon.elevationAngle - Math.PI/12) / (Math.PI/36)); // 0-9 segments (15°-60° in 5° steps)
+      const numSegments = Math.round((cannon.elevationAngle - Math.PI / 12) / (Math.PI / 36)); // 0-9 segments (15°-60° in 5° steps)
 
       for (let i = 0; i < 9; i++) {
         const alpha = i < numSegments ? 0.8 : 0.2;
@@ -1346,7 +1346,7 @@ export class GameScene extends Phaser.Scene {
 
           // Check if tile is actually within camera view
           if (worldPos.x >= viewLeft && worldPos.x <= viewRight &&
-              worldPos.y >= viewTop && worldPos.y <= viewBottom) {
+            worldPos.y >= viewTop && worldPos.y <= viewBottom) {
 
             // Create a more varied wave effect by combining multiple sine waves
             // This creates interference patterns like real ocean waves
@@ -1586,17 +1586,17 @@ export class GameScene extends Phaser.Scene {
         ship.cannons.port.forEach((cannon, index) => {
           const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-port-${index}`);
           const isControlledByUs = this.controllingShip === ship.id &&
-                                    this.controllingPoint === 'cannon' &&
-                                    this.controllingCannon?.side === 'port' &&
-                                    this.controllingCannon?.index === index;
+            this.controllingPoint === 'cannon' &&
+            this.controllingCannon?.side === 'port' &&
+            this.controllingCannon?.index === index;
           this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
         });
         ship.cannons.starboard.forEach((cannon, index) => {
           const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
           const isControlledByUs = this.controllingShip === ship.id &&
-                                    this.controllingPoint === 'cannon' &&
-                                    this.controllingCannon?.side === 'starboard' &&
-                                    this.controllingCannon?.index === index;
+            this.controllingPoint === 'cannon' &&
+            this.controllingCannon?.side === 'starboard' &&
+            this.controllingCannon?.index === index;
           this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
         });
       }
@@ -1793,29 +1793,29 @@ export class GameScene extends Phaser.Scene {
         if (tilePos) {
           const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
 
-        if (tile && tile.properties?.navigable === true) {
-          // Projectile is over water - calculate water surface Y coordinate
-          const worldPos = this.map.tileToWorldXY(Math.floor(tilePos.x), Math.floor(tilePos.y));
-          if (worldPos) {
-            // Water surface is at the tile's world Y position
-            // Add half tile visual height to get the center/surface of the water tile
-            const waterSurfaceY = worldPos.y + (TILE_VISUAL_HEIGHT / 2);
+          if (tile && tile.properties?.navigable === true) {
+            // Projectile is over water - calculate water surface Y coordinate
+            const worldPos = this.map.tileToWorldXY(Math.floor(tilePos.x), Math.floor(tilePos.y));
+            if (worldPos) {
+              // Water surface is at the tile's world Y position
+              // Add half tile visual height to get the center/surface of the water tile
+              const waterSurfaceY = worldPos.y + (TILE_VISUAL_HEIGHT / 2);
 
-            // Check if cannonball has hit the water (with small margin for cannonball radius)
-            if (proj.sprite.y >= waterSurfaceY - 5) {
-              // HIT WATER! Show splash and despawn
-              this.createWaterSplash(proj.sprite.x, proj.sprite.y);
+              // Check if cannonball has hit the water (with small margin for cannonball radius)
+              if (proj.sprite.y >= waterSurfaceY - 5) {
+                // HIT WATER! Show splash and despawn
+                this.createWaterSplash(proj.sprite.x, proj.sprite.y);
 
-              // Phase 5: Play water splash sound (c5x-ship-combat)
-              this.sounds?.waterSplash?.play();
+                // Phase 5: Play water splash sound (c5x-ship-combat)
+                this.sounds?.waterSplash?.play();
 
-              proj.sprite.destroy();
-              this.projectiles.delete(id);
-              console.log(`[GameScene] Projectile ${id} hit water at (${proj.sprite.x.toFixed(1)}, ${proj.sprite.y.toFixed(1)}). Total: ${this.projectiles.size}`);
-              return;
+                proj.sprite.destroy();
+                this.projectiles.delete(id);
+                console.log(`[GameScene] Projectile ${id} hit water at (${proj.sprite.x.toFixed(1)}, ${proj.sprite.y.toFixed(1)}). Total: ${this.projectiles.size}`);
+                return;
+              }
             }
           }
-        }
         }
       }
 
@@ -1823,9 +1823,9 @@ export class GameScene extends Phaser.Scene {
       const bounds = this.cameras.main.worldView;
       const margin = 100;
       if (proj.sprite.x < bounds.x - margin ||
-          proj.sprite.x > bounds.right + margin ||
-          proj.sprite.y < bounds.y - margin ||
-          proj.sprite.y > bounds.bottom + margin) {
+        proj.sprite.x > bounds.right + margin ||
+        proj.sprite.y < bounds.y - margin ||
+        proj.sprite.y > bounds.bottom + margin) {
         proj.sprite.destroy();
         this.projectiles.delete(id);
         console.log(`[GameScene] Projectile ${id} despawned (off-screen). Total: ${this.projectiles.size}`);
@@ -2178,9 +2178,9 @@ export class GameScene extends Phaser.Scene {
 
           if (cannonDistance < INTERACTION_DISTANCE) {
             const isControlledByUs = this.controllingShip === ship.id &&
-                                      this.controllingPoint === 'cannon' &&
-                                      this.controllingCannon?.side === 'port' &&
-                                      this.controllingCannon?.index === index;
+              this.controllingPoint === 'cannon' &&
+              this.controllingCannon?.side === 'port' &&
+              this.controllingCannon?.index === index;
             const isControlledByOther = cannon.controlledBy && cannon.controlledBy !== this.playerId;
 
             if (isControlledByUs || !isControlledByOther) {
@@ -2208,9 +2208,9 @@ export class GameScene extends Phaser.Scene {
 
           if (cannonDistance < INTERACTION_DISTANCE) {
             const isControlledByUs = this.controllingShip === ship.id &&
-                                      this.controllingPoint === 'cannon' &&
-                                      this.controllingCannon?.side === 'starboard' &&
-                                      this.controllingCannon?.index === index;
+              this.controllingPoint === 'cannon' &&
+              this.controllingCannon?.side === 'starboard' &&
+              this.controllingCannon?.index === index;
             const isControlledByOther = cannon.controlledBy && cannon.controlledBy !== this.playerId;
 
             if (isControlledByUs || !isControlledByOther) {
@@ -2251,8 +2251,8 @@ export class GameScene extends Phaser.Scene {
       } else if (nearestControlPoint) {
         // Grab nearest control point (only if within range)
         if (nearestControlPoint.controlPoint === 'cannon' &&
-            nearestControlPoint.cannonSide !== undefined &&
-            nearestControlPoint.cannonIndex !== undefined) {
+          nearestControlPoint.cannonSide !== undefined &&
+          nearestControlPoint.cannonIndex !== undefined) {
           // Grab cannon
           this.sendGrabCannon(
             nearestControlPoint.shipId,
