@@ -78,7 +78,7 @@ All combat sound effects are stored in `assets/sounds/` as MP3 files (38-104KB e
 - `ship-sinking.mp3` - Creaking/bubbling loop (91KB)
 - `ship-respawn.mp3` - Triumphant chime (74KB)
 
-See `spec/integration-plans/c5x-ship-combat.md` for detailed troubleshooting history.
+See `spec/mew-world/proposals/c5x-ship-combat/implementation.md` for detailed troubleshooting history.
 
 ### Connection Flow
 
@@ -1069,7 +1069,7 @@ Add cannon-based ship combat enabling multiplayer PvP and cooperative multi-crew
 
 - `c5x-ship-combat`: Full specification with 5 implementation phases
 - See detailed documentation in `spec/mew-world/proposals/c5x-ship-combat/`
-- Integration plan: `spec/integration-plans/c5x-ship-combat.md`
+- Implementation plan: `spec/mew-world/proposals/c5x-ship-combat/implementation.md`
 
 ### Phase 5: Polish & Sound Effects ⚠️ PARTIAL
 
@@ -1091,8 +1091,8 @@ Add cannon-based ship combat enabling multiplayer PvP and cooperative multi-crew
    - MP3 files present and valid in `clients/mew-world/assets/sounds/`
    - Phaser audio loader crashes Electron on startup (file:// protocol issue suspected)
 
-**Known Issue - Audio Disabled:**
-Phaser's `this.load.audio()` crashes Electron when loading MP3 files. All audio infrastructure is in place but temporarily disabled (commented out). Needs investigation using Electron-native audio APIs or alternative loaders. See `spec/integration-plans/c5x-ship-combat.md` Phase 5 for details.
+**Status - Audio Working:**
+Audio system implemented with Howler.js (replacing Phaser audio). All combat sounds working in Electron. See `spec/mew-world/proposals/c5x-ship-combat/implementation.md` Phase 5 for troubleshooting history and solution details.
 
 ---
 
