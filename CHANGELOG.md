@@ -6,40 +6,30 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ### MEW World
 
-#### Proposed: Ship-to-Ship Combat (c5x-ship-combat)
-**Status:** Implementation In Progress 🚧 (Phase 1 ✅ COMPLETE, Phase 2 next)
+#### Implemented: Ship-to-Ship Combat (c5x-ship-combat)
+**Status:** Complete ✅ (All 5 Phases)
 **Proposal:** `spec/mew-world/proposals/c5x-ship-combat/`
-**Implementation Plan:** `spec/integration-plans/c5x-ship-combat.md`
+**Implementation Plan:** `spec/mew-world/proposals/c5x-ship-combat/implementation.md`
 
-Add cannon-based ship combat for multiplayer PvP and cooperative multi-crew gameplay.
+Full cannon-based ship combat for multiplayer PvP and cooperative multi-crew gameplay.
 
-**Proposed Features:**
-- 🎯 Cannon control points (port/starboard sides)
-- 🎯 Manual aiming system (±45° arc adjustment)
-- 🎯 Physics-based projectiles (gravity, momentum inheritance)
-- 🎯 Damage/health system (100 HP, sinking at 0)
-- 🎯 Client prediction with server validation
-- 🎯 Visual/audio effects (blasts, splashes, impacts, smoke)
-- 🎯 Multi-crew coordination required
+**Features Implemented:**
+- ✅ Cannon control points (3 per side: port/starboard)
+- ✅ Manual aiming system (±45° arc adjustment)
+- ✅ Physics-based projectiles (gravity, momentum inheritance)
+- ✅ Damage/health system (100 HP, sinking at 0)
+- ✅ Hit detection with client claims & server validation
+- ✅ Visual effects (cannonball trails, explosions, water splash, damage smoke)
+- ✅ Audio effects (5 sounds via Howler.js: cannon fire, impact, splash, sinking, respawn)
+- ✅ Ship sinking animation and respawn mechanics
+- ✅ Multi-crew coordination support
 
-**Implementation Progress:**
+**Implementation Phases:**
 - Phase 1 (Control points & aiming): ✅ COMPLETE
-  - ✅ Ship server initialization (2 port, 2 starboard cannons)
-  - ✅ Cannon config with 4s cooldown
-  - ✅ Grab/release implementation (server + client)
-  - ✅ Aim system (±45° clamping, isometric rotation)
-  - ✅ Fire method (cooldown enforcement)
-  - ✅ Client interaction detection (30px proximity)
-  - ✅ Input handling (E key grab/release, arrows aim, space fire)
-  - ✅ Visual rendering (orange/yellow/red circles)
-  - ✅ Aim arc visualization (cyan arc, magenta aim line, crosshair)
-  - ✅ Cooldown indicator (gray shrinking circle)
-  - ✅ Message handlers (all 4 cannon messages implemented)
-- Phase 2 (Firing & projectiles): 🔲 Not started
-  - Next: Projectile spawn on fire, physics simulation, trail effects
-- Phase 3 (Collision & damage): 🔲 Not started
-- Phase 4 (Sinking & respawn): 🔲 Not started
-- Phase 5 (Polish & sounds): 🔲 Not started
+- Phase 2 (Firing & projectiles): ✅ COMPLETE
+- Phase 3 (Collision & damage): ✅ COMPLETE
+- Phase 4 (Sinking & respawn): ✅ COMPLETE
+- Phase 5 (Polish & sounds): ✅ COMPLETE
 
 **New Protocol Messages:**
 - `ship/aim_cannon` - Adjust cannon aim angle
@@ -49,10 +39,13 @@ Add cannon-based ship combat for multiplayer PvP and cooperative multi-crew game
 - `ship/damage` - Damage notification
 - `ship/respawn` - Ship respawn after sinking
 
-**Open Questions:**
-- Friendly fire enabled?
-- Respawn location strategy?
-- Speed penalty for damaged ships?
+**Technical Notes:**
+- Audio system uses Howler.js instead of Phaser audio (Phaser's XHR loader crashes in Electron)
+- Solution: HTML5 Audio + absolute file paths via `window.location.href`
+- All 5 combat sounds working in Electron production builds
+- Friendly fire disabled (ships can't damage themselves)
+- Ships respawn at original spawn location after 5 seconds
+- No speed penalty for damaged ships (keeps gameplay smooth)
 
 #### Implemented: Tiled Map Integration (t4m)
 **Status:** Complete ✅
