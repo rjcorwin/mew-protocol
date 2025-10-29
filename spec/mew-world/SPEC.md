@@ -1056,6 +1056,284 @@ Add cannon-based ship combat enabling multiplayer PvP and cooperative multi-crew
 **Known Issue - Audio Disabled:**
 Phaser's `this.load.audio()` crashes Electron when loading MP3 files. All audio infrastructure is in place but temporarily disabled (commented out). Needs investigation using Electron-native audio APIs or alternative loaders. See `spec/integration-plans/c5x-ship-combat.md` Phase 5 for details.
 
+---
+
+## Combat Protocol Messages
+
+All ship combat messages use MEW protocol v0.4 envelope format. Messages are sent via the MEW gateway using WebSocket connections.
+
+### Control Messages
+
+#### `ship/grab_cannon`
+Player requests control of a specific cannon.
+
+```typescript
+{
+  kind: 'ship/grab_cannon',
+  to: ['ship1'],           // Ship participant ID
+  payload: {
+    playerId: string,      // Player requesting control
+    side: 'port' | 'starboard',
+    index: number          // Cannon index (0, 1, 2, ...)
+  }
+}
+```
+
+**Response:** Ship broadcasts updated `game/position` with cannon `controlledBy` field set.
+
+#### `ship/release_cannon`
+Player releases cannon control.
+
+```typescript
+{
+  kind: 'ship/release_cannon',
+  to: ['ship1'],
+  payload: {
+    playerId: string,
+    side: 'port' | 'starboard',
+    index: number
+  }
+}
+```
+
+#### `ship/aim_cannon`
+Player adjusts cannon horizontal aim angle.
+
+```typescript
+{
+  kind: 'ship/aim_cannon',
+  to: ['ship1'],
+  payload: {
+    playerId: string,
+    side: 'port' | 'starboard',
+    index: number,
+    aimAngle: number       // Radians, clamped to ±π/4 (±45°)
+  }
+}
+```
+
+**Update Rate:** Sent continuously while aiming (throttled client-side).
+
+#### `ship/adjust_elevation`
+Player adjusts cannon elevation angle.
+
+```typescript
+{
+  kind: 'ship/adjust_elevation',
+  to: ['ship1'],
+  payload: {
+    playerId: string,
+    side: 'port' | 'starboard',
+    index: number,
+    adjustment: number     // Delta in radians (e.g., 0.05)
+  }
+}
+```
+
+**Constraints:** Server clamps elevation to 15-60° range.
+
+#### `ship/fire_cannon`
+Player fires cannon.
+
+```typescript
+{
+  kind: 'ship/fire_cannon',
+  to: ['ship1'],
+  payload: {
+    playerId: string,
+    side: 'port' | 'starboard',
+    index: number
+  }
+}
+```
+
+**Server Response:** If valid (not on cooldown, player controls cannon), ship broadcasts `game/projectile_spawn`.
+
+### Projectile Messages
+
+#### `game/projectile_spawn`
+Ship broadcasts projectile creation after cannon fires.
+
+```typescript
+{
+  kind: 'game/projectile_spawn',
+  to: [],                  // Broadcast to all participants
+  payload: {
+    id: string,            // Unique ID: "shipId-side-index-timestamp"
+    type: 'cannonball',
+    sourceShip: string,    // Ship ID that fired
+    position: { x: number, y: number },      // World coordinates
+    velocity: { x: number, y: number },      // px/s (includes ship velocity)
+    timestamp: number      // Server time (for physics replay)
+  }
+}
+```
+
+**Physics:** All clients simulate identical trajectories using deterministic physics (gravity = 150 px/s²).
+
+#### `game/projectile_hit_claim`
+Client claims projectile hit for server validation.
+
+```typescript
+{
+  kind: 'game/projectile_hit_claim',
+  to: ['sourceShipId'],    // Send to ship that FIRED the projectile
+  payload: {
+    projectileId: string,
+    targetShipId: string,  // Ship that was hit
+    targetPosition: { x: number, y: number },   // For OBB validation
+    targetRotation: number,
+    targetBoundary: { width: number, height: number },
+    claimedDamage: number, // Always 25 for cannonballs
+    timestamp: number      // Client time of collision
+  }
+}
+```
+
+**Validation:** Source ship replays projectile physics and checks OBB collision with target boundary. If valid, forwards damage.
+
+#### `ship/apply_damage`
+Source ship forwards validated damage to target.
+
+```typescript
+{
+  kind: 'ship/apply_damage',
+  to: ['targetShipId'],
+  payload: {
+    amount: number,        // Validated damage amount
+    sourceProjectile: string
+  }
+}
+```
+
+**Server Action:** Target ship reduces health, broadcasts updated state, triggers sinking if health ≤ 0.
+
+### Ship State Messages
+
+#### `game/position` (Ship Extension)
+Ships broadcast extended position updates including combat state.
+
+```typescript
+{
+  kind: 'game/position',
+  to: [],                  // Broadcast
+  payload: {
+    participantId: string, // Ship ID
+    worldCoords: { x: number, y: number },
+    velocity: { x: number, y: number },
+    facing: number,
+    timestamp: number,
+    shipData: {
+      rotation: number,
+      speedLevel: number,
+      deckBoundary: { width: number, height: number },
+
+      // Combat state (c5x-ship-combat)
+      cannons: {
+        port: [{
+          worldPosition: { x: number, y: number },
+          controlledBy: string | null,
+          aimAngle: number,          // Radians
+          elevationAngle: number,     // Radians (15-60°)
+          cooldownRemaining: number   // Milliseconds
+        }],
+        starboard: [/* same structure */]
+      },
+
+      // Health state (Phase 3-4)
+      health: number,
+      maxHealth: number,
+      sinking: boolean
+    }
+  }
+}
+```
+
+**Update Rate:** 10 Hz (every 100ms) for smooth interpolation.
+
+### Wheel Steering Messages
+
+#### `ship/grab_control`
+Player grabs wheel or sails control point.
+
+```typescript
+{
+  kind: 'ship/grab_control',
+  to: ['ship1'],
+  payload: {
+    playerId: string,
+    controlPoint: 'wheel' | 'sails'
+  }
+}
+```
+
+#### `ship/release_control`
+Player releases control point.
+
+```typescript
+{
+  kind: 'ship/release_control',
+  to: ['ship1'],
+  payload: {
+    playerId: string
+  }
+}
+```
+
+#### `ship/wheel_turn_start` / `ship/wheel_turn_stop`
+Player starts/stops turning wheel.
+
+```typescript
+{
+  kind: 'ship/wheel_turn_start',
+  to: ['ship1'],
+  payload: {
+    playerId: string,
+    direction: 'left' | 'right'
+  }
+}
+```
+
+#### `ship/adjust_sails`
+Player adjusts sail state.
+
+```typescript
+{
+  kind: 'ship/adjust_sails',
+  to: ['ship1'],
+  payload: {
+    playerId: string,
+    adjustment: number      // -1 = lower, +1 = raise
+  }
+}
+```
+
+**Server Action:** Ship clamps `speedLevel` to 0-3 range, adjusts velocity accordingly.
+
+### Map Data Messages
+
+#### `ship/map_data`
+Client sends map navigation data to ship server.
+
+```typescript
+{
+  kind: 'ship/map_data',
+  to: ['ship1'],
+  payload: {
+    mapWidth: number,
+    mapHeight: number,
+    tileWidth: number,
+    tileHeight: number,
+    navigableTiles: Array<{ x: number, y: number }>,
+    orientation: 'isometric' | 'orthogonal'
+  }
+}
+```
+
+**Purpose:** Allows ship server to perform collision detection for obstacles/boundaries.
+
+---
+
 ### Future Enhancements (Phase 6+)
 
 3. **Combat UI:**
