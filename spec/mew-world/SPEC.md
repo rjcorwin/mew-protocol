@@ -38,9 +38,47 @@ The Electron-based game client (`clients/mew-world`) provides the complete playe
 
 - **Electron 28**: Desktop application framework providing native windowing and Node.js integration
 - **Phaser 3.90**: Game engine handling rendering, sprites, input, and game loop
+- **Howler.js 2.2.3**: Audio library for cross-platform sound effects (replaces Phaser audio for Electron compatibility)
 - **TypeScript**: Type-safe development with ES modules
 - **esbuild**: Fast bundling of renderer code with CommonJS output for Electron compatibility
 - **MEW SDK Client**: WebSocket-based protocol client for real-time communication
+
+### Audio System
+
+The game uses **Howler.js** instead of Phaser's built-in audio system due to Electron compatibility issues.
+
+**Problem**: Phaser's `this.load.audio()` uses an XHR-based loader that is fundamentally incompatible with Electron's `file://` protocol. Even with absolute file paths, Phaser's audio loader crashes the Electron renderer process.
+
+**Solution**: Howler.js provides HTML5 Audio and Web Audio API support that works correctly in Electron:
+
+```typescript
+// Create Howl instances with absolute paths
+const basePath = window.location.href.replace('index.html', '');
+this.sounds = {
+  cannonFire: new Howl({
+    src: [basePath + 'assets/sounds/cannon-fire.mp3'],
+    volume: 0.5,
+    html5: true,      // Use HTML5 Audio for Electron compatibility
+    preload: true     // Load files immediately
+  })
+};
+```
+
+**Key Implementation Details**:
+- **Absolute paths**: Use `window.location.href` to construct full `file://` URLs (relative paths fail in Electron)
+- **html5: true**: Forces HTML5 `<audio>` elements instead of Web Audio API's XHR loader
+- **preload: true**: Loads audio files on scene creation for instant playback
+- **Playback API**: `.play()` and `.stop()` methods are compatible with Phaser's sound interface
+
+**Audio Files**:
+All combat sound effects are stored in `assets/sounds/` as MP3 files (38-104KB each):
+- `cannon-fire.mp3` - Deep cannon boom (60KB)
+- `hit-impact.mp3` - Wood crack when cannonball hits ship (104KB)
+- `water-splash.mp3` - Splash when cannonball misses (38KB)
+- `ship-sinking.mp3` - Creaking/bubbling loop (91KB)
+- `ship-respawn.mp3` - Triumphant chime (74KB)
+
+See `spec/integration-plans/c5x-ship-combat.md` for detailed troubleshooting history.
 
 ### Connection Flow
 
