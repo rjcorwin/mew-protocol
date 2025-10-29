@@ -25,7 +25,7 @@ MEW Protocol follows a spec-driven development approach where specifications are
 
 1. **Draft** - Add CHANGELOG entry, design and write proposals in proposals/ (in Draft PR)
 2. **Incorporate** - Update specs, mark CHANGELOG entry as needing implementation (still Draft PR)
-3. **Implementation Planning** - Create implementation plan in integration-plans/, reference from CHANGELOG (still Draft PR)
+3. **Implementation Planning** - Create implementation.md in proposal directory if needed (still Draft PR)
 4. **Implementation** - Write code, tests, examples, update CHANGELOG status (still Draft PR)
 5. **Review** - Get feedback, iterate or revert if needed (PR Ready for Review)
 6. **Merge** - Merge approved changes (specs + code together)
@@ -42,19 +42,13 @@ MEW Protocol follows a spec-driven development approach where specifications are
   - `proposal.md` - Main specification with motivation, goals, technical details
   - `research.md` - Background research, constraints, current state, prior art
   - `decision-XXX-name.md` - Individual ADR-style decision records as needed
-
-**Rejected proposals:** `spec/<area>/rejected/XXX-name/`
-
-**Implementation plans:** `spec/integration-plans/XXX-name.md`
-- Same XXX-name format as proposals
-- Optional, for complex changes requiring coordination
+  - `implementation.md` - Step-by-step implementation plan (optional, for complex changes)
 
 ### Core Documents
 
-- **Proposals** - Design rationale, research, decisions (stay in `proposals/` permanently)
+- **Proposals** - Design rationale, research, decisions, and implementation plans (stay in `proposals/` permanently)
 - **Main Specs** - Authoritative documentation (updated from proposals)
 - **CHANGELOG.md** - Tracks status of all proposals (Draft → Needs Implementation → In Progress → Done → Released)
-- **Implementation Plans** - Guides code development (optional, for complex changes)
 
 ---
 
@@ -77,11 +71,10 @@ See [Development Guide](docs/development.md) for detailed development setup, tes
 ### PR Structure
 
 A typical PR includes:
-1. **Proposals** in `spec/<area>/proposals/XXX-name/`
+1. **Proposals** in `spec/<area>/proposals/XXX-name/` (with optional implementation.md)
 2. **Spec updates** incorporating the proposals
 3. **CHANGELOG entries** tracking status
-4. **Implementation plan** (if complex changes)
-5. **Code implementation** with tests and examples
+4. **Code implementation** with tests and examples
 
 ### Review Process
 
