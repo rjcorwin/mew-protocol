@@ -702,7 +702,9 @@ Then import in both server and client to ensure perfect synchronization.
 - Phaser's `this.load.audio()` in Electron environment causes crash
 - MP3 files are valid (verified with `file` command)
 - Files load in browser but not in Electron/bundled context
-- Issue: Electron's file:// protocol incompatibility with Phaser's XHR audio loader
+- Issue: Phaser's XHR-based audio loader fundamentally incompatible with Electron
+- **Tested**: Phaser with absolute paths (same as Howler fix) still crashes
+- **Conclusion**: Path resolution was only part of the problem; Phaser's loader itself fails in Electron
 
 **Solution Implemented** ✅:
 Replaced Phaser audio with **Howler.js v2.2.3**:
