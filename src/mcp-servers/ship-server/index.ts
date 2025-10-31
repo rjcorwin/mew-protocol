@@ -16,7 +16,7 @@ import path from 'path';
 
 // Parse configuration from environment or use defaults
 const participantId = process.env.SHIP_ID || 'ship1';
-const spaceName = process.env.SPACE_NAME || 'mew-world';
+const spaceName = process.env.SPACE_NAME || 'seacat';
 const gatewayUrl = process.env.GATEWAY_URL || 'ws://localhost:8080';
 
 // Read token from file

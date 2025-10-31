@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Ship Server for MEW World
+ * Ship Server for Seacat
  *
  * Represents a ship entity with interactive control points.
  * Players can grab the steering wheel or sail ropes to control the ship.

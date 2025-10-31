@@ -4,12 +4,12 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ## [Unreleased]
 
-### MEW World
+### Seacat
 
 #### Implemented: Ship-to-Ship Combat (c5x-ship-combat)
 **Status:** Complete ✅ (All 5 Phases)
-**Proposal:** `spec/mew-world/proposals/c5x-ship-combat/`
-**Implementation Plan:** `spec/mew-world/proposals/c5x-ship-combat/implementation.md`
+**Proposal:** `spec/seacat/proposals/c5x-ship-combat/`
+**Implementation Plan:** `spec/seacat/proposals/c5x-ship-combat/implementation.md`
 
 Full cannon-based ship combat for multiplayer PvP and cooperative multi-crew gameplay.
 
@@ -49,7 +49,7 @@ Full cannon-based ship combat for multiplayer PvP and cooperative multi-crew gam
 
 #### Implemented: Tiled Map Integration (t4m)
 **Status:** Complete ✅
-**Proposal:** `spec/mew-world/proposals/t4m-tiled-maps/`
+**Proposal:** `spec/seacat/proposals/t4m-tiled-maps/`
 
 Add support for Tiled Map Editor (.tmj) files with tile-based collision detection and gameplay properties.
 
@@ -71,14 +71,14 @@ Add support for Tiled Map Editor (.tmj) files with tile-based collision detectio
 - Phase 3d: Multiplayer testing (ready for testing)
 
 **Files Added:**
-- `clients/mew-world/assets/maps/example-map.tmj` - Example 20×20 map
-- `clients/mew-world/assets/maps/tilesets/terrain.tsj` - Terrain tileset definition
-- `clients/mew-world/assets/maps/README.md` - Map creation guide
-- `spec/mew-world/proposals/t4m-tiled-maps/` - Complete proposal
+- `clients/seacat/assets/maps/example-map.tmj` - Example 20×20 map
+- `clients/seacat/assets/maps/tilesets/terrain.tsj` - Terrain tileset definition
+- `clients/seacat/assets/maps/README.md` - Map creation guide
+- `spec/seacat/proposals/t4m-tiled-maps/` - Complete proposal
 
 **Files Modified:**
-- `clients/mew-world/src/game/GameScene.ts` - Map loading, collision, rendering
-- `spec/mew-world/implementation-plan.md` - Milestone 3 complete
+- `clients/seacat/src/game/GameScene.ts` - Map loading, collision, rendering
+- `spec/seacat/implementation-plan.md` - Milestone 3 complete
 
 ## [v0.5.1] - 2025-01-06
 

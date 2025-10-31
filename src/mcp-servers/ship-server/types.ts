@@ -1,5 +1,5 @@
 /**
- * Ship state and control types for MEW World ship entities
+ * Ship state and control types for Seacat ship entities
  */
 
 /**

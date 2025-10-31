@@ -62,7 +62,7 @@ mcp
 
 mcp
   .command('ship-server')
-  .description('Run MCP ship server for MEW World game')
+  .description('Run MCP ship server for Seacat game')
   .action(async () => {
     // __dirname is dist/cli/commands, ship-server is at dist/mcp-servers/ship-server/
     const serverPath = resolve(__dirname, '../../mcp-servers/ship-server/index.js');
@@ -94,7 +94,7 @@ mcp
     console.log('\nAvailable MCP servers:\n');
     console.log('  filesystem <path>  - Filesystem MCP server for file operations');
     console.log('  cat-maze           - Interactive maze game for AI agents');
-    console.log('  ship-server        - Ship entity server for MEW World game');
+    console.log('  ship-server        - Ship entity server for Seacat game');
     console.log('');
   });
 
