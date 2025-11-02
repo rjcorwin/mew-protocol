@@ -7,6 +7,7 @@ import * as IsoMath from './utils/IsometricMath.js';
 import { CollisionManager } from './managers/CollisionManager.js';
 import { MapManager } from './managers/MapManager.js';
 import { PlayerManager } from './managers/PlayerManager.js';
+import { ProjectileManager } from './managers/ProjectileManager.js';
 import { EffectsRenderer } from './rendering/EffectsRenderer.js';
 import { WaterRenderer } from './rendering/WaterRenderer.js';
 import { PlayerRenderer } from './rendering/PlayerRenderer.js';
@@ -49,6 +50,7 @@ export class GameScene extends Phaser.Scene {
   private mapManager!: MapManager;
   private collisionManager!: CollisionManager;
   private playerManager!: PlayerManager;
+  private projectileManager!: ProjectileManager;
   private effectsRenderer!: EffectsRenderer;
   private waterRenderer!: WaterRenderer;
   private playerRenderer!: PlayerRenderer;
@@ -157,8 +159,19 @@ export class GameScene extends Phaser.Scene {
 
     // Initialize managers and renderers
     this.waterRenderer = new WaterRenderer(this, this.map);
-    this.playerManager = new PlayerManager(this, this.map, this.groundLayer, this.secondLayer, this.waterRenderer, this.remotePlayers);
     this.effectsRenderer = new EffectsRenderer(this);
+    this.playerManager = new PlayerManager(this, this.map, this.groundLayer, this.secondLayer, this.waterRenderer, this.remotePlayers);
+    this.projectileManager = new ProjectileManager(
+      this,
+      this.map,
+      this.groundLayer,
+      this.projectiles,
+      this.collisionManager,
+      this.effectsRenderer,
+      this.sounds,
+      this.onShip,
+      this.sendProjectileHitClaim.bind(this)
+    );
     this.playerRenderer = new PlayerRenderer(this);
     this.shipRenderer = new ShipRenderer(this);
 
@@ -283,7 +296,7 @@ export class GameScene extends Phaser.Scene {
         }
       } else if (envelope.kind === 'game/projectile_spawn') {
         // c5x-ship-combat Phase 2: Handle projectile spawn
-        this.spawnProjectile(envelope.payload);
+        this.projectileManager.spawnProjectile(envelope.payload);
       }
     });
   }
@@ -552,56 +565,6 @@ export class GameScene extends Phaser.Scene {
         this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
       });
     }
-  }
-
-  /**
-   * Spawn a projectile from a cannon (c5x-ship-combat Phase 2)
-   */
-  private spawnProjectile(payload: any) {
-    const { id, position, velocity, timestamp, sourceShip } = payload;
-
-    // Check for duplicate (idempotency)
-    if (this.projectiles.has(id)) {
-      console.log(`Projectile ${id} already exists, ignoring duplicate spawn`);
-      return;
-    }
-
-    console.log(`[GameScene] Spawning projectile ${id} at (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
-    console.log(`  Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) px/s`);
-
-    // Create cannonball sprite (black circle, 8px diameter)
-    const sprite = this.add.circle(
-      position.x,
-      position.y,
-      4, // radius = 4px (8px diameter)
-      0x222222, // Dark gray/black
-      1.0 // Full opacity
-    );
-    sprite.setDepth(100); // Above ships and players
-
-    // Store projectile
-    const projectile: Projectile = {
-      id,
-      sprite,
-      velocity: { ...velocity }, // Copy velocity
-      spawnTime: timestamp,
-      sourceShip,
-      minFlightTime: 200, // 200ms grace period before water collision check (prevents instant despawn from deck-level shots)
-    };
-
-    this.projectiles.set(id, projectile);
-    console.log(`[GameScene] Projectile ${id} spawned successfully. Total projectiles: ${this.projectiles.size}`);
-
-    // Phase 5: Play cannon fire sound (c5x-ship-combat)
-    this.sounds?.cannonFire?.play();
-
-    // Phase 5: Camera shake if local player is on the firing ship (c5x-ship-combat)
-    if (sourceShip === this.onShip) {
-      this.cameras.main.shake(100, 0.005); // 100ms duration, 0.005 intensity
-    }
-
-    // Show cannon blast effect at spawn position (Phase 2c)
-    this.effectsRenderer.createCannonBlast(position.x, position.y);
   }
 
   private animateVisibleWaterTiles(time: number) {
@@ -941,141 +904,7 @@ export class GameScene extends Phaser.Scene {
     this.playerManager.interpolateRemotePlayers(delta, time);
 
     // c5x-ship-combat Phase 2: Update projectile physics
-    const GRAVITY = 150; // px/s² (must match server)
-    const LIFETIME = 2000; // ms
-    const deltaS = delta / 1000; // Convert to seconds
-
-    this.projectiles.forEach((proj, id) => {
-      // Check lifetime (safety net)
-      const age = Date.now() - proj.spawnTime;
-      if (age > LIFETIME) {
-        proj.sprite.destroy();
-        this.projectiles.delete(id);
-        console.log(`[GameScene] Projectile ${id} despawned (lifetime expired). Total: ${this.projectiles.size}`);
-        return;
-      }
-
-      // Apply gravity (downward acceleration)
-      proj.velocity.y += GRAVITY * deltaS;
-
-      // Update position (Euler integration)
-      proj.sprite.x += proj.velocity.x * deltaS;
-      proj.sprite.y += proj.velocity.y * deltaS;
-
-      // Phase 2c: Add smoke trail effect (30% chance per frame ~18 puffs/sec at 60fps)
-      if (Math.random() < 0.3) {
-        const trail = this.add.circle(
-          proj.sprite.x,
-          proj.sprite.y,
-          3,
-          0x888888,
-          0.5
-        );
-        trail.setDepth(100);
-
-        this.tweens.add({
-          targets: trail,
-          alpha: 0,
-          scale: 1.5,
-          duration: 300,
-          ease: 'Cubic.easeOut',
-          onComplete: () => trail.destroy()
-        });
-      }
-
-      // Phase 3: Check collision with ships (except source ship)
-      let hitShip = false;
-      this.ships.forEach((ship) => {
-        if (ship.id === proj.sourceShip) return; // Don't hit own ship
-        if (hitShip) return; // Already hit a ship this frame
-
-        // Use existing OBB collision with generous hitbox
-        const hitboxPadding = 1.2; // 20% generous hitbox
-        const paddedBoundary = {
-          width: ship.deckBoundary.width * hitboxPadding,
-          height: ship.deckBoundary.height * hitboxPadding
-        };
-
-        if (this.collisionManager.isPointInRotatedRect(
-          { x: proj.sprite.x, y: proj.sprite.y },
-          { x: ship.sprite.x, y: ship.sprite.y },
-          paddedBoundary,
-          ship.rotation
-        )) {
-          // HIT! Show effect immediately (client prediction)
-          this.effectsRenderer.createHitEffect(proj.sprite.x, proj.sprite.y);
-
-          // Phase 5: Play hit impact sound (c5x-ship-combat)
-          this.sounds?.hitImpact?.play();
-
-          // Send hit claim to target ship for validation (include target's position/boundary for server validation)
-          this.sendProjectileHitClaim(
-            ship.id,
-            proj.id,
-            Date.now(),
-            ship.sprite.x,
-            ship.sprite.y,
-            ship.rotation,
-            ship.deckBoundary
-          );
-
-          // Despawn projectile locally
-          proj.sprite.destroy();
-          this.projectiles.delete(id);
-          console.log(`[GameScene] Projectile ${id} hit ship ${ship.id}. Total: ${this.projectiles.size}`);
-          hitShip = true;
-          return;
-        }
-      });
-
-      if (hitShip) return; // Skip water check if we hit a ship
-
-      // Phase 2c: Check for water surface collision
-      // ONLY check if: (1) past grace period AND (2) descending
-      // Grace period prevents instant despawn from deck-level downward shots
-      if (age > proj.minFlightTime && proj.velocity.y > 0) {
-        const tilePos = this.map.worldToTileXY(proj.sprite.x, proj.sprite.y);
-        if (tilePos) {
-          const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
-
-          if (tile && tile.properties?.navigable === true) {
-            // Projectile is over water - calculate water surface Y coordinate
-            const worldPos = this.map.tileToWorldXY(Math.floor(tilePos.x), Math.floor(tilePos.y));
-            if (worldPos) {
-              // Water surface is at the tile's world Y position
-              // Add half tile visual height to get the center/surface of the water tile
-              const waterSurfaceY = worldPos.y + (TILE_VISUAL_HEIGHT / 2);
-
-              // Check if cannonball has hit the water (with small margin for cannonball radius)
-              if (proj.sprite.y >= waterSurfaceY - 5) {
-                // HIT WATER! Show splash and despawn
-                this.effectsRenderer.createWaterSplash(proj.sprite.x, proj.sprite.y);
-
-                // Phase 5: Play water splash sound (c5x-ship-combat)
-                this.sounds?.waterSplash?.play();
-
-                proj.sprite.destroy();
-                this.projectiles.delete(id);
-                console.log(`[GameScene] Projectile ${id} hit water at (${proj.sprite.x.toFixed(1)}, ${proj.sprite.y.toFixed(1)}). Total: ${this.projectiles.size}`);
-                return;
-              }
-            }
-          }
-        }
-      }
-
-      // Check if off-screen (optimization)
-      const bounds = this.cameras.main.worldView;
-      const margin = 100;
-      if (proj.sprite.x < bounds.x - margin ||
-        proj.sprite.x > bounds.right + margin ||
-        proj.sprite.y < bounds.y - margin ||
-        proj.sprite.y > bounds.bottom + margin) {
-        proj.sprite.destroy();
-        this.projectiles.delete(id);
-        console.log(`[GameScene] Projectile ${id} despawned (off-screen). Total: ${this.projectiles.size}`);
-      }
-    });
+    this.projectileManager.updateProjectiles(delta, this.ships);
   }
 
 
