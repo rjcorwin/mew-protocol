@@ -32,9 +32,17 @@
 - **Shift+A:** Add new object
 - **Shift+D:** Duplicate object
 - **Tab:** Toggle Edit mode (for modifying mesh)
+- **Z:** Open viewport shading menu
 - **Numpad 7:** Top view
 - **Numpad 1:** Front view
 - **Numpad 3:** Side view
+
+### Viewport Shading (IMPORTANT!)
+To see colors and materials as you work:
+1. Look at **top-right of 3D viewport** - you'll see 4 small sphere icons
+2. Click the **3rd icon** (Material Preview) - white sphere
+3. Now colors and materials will be visible (default Solid mode shows everything gray)
+4. Quick toggle: Press **Z** to open shading menu
 
 ### Pro Tip: Use Numpad Views
 Press **Numpad 7** for perfect top-down view when modeling.
@@ -143,9 +151,13 @@ We're making a simple blocky sailing ship:
    - Press Enter
 
 3. **Change color (optional, for visual distinction):**
+   - **Switch to Material Preview mode first:** Top-right viewport icons → 3rd sphere (or press **Z** → Material Preview)
    - With deck selected, right panel → Material Properties
    - Click "New" to add material
    - Base Color: Choose lighter brown/tan
+     - Click color swatch → switch to "Hex" mode
+     - Recommended: `D2B48C` (tan) or `DEB887` (burlywood)
+   - You should now see the color on your deck!
 
 ### Step 3: Create Mast
 
@@ -253,7 +265,7 @@ We're making a simple blocky sailing ship:
 
 ### Step 1: Configure Render Output
 
-1. **Select Render Properties** (right panel, camera icon)
+1. **Select Render Properties** (right panel tabs, camera icon)
 
 2. **Set Render Engine:**
    - Render Engine: **Eevee** (faster) or **Cycles** (better quality, slower)
@@ -280,18 +292,37 @@ We're making a simple blocky sailing ship:
 
 1. **Enter camera view:** Press **Numpad 0**
 2. **Check ship framing:**
-   - Ship should fill ~80% of frame
-   - Leave small margin on all sides
+   - Ship should fill ~70-80% of frame
+   - Leave small margin on all sides (10-15% space)
 
 3. **If ship too small/large:**
    - Select camera
    - Press **N** → Item tab
-   - Adjust **Orthographic Scale** (try 8-12)
+   - Adjust **Orthographic Scale** (try 6-8)
+   - Smaller numbers = ship appears larger
+   - Larger numbers = ship appears smaller
 
-4. **If ship off-center:**
+4. **If ship off-center vertically:**
+   - Select camera (not ship)
+   - Adjust Camera Location Z value
+   - Try values between 7-9
+   - Higher Z = ship appears lower in frame
+
+5. **If ship off-center horizontally:**
    - Select ship (not camera)
    - Move ship: **G**, then mouse/arrow keys
    - Or set Location to X=0, Y=0, Z=0
+
+**Typical final settings for this ship:**
+- Ship Location: X=0, Y=0, Z=0
+- Camera Location: X=10, Y=-10, Z=8.5
+- Camera Orthographic Scale: 7.0
+
+**Pro tip:** Adjust in this order:
+1. First: Set ship Z location to 0
+2. Second: Adjust camera Orthographic Scale for size
+3. Third: Adjust camera Z location for vertical centering
+4. Fourth: Fine-tune if needed
 
 ---
 
@@ -374,14 +405,16 @@ We're making a simple blocky sailing ship:
 ### Color Palette Suggestions
 
 **Wooden ship:**
-- Hull: Dark brown (#8B4513)
-- Deck: Light brown (#DEB887)
-- Sails: Off-white (#F5F5DC)
+- Hull: Dark brown `8B4513` (saddle brown)
+- Deck: Light brown `DEB887` (burlywood) or `D2B48C` (tan)
+- Mast: Medium brown `C19A6B` (camel)
+- Sails: Off-white `F5F5DC` (beige) or `FFFAF0` (floral white)
 
 **How to set colors:**
 1. Select object part
-2. Material Properties → Base Color
-3. Click color picker, enter hex code
+2. Material Properties → New (if needed) → Base Color
+3. Click color swatch → switch to "Hex" mode at top
+4. Enter hex code (without the # symbol)
 
 ---
 
