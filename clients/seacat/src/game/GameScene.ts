@@ -8,6 +8,7 @@ import { CollisionManager } from './managers/CollisionManager.js';
 import { MapManager } from './managers/MapManager.js';
 import { EffectsRenderer } from './rendering/EffectsRenderer.js';
 import { WaterRenderer } from './rendering/WaterRenderer.js';
+import { PlayerRenderer } from './rendering/PlayerRenderer.js';
 
 const {
   TILE_WIDTH,
@@ -47,6 +48,7 @@ export class GameScene extends Phaser.Scene {
   private collisionManager!: CollisionManager;
   private effectsRenderer!: EffectsRenderer;
   private waterRenderer!: WaterRenderer;
+  private playerRenderer!: PlayerRenderer;
   private controllingShip: string | null = null;
   private controllingPoint: 'wheel' | 'sails' | 'mast' | 'cannon' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
@@ -152,13 +154,14 @@ export class GameScene extends Phaser.Scene {
     // Initialize renderers
     this.effectsRenderer = new EffectsRenderer(this);
     this.waterRenderer = new WaterRenderer(this, this.map);
+    this.playerRenderer = new PlayerRenderer(this);
 
     // Create graphics for shallow water overlay (renders on top of sand)
     this.shallowWaterGraphics = this.add.graphics();
     this.shallowWaterGraphics.setDepth(0.5); // Between ground (0) and ships (0)
 
     // Create 8-direction walk animations
-    this.createPlayerAnimations();
+    this.playerRenderer.createPlayerAnimations();
 
     // Set up camera bounds based on map dimensions
     const camera = this.cameras.main;
@@ -242,68 +245,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     console.log(`Game started as ${this.playerId}`);
-  }
-
-  private createPlayerAnimations() {
-    // Create 8 directional walk animations
-    // Sprite sheet layout: 8 rows (directions) × 4 columns (frames)
-    const directions = [
-      'south',     // Row 0: Walking down
-      'southwest', // Row 1
-      'west',      // Row 2: Walking left
-      'northwest', // Row 3
-      'north',     // Row 4: Walking up
-      'northeast', // Row 5
-      'east',      // Row 6: Walking right
-      'southeast', // Row 7
-    ];
-
-    directions.forEach((dir, row) => {
-      this.anims.create({
-        key: `walk-${dir}`,
-        frames: this.anims.generateFrameNumbers('player', {
-          start: row * 4,
-          end: row * 4 + 3,
-        }),
-        frameRate: 10,
-        repeat: -1, // Loop indefinitely
-      });
-    });
-
-    console.log('Created 8 directional walk animations');
-  }
-
-  private updatePlayerAnimation(sprite: Phaser.GameObjects.Sprite, velocity: Phaser.Math.Vector2): Direction {
-    // Calculate direction from velocity
-    const direction = this.calculateDirection(velocity);
-
-    // Play corresponding walk animation (true = ignore if already playing)
-    sprite.play(`walk-${direction}`, true);
-
-    return direction;
-  }
-
-  private calculateDirection(velocity: Phaser.Math.Vector2): Direction {
-    // Calculate angle from velocity vector
-    const angle = Math.atan2(velocity.y, velocity.x);
-
-    // Quantize to nearest 45° increment (8 directions)
-    // Add 8 and mod 8 to handle negative angles
-    const directionIndex = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
-
-    // Map angle to direction name
-    const directions: Direction[] = [
-      'east',      // 0° (right)
-      'southeast', // 45°
-      'south',     // 90° (down)
-      'southwest', // 135°
-      'west',      // 180° (left)
-      'northwest', // 225°
-      'north',     // 270° (up)
-      'northeast', // 315°
-    ];
-
-    return directions[directionIndex];
   }
 
   private async requestPositionStream() {
@@ -1108,7 +1049,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         // Update animation based on movement direction and store facing
-        this.lastFacing = this.updatePlayerAnimation(this.localPlayer, velocity);
+        this.lastFacing = this.playerRenderer.updatePlayerAnimation(this.localPlayer, velocity);
       } else {
         // Stop animation when idle
         this.localPlayer.anims.stop();
