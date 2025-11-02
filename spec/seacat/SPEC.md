@@ -721,8 +721,8 @@ Replace placeholder ship visualization (4 colored corner dots) with high-quality
 ### Sprite Sheet Format
 
 **File:** `assets/sprites/ship1.png`
-**Dimensions:** 1024×1024 pixels (8 columns × 8 rows)
-**Frame size:** 128×128 pixels per frame
+**Dimensions:** 2048×2048 pixels (8 columns × 8 rows)
+**Frame size:** 256×256 pixels per frame (high resolution to avoid blur when scaled)
 **Frame count:** 64 frames covering 360° rotation
 **Rotation increment:** 5.625° per frame (360° / 64)
 
@@ -754,12 +754,12 @@ Replace placeholder ship visualization (4 colored corner dots) with high-quality
 
 **Camera settings:**
 - Type: Orthographic (matches isometric tiles)
-- Position: X=10, Y=-10, Z=7
+- Position: X=10, Y=-10, Z=8.5 (adjusted for proper framing)
 - Rotation: X=60°, Y=0°, Z=45°
-- Orthographic Scale: 200 (adjusted to fit ship in frame)
+- Orthographic Scale: 7.0 (adjusted to fit ship in frame)
 
 **Render settings:**
-- Resolution: 128×128 pixels per frame
+- Resolution: 256×256 pixels per frame (high res to avoid blur when scaled)
 - Background: Transparent (PNG with alpha channel)
 - Samples: 32 (good quality for blocky geometry)
 - Shading: Flat (no smooth interpolation)
@@ -778,7 +778,7 @@ Replace placeholder ship visualization (4 colored corner dots) with high-quality
 # Combines 64 frames into 8×8 grid using ImageMagick
 montage ship_frames/ship_*.png \
   -tile 8x8 \
-  -geometry 128x128+0+0 \
+  -geometry 256x256+0+0 \
   -background none \
   ship1.png
 ```
@@ -789,8 +789,8 @@ montage ship_frames/ship_*.png \
 ```typescript
 preload() {
   this.load.spritesheet('ship1', 'assets/sprites/ship1.png', {
-    frameWidth: 128,
-    frameHeight: 128
+    frameWidth: 256,
+    frameHeight: 256
   });
 }
 ```
@@ -798,24 +798,33 @@ preload() {
 **Creating ship sprite:**
 ```typescript
 const shipSprite = this.add.sprite(x, y, 'ship1', 0);
-shipSprite.setOrigin(0.5, 0.5);
+// Origin at (0.5, 0.7) aligns hull/deck at center, mast extends upward
+shipSprite.setOrigin(0.5, 0.7);
 shipSprite.setDepth(1); // Above ground tiles
+// Scale to 0.75 (256px frames scaled to fit 128px deck width, then 1.5x for visibility)
+shipSprite.setScale(0.75);
 ```
 
 **Updating sprite frame from rotation:**
 ```typescript
 private calculateShipSpriteFrame(rotation: number): number {
+  // Apply -45° offset to align Blender camera orientation with game coordinates
+  const offset = Math.PI / 4; // 45 degrees
+  const offsetRotation = rotation - offset;
+
   // Normalize rotation to 0-2π range
-  const normalizedRotation = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  const normalizedRotation = ((offsetRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
 
   // Convert to frame index (0-63)
-  const frameIndex = Math.round((normalizedRotation / (Math.PI * 2)) * 64) % 64;
+  // Reverse direction: Blender rendered counter-clockwise, game rotates clockwise
+  const frameIndex = Math.round(((Math.PI * 2 - normalizedRotation) / (Math.PI * 2)) * 64) % 64;
 
   return frameIndex;
 }
 
 // In update loop
 ship.sprite.setFrame(this.calculateShipSpriteFrame(ship.rotation));
+// Note: Do NOT call ship.sprite.setRotation() - rotation is shown via frames
 ```
 
 ### Implementation Files
@@ -837,10 +846,10 @@ ship.sprite.setFrame(this.calculateShipSpriteFrame(ship.rotation));
 
 ### Performance
 
-**File size:** ~300-600 KB per ship type (acceptable for web delivery)
-**Loading time:** ~50-100ms for PNG decode
+**File size:** ~1.1 MB per ship type (higher res sprites, acceptable for web delivery)
+**Loading time:** ~100-150ms for PNG decode
 **Frame switching:** <1ms (O(1) in Phaser)
-**GPU memory:** ~4 MB (uncompressed RGBA)
+**GPU memory:** ~16 MB (uncompressed RGBA at 2048×2048)
 
 No performance degradation from placeholder rendering.
 
@@ -860,8 +869,12 @@ To add `ship2`, `ship3`, etc.:
 - ✅ Sprite sheet assembly script created
 - ✅ Client integration (GameScene.ts updated)
 - ✅ Documentation and guides completed
-- ⏳ Awaiting ship model creation in Blender (human task)
-- ⏳ Awaiting sprite sheet generation and testing
+- ✅ Ship model created in Blender (ship1.blend)
+- ✅ Sprite sheet generated and tested (ship1.png)
+- ✅ In-game rendering working with smooth rotation
+- ✅ Control point rotation fixed
+- ✅ Sprite origin and scaling adjusted for proper alignment
+- ✅ Resolution increased to 256×256 to eliminate blur
 
 ### Related Proposals
 
