@@ -1,17 +1,23 @@
 # To Do
 
-- [ ] Shader for dynamic water effects
-- [ ] Fix the bug in cannon tragectories
+- [ ] Show control points above the ship sprite
+- [ ] Fix the bug in cannon tragectories (when pointing south with cannon all the way up, immediately hits water on firing but should be up in the air for a while)
+- [ ] Cannon ball shadows
+- [ ] Character sprites (multiple with option to pick)
 - [ ] Ships collisions
 - [ ] Seperate the ship's mast/sail sprites  so when characters walk behind the mast/sail, they appear behind it.
-- [ ] Show control points above the ship sprite
+- [ ] On sail down, show sails position change
+- [ ] Show cannons on deck
 - [ ] Add debug mode that only shows certain things like control points and health bars when enabled via a start screen checkbox
+
 - [ ] Zoom perspective out 30%. ANything outside of original perspective we don't render. 
 - [ ] Add a parallax sky background
+
 - [ ] Add a map mode
-- [ ] Character sprites (multiple with option to pick)
 - [ ] Stormy weather
 - [ ] Character swords
 - [ ] Character block with strafe 
 - [ ] Character lunge
 - [ ] Double-barrel cannons
+- [ ] Shader for dynamic water effects
+- [ ] Reduce jitter of the player 

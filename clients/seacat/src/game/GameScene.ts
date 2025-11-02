@@ -7,6 +7,7 @@ import * as IsoMath from './utils/IsometricMath.js';
 import { CollisionManager } from './managers/CollisionManager.js';
 import { MapManager } from './managers/MapManager.js';
 import { EffectsRenderer } from './rendering/EffectsRenderer.js';
+import { WaterRenderer } from './rendering/WaterRenderer.js';
 
 const {
   TILE_WIDTH,
@@ -45,6 +46,7 @@ export class GameScene extends Phaser.Scene {
   private mapManager!: MapManager;
   private collisionManager!: CollisionManager;
   private effectsRenderer!: EffectsRenderer;
+  private waterRenderer!: WaterRenderer;
   private controllingShip: string | null = null;
   private controllingPoint: 'wheel' | 'sails' | 'mast' | 'cannon' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
@@ -147,8 +149,9 @@ export class GameScene extends Phaser.Scene {
       this.waterLayer
     );
 
-    // Initialize effects renderer
+    // Initialize renderers
     this.effectsRenderer = new EffectsRenderer(this);
+    this.waterRenderer = new WaterRenderer(this, this.map);
 
     // Create graphics for shallow water overlay (renders on top of sand)
     this.shallowWaterGraphics = this.add.graphics();
@@ -931,37 +934,6 @@ export class GameScene extends Phaser.Scene {
     return frameIndex;
   }
 
-  private calculateWaveHeightAtPosition(x: number, y: number, time: number): number {
-    // Convert world position to tile coordinates for wave calculation
-    const tilePos = this.map.worldToTileXY(x, y);
-    if (!tilePos) return 0;
-
-    const waveSpeed = 0.0005;
-    const waveFrequency = 0.2;
-    const waveAmplitude = 12;
-
-    // Calculate wave using same formula as water tiles
-    const tileX = Math.floor(tilePos.x);
-    const tileY = Math.floor(tilePos.y);
-
-    // Primary wave - travels east-west
-    const wavePhase1 = (tileX * waveFrequency - tileY * waveFrequency * 0.3) + (time * waveSpeed);
-    const wave1 = Math.sin(wavePhase1);
-
-    // Secondary wave - different frequency and direction (more north-south)
-    const wavePhase2 = (tileX * waveFrequency * 0.5 + tileY * waveFrequency * 0.7) + (time * waveSpeed * 1.3);
-    const wave2 = Math.sin(wavePhase2) * 0.5;
-
-    // Tertiary wave - high frequency ripples
-    const wavePhase3 = (tileX * waveFrequency * 2 - tileY * waveFrequency * 0.5) + (time * waveSpeed * 0.7);
-    const wave3 = Math.sin(wavePhase3) * 0.3;
-
-    // Combine all waves
-    const combinedWave = wave1 + wave2 + wave3;
-
-    return combinedWave * waveAmplitude;
-  }
-
   private animateVisibleWaterTiles(time: number) {
     const camera = this.cameras.main;
 
@@ -1154,7 +1126,7 @@ export class GameScene extends Phaser.Scene {
         const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
         if (tile && tile.properties?.navigable === true) {
           // Player is in water, apply wave offset delta
-          const currentWaveOffset = this.calculateWaveHeightAtPosition(this.localPlayer.x, this.localPlayer.y, time);
+          const currentWaveOffset = this.waterRenderer.calculateWaveHeightAtPosition(this.localPlayer.x, this.localPlayer.y, time);
           const waveDelta = currentWaveOffset - this.lastPlayerWaveOffset;
           this.localPlayer.y += waveDelta;
           this.lastPlayerWaveOffset = currentWaveOffset;
@@ -1209,7 +1181,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Apply wave bobbing to ship at its current position
-      const currentWaveOffset = this.calculateWaveHeightAtPosition(ship.sprite.x, ship.sprite.y, time);
+      const currentWaveOffset = this.waterRenderer.calculateWaveHeightAtPosition(ship.sprite.x, ship.sprite.y, time);
       const waveYDelta = currentWaveOffset - ship.lastWaveOffset;
       ship.sprite.y += waveYDelta;
       ship.lastWaveOffset = currentWaveOffset;
@@ -1340,7 +1312,7 @@ export class GameScene extends Phaser.Scene {
           const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
           if (tile && tile.properties?.navigable === true) {
             // Remote player is in water, apply wave offset delta
-            const currentWaveOffset = this.calculateWaveHeightAtPosition(player.sprite.x, player.sprite.y, time);
+            const currentWaveOffset = this.waterRenderer.calculateWaveHeightAtPosition(player.sprite.x, player.sprite.y, time);
             const waveDelta = currentWaveOffset - player.lastWaveOffset;
             player.sprite.y += waveDelta;
             player.lastWaveOffset = currentWaveOffset;
