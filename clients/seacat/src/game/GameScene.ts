@@ -9,6 +9,7 @@ import { MapManager } from './managers/MapManager.js';
 import { EffectsRenderer } from './rendering/EffectsRenderer.js';
 import { WaterRenderer } from './rendering/WaterRenderer.js';
 import { PlayerRenderer } from './rendering/PlayerRenderer.js';
+import { ShipRenderer } from './rendering/ShipRenderer.js';
 
 const {
   TILE_WIDTH,
@@ -49,6 +50,7 @@ export class GameScene extends Phaser.Scene {
   private effectsRenderer!: EffectsRenderer;
   private waterRenderer!: WaterRenderer;
   private playerRenderer!: PlayerRenderer;
+  private shipRenderer!: ShipRenderer;
   private controllingShip: string | null = null;
   private controllingPoint: 'wheel' | 'sails' | 'mast' | 'cannon' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
@@ -155,6 +157,7 @@ export class GameScene extends Phaser.Scene {
     this.effectsRenderer = new EffectsRenderer(this);
     this.waterRenderer = new WaterRenderer(this, this.map);
     this.playerRenderer = new PlayerRenderer(this);
+    this.shipRenderer = new ShipRenderer(this);
 
     // Create graphics for shallow water overlay (renders on top of sand)
     this.shallowWaterGraphics = this.add.graphics();
@@ -363,7 +366,7 @@ export class GameScene extends Phaser.Scene {
       shipSprite.setScale(baseScale); // Uniform scaling
 
       // Set initial sprite frame based on ship rotation (s6r-ship-sprite-rendering)
-      const initialFrameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
+      const initialFrameIndex = this.shipRenderer.calculateShipSpriteFrame(update.shipData.rotation);
       shipSprite.setFrame(initialFrameIndex);
 
       // Create control point indicators
@@ -545,7 +548,7 @@ export class GameScene extends Phaser.Scene {
 
       // Update ship sprite frame to match rotation (s6r-ship-sprite-rendering)
       // NOTE: Don't call setRotation() - rotation is shown via sprite frames, not sprite rotation
-      const frameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
+      const frameIndex = this.shipRenderer.calculateShipSpriteFrame(update.shipData.rotation);
       ship.sprite.setFrame(frameIndex);
 
       // Phase C: Rotate players on deck when ship turns
@@ -580,10 +583,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Draw ship boundary and control point indicators at current ship position
-    this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
-    this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`), 'wheel', ship.rotation);
-    this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`), 'sails', ship.rotation);
-    this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast', ship.rotation);
+    this.shipRenderer.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
+    this.shipRenderer.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`), 'wheel', ship.rotation);
+    this.shipRenderer.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`), 'sails', ship.rotation);
+    this.shipRenderer.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast', ship.rotation);
 
     // c5x-ship-combat: Draw cannon control points
     if (ship.cannons) {
@@ -593,7 +596,7 @@ export class GameScene extends Phaser.Scene {
           this.controllingPoint === 'cannon' &&
           this.controllingCannon?.side === 'port' &&
           this.controllingCannon?.index === index;
-        this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
+        this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
       });
       ship.cannons.starboard.forEach((cannon, index) => {
         const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
@@ -601,7 +604,7 @@ export class GameScene extends Phaser.Scene {
           this.controllingPoint === 'cannon' &&
           this.controllingCannon?.side === 'starboard' &&
           this.controllingCannon?.index === index;
-        this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
+        this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
       });
     }
   }
@@ -654,225 +657,6 @@ export class GameScene extends Phaser.Scene {
 
     // Show cannon blast effect at spawn position (Phase 2c)
     this.effectsRenderer.createCannonBlast(position.x, position.y);
-  }
-
-  private drawControlPoint(
-    graphics: Phaser.GameObjects.Graphics,
-    controlPoint: { relativePosition: { x: number; y: number }; controlledBy: string | null },
-    shipSprite: Phaser.GameObjects.Sprite,
-    isPlayerNear: boolean = false,
-    type: 'wheel' | 'sails' | 'mast' = 'wheel',
-    shipRotation?: number
-  ) {
-    graphics.clear();
-
-    // Phase D: Rotate control point position with ship rotation using isometric rotation (i2m-true-isometric Phase 4)
-    // Apply ship's rotation to the relative position to get rotated world position
-    // Use passed rotation parameter if available (s6r-ship-sprite-rendering), otherwise fall back to sprite rotation
-    const rotation = shipRotation !== undefined ? shipRotation : shipSprite.rotation;
-    const rotatedPos = IsoMath.rotatePointIsometric(controlPoint.relativePosition, rotation);
-    const worldX = shipSprite.x + rotatedPos.x;
-    const worldY = shipSprite.y + rotatedPos.y;
-
-    // Draw a circle at the control point position
-    // Yellow if player is near and can interact, red if controlled by other, green/brown if free
-    let color: number;
-    let opacity: number;
-    if (isPlayerNear) {
-      color = 0xffcc00; // Bright amber-yellow when player is close enough to interact
-      opacity = 0.8; // Higher opacity for better visibility
-    } else if (controlPoint.controlledBy) {
-      color = 0xff0000; // Red if controlled by someone
-      opacity = 0.5;
-    } else {
-      // Different color for mast (brown) vs other controls (green)
-      color = type === 'mast' ? 0x8b4513 : 0x00ff00; // Brown for mast, green for others
-      opacity = 0.5;
-    }
-
-    graphics.fillStyle(color, opacity);
-    graphics.fillCircle(worldX, worldY, 8);
-    graphics.lineStyle(2, 0xffffff, 1);
-    graphics.strokeCircle(worldX, worldY, 8);
-  }
-
-  /**
-   * Draw cannon control point with aim arc (c5x-ship-combat)
-   */
-  private drawCannon(
-    graphics: Phaser.GameObjects.Graphics,
-    cannon: { relativePosition: { x: number; y: number }; controlledBy: string | null; aimAngle: number; elevationAngle: number; cooldownRemaining: number },
-    shipSprite: Phaser.GameObjects.Sprite,
-    shipRotation: number,
-    isPlayerNear: boolean = false,
-    isControlledByUs: boolean = false
-  ) {
-    graphics.clear();
-
-    // Calculate cannon world position with isometric rotation
-    const rotatedPos = IsoMath.rotatePointIsometric(cannon.relativePosition, shipRotation);
-    const worldX = shipSprite.x + rotatedPos.x;
-    const worldY = shipSprite.y + rotatedPos.y;
-
-    // Determine cannon color based on state
-    let color: number;
-    let opacity: number;
-
-    if (isPlayerNear) {
-      color = 0xffff00; // Yellow if player is near
-      opacity = 0.8;
-    } else if (cannon.controlledBy) {
-      color = 0xff0000; // Red if controlled by someone
-      opacity = 0.5;
-    } else {
-      color = 0xff8800; // Orange for cannons (distinct from green controls)
-      opacity = 0.5;
-    }
-
-    // Draw cannon control point
-    graphics.fillStyle(color, opacity);
-    graphics.fillCircle(worldX, worldY, 8);
-    graphics.lineStyle(2, 0xffffff, 1);
-    graphics.strokeCircle(worldX, worldY, 8);
-
-    // If controlled by us, draw aim arc and aim line
-    if (isControlledByUs) {
-      const maxAim = Math.PI / 4; // ±45°
-      const aimLength = 60; // Length of aim indicator line
-
-      // Determine which side cannon is on (port = left, starboard = right)
-      // Port cannons aim to the left (negative Y in ship space)
-      // Starboard cannons aim to the right (positive Y in ship space)
-      const isPort = cannon.relativePosition.y < 0;
-      const perpendicularAngle = isPort ? shipRotation - Math.PI / 2 : shipRotation + Math.PI / 2;
-
-      // Draw aim arc (±45° from perpendicular)
-      graphics.lineStyle(2, 0x00ffff, 0.5); // Cyan arc
-      graphics.beginPath();
-      graphics.arc(
-        worldX,
-        worldY,
-        aimLength,
-        perpendicularAngle - maxAim,
-        perpendicularAngle + maxAim,
-        false
-      );
-      graphics.strokePath();
-
-      // Draw current aim line (use local aim for immediate feedback if we're controlling)
-      const aimAngle = isControlledByUs ? this.currentCannonAim : cannon.aimAngle;
-      const currentAimAngle = perpendicularAngle + aimAngle;
-      const aimEndX = worldX + Math.cos(currentAimAngle) * aimLength;
-      const aimEndY = worldY + Math.sin(currentAimAngle) * aimLength;
-
-      graphics.lineStyle(3, 0xff00ff, 1); // Bright magenta aim line
-      graphics.beginPath();
-      graphics.moveTo(worldX, worldY);
-      graphics.lineTo(aimEndX, aimEndY);
-      graphics.strokePath();
-
-      // Draw crosshair at end of aim line
-      const crosshairSize = 8;
-      graphics.lineStyle(2, 0xff00ff, 1);
-      graphics.beginPath();
-      graphics.moveTo(aimEndX - crosshairSize, aimEndY);
-      graphics.lineTo(aimEndX + crosshairSize, aimEndY);
-      graphics.moveTo(aimEndX, aimEndY - crosshairSize);
-      graphics.lineTo(aimEndX, aimEndY + crosshairSize);
-      graphics.strokePath();
-
-      // Draw elevation indicator (Option 3: Show elevation angle)
-      const elevationDegrees = Math.round(cannon.elevationAngle * 180 / Math.PI);
-      const elevationText = `${elevationDegrees}°`;
-
-      // Create text above cannon (elevation display)
-      const textStyle = {
-        fontSize: '14px',
-        color: '#00ffff',
-        fontFamily: 'monospace',
-        backgroundColor: '#000000',
-        padding: { x: 4, y: 2 }
-      };
-
-      // Note: We'll use the graphics to draw simple text representation
-      // Draw a small elevation bar indicator instead (3 segments for 15°/30°/45°/60°)
-      const elevBarX = worldX - 20;
-      const elevBarY = worldY - 25;
-      const segmentHeight = 4;
-      const numSegments = Math.round((cannon.elevationAngle - Math.PI / 12) / (Math.PI / 36)); // 0-9 segments (15°-60° in 5° steps)
-
-      for (let i = 0; i < 9; i++) {
-        const alpha = i < numSegments ? 0.8 : 0.2;
-        const segColor = i < numSegments ? 0x00ff00 : 0x333333;
-        graphics.fillStyle(segColor, alpha);
-        graphics.fillRect(elevBarX, elevBarY - (i * segmentHeight), 40, segmentHeight - 1);
-      }
-
-      // Draw elevation number
-      graphics.fillStyle(0x000000, 0.8);
-      graphics.fillRect(elevBarX - 2, elevBarY - 42, 44, 14);
-      // Note: Phaser Graphics doesn't support text, we'd need a Text object for actual numbers
-      // For now, the bar indicator shows elevation visually
-    }
-
-    // Draw cooldown indicator if reloading
-    if (cannon.cooldownRemaining > 0) {
-      const cooldownProgress = cannon.cooldownRemaining / 4000; // Assume 4s cooldown
-      // console.log(`Drawing cooldown: ${cannon.cooldownRemaining}ms remaining (${(cooldownProgress * 100).toFixed(0)}%)`);
-      graphics.fillStyle(0x888888, 0.7);
-      graphics.fillCircle(worldX, worldY, 12 * cooldownProgress);
-    }
-  }
-
-  private drawShipBoundary(
-    graphics: Phaser.GameObjects.Graphics,
-    shipSprite: Phaser.GameObjects.Sprite,
-    deckBoundary: { width: number; height: number },
-    rotation: number
-  ) {
-    graphics.clear();
-
-    // Define the 4 corners of the deck in local ship space (relative to center)
-    const halfW = deckBoundary.width / 2;
-    const halfH = deckBoundary.height / 2;
-    const corners = [
-      { x: -halfW, y: -halfH, color: 0xff0000 }, // Top-left: Red
-      { x: halfW, y: -halfH, color: 0x00ff00 },  // Top-right: Green
-      { x: halfW, y: halfH, color: 0x0000ff },   // Bottom-right: Blue
-      { x: -halfW, y: halfH, color: 0xffff00 },  // Bottom-left: Yellow
-    ];
-
-    // Draw each corner dot using isometric rotation (i2m-true-isometric)
-    corners.forEach((corner) => {
-      const rotatedPos = IsoMath.rotatePointIsometric({ x: corner.x, y: corner.y }, rotation);
-      const worldX = shipSprite.x + rotatedPos.x;
-      const worldY = shipSprite.y + rotatedPos.y;
-
-      graphics.fillStyle(corner.color, 1);
-      graphics.fillCircle(worldX, worldY, 6);
-    });
-  }
-
-  /**
-   * Calculate sprite sheet frame index from ship rotation (s6r-ship-sprite-rendering)
-   * @param rotation Ship rotation in radians
-   * @returns Frame index (0-63) corresponding to rotation angle
-   */
-  private calculateShipSpriteFrame(rotation: number): number {
-    // Subtract 45° offset to align Blender camera orientation with game coordinates
-    // Blender camera was rotated 45° around Z axis for isometric view
-    const offset = Math.PI / 4; // 45 degrees
-    const offsetRotation = rotation - offset;
-
-    // Normalize rotation to 0-2π range
-    const normalizedRotation = ((offsetRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-
-    // Convert to frame index (0-63)
-    // 64 frames cover 360° (2π radians), so each frame is 5.625° (π/32 radians)
-    // Negate rotation to reverse direction (Blender rendered counter-clockwise, game rotates clockwise)
-    const frameIndex = Math.round(((Math.PI * 2 - normalizedRotation) / (Math.PI * 2)) * 64) % 64;
-
-    return frameIndex;
   }
 
   private animateVisibleWaterTiles(time: number) {
@@ -1152,10 +936,10 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Always redraw control points and ship boundary at their current positions (they move with ship sprite)
-      this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
-      this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`), 'wheel', ship.rotation);
-      this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`), 'sails', ship.rotation);
-      this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast', ship.rotation);
+      this.shipRenderer.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
+      this.shipRenderer.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`), 'wheel', ship.rotation);
+      this.shipRenderer.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`), 'sails', ship.rotation);
+      this.shipRenderer.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast', ship.rotation);
 
       // c5x-ship-combat: Draw cannon control points
       if (ship.cannons) {
@@ -1165,7 +949,7 @@ export class GameScene extends Phaser.Scene {
             this.controllingPoint === 'cannon' &&
             this.controllingCannon?.side === 'port' &&
             this.controllingCannon?.index === index;
-          this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
+          this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
         });
         ship.cannons.starboard.forEach((cannon, index) => {
           const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
@@ -1173,7 +957,7 @@ export class GameScene extends Phaser.Scene {
             this.controllingPoint === 'cannon' &&
             this.controllingCannon?.side === 'starboard' &&
             this.controllingCannon?.index === index;
-          this.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs);
+          this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
         });
       }
 
