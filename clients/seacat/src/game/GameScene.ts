@@ -5,6 +5,7 @@ import { PositionUpdate, Player, Ship, Direction, Projectile } from '../types.js
 import * as Constants from './utils/Constants.js';
 import * as IsoMath from './utils/IsometricMath.js';
 import { CollisionManager } from './managers/CollisionManager.js';
+import { MapManager } from './managers/MapManager.js';
 
 const {
   TILE_WIDTH,
@@ -40,6 +41,7 @@ export class GameScene extends Phaser.Scene {
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
   private shallowWaterGraphics!: Phaser.GameObjects.Graphics; // Semi-transparent water overlay for sand tiles
+  private mapManager!: MapManager;
   private collisionManager!: CollisionManager;
   private controllingShip: string | null = null;
   private controllingPoint: 'wheel' | 'sails' | 'mast' | 'cannon' | null = null;
@@ -121,8 +123,27 @@ export class GameScene extends Phaser.Scene {
       console.warn('  Ships will use fallback placeholder rendering');
     }
 
-    // Load Tiled map
-    this.loadTiledMap();
+    // Initialize MapManager and load map
+    this.mapManager = new MapManager(this, this.client);
+    this.mapManager.loadTiledMap();
+
+    // Get map layers from MapManager
+    this.map = this.mapManager.getMap();
+    this.groundLayer = this.mapManager.getGroundLayer();
+    this.secondLayer = this.mapManager.getSecondLayer();
+    this.secondLayerSprites = this.mapManager.getSecondLayerSprites();
+    this.obstacleLayer = this.mapManager.getObstacleLayer();
+    this.waterLayer = this.mapManager.getWaterLayer();
+
+    // Initialize collision manager
+    this.collisionManager = new CollisionManager(
+      this,
+      this.map,
+      this.groundLayer,
+      this.secondLayer,
+      this.obstacleLayer,
+      this.waterLayer
+    );
 
     // Create graphics for shallow water overlay (renders on top of sand)
     this.shallowWaterGraphics = this.add.graphics();
@@ -213,222 +234,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     console.log(`Game started as ${this.playerId}`);
-  }
-
-  private generateTilesetTexture() {
-    // Generate a simple tileset texture with different colored tiles
-    const tilesetWidth = 512;
-    const tilesetHeight = 128;
-    const graphics = this.add.graphics();
-
-    // Tile colors: Match your actual cube tiles
-    const tileColors = [
-      0xd4b896, // 0: sand/tan cube
-      0x5a9547, // 1: grass (green cube)
-      0x5ba3d4, // 2: water (blue cube)
-      0x4a4a4a, // 3: concrete/dark cube (wall)
-      0x808080  // 4: stone (light gray) - unused
-    ];
-
-    // Draw tiles in a grid (8 columns × 4 rows = 32 tiles)
-    for (let tileId = 0; tileId < 32; tileId++) {
-      const col = tileId % 8;
-      const row = Math.floor(tileId / 8);
-      const x = col * TILE_WIDTH;
-      const y = row * TILE_HEIGHT;
-
-      // Use color for first 5 tiles, then repeat pattern
-      const colorIndex = tileId < 5 ? tileId : tileId % 5;
-      const color = tileColors[colorIndex];
-
-      // Draw isometric diamond tile
-      graphics.fillStyle(color, 1);
-      graphics.lineStyle(1, 0x000000, 0.3);
-
-      graphics.beginPath();
-      graphics.moveTo(x + TILE_WIDTH / 2, y);                              // Top
-      graphics.lineTo(x + TILE_WIDTH, y + TILE_HEIGHT / 2);               // Right
-      graphics.lineTo(x + TILE_WIDTH / 2, y + TILE_HEIGHT);               // Bottom
-      graphics.lineTo(x, y + TILE_HEIGHT / 2);                            // Left
-      graphics.closePath();
-      graphics.fillPath();
-      graphics.strokePath();
-    }
-
-    // Generate texture from graphics
-    graphics.generateTexture('terrain', tilesetWidth, tilesetHeight);
-    graphics.destroy();
-  }
-
-  private loadTiledMap() {
-    // Create tilemap from Tiled JSON
-    this.map = this.make.tilemap({ key: 'map' });
-
-    // Add tileset (name from Tiled must match)
-    const tileset = this.map.addTilesetImage('terrain', 'terrain');
-
-    if (!tileset) {
-      console.error('Failed to load tileset');
-      return;
-    }
-
-    // Create layers - map1.tmj has "Tile Layer 1"
-    const ground = this.map.createLayer('Tile Layer 1', tileset, 0, 0);
-    if (ground) {
-      this.groundLayer = ground;
-    } else {
-      // Fallback to original layer names if using example map
-      const fallbackGround = this.map.createLayer('Ground', tileset, 0, 0);
-      if (fallbackGround) {
-        this.groundLayer = fallbackGround;
-      }
-    }
-
-    // Create "Tile Layer 2" if it exists
-    // Convert to individual sprites for per-tile depth sorting
-    if (this.map.getLayer('Tile Layer 2')) {
-      const layer2 = this.map.createLayer('Tile Layer 2', tileset, 0, 0);
-      if (layer2) {
-        this.secondLayer = layer2;
-
-        // Create individual sprites for each tile using render texture approach
-        for (let tileY = 0; tileY < this.map.height; tileY++) {
-          for (let tileX = 0; tileX < this.map.width; tileX++) {
-            const tile = layer2.getTileAt(tileX, tileY);
-            if (tile) {
-              const worldPos = this.map.tileToWorldXY(tileX, tileY);
-              if (worldPos) {
-                // Use Phaser's tile texture data directly
-                const tileTexture = tile.tileset?.image;
-                if (!tileTexture) continue;
-
-                // Get the tile's source position from Phaser's tileset
-                const tileData = tile.tileset?.getTileTextureCoordinates(tile.index) as { x: number; y: number } | null;
-                if (!tileData) continue;
-
-                // Create a unique frame for this tile
-                const frameName = `tile_layer2_${tileX}_${tileY}`;
-                const terrainTexture = this.textures.get('terrain');
-
-                if (!terrainTexture.has(frameName)) {
-                  // Extract tile with extra height for 3D appearance
-                  terrainTexture.add(
-                    frameName,
-                    0,
-                    tileData.x,
-                    tileData.y,
-                    TILE_WIDTH,
-                    TILE_VISUAL_HEIGHT
-                  );
-                }
-
-                // Create sprite at exact position where tilemap would render it
-                // Position at full visual height (32px) to align bottom with ground
-                const sprite = this.add.sprite(
-                  worldPos.x + TILE_WIDTH / 2,
-                  worldPos.y + TILE_VISUAL_HEIGHT,
-                  'terrain',
-                  frameName
-                );
-                sprite.setOrigin(0.5, 1); // Center-bottom origin
-
-                // Layer 2 renders above or below player dynamically
-                sprite.setDepth(10000);
-
-                this.secondLayerSprites.push(sprite);
-              }
-            }
-          }
-        }
-
-        // Hide original layer
-        layer2.setVisible(false);
-      }
-    }
-
-    // Create Obstacles layer if it exists
-    if (this.map.getLayer('Obstacles')) {
-      const obstacles = this.map.createLayer('Obstacles', tileset, 0, 0);
-      if (obstacles) {
-        this.obstacleLayer = obstacles;
-      }
-    }
-
-    // Create Water layer if it exists
-    if (this.map.getLayer('Water')) {
-      const water = this.map.createLayer('Water', tileset, 0, 0);
-      if (water) {
-        this.waterLayer = water;
-      }
-    }
-
-    console.log(`Map loaded: ${this.map.width}×${this.map.height} tiles`);
-
-    // Initialize collision manager
-    this.collisionManager = new CollisionManager(
-      this,
-      this.map,
-      this.groundLayer,
-      this.secondLayer,
-      this.obstacleLayer,
-      this.waterLayer
-    );
-
-    // Send map navigation data to ships
-    this.sendMapDataToShips();
-  }
-
-  private sendMapDataToShips() {
-    // Extract navigable tile data for ship collision detection
-    const navigableTiles: boolean[][] = [];
-    let navigableCount = 0;
-    let nonNavigableCount = 0;
-
-    for (let y = 0; y < this.map.height; y++) {
-      navigableTiles[y] = [];
-      for (let x = 0; x < this.map.width; x++) {
-        // Check if tile is navigable (for ships - should be water)
-        const tile = this.groundLayer.getTileAt(x, y);
-        const isNavigable = tile?.properties?.navigable === true;
-        navigableTiles[y][x] = isNavigable;
-
-        if (isNavigable) {
-          navigableCount++;
-        } else {
-          nonNavigableCount++;
-        }
-      }
-    }
-
-    console.log(`Map navigation data: ${navigableCount} navigable tiles, ${nonNavigableCount} non-navigable tiles`);
-
-    // Determine map orientation
-    // Phaser uses numeric constants: 0=orthogonal, 1=isometric, 2=staggered, 3=hexagonal
-    const rawOrientation = this.map.orientation;
-    const orientationNum = Number(rawOrientation);
-    const orientation = (orientationNum === 1 || String(rawOrientation).toLowerCase() === 'isometric') ?
-      'isometric' as const :
-      'orthogonal' as const;
-
-    console.log(`Map orientation: ${rawOrientation} -> ${orientation}`);
-
-    const mapData = {
-      tileWidth: TILE_WIDTH,
-      tileHeight: TILE_HEIGHT,
-      mapWidth: this.map.width,
-      mapHeight: this.map.height,
-      navigableTiles,
-      orientation,
-    };
-
-    // Send to all ships (broadcast since we don't know ship IDs yet)
-    this.client.send({
-      kind: 'ship/map_data',
-      to: [], // Broadcast to all participants
-      payload: mapData,
-    });
-
-    console.log(`Sent map navigation data: ${this.map.width}×${this.map.height} tiles, orientation: ${orientation}`);
   }
 
   private createPlayerAnimations() {
@@ -705,7 +510,7 @@ export class GameScene extends Phaser.Scene {
       console.log(`Ship joined: ${update.participantId}`);
 
       // Send map data to newly joined ship
-      this.sendMapDataToShips();
+      this.mapManager.sendMapDataToShips();
     } else {
       // Update existing ship
       ship.targetPosition = { x: update.worldCoords.x, y: update.worldCoords.y };
