@@ -2,25 +2,21 @@ import Phaser from 'phaser';
 import { Howl } from 'howler';
 import { MEWClient } from '@mew-protocol/mew/client';
 import { PositionUpdate, Player, Ship, Direction, Projectile } from '../types.js';
+import * as Constants from './utils/Constants.js';
 
-const TILE_WIDTH = 32;
-const TILE_HEIGHT = 16;
-const TILE_VISUAL_HEIGHT = 32; // Actual height of tiles with 3D depth in tileset
-const WORLD_WIDTH = 20;
-const WORLD_HEIGHT = 20;
-const MOVE_SPEED = 100; // pixels per second
-const POSITION_UPDATE_RATE = 100; // ms between position updates
-
-// Isometric movement basis vectors (i2m-true-isometric Phase 1)
-// Calculated from tile dimensions and normalized for consistent movement speed
-const ISO_X_AXIS = { x: TILE_WIDTH / 2, y: TILE_HEIGHT / 2 }; // Southeast direction
-const ISO_Y_AXIS = { x: TILE_WIDTH / 2, y: -TILE_HEIGHT / 2 }; // Northeast direction
-const isoXLength = Math.sqrt(ISO_X_AXIS.x ** 2 + ISO_X_AXIS.y ** 2);
-const isoYLength = Math.sqrt(ISO_Y_AXIS.x ** 2 + ISO_Y_AXIS.y ** 2);
-const ISO_NORTHEAST = { x: ISO_Y_AXIS.x / isoYLength, y: ISO_Y_AXIS.y / isoYLength };
-const ISO_SOUTHEAST = { x: ISO_X_AXIS.x / isoXLength, y: ISO_X_AXIS.y / isoXLength };
-const ISO_SOUTHWEST = { x: -ISO_NORTHEAST.x, y: -ISO_NORTHEAST.y };
-const ISO_NORTHWEST = { x: -ISO_SOUTHEAST.x, y: -ISO_SOUTHEAST.y };
+const {
+  TILE_WIDTH,
+  TILE_HEIGHT,
+  TILE_VISUAL_HEIGHT,
+  WORLD_WIDTH,
+  WORLD_HEIGHT,
+  MOVE_SPEED,
+  POSITION_UPDATE_RATE,
+  ISO_NORTHEAST,
+  ISO_SOUTHEAST,
+  ISO_SOUTHWEST,
+  ISO_NORTHWEST
+} = Constants;
 
 export class GameScene extends Phaser.Scene {
   private client!: MEWClient;
