@@ -13,6 +13,7 @@ import { EffectsRenderer } from './rendering/EffectsRenderer.js';
 import { WaterRenderer } from './rendering/WaterRenderer.js';
 import { PlayerRenderer } from './rendering/PlayerRenderer.js';
 import { ShipRenderer } from './rendering/ShipRenderer.js';
+import { ShipCommands } from './network/ShipCommands.js';
 
 const {
   TILE_WIDTH,
@@ -53,6 +54,7 @@ export class GameScene extends Phaser.Scene {
   private playerManager!: PlayerManager;
   private projectileManager!: ProjectileManager;
   private shipManager!: ShipManager;
+  private shipCommands!: ShipCommands;
   private effectsRenderer!: EffectsRenderer;
   private waterRenderer!: WaterRenderer;
   private playerRenderer!: PlayerRenderer;
@@ -165,6 +167,18 @@ export class GameScene extends Phaser.Scene {
     this.playerRenderer = new PlayerRenderer(this);
     this.shipRenderer = new ShipRenderer(this);
 
+    // Initialize ship commands first (needed by other managers)
+    this.shipCommands = new ShipCommands(
+      this,
+      this.client,
+      this.playerId,
+      this.ships,
+      (shipId) => { this.controllingShip = shipId; },
+      (point) => { this.controllingPoint = point; },
+      (cannon) => { this.controllingCannon = cannon; },
+      (aim) => { this.currentCannonAim = aim; }
+    );
+
     // Initialize managers
     this.playerManager = new PlayerManager(this, this.map, this.groundLayer, this.secondLayer, this.waterRenderer, this.remotePlayers);
     this.projectileManager = new ProjectileManager(
@@ -176,7 +190,7 @@ export class GameScene extends Phaser.Scene {
       this.effectsRenderer,
       this.sounds,
       this.onShip,
-      this.sendProjectileHitClaim.bind(this)
+      this.shipCommands
     );
     this.shipManager = new ShipManager(
       this,
@@ -792,21 +806,21 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
       if (this.controllingPoint) {
         // Release current control (no distance check - always allow disengagement)
-        this.sendReleaseControl();
+        this.shipCommands.releaseControl(this.controllingShip, this.controllingPoint, this.controllingCannon);
       } else if (nearestControlPoint) {
         // Grab nearest control point (only if within range)
         if (nearestControlPoint.controlPoint === 'cannon' &&
           nearestControlPoint.cannonSide !== undefined &&
           nearestControlPoint.cannonIndex !== undefined) {
           // Grab cannon
-          this.sendGrabCannon(
+          this.shipCommands.grabCannon(
             nearestControlPoint.shipId,
             nearestControlPoint.cannonSide,
             nearestControlPoint.cannonIndex
           );
         } else {
           // Grab wheel, sails, or mast
-          this.sendGrabControl(nearestControlPoint.shipId, nearestControlPoint.controlPoint as 'wheel' | 'sails' | 'mast');
+          this.shipCommands.grabControl(nearestControlPoint.shipId, nearestControlPoint.controlPoint as 'wheel' | 'sails' | 'mast');
         }
       }
     }
@@ -817,28 +831,28 @@ export class GameScene extends Phaser.Scene {
         // w3l-wheel-steering: Use isDown for continuous wheel turning
         if (this.cursors.left?.isDown) {
           if (!this.currentWheelDirection || this.currentWheelDirection !== 'left') {
-            this.sendWheelTurnStart(this.controllingShip, 'left');
+            this.shipCommands.wheelTurnStart(this.controllingShip, 'left');
             this.currentWheelDirection = 'left';
           }
         } else if (this.cursors.right?.isDown) {
           if (!this.currentWheelDirection || this.currentWheelDirection !== 'right') {
-            this.sendWheelTurnStart(this.controllingShip, 'right');
+            this.shipCommands.wheelTurnStart(this.controllingShip, 'right');
             this.currentWheelDirection = 'right';
           }
         } else {
           // Neither key pressed - stop turning if we were turning
           if (this.currentWheelDirection) {
-            this.sendWheelTurnStop(this.controllingShip);
+            this.shipCommands.wheelTurnStop(this.controllingShip);
             this.currentWheelDirection = null;
           }
         }
       } else if (this.controllingPoint === 'sails') {
         // Up/down arrows to adjust speed
         if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
-          this.sendAdjustSails(this.controllingShip, 'up');
+          this.shipCommands.adjustSails(this.controllingShip, 'up');
         }
         if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
-          this.sendAdjustSails(this.controllingShip, 'down');
+          this.shipCommands.adjustSails(this.controllingShip, 'down');
         }
       } else if (this.controllingPoint === 'cannon' && this.controllingCannon) {
         // c5x-ship-combat: Left/right arrows to aim cannon
@@ -857,7 +871,7 @@ export class GameScene extends Phaser.Scene {
         // Send aim update to server if changed
         if (aimChanged) {
           console.log(`Aiming cannon: ${(this.currentCannonAim * 180 / Math.PI).toFixed(1)}°`);
-          this.sendAimCannon(
+          this.shipCommands.aimCannon(
             this.controllingShip,
             this.controllingCannon.side,
             this.controllingCannon.index,
@@ -867,14 +881,14 @@ export class GameScene extends Phaser.Scene {
 
         // Up/down arrows to adjust elevation (Option 3: True elevation control)
         if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
-          this.sendAdjustElevation(
+          this.shipCommands.adjustElevation(
             this.controllingShip,
             this.controllingCannon.side,
             this.controllingCannon.index,
             'up'
           );
         } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
-          this.sendAdjustElevation(
+          this.shipCommands.adjustElevation(
             this.controllingShip,
             this.controllingCannon.side,
             this.controllingCannon.index,
@@ -884,7 +898,7 @@ export class GameScene extends Phaser.Scene {
 
         // Space bar to fire cannon
         if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-          this.sendFireCannon(
+          this.shipCommands.fireCannon(
             this.controllingShip,
             this.controllingCannon.side,
             this.controllingCannon.index
@@ -894,239 +908,4 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private sendGrabControl(shipId: string, controlPoint: 'wheel' | 'sails' | 'mast') {
-    // Mast is client-side only (for camera zoom), don't send to ship server
-    if (controlPoint !== 'mast') {
-      this.client.send({
-        kind: 'ship/grab_control',
-        to: [shipId],
-        payload: {
-          controlPoint,
-          playerId: this.playerId,
-        },
-      });
-    }
-
-    this.controllingShip = shipId;
-    this.controllingPoint = controlPoint;
-
-    // If grabbing mast, zoom camera out for better view
-    if (controlPoint === 'mast') {
-      const ship = this.ships.get(shipId);
-      if (ship) {
-        ship.controlPoints.mast.controlledBy = this.playerId;
-      }
-      this.cameras.main.zoomTo(0.8, 500); // Zoom out to 0.8x over 500ms
-      console.log(`Climbed mast on ship ${shipId} - zooming out for better view`);
-    } else {
-      console.log(`Grabbed ${controlPoint} on ship ${shipId}`);
-    }
-  }
-
-  private sendReleaseControl() {
-    if (!this.controllingShip || !this.controllingPoint) return;
-
-    // Handle cannon release separately (c5x-ship-combat)
-    if (this.controllingPoint === 'cannon' && this.controllingCannon) {
-      this.sendReleaseCannon(
-        this.controllingShip,
-        this.controllingCannon.side,
-        this.controllingCannon.index
-      );
-      this.controllingCannon = null;
-      this.currentCannonAim = 0;
-    }
-    // Mast is client-side only, don't send to ship server
-    else if (this.controllingPoint === 'mast') {
-      const ship = this.ships.get(this.controllingShip);
-      if (ship) {
-        ship.controlPoints.mast.controlledBy = null;
-      }
-      this.cameras.main.zoomTo(1.5, 500); // Zoom back to 1.5x over 500ms
-      console.log(`Climbed down mast - zooming back to normal view`);
-    }
-    // Wheel or sails
-    else {
-      this.client.send({
-        kind: 'ship/release_control',
-        to: [this.controllingShip],
-        payload: {
-          controlPoint: this.controllingPoint as 'wheel' | 'sails',
-          playerId: this.playerId,
-        },
-      });
-      console.log(`Released ${this.controllingPoint} on ship ${this.controllingShip}`);
-    }
-
-    this.controllingShip = null;
-    this.controllingPoint = null;
-  }
-
-  private sendSteer(shipId: string, direction: 'left' | 'right') {
-    this.client.send({
-      kind: 'ship/steer',
-      to: [shipId],
-      payload: {
-        direction,
-        playerId: this.playerId,
-      },
-    });
-
-    console.log(`Steering ${direction}`);
-  }
-
-  /**
-   * Start turning wheel (w3l-wheel-steering)
-   * Player holds left/right to continuously rotate wheel
-   */
-  private sendWheelTurnStart(shipId: string, direction: 'left' | 'right') {
-    this.client.send({
-      kind: 'ship/wheel_turn_start',
-      to: [shipId],
-      payload: {
-        direction,
-        playerId: this.playerId,
-      },
-    });
-
-    console.log(`Started turning wheel ${direction}`);
-  }
-
-  /**
-   * Stop turning wheel (w3l-wheel-steering)
-   * Wheel locks at current angle, ship continues turning
-   */
-  private sendWheelTurnStop(shipId: string) {
-    this.client.send({
-      kind: 'ship/wheel_turn_stop',
-      to: [shipId],
-      payload: {
-        playerId: this.playerId,
-      },
-    });
-
-    console.log(`Stopped turning wheel`);
-  }
-
-  private sendAdjustSails(shipId: string, adjustment: 'up' | 'down') {
-    this.client.send({
-      kind: 'ship/adjust_sails',
-      to: [shipId],
-      payload: {
-        adjustment,
-        playerId: this.playerId,
-      },
-    });
-
-    console.log(`Adjusting sails ${adjustment}`);
-  }
-
-  /**
-   * Cannon control methods (c5x-ship-combat)
-   */
-  private sendGrabCannon(shipId: string, side: 'port' | 'starboard', index: number) {
-    this.client.send({
-      kind: 'ship/grab_cannon',
-      to: [shipId],
-      payload: {
-        side,
-        index,
-        playerId: this.playerId,
-      },
-    });
-
-    this.controllingShip = shipId;
-    this.controllingPoint = 'cannon';
-    this.controllingCannon = { side, index };
-    this.currentCannonAim = 0; // Reset aim when grabbing
-
-    console.log(`Grabbed ${side} cannon ${index} on ship ${shipId}`);
-  }
-
-  private sendReleaseCannon(shipId: string, side: 'port' | 'starboard', index: number) {
-    this.client.send({
-      kind: 'ship/release_cannon',
-      to: [shipId],
-      payload: {
-        side,
-        index,
-        playerId: this.playerId,
-      },
-    });
-
-    console.log(`Released ${side} cannon ${index}`);
-  }
-
-  private sendAimCannon(shipId: string, side: 'port' | 'starboard', index: number, aimAngle: number) {
-    this.client.send({
-      kind: 'ship/aim_cannon',
-      to: [shipId],
-      payload: {
-        side,
-        index,
-        aimAngle,
-        playerId: this.playerId,
-      },
-    });
-  }
-
-  private sendAdjustElevation(shipId: string, side: 'port' | 'starboard', index: number, adjustment: 'up' | 'down') {
-    this.client.send({
-      kind: 'ship/adjust_elevation',
-      to: [shipId],
-      payload: {
-        side,
-        index,
-        adjustment,
-        playerId: this.playerId,
-      },
-    });
-  }
-
-  private sendFireCannon(shipId: string, side: 'port' | 'starboard', index: number) {
-    this.client.send({
-      kind: 'ship/fire_cannon',
-      to: [shipId],
-      payload: {
-        side,
-        index,
-        playerId: this.playerId,
-      },
-    });
-
-    console.log(`Fired ${side} cannon ${index}!`);
-  }
-
-  /**
-   * Phase 3: Send projectile hit claim to SOURCE ship for validation
-   * The source ship owns the projectile and can validate physics.
-   * If valid, it will apply damage to the target ship.
-   */
-  private sendProjectileHitClaim(
-    targetShipId: string,
-    projectileId: string,
-    timestamp: number,
-    targetX: number,
-    targetY: number,
-    targetRotation: number,
-    targetBoundary: { width: number; height: number }
-  ) {
-    // Extract source ship from projectile ID (format: "ship1-port-0-timestamp")
-    const sourceShipId = projectileId.split('-')[0];
-
-    this.client.send({
-      kind: 'game/projectile_hit_claim',
-      to: [sourceShipId], // Send to SOURCE ship (not target!)
-      payload: {
-        projectileId,
-        targetShipId, // Include target so source knows who got hit
-        targetPosition: { x: targetX, y: targetY },
-        targetRotation,
-        targetBoundary,
-        claimedDamage: 25, // Standard cannonball damage
-        timestamp,
-      },
-    });
-    console.log(`Claimed hit on ${targetShipId} with projectile ${projectileId} (sent to ${sourceShipId})`);
-  }
 }

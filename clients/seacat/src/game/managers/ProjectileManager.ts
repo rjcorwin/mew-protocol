@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Projectile, Ship } from '../../types.js';
 import { CollisionManager } from './CollisionManager.js';
 import { EffectsRenderer } from '../rendering/EffectsRenderer.js';
+import { ShipCommands } from '../network/ShipCommands.js';
 import { TILE_VISUAL_HEIGHT } from '../utils/Constants.js';
 import { Howl } from 'howler';
 
@@ -34,15 +35,7 @@ export class ProjectileManager {
       shipRespawn?: Howl;
     },
     private onShip: string | null,
-    private sendProjectileHitClaim: (
-      targetShipId: string,
-      projectileId: string,
-      timestamp: number,
-      targetX: number,
-      targetY: number,
-      targetRotation: number,
-      targetBoundary: { width: number; height: number }
-    ) => void
+    private shipCommands: ShipCommands
   ) {}
 
   /**
@@ -168,7 +161,7 @@ export class ProjectileManager {
           this.sounds?.hitImpact?.play();
 
           // Send hit claim to target ship for validation (include target's position/boundary for server validation)
-          this.sendProjectileHitClaim(
+          this.shipCommands.sendProjectileHitClaim(
             ship.id,
             proj.id,
             Date.now(),
