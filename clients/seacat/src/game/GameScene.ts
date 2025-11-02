@@ -808,9 +808,9 @@ export class GameScene extends Phaser.Scene {
 
     // Draw ship boundary and control point indicators at current ship position
     this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
-    this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`));
-    this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`));
-    this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast');
+    this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`), 'wheel', ship.rotation);
+    this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`), 'sails', ship.rotation);
+    this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast', ship.rotation);
 
     // c5x-ship-combat: Draw cannon control points
     if (ship.cannons) {
@@ -1059,13 +1059,16 @@ export class GameScene extends Phaser.Scene {
     controlPoint: { relativePosition: { x: number; y: number }; controlledBy: string | null },
     shipSprite: Phaser.GameObjects.Sprite,
     isPlayerNear: boolean = false,
-    type: 'wheel' | 'sails' | 'mast' = 'wheel'
+    type: 'wheel' | 'sails' | 'mast' = 'wheel',
+    shipRotation?: number
   ) {
     graphics.clear();
 
     // Phase D: Rotate control point position with ship rotation using isometric rotation (i2m-true-isometric Phase 4)
     // Apply ship's rotation to the relative position to get rotated world position
-    const rotatedPos = this.rotatePointIsometric(controlPoint.relativePosition, shipSprite.rotation);
+    // Use passed rotation parameter if available (s6r-ship-sprite-rendering), otherwise fall back to sprite rotation
+    const rotation = shipRotation !== undefined ? shipRotation : shipSprite.rotation;
+    const rotatedPos = this.rotatePointIsometric(controlPoint.relativePosition, rotation);
     const worldX = shipSprite.x + rotatedPos.x;
     const worldY = shipSprite.y + rotatedPos.y;
 
@@ -1579,9 +1582,9 @@ export class GameScene extends Phaser.Scene {
 
       // Always redraw control points and ship boundary at their current positions (they move with ship sprite)
       this.drawShipBoundary(ship.boundaryGraphics, ship.sprite, ship.deckBoundary, ship.rotation);
-      this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`));
-      this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`));
-      this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast');
+      this.drawControlPoint(ship.controlPoints.wheel.sprite, ship.controlPoints.wheel, ship.sprite, this.nearControlPoints.has(`${ship.id}:wheel`), 'wheel', ship.rotation);
+      this.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`), 'sails', ship.rotation);
+      this.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast', ship.rotation);
 
       // c5x-ship-combat: Draw cannon control points
       if (ship.cannons) {
