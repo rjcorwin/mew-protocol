@@ -6,6 +6,33 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ### Seacat
 
+#### Proposed: GameScene Refactor (s7g-gamescene-refactor)
+**Status:** Proposal Draft 📝
+**Proposal:** `spec/seacat/proposals/s7g-gamescene-refactor/`
+**Implementation Plan:** `spec/seacat/proposals/s7g-gamescene-refactor/IMPLEMENTATION_PLAN.md`
+
+Refactor the monolithic GameScene.ts (2603 lines) into focused, maintainable modules using the manager pattern.
+
+**Motivation:**
+- GameScene.ts has grown too large with mixed concerns
+- Difficult to maintain, test, and collaborate on
+- Major methods (update: 435 lines, updateShip: 270 lines, checkShipInteractions: 268 lines)
+
+**Proposed Architecture:**
+- `managers/` - State management (PlayerManager, ShipManager, ProjectileManager, CollisionManager, MapManager)
+- `rendering/` - Visual systems (ShipRenderer, WaterRenderer, EffectsRenderer, PlayerRenderer)
+- `controls/` - Input handling (ShipControls, ShipInputHandler)
+- `network/` - Communication (NetworkClient, ShipCommands)
+- `utils/` - Utilities (IsometricMath, Constants, Types)
+
+**Benefits:**
+- GameScene reduced to ~200 lines (orchestrator role)
+- Single-responsibility modules (easier to understand, test, modify)
+- Parallel development (multiple devs can work simultaneously)
+- No file exceeds 500 lines
+
+**Timeline:** 1-2 weeks (33-44 hours estimated)
+
 #### Implemented: Ship-to-Ship Combat (c5x-ship-combat)
 **Status:** Complete ✅ (All 5 Phases)
 **Proposal:** `spec/seacat/proposals/c5x-ship-combat/`
