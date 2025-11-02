@@ -29,7 +29,7 @@ NC='\033[0m' # No Color
 FRAMES_DIR="assets/sprites/ship_frames"
 OUTPUT_FILE="assets/sprites/ship1.png"
 GRID_SIZE="8x8"
-FRAME_SIZE="128x128"
+FRAME_SIZE="256x256"  # Increased from 128x128 for sharper sprites
 NUM_FRAMES=64
 
 echo ""

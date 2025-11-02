@@ -69,7 +69,7 @@ clients/seacat/assets/
 ### 2.3 Test Single Frame Render (HUMAN)
 **Agent provides:** Render settings checklist
 **Human does:**
-1. Set render to 128×128 PNG
+1. Set render to 256×256 PNG (higher res to avoid blur when scaled)
 2. Enable transparent background
 3. Render single frame (F12)
 4. Verify ship looks good and fits in frame
@@ -115,7 +115,7 @@ Agent creates: `clients/seacat/scripts/assemble-sprite-sheet.sh`
 
 **Script features:**
 - Uses ImageMagick to combine 64 frames
-- Creates 8×8 grid (1024×1024)
+- Creates 8×8 grid (2048×2048, using 256×256 frames)
 - Transparent background
 - Outputs to `assets/sprites/ship1.png`
 - Cleans up temp frames (optional)
@@ -274,7 +274,7 @@ Add ship sprite rendering documentation
 ## Success Criteria
 
 - [ ] 64 ship rotation frames rendered from Blender
-- [ ] Sprite sheet assembled (8×8 grid, 1024×1024)
+- [ ] Sprite sheet assembled (8×8 grid, 2048×2048)
 - [ ] Client loads and displays ship sprite
 - [ ] Ship rotates smoothly during gameplay
 - [ ] No performance degradation

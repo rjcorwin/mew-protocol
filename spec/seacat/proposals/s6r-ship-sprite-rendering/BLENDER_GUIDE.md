@@ -91,11 +91,13 @@ Press **Numpad 7** for perfect top-down view when modeling.
 ### Step 3: Adjust Camera Frame
 1. In camera view (Numpad 0)
 2. You should see a rectangular frame
-3. We need it square for our 128×128 sprite
+3. We need it square for our 256×256 sprite frames
 4. Go to **Output Properties** (right panel, printer icon)
 5. Resolution:
-   - X: **128**
-   - Y: **128**
+   - X: **256**
+   - Y: **256**
+
+**Note:** We use 256×256 (not 128×128) to avoid blurriness when the sprite is scaled up in-game.
 
 ---
 

@@ -82,10 +82,10 @@ export class GameScene extends Phaser.Scene {
 
     // Load ship sprite sheet (s6r-ship-sprite-rendering)
     // 64 rotation frames (5.625° per frame) in 8×8 grid
-    // NOTE: This file doesn't exist yet - Phaser will warn but continue with fallback rendering
+    // Frames are 256x256 (increased from 128 for sharper rendering when scaled)
     this.load.spritesheet('ship1', 'assets/sprites/ship1.png', {
-      frameWidth: 128,
-      frameHeight: 128,
+      frameWidth: 256,
+      frameHeight: 256,
     });
 
     // Handle load errors for optional assets (don't crash the game)
@@ -594,9 +594,9 @@ export class GameScene extends Phaser.Scene {
       shipSprite.setDepth(1); // Above ground tiles
 
       // Scale sprite to appropriate size for the ship
-      // Sprite is 128x128, deck boundary is 128x48
-      // Scale up a bit so the ship looks substantial (1.5x to 2x)
-      const baseScale = 1.5; // Increase sprite size
+      // Sprite frames are 256x256, deck boundary is 128x48
+      // Scale to fit: 128/256 = 0.5, then multiply by desired size (1.5x)
+      const baseScale = (128 / 256) * 1.5; // 0.5 * 1.5 = 0.75
       shipSprite.setScale(baseScale); // Uniform scaling
 
       // Set initial sprite frame based on ship rotation (s6r-ship-sprite-rendering)
