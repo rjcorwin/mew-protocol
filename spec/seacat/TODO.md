@@ -13,6 +13,8 @@
 - [ ] Zoom perspective out 30%. ANything outside of original perspective we don't render. 
 - [ ] Add a parallax sky background
 
+- [ ] Make a build that I can install on my steamdeck
+
 - [ ] Add a map mode
 - [ ] Stormy weather
 - [ ] Character swords

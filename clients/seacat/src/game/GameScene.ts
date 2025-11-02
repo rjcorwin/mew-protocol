@@ -6,6 +6,7 @@ import * as Constants from './utils/Constants.js';
 import * as IsoMath from './utils/IsometricMath.js';
 import { CollisionManager } from './managers/CollisionManager.js';
 import { MapManager } from './managers/MapManager.js';
+import { PlayerManager } from './managers/PlayerManager.js';
 import { EffectsRenderer } from './rendering/EffectsRenderer.js';
 import { WaterRenderer } from './rendering/WaterRenderer.js';
 import { PlayerRenderer } from './rendering/PlayerRenderer.js';
@@ -47,6 +48,7 @@ export class GameScene extends Phaser.Scene {
   private shallowWaterGraphics!: Phaser.GameObjects.Graphics; // Semi-transparent water overlay for sand tiles
   private mapManager!: MapManager;
   private collisionManager!: CollisionManager;
+  private playerManager!: PlayerManager;
   private effectsRenderer!: EffectsRenderer;
   private waterRenderer!: WaterRenderer;
   private playerRenderer!: PlayerRenderer;
@@ -153,9 +155,10 @@ export class GameScene extends Phaser.Scene {
       this.waterLayer
     );
 
-    // Initialize renderers
-    this.effectsRenderer = new EffectsRenderer(this);
+    // Initialize managers and renderers
     this.waterRenderer = new WaterRenderer(this, this.map);
+    this.playerManager = new PlayerManager(this, this.map, this.groundLayer, this.secondLayer, this.waterRenderer, this.remotePlayers);
+    this.effectsRenderer = new EffectsRenderer(this);
     this.playerRenderer = new PlayerRenderer(this);
     this.shipRenderer = new ShipRenderer(this);
 
@@ -273,7 +276,7 @@ export class GameScene extends Phaser.Scene {
             this.updateShip(update);
           } else {
             // Update or create remote player
-            this.updateRemotePlayer(update);
+            this.playerManager.updateRemotePlayer(update);
           }
         } catch (error) {
           console.error('Failed to parse position update:', error);
@@ -283,54 +286,6 @@ export class GameScene extends Phaser.Scene {
         this.spawnProjectile(envelope.payload);
       }
     });
-  }
-
-  private updateRemotePlayer(update: PositionUpdate) {
-    let player = this.remotePlayers.get(update.participantId);
-
-    if (!player) {
-      // Create new remote player
-      const sprite = this.add.sprite(
-        update.worldCoords.x,
-        update.worldCoords.y,
-        'player'
-      );
-      sprite.setOrigin(0.5, 0.8);
-      sprite.setTint(0xff0000); // Red for remote players
-      // Depth is set dynamically in update() based on Y position
-
-      player = {
-        id: update.participantId,
-        sprite,
-        targetPosition: { x: update.worldCoords.x, y: update.worldCoords.y },
-        lastUpdate: update.timestamp,
-        velocity: update.velocity,
-        platformRef: update.platformRef,
-        onShip: null,
-        lastWaveOffset: 0, // Initialize wave offset tracking
-      };
-
-      this.remotePlayers.set(update.participantId, player);
-      console.log(`Remote player joined: ${update.participantId}`);
-    } else {
-      // Update existing player's target position
-      player.targetPosition = { x: update.worldCoords.x, y: update.worldCoords.y };
-      player.lastUpdate = update.timestamp;
-      player.velocity = update.velocity;
-    }
-
-    // Update remote player animation based on received facing direction
-    const velocityMagnitude = Math.sqrt(
-      update.velocity.x ** 2 + update.velocity.y ** 2
-    );
-
-    if (velocityMagnitude > 0) {
-      // Player is moving - play walk animation in the received direction
-      player.sprite.play(`walk-${update.facing}`, true);
-    } else {
-      // Player is idle - stop animation
-      player.sprite.anims.stop();
-    }
   }
 
   private updateShip(update: PositionUpdate) {
@@ -517,11 +472,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         // Teleport remote players off ship
-        this.remotePlayers.forEach((player) => {
-          if (player.onShip === ship.id) {
-            player.onShip = null;
-          }
-        });
+        this.playerManager.teleportPlayersOffShip(ship.id);
       }
 
       // Phase 4: Detect respawn (sinking → not sinking)
@@ -572,13 +523,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         // Rotate remote players on this ship
-        this.remotePlayers.forEach((player) => {
-          if (player.onShip === ship.id) {
-            // Note: We need to add shipRelativePosition to Player type
-            // For now, this will handle future implementation
-            console.log(`Remote player ${player.id} should rotate on ship ${ship.id}`);
-          }
-        });
+        this.playerManager.rotatePlayersOnShip(ship.id, rotationDelta);
       }
     }
 
@@ -897,12 +842,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         // Move remote players if on this ship
-        this.remotePlayers.forEach((player) => {
-          if (player.onShip === ship.id) {
-            player.sprite.x += shipDx;
-            player.sprite.y += shipDy;
-          }
-        });
+        this.playerManager.movePlayersOnShip(ship.id, shipDx, shipDy);
       }
 
       // Apply wave bobbing to ship at its current position
@@ -917,11 +857,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Move remote players with wave delta if on this ship
-      this.remotePlayers.forEach((player) => {
-        if (player.onShip === ship.id) {
-          player.sprite.y += waveYDelta;
-        }
-      });
+      this.playerManager.movePlayersOnShip(ship.id, 0, waveYDelta);
 
       // Update shipRelativePosition from current player world position
       // This needs to happen every frame so player movement updates the relative position
@@ -1002,58 +938,7 @@ export class GameScene extends Phaser.Scene {
     this.checkShipInteractions();
 
     // Interpolate remote players toward their target positions
-    this.remotePlayers.forEach((player) => {
-      // Update depth dynamically - check if south of Layer 2 tiles
-      const remoteTilePos = this.map.worldToTileXY(player.sprite.x, player.sprite.y);
-      let remoteRenderAbove = false;
-
-      if (remoteTilePos && this.secondLayer) {
-        const tileNorth = this.secondLayer.getTileAt(
-          Math.floor(remoteTilePos.x),
-          Math.floor(remoteTilePos.y) - 1
-        );
-        if (tileNorth) {
-          remoteRenderAbove = true;
-        }
-      }
-
-      player.sprite.setDepth(remoteRenderAbove ? 20000 : 1000);
-
-      const dx = player.targetPosition.x - player.sprite.x;
-      const dy = player.targetPosition.y - player.sprite.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance > 1) {
-        // Smooth interpolation
-        const factor = Math.min(1, (delta / 1000) * 5); // Adjust speed as needed
-        player.sprite.x += dx * factor;
-        player.sprite.y += dy * factor;
-      }
-
-      // Apply wave bobbing if remote player is in water (not on ship)
-      if (!player.onShip) {
-        const tilePos = this.map.worldToTileXY(player.sprite.x, player.sprite.y);
-        if (tilePos) {
-          const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
-          if (tile && tile.properties?.navigable === true) {
-            // Remote player is in water, apply wave offset delta
-            const currentWaveOffset = this.waterRenderer.calculateWaveHeightAtPosition(player.sprite.x, player.sprite.y, time);
-            const waveDelta = currentWaveOffset - player.lastWaveOffset;
-            player.sprite.y += waveDelta;
-            player.lastWaveOffset = currentWaveOffset;
-          } else {
-            // Remote player is not in water, reset wave offset
-            player.lastWaveOffset = 0;
-          }
-        } else {
-          // Out of bounds, reset wave offset
-          player.lastWaveOffset = 0;
-        }
-      } else {
-        // Remote player is on ship, reset wave offset (ship handles bobbing)
-        player.lastWaveOffset = 0;
-      }
-    });
+    this.playerManager.interpolateRemotePlayers(delta, time);
 
     // c5x-ship-combat Phase 2: Update projectile physics
     const GRAVITY = 150; // px/s² (must match server)
