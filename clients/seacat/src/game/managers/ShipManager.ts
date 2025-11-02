@@ -36,10 +36,10 @@ export class ShipManager {
       shipRespawn?: Howl;
     },
     private nearControlPoints: Set<string>,
-    private controllingShip: string | null,
-    private controllingPoint: 'wheel' | 'sails' | 'mast' | 'cannon' | null,
-    private controllingCannon: { side: 'port' | 'starboard', index: number } | null,
-    private currentCannonAim: number,
+    private getControllingShip: () => string | null,
+    private getControllingPoint: () => 'wheel' | 'sails' | 'mast' | 'cannon' | null,
+    private getControllingCannon: () => { side: 'port' | 'starboard', index: number } | null,
+    private getCurrentCannonAim: () => number,
     private getOnShip: () => string | null,
     private onShipChanged: (shipId: string | null) => void,
     private onApplyingShipRotation: (rotating: boolean) => void
@@ -306,19 +306,19 @@ export class ShipManager {
     if (ship.cannons) {
       ship.cannons.port.forEach((cannon, index) => {
         const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-port-${index}`);
-        const isControlledByUs = this.controllingShip === ship.id &&
-          this.controllingPoint === 'cannon' &&
-          this.controllingCannon?.side === 'port' &&
-          this.controllingCannon?.index === index;
-        this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
+        const isControlledByUs = this.getControllingShip() === ship.id &&
+          this.getControllingPoint() === 'cannon' &&
+          this.getControllingCannon()?.side === 'port' &&
+          this.getControllingCannon()?.index === index;
+        this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.getCurrentCannonAim());
       });
       ship.cannons.starboard.forEach((cannon, index) => {
         const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
-        const isControlledByUs = this.controllingShip === ship.id &&
-          this.controllingPoint === 'cannon' &&
-          this.controllingCannon?.side === 'starboard' &&
-          this.controllingCannon?.index === index;
-        this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
+        const isControlledByUs = this.getControllingShip() === ship.id &&
+          this.getControllingPoint() === 'cannon' &&
+          this.getControllingCannon()?.side === 'starboard' &&
+          this.getControllingCannon()?.index === index;
+        this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.getCurrentCannonAim());
       });
     }
 
@@ -404,19 +404,19 @@ export class ShipManager {
       if (ship.cannons) {
         ship.cannons.port.forEach((cannon, index) => {
           const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-port-${index}`);
-          const isControlledByUs = this.controllingShip === ship.id &&
-            this.controllingPoint === 'cannon' &&
-            this.controllingCannon?.side === 'port' &&
-            this.controllingCannon?.index === index;
-          this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
+          const isControlledByUs = this.getControllingShip() === ship.id &&
+            this.getControllingPoint() === 'cannon' &&
+            this.getControllingCannon()?.side === 'port' &&
+            this.getControllingCannon()?.index === index;
+          this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.getCurrentCannonAim());
         });
         ship.cannons.starboard.forEach((cannon, index) => {
           const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
-          const isControlledByUs = this.controllingShip === ship.id &&
-            this.controllingPoint === 'cannon' &&
-            this.controllingCannon?.side === 'starboard' &&
-            this.controllingCannon?.index === index;
-          this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.currentCannonAim);
+          const isControlledByUs = this.getControllingShip() === ship.id &&
+            this.getControllingPoint() === 'cannon' &&
+            this.getControllingCannon()?.side === 'starboard' &&
+            this.getControllingCannon()?.index === index;
+          this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.getCurrentCannonAim());
         });
       }
 
