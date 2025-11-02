@@ -3,6 +3,8 @@ import { Howl } from 'howler';
 import { MEWClient } from '@mew-protocol/mew/client';
 import { PositionUpdate, Player, Ship, Direction, Projectile } from '../types.js';
 import * as Constants from './utils/Constants.js';
+import * as IsoMath from './utils/IsometricMath.js';
+import { CollisionManager } from './managers/CollisionManager.js';
 
 const {
   TILE_WIDTH,
@@ -38,6 +40,7 @@ export class GameScene extends Phaser.Scene {
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
   private shallowWaterGraphics!: Phaser.GameObjects.Graphics; // Semi-transparent water overlay for sand tiles
+  private collisionManager!: CollisionManager;
   private controllingShip: string | null = null;
   private controllingPoint: 'wheel' | 'sails' | 'mast' | 'cannon' | null = null;
   private onShip: string | null = null; // Track if local player is on a ship
@@ -68,7 +71,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image('terrain', 'assets/maps/terrain.png');
 
     // Load Tiled map
-    this.load.tilemapTiledJSON('map', 'assets/maps/small-map.tmj');
+    this.load.tilemapTiledJSON('map', 'assets/maps/map1.tmj');
 
     // Load player sprite sheet (8 directions, 4 frames each)
     this.load.spritesheet('player', 'assets/sprites/player.png', {
@@ -360,6 +363,16 @@ export class GameScene extends Phaser.Scene {
     }
 
     console.log(`Map loaded: ${this.map.width}×${this.map.height} tiles`);
+
+    // Initialize collision manager
+    this.collisionManager = new CollisionManager(
+      this,
+      this.map,
+      this.groundLayer,
+      this.secondLayer,
+      this.obstacleLayer,
+      this.waterLayer
+    );
 
     // Send map navigation data to ships
     this.sendMapDataToShips();
@@ -794,7 +807,7 @@ export class GameScene extends Phaser.Scene {
           // Apply rotation to player's world position using isometric rotation
           // Note: We use ship.rotation (total angle), NOT rotationDelta
           // This matches how ship boundary corners are calculated (no accumulated error)
-          const rotatedWorldPos = this.rotatePointIsometric(this.shipRelativePosition, ship.rotation);
+          const rotatedWorldPos = IsoMath.rotatePointIsometric(this.shipRelativePosition, ship.rotation);
           this.localPlayer.x = ship.sprite.x + rotatedWorldPos.x;
           this.localPlayer.y = ship.sprite.y + rotatedWorldPos.y;
 
@@ -1074,7 +1087,7 @@ export class GameScene extends Phaser.Scene {
     // Apply ship's rotation to the relative position to get rotated world position
     // Use passed rotation parameter if available (s6r-ship-sprite-rendering), otherwise fall back to sprite rotation
     const rotation = shipRotation !== undefined ? shipRotation : shipSprite.rotation;
-    const rotatedPos = this.rotatePointIsometric(controlPoint.relativePosition, rotation);
+    const rotatedPos = IsoMath.rotatePointIsometric(controlPoint.relativePosition, rotation);
     const worldX = shipSprite.x + rotatedPos.x;
     const worldY = shipSprite.y + rotatedPos.y;
 
@@ -1114,7 +1127,7 @@ export class GameScene extends Phaser.Scene {
     graphics.clear();
 
     // Calculate cannon world position with isometric rotation
-    const rotatedPos = this.rotatePointIsometric(cannon.relativePosition, shipRotation);
+    const rotatedPos = IsoMath.rotatePointIsometric(cannon.relativePosition, shipRotation);
     const worldX = shipSprite.x + rotatedPos.x;
     const worldY = shipSprite.y + rotatedPos.y;
 
@@ -1248,7 +1261,7 @@ export class GameScene extends Phaser.Scene {
 
     // Draw each corner dot using isometric rotation (i2m-true-isometric)
     corners.forEach((corner) => {
-      const rotatedPos = this.rotatePointIsometric({ x: corner.x, y: corner.y }, rotation);
+      const rotatedPos = IsoMath.rotatePointIsometric({ x: corner.x, y: corner.y }, rotation);
       const worldX = shipSprite.x + rotatedPos.x;
       const worldY = shipSprite.y + rotatedPos.y;
 
@@ -1473,7 +1486,7 @@ export class GameScene extends Phaser.Scene {
           this.localPlayer.y += velocity.y;
         } else {
           // Player is on land - check tile collision and apply speed modifier
-          const collision = this.checkTileCollision(newX, newY);
+          const collision = this.collisionManager.checkTileCollision(newX, newY);
 
           if (collision.walkable) {
             // Apply movement with speed modifier from terrain
@@ -1583,7 +1596,7 @@ export class GameScene extends Phaser.Scene {
 
         // Rotate to ship-local coordinates using isometric rotation (i2m-true-isometric Phase 3)
         const offset = { x: dx, y: dy };
-        this.shipRelativePosition = this.rotatePointIsometric(offset, -ship.rotation);
+        this.shipRelativePosition = IsoMath.rotatePointIsometric(offset, -ship.rotation);
       }
 
       // Always redraw control points and ship boundary at their current positions (they move with ship sprite)
@@ -1762,7 +1775,7 @@ export class GameScene extends Phaser.Scene {
           height: ship.deckBoundary.height * hitboxPadding
         };
 
-        if (this.isPointInRotatedRect(
+        if (this.collisionManager.isPointInRotatedRect(
           { x: proj.sprite.x, y: proj.sprite.y },
           { x: ship.sprite.x, y: ship.sprite.y },
           paddedBoundary,
@@ -1844,125 +1857,16 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /**
-   * Rotate a point by the given angle (Cartesian rotation)
-   * @param point Point to rotate
-   * @param angle Rotation angle in radians
-   * @returns Rotated point
-   */
-  private rotatePoint(point: { x: number; y: number }, angle: number): { x: number; y: number } {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    return {
-      x: point.x * cos - point.y * sin,
-      y: point.x * sin + point.y * cos,
-    };
-  }
-
-  /**
-   * Convert isometric coordinates to Cartesian coordinates (i2m-true-isometric Phase 3)
-   * @param isoPoint Point in isometric space
-   * @returns Point in Cartesian space
-   */
-  private isometricToCartesian(isoPoint: { x: number; y: number }): { x: number; y: number } {
-    return {
-      x: (isoPoint.x + isoPoint.y * 2) / 2,
-      y: (isoPoint.y * 2 - isoPoint.x) / 2,
-    };
-  }
-
-  /**
-   * Convert Cartesian coordinates to isometric coordinates (i2m-true-isometric Phase 3)
-   * @param cartPoint Point in Cartesian space
-   * @returns Point in isometric space
-   */
-  private cartesianToIsometric(cartPoint: { x: number; y: number }): { x: number; y: number } {
-    return {
-      x: cartPoint.x - cartPoint.y,
-      y: (cartPoint.x + cartPoint.y) / 2,
-    };
-  }
-
-  /**
-   * Rotate a point in isometric space (i2m-true-isometric Phase 3)
-   * This ensures rotation appears correct in isometric projection
-   * @param point Point to rotate in isometric space
-   * @param angle Rotation angle in radians
-   * @returns Rotated point in isometric space
-   */
-  private rotatePointIsometric(point: { x: number; y: number }, angle: number): { x: number; y: number } {
-    // Transform to Cartesian
-    const cart = this.isometricToCartesian(point);
-
-    // Apply Cartesian rotation
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const rotatedCart = {
-      x: cart.x * cos - cart.y * sin,
-      y: cart.x * sin + cart.y * cos,
-    };
-
-    // Transform back to isometric
-    return this.cartesianToIsometric(rotatedCart);
-  }
-
-  /**
-   * Check if a point is inside a rotated rectangle using OBB (Oriented Bounding Box) collision
-   * Uses isometric rotation to match how players rotate on ships (i2m-true-isometric)
-   * @param point Point to test in world coordinates
-   * @param rectCenter Center of rectangle in world coordinates
-   * @param rectSize Size of rectangle (width, height)
-   * @param rotation Rotation angle in radians
-   * @returns true if point is inside rotated rectangle
-   */
-  private isPointInRotatedRect(
-    point: { x: number; y: number },
-    rectCenter: { x: number; y: number },
-    rectSize: { width: number; height: number },
-    rotation: number
-  ): boolean {
-    // Transform point to rectangle's local space
-    const dx = point.x - rectCenter.x;
-    const dy = point.y - rectCenter.y;
-
-    // Rotate point by -rotation using isometric rotation to align with rect's axes
-    const offset = { x: dx, y: dy };
-    const localPos = this.rotatePointIsometric(offset, -rotation);
-
-    // Check if point is inside axis-aligned rect
-    const halfWidth = rectSize.width / 2;
-    const halfHeight = rectSize.height / 2;
-
-    return Math.abs(localPos.x) <= halfWidth && Math.abs(localPos.y) <= halfHeight;
-  }
 
   private checkShipBoundary() {
     // Check if player is within any ship's deck boundary (using OBB for rotated ships)
-    let foundShip: string | null = null;
-    let shipRelativePos: { x: number; y: number } | null = null;
+    const result = this.collisionManager.checkShipBoundary(
+      { x: this.localPlayer.x, y: this.localPlayer.y },
+      this.ships
+    );
 
-    this.ships.forEach((ship) => {
-      // Use OBB collision to check if player is on rotated ship deck
-      const isOnDeck = this.isPointInRotatedRect(
-        { x: this.localPlayer.x, y: this.localPlayer.y },
-        { x: ship.sprite.x, y: ship.sprite.y },
-        ship.deckBoundary,
-        ship.rotation
-      );
-
-      if (isOnDeck) {
-        // Calculate position relative to ship center (in ship's local space)
-        const dx = this.localPlayer.x - ship.sprite.x;
-        const dy = this.localPlayer.y - ship.sprite.y;
-
-        // Rotate to ship-local coordinates using isometric rotation (i2m-true-isometric)
-        const offset = { x: dx, y: dy };
-        const localPos = this.rotatePointIsometric(offset, -ship.rotation);
-
-        foundShip = ship.id;
-        shipRelativePos = { x: localPos.x, y: localPos.y }; // Store in ship-local coords
-      }
-    });
+    const foundShip = result ? result.shipId : null;
+    const shipRelativePos = result ? result.relativePosition : null;
 
     // Update onShip state
     if (foundShip !== this.onShip) {
@@ -1978,88 +1882,6 @@ export class GameScene extends Phaser.Scene {
     }
     // DON'T update shipRelativePosition while on ship - it gets rotated when ship turns
     // and recalculated from world position each frame in the update loop
-  }
-
-  private checkTileCollision(worldX: number, worldY: number): {
-    walkable: boolean;
-    speedModifier: number;
-    terrain: string;
-  } {
-    // Offset collision check northward (negative Y) to account for 3D tile height
-    // This prevents north-side penetration and allows south-side approach
-    // Players can get close from south (appear in front), but blocked earlier from north
-    const collisionOffsetY = -TILE_HEIGHT; // Check one full tile north
-    const tilePos = this.map.worldToTileXY(worldX, worldY + collisionOffsetY);
-
-    if (!tilePos) {
-      // Out of bounds
-      return { walkable: false, speedModifier: 0, terrain: 'boundary' };
-    }
-
-    // Floor the coordinates to ensure integer tile indices
-    const tileX = Math.floor(tilePos.x);
-    const tileY = Math.floor(tilePos.y);
-
-    // Check map boundaries
-    if (tileX < 0 || tileY < 0 || tileX >= this.map.width || tileY >= this.map.height) {
-      return { walkable: false, speedModifier: 0, terrain: 'boundary' };
-    }
-
-    // Check obstacle layer first (highest priority)
-    if (this.obstacleLayer) {
-      const obstacleTile = this.obstacleLayer.getTileAt(tileX, tileY);
-      if (obstacleTile) {
-        const walkable = obstacleTile.properties.walkable ?? true;
-        if (!walkable) {
-          return {
-            walkable: false,
-            speedModifier: 0,
-            terrain: obstacleTile.properties.terrain || 'wall'
-          };
-        }
-      }
-    }
-
-    // Check Tile Layer 2 (blocks movement by default if tile exists)
-    if (this.secondLayer) {
-      const tile = this.secondLayer.getTileAt(tileX, tileY);
-      if (tile) {
-        // Default to blocking (false) if tile exists, unless explicitly set to walkable
-        const walkable = tile.properties.walkable ?? false;
-        if (!walkable) {
-          return {
-            walkable: false,
-            speedModifier: 0,
-            terrain: tile.properties.terrain || 'obstacle'
-          };
-        }
-      }
-    }
-
-    // Check water layer (affects speed)
-    if (this.waterLayer) {
-      const waterTile = this.waterLayer.getTileAt(tileX, tileY);
-      if (waterTile) {
-        return {
-          walkable: true,
-          speedModifier: waterTile.properties.speedModifier ?? 0.5,
-          terrain: waterTile.properties.terrain || 'water'
-        };
-      }
-    }
-
-    // Default to ground tile (walkable, normal speed)
-    const groundTile = this.groundLayer.getTileAt(tileX, tileY);
-    if (groundTile) {
-      return {
-        walkable: groundTile.properties.walkable ?? true,
-        speedModifier: groundTile.properties.speedModifier ?? 1.0,
-        terrain: groundTile.properties.terrain || 'grass'
-      };
-    }
-
-    // No tile found - treat as walkable
-    return { walkable: true, speedModifier: 1.0, terrain: 'grass' };
   }
 
   private publishPosition(velocity: Phaser.Math.Vector2) {
@@ -2106,7 +1928,7 @@ export class GameScene extends Phaser.Scene {
     // Find closest control point
     this.ships.forEach((ship) => {
       // Phase D: Calculate wheel world position with isometric rotation (i2m-true-isometric)
-      const rotatedWheelPos = this.rotatePointIsometric(ship.controlPoints.wheel.relativePosition, ship.rotation);
+      const rotatedWheelPos = IsoMath.rotatePointIsometric(ship.controlPoints.wheel.relativePosition, ship.rotation);
       const wheelWorldX = ship.sprite.x + rotatedWheelPos.x;
       const wheelWorldY = ship.sprite.y + rotatedWheelPos.y;
       const wheelDx = wheelWorldX - this.localPlayer.x;
@@ -2130,7 +1952,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Phase D: Calculate sails world position with isometric rotation (i2m-true-isometric)
-      const rotatedSailsPos = this.rotatePointIsometric(ship.controlPoints.sails.relativePosition, ship.rotation);
+      const rotatedSailsPos = IsoMath.rotatePointIsometric(ship.controlPoints.sails.relativePosition, ship.rotation);
       const sailsWorldX = ship.sprite.x + rotatedSailsPos.x;
       const sailsWorldY = ship.sprite.y + rotatedSailsPos.y;
       const sailsDx = sailsWorldX - this.localPlayer.x;
@@ -2154,7 +1976,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       // Check mast (crow's nest at center of ship for zooming out view)
-      const rotatedMastPos = this.rotatePointIsometric(ship.controlPoints.mast.relativePosition, ship.rotation);
+      const rotatedMastPos = IsoMath.rotatePointIsometric(ship.controlPoints.mast.relativePosition, ship.rotation);
       const mastWorldX = ship.sprite.x + rotatedMastPos.x;
       const mastWorldY = ship.sprite.y + rotatedMastPos.y;
       const mastDx = mastWorldX - this.localPlayer.x;
@@ -2180,7 +2002,7 @@ export class GameScene extends Phaser.Scene {
       if (ship.cannons) {
         // Check port cannons
         ship.cannons.port.forEach((cannon, index) => {
-          const rotatedCannonPos = this.rotatePointIsometric(cannon.relativePosition, ship.rotation);
+          const rotatedCannonPos = IsoMath.rotatePointIsometric(cannon.relativePosition, ship.rotation);
           const cannonWorldX = ship.sprite.x + rotatedCannonPos.x;
           const cannonWorldY = ship.sprite.y + rotatedCannonPos.y;
           const cannonDx = cannonWorldX - this.localPlayer.x;
@@ -2210,7 +2032,7 @@ export class GameScene extends Phaser.Scene {
 
         // Check starboard cannons
         ship.cannons.starboard.forEach((cannon, index) => {
-          const rotatedCannonPos = this.rotatePointIsometric(cannon.relativePosition, ship.rotation);
+          const rotatedCannonPos = IsoMath.rotatePointIsometric(cannon.relativePosition, ship.rotation);
           const cannonWorldX = ship.sprite.x + rotatedCannonPos.x;
           const cannonWorldY = ship.sprite.y + rotatedCannonPos.y;
           const cannonDx = cannonWorldX - this.localPlayer.x;
