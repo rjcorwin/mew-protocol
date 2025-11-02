@@ -589,10 +589,9 @@ export class GameScene extends Phaser.Scene {
       shipSprite.setOrigin(0.5, 0.5);
       shipSprite.setDepth(1); // Above ground tiles
 
-      // Set initial sprite frame based on ship rotation
-      // TEMP: Disabled until sprite sheet is generated
-      // const initialFrameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
-      // shipSprite.setFrame(initialFrameIndex);
+      // Set initial sprite frame based on ship rotation (s6r-ship-sprite-rendering)
+      const initialFrameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
+      shipSprite.setFrame(initialFrameIndex);
 
       // Create control point indicators
       const wheelGraphics = this.add.graphics();
@@ -680,8 +679,8 @@ export class GameScene extends Phaser.Scene {
         sinkStartTime: 0,
       };
 
-      // Set initial rotation
-      shipSprite.setRotation(update.shipData.rotation);
+      // NOTE: Don't call setRotation() on sprite - rotation is shown via sprite frames (s6r-ship-sprite-rendering)
+      // The frame was already set above via calculateShipSpriteFrame()
 
       this.ships.set(update.participantId, ship);
       console.log(`Ship joined: ${update.participantId}`);
@@ -771,13 +770,10 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // Update ship sprite rotation (stores rotation for other calculations)
-      ship.sprite.setRotation(update.shipData.rotation);
-
       // Update ship sprite frame to match rotation (s6r-ship-sprite-rendering)
-      // TEMP: Disabled until sprite sheet is generated
-      // const frameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
-      // ship.sprite.setFrame(frameIndex);
+      // NOTE: Don't call setRotation() - rotation is shown via sprite frames, not sprite rotation
+      const frameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
+      ship.sprite.setFrame(frameIndex);
 
       // Phase C: Rotate players on deck when ship turns
       if (update.shipData.rotationDelta && Math.abs(update.shipData.rotationDelta) > 0.001) {
@@ -1258,12 +1254,18 @@ export class GameScene extends Phaser.Scene {
    * @returns Frame index (0-63) corresponding to rotation angle
    */
   private calculateShipSpriteFrame(rotation: number): number {
+    // Subtract 45° offset to align Blender camera orientation with game coordinates
+    // Blender camera was rotated 45° around Z axis for isometric view
+    const offset = Math.PI / 4; // 45 degrees
+    const offsetRotation = rotation - offset;
+
     // Normalize rotation to 0-2π range
-    const normalizedRotation = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const normalizedRotation = ((offsetRotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
 
     // Convert to frame index (0-63)
     // 64 frames cover 360° (2π radians), so each frame is 5.625° (π/32 radians)
-    const frameIndex = Math.round((normalizedRotation / (Math.PI * 2)) * 64) % 64;
+    // Negate rotation to reverse direction (Blender rendered counter-clockwise, game rotates clockwise)
+    const frameIndex = Math.round(((Math.PI * 2 - normalizedRotation) / (Math.PI * 2)) * 64) % 64;
 
     return frameIndex;
   }
