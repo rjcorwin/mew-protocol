@@ -586,8 +586,18 @@ export class GameScene extends Phaser.Scene {
         'ship1',
         0 // Start with frame 0 (0° rotation, facing east)
       );
-      shipSprite.setOrigin(0.5, 0.5);
+      // Set origin to align deck/hull with center, not the entire sprite including mast
+      // The mast extends upward, so we place origin lower (higher Y value)
+      // Origin (0.5, 0.7) means: center horizontally, but 70% down vertically
+      // This puts the hull/deck at the center, with mast extending above
+      shipSprite.setOrigin(0.5, 0.7);
       shipSprite.setDepth(1); // Above ground tiles
+
+      // Scale sprite to appropriate size for the ship
+      // Sprite is 128x128, deck boundary is 128x48
+      // Scale up a bit so the ship looks substantial (1.5x to 2x)
+      const baseScale = 1.5; // Increase sprite size
+      shipSprite.setScale(baseScale); // Uniform scaling
 
       // Set initial sprite frame based on ship rotation (s6r-ship-sprite-rendering)
       const initialFrameIndex = this.calculateShipSpriteFrame(update.shipData.rotation);
