@@ -189,7 +189,7 @@ export class GameScene extends Phaser.Scene {
       this.collisionManager,
       this.effectsRenderer,
       this.sounds,
-      this.onShip,
+      () => this.onShip,
       this.shipCommands
     );
     this.shipManager = new ShipManager(
@@ -206,7 +206,7 @@ export class GameScene extends Phaser.Scene {
       this.controllingPoint,
       this.controllingCannon,
       this.currentCannonAim,
-      this.onShip,
+      () => this.onShip,
       (shipId) => { this.onShip = shipId; this.shipRelativePosition = null; },
       (rotating) => { this.applyingShipRotation = rotating; }
     );

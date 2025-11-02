@@ -40,7 +40,7 @@ export class ShipManager {
     private controllingPoint: 'wheel' | 'sails' | 'mast' | 'cannon' | null,
     private controllingCannon: { side: 'port' | 'starboard', index: number } | null,
     private currentCannonAim: number,
-    private onShip: string | null,
+    private getOnShip: () => string | null,
     private onShipChanged: (shipId: string | null) => void,
     private onApplyingShipRotation: (rotating: boolean) => void
   ) {}
@@ -234,7 +234,7 @@ export class ShipManager {
         this.sounds?.shipSinking?.play();
 
         // Teleport local player off ship to water
-        if (this.onShip === ship.id) {
+        if (this.getOnShip() === ship.id) {
           this.onShipChanged(null);
           shipRelativePosition = null;
           // Player will fall into water and bob
@@ -277,7 +277,7 @@ export class ShipManager {
         console.log(`Ship ${ship.id} rotated by ${(rotationDelta * 180 / Math.PI).toFixed(1)}°`);
 
         // Rotate local player if on this ship
-        if (this.onShip === ship.id && shipRelativePosition) {
+        if (this.getOnShip() === ship.id && shipRelativePosition) {
           // Flag that we're applying rotation (don't recalculate shipRelativePosition this frame)
           this.onApplyingShipRotation(true);
 
@@ -359,7 +359,7 @@ export class ShipManager {
         ship.sprite.y += shipDy;
 
         // Move local player if on this ship (move with ship delta)
-        if (this.onShip === ship.id) {
+        if (this.getOnShip() === ship.id) {
           localPlayerSprite.x += shipDx;
           localPlayerSprite.y += shipDy;
         }
@@ -375,7 +375,7 @@ export class ShipManager {
       ship.lastWaveOffset = currentWaveOffset;
 
       // Move local player with wave delta if on this ship
-      if (this.onShip === ship.id) {
+      if (this.getOnShip() === ship.id) {
         localPlayerSprite.y += waveYDelta;
       }
 
@@ -385,7 +385,7 @@ export class ShipManager {
       // Update shipRelativePosition from current player world position
       // This needs to happen every frame so player movement updates the relative position
       // BUT skip this frame if we just applied a rotation (to avoid overwriting the rotated position)
-      if (this.onShip === ship.id && !applyingShipRotation) {
+      if (this.getOnShip() === ship.id && !applyingShipRotation) {
         const dx = localPlayerSprite.x - ship.sprite.x;
         const dy = localPlayerSprite.y - ship.sprite.y;
 

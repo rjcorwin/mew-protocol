@@ -34,7 +34,7 @@ export class ProjectileManager {
       shipSinking?: Howl;
       shipRespawn?: Howl;
     },
-    private onShip: string | null,
+    private getOnShip: () => string | null,
     private shipCommands: ShipCommands
   ) {}
 
@@ -81,7 +81,7 @@ export class ProjectileManager {
     this.sounds?.cannonFire?.play();
 
     // Phase 5: Camera shake if local player is on the firing ship (c5x-ship-combat)
-    if (sourceShip === this.onShip) {
+    if (sourceShip === this.getOnShip()) {
       this.scene.cameras.main.shake(100, 0.005); // 100ms duration, 0.005 intensity
     }
 
