@@ -1,0 +1,57 @@
+{
+  "columns": 8,
+  "image": "terrain.png",
+  "imageheight": 128,
+  "imagewidth": 512,
+  "margin": 0,
+  "name": "terrain",
+  "spacing": 0,
+  "tilecount": 32,
+  "tiledversion": "1.11.0",
+  "tileheight": 32,
+  "tilewidth": 64,
+  "type": "tileset",
+  "version": "1.10",
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        { "name": "walkable", "type": "bool", "value": true },
+        { "name": "terrain", "type": "string", "value": "grass" },
+        { "name": "speedModifier", "type": "float", "value": 1.0 }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        { "name": "walkable", "type": "bool", "value": true },
+        { "name": "terrain", "type": "string", "value": "sand" },
+        { "name": "speedModifier", "type": "float", "value": 1.0 }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        { "name": "walkable", "type": "bool", "value": true },
+        { "name": "terrain", "type": "string", "value": "water" },
+        { "name": "speedModifier", "type": "float", "value": 0.5 }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        { "name": "walkable", "type": "bool", "value": false },
+        { "name": "terrain", "type": "string", "value": "wall" },
+        { "name": "speedModifier", "type": "float", "value": 0.0 }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        { "name": "walkable", "type": "bool", "value": true },
+        { "name": "terrain", "type": "string", "value": "stone" },
+        { "name": "speedModifier", "type": "float", "value": 1.0 }
+      ]
+    }
+  ]
+}
