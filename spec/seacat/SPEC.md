@@ -43,6 +43,106 @@ The Electron-based game client (`clients/seacat`) provides the complete player e
 - **esbuild**: Fast bundling of renderer code with CommonJS output for Electron compatibility
 - **MEW SDK Client**: WebSocket-based protocol client for real-time communication
 
+### Code Architecture
+
+The game code uses a **manager pattern** with clear separation of concerns, implemented in the s7g-gamescene-refactor (2025-11-03).
+
+**Directory Structure:**
+```
+clients/seacat/src/game/
+├── GameScene.ts              # Main orchestrator (~500 lines)
+│
+├── managers/                 # State management
+│   ├── CollisionManager.ts  # Tile & OBB collision detection
+│   ├── MapManager.ts         # Tiled map loading & navigation
+│   ├── PlayerManager.ts      # Remote player lifecycle & interpolation
+│   ├── ProjectileManager.ts  # Cannonball physics & collision
+│   └── ShipManager.ts        # Ship state updates & lifecycle
+│
+├── rendering/                # Visual systems
+│   ├── EffectsRenderer.ts   # VFX (cannon blasts, splashes, particles)
+│   ├── PlayerRenderer.ts     # 8-directional player animations
+│   ├── ShipRenderer.ts       # Ship sprites, control points, boundaries
+│   └── WaterRenderer.ts      # Wave animation & height calculation
+│
+├── input/                    # Input handling
+│   ├── PlayerInputHandler.ts  # Keyboard movement, collision, wave bobbing
+│   └── ShipInputHandler.ts    # Ship control interaction & commands
+│
+├── network/                  # Multiplayer communication
+│   ├── NetworkClient.ts      # Position updates & message routing
+│   └── ShipCommands.ts       # Ship control protocol messages
+│
+└── utils/                    # Shared utilities
+    ├── Constants.ts          # Game constants (speeds, dimensions)
+    └── IsometricMath.ts      # Coordinate transforms & rotation
+```
+
+**Design Principles:**
+- **Single Responsibility**: Each file handles one concern (rendering, physics, input, etc.)
+- **Manager Pattern**: Managers own lifecycle and updates for their domain
+- **Dependency Injection**: Managers receive dependencies via constructor
+- **Clear Interfaces**: Public APIs documented with comprehensive JSDoc
+- **Phaser Integration**: Works with Phaser's scene system, not against it
+
+**GameScene as Orchestrator:**
+
+GameScene.ts acts as a lightweight orchestrator that initializes managers and delegates updates:
+
+```typescript
+export class GameScene extends Phaser.Scene {
+  // Managers
+  private mapManager!: MapManager;
+  private collisionManager!: CollisionManager;
+  private playerManager!: PlayerManager;
+  private shipManager!: ShipManager;
+  private projectileManager!: ProjectileManager;
+
+  // Renderers
+  private effectsRenderer!: EffectsRenderer;
+  private playerRenderer!: PlayerRenderer;
+  private shipRenderer!: ShipRenderer;
+  private waterRenderer!: WaterRenderer;
+
+  // Input handlers
+  private playerInputHandler!: PlayerInputHandler;
+  private shipInputHandler!: ShipInputHandler;
+
+  // Network
+  private networkClient!: NetworkClient;
+  private shipCommands!: ShipCommands;
+
+  create() {
+    // Initialize managers in dependency order
+    this.initializeUtilities();
+    this.initializeManagers();
+    this.initializeRenderers();
+    this.initializeInput();
+    this.initializeNetwork();
+  }
+
+  update(time: number, delta: number) {
+    // Delegate to managers
+    this.networkClient.update(time, velocity);
+    const velocity = this.playerInputHandler.handleMovement(delta, controllingShip, onShip);
+    this.playerManager.update(delta, time);
+    this.shipManager.update(delta, time);
+    this.projectileManager.update(delta);
+    this.waterRenderer.update(time);
+    // ... etc
+  }
+}
+```
+
+**Benefits:**
+- Reduced GameScene.ts from 2603 lines to ~500 lines
+- 15 focused modules with clear responsibilities
+- Easier to understand, test, and modify individual systems
+- Enables parallel development (multiple devs can work on different managers)
+- No file exceeds 500 lines
+
+See `spec/seacat/proposals/s7g-gamescene-refactor/` for full refactor specification and implementation plan.
+
 ### Audio System
 
 The game uses **Howler.js** instead of Phaser's built-in audio system due to Electron compatibility issues.

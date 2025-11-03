@@ -3,10 +3,12 @@
 - [ ] Show control points above the ship sprite
 - [ ] Fix the bug in cannon tragectories (when pointing south with cannon all the way up, immediately hits water on firing but should be up in the air for a while)
 - [ ] Cannon ball shadows
-- [ ] Character sprites (multiple with option to pick)
+
 - [ ] Ships collisions
-- [ ] Seperate the ship's mast/sail sprites  so when characters walk behind the mast/sail, they appear behind it.
 - [ ] On sail down, show sails position change
+
+- [ ] Character sprites (multiple with option to pick)
+- [ ] Seperate the ship's mast/sail sprites  so when characters walk behind the mast/sail, they appear behind it.
 - [ ] Show cannons on deck
 - [ ] Add debug mode that only shows certain things like control points and health bars when enabled via a start screen checkbox
 
