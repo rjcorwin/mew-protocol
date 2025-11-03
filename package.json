@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsc && chmod +x dist/cli/index.js",
     "build:bin": "tsup",
-    "build:all": "npm run build && npm run build:bin",
+    "build:seacat": "cd clients/seacat && npm install && npm run build",
+    "build:all": "npm run build && npm run build:bin && npm run build:seacat",
     "build:watch": "tsc --watch",
     "dev": "tsc --watch",
     "test": "vitest run",
@@ -91,6 +92,10 @@
   "files": [
     "dist",
     "templates",
+    "clients/seacat/dist",
+    "clients/seacat/assets",
+    "clients/seacat/index.html",
+    "clients/seacat/package.json",
     "README.md",
     "CHANGELOG.md"
   ],

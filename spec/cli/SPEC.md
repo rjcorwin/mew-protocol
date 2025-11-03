@@ -1349,6 +1349,64 @@ mew space down
 mew space clean --all --force
 ```
 
+### `mew seacat`
+
+Launches the Seacat multiplayer sailing game client - a demonstration application showcasing MEW Protocol in action.
+
+```bash
+mew seacat
+```
+
+**Description:**
+
+Seacat is a cozy multiplayer isometric sailing game where players explore an ocean world, board ships, control cannons, and engage in ship-to-ship combat. It demonstrates MEW Protocol's capabilities for real-time multiplayer games with:
+- Real-time position synchronization across all clients
+- Ship control via MEW protocol messages (wheel steering, sail adjustment, cannon firing)
+- Multiplayer coordination (multi-crew ships)
+- Client-side prediction with server-authoritative physics
+
+**Requirements:**
+- Seacat client files (included with npm package)
+- Electron runtime (automatically installed via seacat client dependencies)
+- Running MEW space with seacat template (optional for single-player testing)
+
+**First Launch:**
+On first run, the command will:
+1. Check if seacat client is present
+2. Install dependencies if needed (runs `npm install` in client directory)
+3. Build the client if not already built (runs `npm run build`)
+4. Launch the Electron application
+
+**Subsequent Launches:**
+The command directly launches the pre-built Electron app for faster startup.
+
+**Usage Flow:**
+1. Run `mew seacat` from terminal
+2. Electron window opens with connection form
+3. Enter gateway URL, space name, player ID, and token
+4. Click "Connect" to join the game world
+5. Use arrow keys to move, E to interact, space to fire cannons
+
+**Technical Details:**
+- **Client Type:** Electron desktop application
+- **Rendering:** Phaser 3 game engine with isometric graphics
+- **Audio:** Howler.js for cross-platform sound effects
+- **Architecture:** Refactored manager pattern with 15 focused modules
+- **Build Output:** ~7MB bundled renderer + game assets
+
+**Related Commands:**
+- `mew init seacat` - Initialize a seacat game space
+- `mew space up` - Start the game server
+- `mew space down` - Stop the game server
+
+**For Developers:**
+To modify the seacat client, navigate to `clients/seacat/` and see the README.md for development instructions.
+
+**Specifications:**
+- Full game specification: `spec/seacat/SPEC.md`
+- Architecture details: `spec/seacat/proposals/s7g-gamescene-refactor/`
+
+
 ## Interactive Terminal Interface
 
 The CLI provides two interactive modes for different use cases:

@@ -24,6 +24,7 @@ import bridgeCommand from './commands/bridge.js';
 import mcpCommand from './commands/mcp.js';
 import tokenCommand from './commands/token.js';
 import spaceCommand, { spaceUpAction, spaceDownAction } from './commands/space.js';
+import seacatCommand from './commands/seacat.js';
 import InitCommand from './commands/init.js';
 import { playStartupAnimation, showQuickBanner } from './startup-animation.js';
 
@@ -71,6 +72,7 @@ program.addCommand(bridgeCommand);
 program.addCommand(mcpCommand);
 program.addCommand(tokenCommand);
 program.addCommand(spaceCommand);
+program.addCommand(seacatCommand);
 
 // Add aliases for common space commands
 program
