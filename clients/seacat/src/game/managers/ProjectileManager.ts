@@ -7,14 +7,48 @@ import { TILE_VISUAL_HEIGHT } from '../utils/Constants.js';
 import { Howl } from 'howler';
 
 /**
- * Manages projectile lifecycle, physics, and collision detection.
+ * Manages projectile lifecycle, physics simulation, and collision detection for ship combat.
+ *
+ * This manager handles all cannonball projectiles in the game, including spawning from
+ * cannon fire events, simulating realistic ballistic physics with gravity, detecting
+ * collisions with ships and water, creating impact effects, and playing audio feedback.
  *
  * Responsibilities:
- * - Spawn projectiles from cannon fire
- * - Update projectile physics (gravity, velocity)
- * - Detect collisions with ships and water
- * - Render smoke trails
- * - Play sound effects (cannon fire, hit impact, water splash)
+ * - Spawn projectiles from cannon fire with initial position and velocity
+ * - Simulate projectile physics with gravity and velocity updates
+ * - Detect collisions with ships using distance checks
+ * - Detect water impacts and despawn projectiles
+ * - Render visual trails behind flying projectiles
+ * - Play sound effects for firing, impacts, and splashes
+ * - Handle hit claims and notify server of successful hits
+ * - Camera shake effects when local player fires
+ *
+ * Dependencies:
+ * - CollisionManager for ship hit detection
+ * - EffectsRenderer for blast, impact, and splash effects
+ * - ShipCommands for sending hit claims to server
+ * - Howler for sound effects
+ *
+ * @example
+ * ```typescript
+ * const projectileManager = new ProjectileManager(
+ *   scene,
+ *   map,
+ *   groundLayer,
+ *   projectiles,
+ *   collisionManager,
+ *   effectsRenderer,
+ *   sounds,
+ *   getOnShip,
+ *   shipCommands
+ * );
+ *
+ * // Spawn projectile from cannon fire event
+ * projectileManager.spawnProjectile(spawnPayload);
+ *
+ * // In game loop:
+ * projectileManager.updateProjectiles(delta, ships);
+ * ```
  */
 export class ProjectileManager {
   private readonly GRAVITY = 150; // px/s² (must match server)

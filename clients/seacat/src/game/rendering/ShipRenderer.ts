@@ -2,13 +2,44 @@ import Phaser from 'phaser';
 import * as IsoMath from '../utils/IsometricMath.js';
 
 /**
- * Manages ship sprite rendering, control points, and visual elements.
+ * Manages ship sprite rendering, control points, and interactive visual elements.
+ *
+ * This renderer handles all visual aspects of ships including debug visualizations,
+ * interactive control points, cannon aiming UI, and sprite frame selection based on
+ * rotation. All visual elements properly rotate with the ship using isometric math.
  *
  * Responsibilities:
- * - Draw ship boundary (colored corner dots)
- * - Draw control points (wheel, sails, mast)
- * - Draw cannons with aim arcs and elevation indicators
- * - Calculate sprite frame from rotation angle
+ * - Draw ship deck boundaries with colored corner indicators for debugging
+ * - Render interactive control points (wheel, sails, mast) that rotate with ship
+ * - Draw cannons with aim arcs and elevation indicators for targeting
+ * - Calculate appropriate sprite frame based on ship rotation angle
+ * - Apply color coding for interaction states (available, near, controlled)
+ *
+ * Dependencies:
+ * - IsometricMath for rotating control point positions
+ * - Phaser graphics for drawing UI elements
+ *
+ * @example
+ * ```typescript
+ * const shipRenderer = new ShipRenderer(scene);
+ *
+ * // Draw ship boundary (debug visualization)
+ * shipRenderer.drawShipBoundary(graphics, shipSprite, deckBoundary, rotation);
+ *
+ * // Draw control point
+ * shipRenderer.drawControlPoint(
+ *   graphics,
+ *   controlPoint,
+ *   shipSprite,
+ *   isPlayerNear,
+ *   'wheel',
+ *   shipRotation
+ * );
+ *
+ * // Calculate sprite frame from rotation
+ * const frame = shipRenderer.calculateShipSpriteFrame(rotation);
+ * shipSprite.setFrame(frame);
+ * ```
  */
 export class ShipRenderer {
   constructor(private scene: Phaser.Scene) {}

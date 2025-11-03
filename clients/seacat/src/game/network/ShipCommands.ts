@@ -3,15 +3,50 @@ import { MEWClient } from '@mew-protocol/mew/client';
 import { Ship } from '../../types.js';
 
 /**
- * Handles all ship control network commands.
+ * Handles all ship control network commands and player-ship interactions.
+ *
+ * This class abstracts the MEW protocol messaging for ship interactions, providing
+ * a clean API for sending control commands to ship servers. It also manages local
+ * client state for which ship/control point the player is controlling.
  *
  * Responsibilities:
- * - Send grab/release control commands for wheel, sails, mast, cannons
- * - Send steering and sail adjustment commands
+ * - Send grab/release control commands for wheel, sails, mast, and cannons
+ * - Send steering and sail adjustment commands to ship servers
  * - Send cannon aiming, elevation, and firing commands
- * - Send projectile hit claims
- * - Manage local control state (controlling ship, control point, cannon)
- * - Handle mast climbing (client-side camera zoom)
+ * - Send projectile hit claims for damage detection
+ * - Manage local control state (which ship, which control point, which cannon)
+ * - Handle mast climbing with client-side camera zoom effects
+ * - Validate control state before sending commands
+ *
+ * Dependencies:
+ * - MEWClient for sending messages to ship servers
+ * - Ship state map for validating control points exist
+ *
+ * @example
+ * ```typescript
+ * const shipCommands = new ShipCommands(
+ *   scene,
+ *   mewClient,
+ *   playerId,
+ *   ships,
+ *   setControllingShip,
+ *   setControllingPoint,
+ *   setControllingCannon,
+ *   setCurrentCannonAim
+ * );
+ *
+ * // Grab ship wheel
+ * shipCommands.grabControl(shipId, 'wheel');
+ *
+ * // Steer ship
+ * shipCommands.steer(shipId, -0.5); // Turn left
+ *
+ * // Fire cannon
+ * shipCommands.fireCannon(shipId, 'port', 0);
+ *
+ * // Release control
+ * shipCommands.releaseControl(controllingShip, controllingPoint, controllingCannon);
+ * ```
  */
 export class ShipCommands {
   constructor(

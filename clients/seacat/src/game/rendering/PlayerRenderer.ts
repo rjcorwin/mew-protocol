@@ -2,12 +2,33 @@ import Phaser from 'phaser';
 import { Direction } from '../../types.js';
 
 /**
- * Manages player sprite animations and direction calculations.
+ * Manages player sprite animations and directional rendering for the isometric game.
+ *
+ * This renderer handles creating and updating player animations based on 8-directional
+ * movement. It converts velocity vectors into appropriate facing directions and plays
+ * the corresponding sprite animations.
  *
  * Responsibilities:
- * - Create 8-directional walk animations
- * - Update sprite animation based on movement velocity
- * - Calculate facing direction from velocity vector
+ * - Create 8-directional walk animations from sprite sheets
+ * - Update sprite animation based on current movement velocity
+ * - Calculate facing direction from velocity vectors
+ * - Map angles to cardinal and diagonal directions
+ *
+ * Dependencies:
+ * - Phaser animation system
+ * - Player sprite sheet with 8 directional animations
+ *
+ * @example
+ * ```typescript
+ * const playerRenderer = new PlayerRenderer(scene);
+ *
+ * // In scene.create():
+ * playerRenderer.createPlayerAnimations();
+ *
+ * // In game loop:
+ * const velocity = new Phaser.Math.Vector2(vx, vy);
+ * const facing = playerRenderer.updatePlayerAnimation(playerSprite, velocity);
+ * ```
  */
 export class PlayerRenderer {
   constructor(private scene: Phaser.Scene) {}

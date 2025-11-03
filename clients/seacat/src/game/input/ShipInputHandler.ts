@@ -4,12 +4,50 @@ import { ShipCommands } from '../network/ShipCommands.js';
 import * as IsoMath from '../utils/IsometricMath.js';
 
 /**
- * Handles all ship interaction and control input.
+ * Handles all ship interaction detection and control input processing.
+ *
+ * This is a complex input handler that detects when the player is near ship control
+ * points, manages grabbing/releasing controls via E key, and processes all ship
+ * control inputs including steering, sail adjustment, and cannon operation. It tracks
+ * local control state and provides visual feedback for interactable control points.
  *
  * Responsibilities:
- * - Detecting nearby control points (wheel, sails, mast, cannons)
- * - Handling E key for grabbing/releasing control
- * - Processing ship control inputs (steering, sails, cannon aiming/firing)
+ * - Detect proximity to all ship control points (wheel, sails, mast, cannons)
+ * - Calculate world positions of control points using isometric rotation
+ * - Find and highlight nearest available control point for interaction
+ * - Handle E key for grabbing/releasing ship controls
+ * - Process wheel steering with continuous left/right input
+ * - Process sail adjustment with up/down keys
+ * - Process cannon aiming (left/right), elevation (up/down), and firing (space)
+ * - Manage local control state (which ship, which control type, which cannon)
+ * - Provide UI state for rendering yellow interaction indicators
+ * - Validate control availability (not controlled by other players)
+ *
+ * Dependencies:
+ * - ShipCommands for sending control commands to ship servers
+ * - IsometricMath for rotating control point positions
+ * - Phaser keyboard input system
+ *
+ * @example
+ * ```typescript
+ * const shipInputHandler = new ShipInputHandler(
+ *   scene,
+ *   ships,
+ *   playerSprite,
+ *   shipCommands,
+ *   playerId,
+ *   cursors,
+ *   interactKey,
+ *   spaceKey
+ * );
+ *
+ * // In game loop:
+ * shipInputHandler.update();
+ *
+ * // Get control state for other systems:
+ * const controlling = shipInputHandler.getControllingShip();
+ * const nearPoints = shipInputHandler.nearControlPoints;
+ * ```
  */
 export class ShipInputHandler {
   private scene: Phaser.Scene;

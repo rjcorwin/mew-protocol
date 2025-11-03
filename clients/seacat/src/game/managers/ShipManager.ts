@@ -9,15 +9,67 @@ import * as IsoMath from '../utils/IsometricMath.js';
 import { Howl } from 'howler';
 
 /**
- * Manages ship lifecycle, updates, and visual state.
+ * Manages ship lifecycle, synchronization, physics, and interactive elements.
+ *
+ * This is the largest and most complex manager, handling all aspects of ship entities
+ * including sprite rendering, control point visualization, smooth interpolation from
+ * network updates, wave bobbing, sinking animations, health displays, cannon UI,
+ * and player-ship interactions.
  *
  * Responsibilities:
- * - Create/update ship sprites and control points
- * - Interpolate ship positions smoothly
- * - Apply wave bobbing effects to ships
- * - Handle sinking animations
- * - Sync ship state with server updates
- * - Manage ship rotation and sprite frames
+ * - Create and destroy ship sprites with proper rendering setup
+ * - Synchronize ship state from server position updates
+ * - Smoothly interpolate ship positions and rotations
+ * - Apply wave bobbing effects to ships in water
+ * - Render and update control points (wheel, sails, mast, cannons)
+ * - Display cannon aiming UI and elevation indicators
+ * - Handle ship sinking animations and respawns
+ * - Update ship sprite frames based on rotation
+ * - Manage players boarding and moving with ships
+ * - Display health bars above ships
+ * - Play sound effects for sinking and respawning
+ *
+ * Dependencies:
+ * - ShipRenderer for all visual rendering
+ * - WaterRenderer for wave height calculations
+ * - PlayerManager for moving players on ships
+ * - MapManager for accessing map data
+ * - EffectsRenderer for health bars
+ * - IsometricMath for rotation transformations
+ * - Howler for sound effects
+ *
+ * @example
+ * ```typescript
+ * const shipManager = new ShipManager(
+ *   scene,
+ *   ships,
+ *   mapManager,
+ *   playerManager,
+ *   shipRenderer,
+ *   waterRenderer,
+ *   effectsRenderer,
+ *   sounds,
+ *   nearControlPoints,
+ *   getControllingShip,
+ *   getControllingPoint,
+ *   getControllingCannon,
+ *   getCurrentCannonAim,
+ *   getOnShip,
+ *   onShipChanged,
+ *   onApplyingShipRotation
+ * );
+ *
+ * // Update ship from network
+ * const newShipRelativePos = shipManager.updateShip(
+ *   positionUpdate,
+ *   localPlayerId,
+ *   playerSprite,
+ *   shipRelativePosition
+ * );
+ *
+ * // In game loop:
+ * shipManager.interpolateShips(delta, time);
+ * ```
  */
 export class ShipManager {
   constructor(

@@ -14,14 +14,51 @@ const {
 } = Constants;
 
 /**
- * Handles local player input and movement.
+ * Handles local player keyboard input, movement physics, and visual updates.
+ *
+ * This handler processes arrow key input and translates it to movement in isometric
+ * space, handling collision detection, terrain speed modifiers, animations, and
+ * water bobbing effects. It manages all aspects of local player control when not
+ * controlling a ship.
  *
  * Responsibilities:
- * - Processing arrow key input for player movement
- * - Calculating velocity in isometric space
- * - Checking collision and applying terrain speed modifiers
- * - Updating player animations based on movement
- * - Applying wave bobbing effects when in water
+ * - Process arrow key input for 4-directional movement
+ * - Calculate velocity vectors in isometric coordinate space
+ * - Check tile collision and apply terrain-based speed modifiers (water, grass, etc.)
+ * - Update player animations based on movement direction
+ * - Apply realistic wave bobbing effects when player is in water
+ * - Handle depth sorting relative to Layer 2 environmental tiles
+ * - Disable movement when player is controlling a ship
+ *
+ * Dependencies:
+ * - CollisionManager for tile collision checks
+ * - PlayerRenderer for animation updates
+ * - WaterRenderer for wave height calculations
+ * - Phaser keyboard input system
+ *
+ * @example
+ * ```typescript
+ * const playerInputHandler = new PlayerInputHandler(
+ *   scene,
+ *   map,
+ *   groundLayer,
+ *   secondLayer,
+ *   playerSprite,
+ *   collisionManager,
+ *   playerRenderer,
+ *   waterRenderer,
+ *   cursors
+ * );
+ *
+ * // In game loop:
+ * const velocity = playerInputHandler.handleMovement(
+ *   delta,
+ *   controllingShip,
+ *   onShip
+ * );
+ * playerInputHandler.applyWaveBobbing(time, onShip);
+ * playerInputHandler.updatePlayerDepth();
+ * ```
  */
 export class PlayerInputHandler {
   private scene: Phaser.Scene;

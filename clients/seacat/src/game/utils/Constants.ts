@@ -1,3 +1,33 @@
+/**
+ * Game constants for the Seacat isometric multiplayer game.
+ *
+ * This module defines all constant values used throughout the game including:
+ * - Tile dimensions for isometric rendering
+ * - World size parameters
+ * - Movement and physics constants
+ * - Isometric basis vectors for movement
+ *
+ * Responsibilities:
+ * - Centralize all magic numbers and configuration values
+ * - Define isometric projection parameters
+ * - Specify movement speeds and update rates
+ *
+ * @module Constants
+ * @example
+ * ```typescript
+ * import * as Constants from './utils/Constants';
+ *
+ * // Use tile dimensions for rendering
+ * const tileWidth = Constants.TILE_WIDTH;
+ *
+ * // Use movement vectors for player input
+ * const moveVector = {
+ *   x: Constants.ISO_NORTHEAST.x * Constants.MOVE_SPEED,
+ *   y: Constants.ISO_NORTHEAST.y * Constants.MOVE_SPEED
+ * };
+ * ```
+ */
+
 import Phaser from 'phaser';
 
 // Tile dimensions

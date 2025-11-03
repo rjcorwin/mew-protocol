@@ -4,12 +4,45 @@ import { TILE_HEIGHT } from '../utils/Constants.js';
 import { Ship } from '../../types.js';
 
 /**
- * Manages collision detection for tiles and ship boundaries.
+ * Manages collision detection for tiles and ship boundaries in the isometric game world.
+ *
+ * This manager provides collision detection services for both terrain-based collisions
+ * (using tilemap layers) and ship deck boundary collisions (using oriented bounding boxes).
+ * It handles the complexity of checking collisions in an isometric world with rotated objects.
  *
  * Responsibilities:
- * - Tile collision detection with terrain properties
+ * - Tile collision detection with terrain properties (walkable, speed modifiers)
  * - Ship deck boundary collision using OBB (Oriented Bounding Box)
- * - Point-in-rotated-rectangle collision detection
+ * - Point-in-rotated-rectangle collision detection for rotated ships
+ * - Terrain type detection (grass, water, obstacles, etc.)
+ *
+ * Dependencies:
+ * - IsometricMath for coordinate transformations and rotations
+ * - Phaser.Tilemaps for tile-based collision detection
+ *
+ * @example
+ * ```typescript
+ * const collisionManager = new CollisionManager(
+ *   scene,
+ *   map,
+ *   groundLayer,
+ *   secondLayer,
+ *   obstacleLayer,
+ *   waterLayer
+ * );
+ *
+ * // Check if a position is walkable
+ * const collision = collisionManager.checkTileCollision(playerX, playerY);
+ * if (!collision.walkable) {
+ *   // Block movement
+ * }
+ *
+ * // Check if player is on a ship
+ * const shipCheck = collisionManager.checkShipBoundary({ x: playerX, y: playerY }, ships);
+ * if (shipCheck) {
+ *   console.log(`Player is on ship ${shipCheck.shipId}`);
+ * }
+ * ```
  */
 export class CollisionManager {
   constructor(

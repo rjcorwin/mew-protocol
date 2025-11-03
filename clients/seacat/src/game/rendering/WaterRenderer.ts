@@ -4,13 +4,43 @@ import * as Constants from '../utils/Constants.js';
 const { TILE_WIDTH, TILE_HEIGHT } = Constants;
 
 /**
- * Manages water rendering and wave animations.
+ * Manages water rendering, wave physics, and animated water effects.
+ *
+ * This renderer creates realistic ocean waves using multiple layered sine waves that
+ * create interference patterns. It provides wave height calculations for bobbing effects
+ * on ships and players, and efficiently animates only visible water tiles.
  *
  * Responsibilities:
- * - Calculate wave height at any position
- * - Provide wave offset for bobbing effects on ships and players
- * - Animate visible water tiles with wave motion
- * - Render shallow water overlays on sand tiles
+ * - Calculate wave height at any world position using combined sine waves
+ * - Provide wave offset deltas for smooth bobbing effects on entities
+ * - Animate visible water tiles with realistic wave motion (camera culled)
+ * - Render semi-transparent shallow water overlays on sand tiles
+ * - Create wave interference patterns for visual realism
+ *
+ * Dependencies:
+ * - Phaser.Tilemaps for tile position lookups
+ * - Phaser.Graphics for shallow water overlay rendering
+ *
+ * @example
+ * ```typescript
+ * const waterRenderer = new WaterRenderer(
+ *   scene,
+ *   map,
+ *   groundLayer,
+ *   shallowWaterGraphics
+ * );
+ *
+ * // Calculate wave height for bobbing effect
+ * const waveHeight = waterRenderer.calculateWaveHeightAtPosition(
+ *   shipX,
+ *   shipY,
+ *   currentTime
+ * );
+ * shipY += waveHeight;
+ *
+ * // In game loop - animate water tiles
+ * waterRenderer.animateVisibleWaterTiles(time);
+ * ```
  */
 export class WaterRenderer {
   private groundLayer: Phaser.Tilemaps.TilemapLayer;

@@ -3,14 +3,41 @@ import { PositionUpdate, Player } from '../../types.js';
 import { WaterRenderer } from '../rendering/WaterRenderer.js';
 
 /**
- * Manages remote player lifecycle and updates.
+ * Manages remote player lifecycle, synchronization, and rendering in the multiplayer game.
+ *
+ * This manager handles all remote player entities, including creating sprites, smoothly
+ * interpolating positions from network updates, applying water wave effects, managing
+ * animations, and handling depth sorting for proper isometric rendering.
  *
  * Responsibilities:
- * - Create/update remote player sprites
- * - Interpolate player positions smoothly
- * - Apply wave bobbing effects to players in water
- * - Handle player animations based on received updates
- * - Dynamic depth sorting relative to Layer 2 tiles
+ * - Create and destroy remote player sprites
+ * - Smoothly interpolate player positions from network updates
+ * - Apply wave bobbing effects to players standing in water
+ * - Update player animations based on movement and facing direction
+ * - Dynamic depth sorting relative to Layer 2 tiles for correct rendering order
+ * - Handle players boarding and disembarking from ships
+ *
+ * Dependencies:
+ * - WaterRenderer for wave height calculations
+ * - Phaser.Tilemaps for tile-based depth sorting
+ *
+ * @example
+ * ```typescript
+ * const playerManager = new PlayerManager(
+ *   scene,
+ *   map,
+ *   groundLayer,
+ *   secondLayer,
+ *   waterRenderer,
+ *   remotePlayers
+ * );
+ *
+ * // Update remote player from network
+ * playerManager.updateRemotePlayer(positionUpdate);
+ *
+ * // In game loop:
+ * playerManager.interpolateRemotePlayers(delta, time);
+ * ```
  */
 export class PlayerManager {
   constructor(

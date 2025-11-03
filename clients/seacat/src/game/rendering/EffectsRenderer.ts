@@ -1,13 +1,35 @@
 import Phaser from 'phaser';
 
 /**
- * Manages visual effects rendering.
+ * Manages visual effects rendering for combat, impacts, and UI overlays.
+ *
+ * This renderer creates and animates all particle effects and temporary visual feedback
+ * in the game, including weapon fire, water splashes, impact effects, and health displays.
+ * All effects are temporary and self-cleaning using Phaser tweens.
  *
  * Responsibilities:
- * - Cannon blast VFX (flash and smoke)
- * - Water splash effects
- * - Ship hit effects (wood splinters and smoke)
- * - Health bars above ships
+ * - Cannon blast VFX with flash and expanding smoke puffs
+ * - Water splash particle effects on projectile impact
+ * - Ship hit effects with wood splinters and smoke bursts
+ * - Dynamic health bars above ships with color-coded health status
+ *
+ * Dependencies:
+ * - Phaser tweens system for animation
+ * - Phaser graphics primitives (circles, rectangles)
+ *
+ * @example
+ * ```typescript
+ * const effectsRenderer = new EffectsRenderer(scene);
+ *
+ * // Create cannon fire effect
+ * effectsRenderer.createCannonBlast(cannonX, cannonY);
+ *
+ * // Show water splash on projectile impact
+ * effectsRenderer.createWaterSplash(impactX, impactY);
+ *
+ * // Display ship health bar
+ * effectsRenderer.drawHealthBar(shipX, shipY - 50, currentHealth, maxHealth);
+ * ```
  */
 export class EffectsRenderer {
   constructor(private scene: Phaser.Scene) {}

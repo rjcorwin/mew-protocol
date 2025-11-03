@@ -3,13 +3,35 @@ import { MEWClient } from '@mew-protocol/mew/client';
 import { TILE_WIDTH, TILE_HEIGHT, TILE_VISUAL_HEIGHT } from '../utils/Constants.js';
 
 /**
- * Manages map loading, tileset generation, and navigation data.
+ * Manages map loading, tileset generation, and navigation data for the isometric game world.
+ *
+ * This manager handles all aspects of the game map including loading Tiled JSON maps,
+ * generating procedural tileset textures, creating depth-sorted sprites for environmental
+ * objects, and extracting navigation data for AI pathfinding.
  *
  * Responsibilities:
- * - Generate tileset textures
- * - Load Tiled maps
- * - Create Layer 2 sprites for depth sorting
- * - Extract and send navigation data to ships
+ * - Generate isometric tileset textures procedurally
+ * - Load Tiled JSON maps and create Phaser tilemap layers
+ * - Create individual sprites from Layer 2 tiles for per-object depth sorting
+ * - Extract and broadcast navigation data to ship AI systems
+ * - Provide map data access to other managers (collision, rendering)
+ *
+ * Dependencies:
+ * - Phaser.Tilemaps for tilemap rendering
+ * - MEWClient for sending navigation data to ships
+ *
+ * @example
+ * ```typescript
+ * const mapManager = new MapManager(scene, mewClient);
+ *
+ * // In scene.create():
+ * mapManager.generateTilesetTexture();
+ * mapManager.loadTiledMap();
+ *
+ * // Access map data in other systems:
+ * const groundLayer = mapManager.getGroundLayer();
+ * const map = mapManager.getMap();
+ * ```
  */
 export class MapManager {
   private map!: Phaser.Tilemaps.Tilemap;

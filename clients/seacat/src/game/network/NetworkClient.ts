@@ -9,12 +9,49 @@ import * as Constants from '../utils/Constants.js';
 const { POSITION_UPDATE_RATE } = Constants;
 
 /**
- * Handles all network communication for the game.
+ * Handles all network communication and state synchronization for the multiplayer game.
+ *
+ * This class manages bi-directional communication with the MEW gateway, including
+ * publishing local player position updates and subscribing to position updates from
+ * remote players and ships. It routes received updates to the appropriate managers.
  *
  * Responsibilities:
- * - Publishing player position updates at regular intervals
- * - Subscribing to and processing position updates from other players
- * - Handling ship and projectile network events
+ * - Publish local player position updates at regular intervals (100ms)
+ * - Subscribe to position update streams from the gateway
+ * - Route remote player updates to PlayerManager
+ * - Route ship updates to ShipManager
+ * - Route projectile spawn events to ProjectileManager
+ * - Manage position stream lifecycle (request/unsubscribe)
+ * - Handle ship-relative positioning for players on ships
+ *
+ * Dependencies:
+ * - MEWClient for protocol communication
+ * - ShipManager for processing ship updates
+ * - PlayerManager for processing player updates
+ * - ProjectileManager for projectile spawn events
+ *
+ * @example
+ * ```typescript
+ * const networkClient = new NetworkClient(
+ *   mewClient,
+ *   playerId,
+ *   playerSprite,
+ *   shipManager,
+ *   playerManager,
+ *   projectileManager,
+ *   getLastFacing,
+ *   getTileWidth,
+ *   getTileHeight,
+ *   getShipRelativePosition,
+ *   setShipRelativePosition
+ * );
+ *
+ * // Initialize streams
+ * await networkClient.initialize();
+ *
+ * // In game loop:
+ * networkClient.update(time, velocity);
+ * ```
  */
 export class NetworkClient {
   private client: MEWClient;
