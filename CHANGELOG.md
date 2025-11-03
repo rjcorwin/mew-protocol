@@ -4,6 +4,117 @@ All notable changes to the MEW Protocol CLI will be documented in this file.
 
 ## [Unreleased]
 
+### Seacat
+
+#### Implemented: GameScene Refactor (s7g-gamescene-refactor)
+**Status:** Complete ✅
+**Proposal:** `spec/seacat/proposals/s7g-gamescene-refactor/`
+**Implementation Plan:** `spec/seacat/proposals/s7g-gamescene-refactor/IMPLEMENTATION_PLAN.md`
+
+Refactored the monolithic GameScene.ts (2603 lines) into 15 focused, maintainable modules using the manager pattern.
+
+**Completed:**
+- ✅ GameScene.ts reduced from 2603 lines to ~500 lines (orchestrator pattern)
+- ✅ 15 single-responsibility modules extracted:
+  - `managers/` - CollisionManager, MapManager, PlayerManager, ProjectileManager, ShipManager
+  - `rendering/` - EffectsRenderer, PlayerRenderer, ShipRenderer, WaterRenderer
+  - `input/` - PlayerInputHandler, ShipInputHandler
+  - `network/` - NetworkClient, ShipCommands
+  - `utils/` - Constants, IsometricMath
+- ✅ Comprehensive JSDoc documentation for all public APIs
+- ✅ TypeScript compilation with no errors
+- ✅ All game features working identically (no regressions)
+- ✅ No performance degradation observed
+
+**Implementation Phases:**
+- Phase 1 (Foundation): ✅ Utils & Constants
+- Phase 2 (Low-Dependency): ✅ Collision & Map managers
+- Phase 3 (Rendering): ✅ All 4 renderers
+- Phase 4 (Game Logic): ✅ All 3 core managers
+- Phase 5 (Input & Network): ✅ All 4 modules
+- Phase 6 (Documentation): ✅ JSDoc for all modules
+- Phase 7 (Testing): ⏸️ Unit tests deferred to future iteration
+
+**Benefits Realized:**
+- Drastically improved code organization and maintainability
+- Clear separation of concerns enables parallel development
+- Easier to locate and modify specific functionality
+- Foundation for future testing infrastructure
+
+#### Implemented: Ship-to-Ship Combat (c5x-ship-combat)
+**Status:** Complete ✅ (All 5 Phases)
+**Proposal:** `spec/seacat/proposals/c5x-ship-combat/`
+**Implementation Plan:** `spec/seacat/proposals/c5x-ship-combat/implementation.md`
+
+Full cannon-based ship combat for multiplayer PvP and cooperative multi-crew gameplay.
+
+**Features Implemented:**
+- ✅ Cannon control points (3 per side: port/starboard)
+- ✅ Manual aiming system (±45° arc adjustment)
+- ✅ Physics-based projectiles (gravity, momentum inheritance)
+- ✅ Damage/health system (100 HP, sinking at 0)
+- ✅ Hit detection with client claims & server validation
+- ✅ Visual effects (cannonball trails, explosions, water splash, damage smoke)
+- ✅ Audio effects (5 sounds via Howler.js: cannon fire, impact, splash, sinking, respawn)
+- ✅ Ship sinking animation and respawn mechanics
+- ✅ Multi-crew coordination support
+
+**Implementation Phases:**
+- Phase 1 (Control points & aiming): ✅ COMPLETE
+- Phase 2 (Firing & projectiles): ✅ COMPLETE
+- Phase 3 (Collision & damage): ✅ COMPLETE
+- Phase 4 (Sinking & respawn): ✅ COMPLETE
+- Phase 5 (Polish & sounds): ✅ COMPLETE
+
+**New Protocol Messages:**
+- `ship/aim_cannon` - Adjust cannon aim angle
+- `ship/fire_cannon` - Fire cannonball
+- `game/projectile_spawn` - Broadcast projectile creation
+- `game/projectile_hit` - Client hit claim
+- `ship/damage` - Damage notification
+- `ship/respawn` - Ship respawn after sinking
+
+**Technical Notes:**
+- Audio system uses Howler.js instead of Phaser audio (Phaser's XHR loader crashes in Electron)
+- Solution: HTML5 Audio + absolute file paths via `window.location.href`
+- All 5 combat sounds working in Electron production builds
+- Friendly fire disabled (ships can't damage themselves)
+- Ships respawn at original spawn location after 5 seconds
+- No speed penalty for damaged ships (keeps gameplay smooth)
+
+#### Implemented: Tiled Map Integration (t4m)
+**Status:** Complete ✅
+**Proposal:** `spec/seacat/proposals/t4m-tiled-maps/`
+
+Add support for Tiled Map Editor (.tmj) files with tile-based collision detection and gameplay properties.
+
+**Features:**
+- ✅ Load isometric maps from Tiled Map Editor (JSON format)
+- ✅ Multiple layer support (Ground, Water, Obstacles)
+- ✅ Tile-based collision detection (O(1) lookups)
+- ✅ Map boundary enforcement (prevent off-map movement)
+- ✅ Tile properties: walkable (bool), speedModifier (float), terrain (string)
+- ✅ Water tiles reduce speed to 50% (swimming mechanics)
+- ✅ Wall tiles block movement completely
+- ✅ Procedural tileset generation (5 terrain types)
+- ✅ Multiplayer position synchronization maintained
+
+**Implementation:**
+- Phase 3a ✅: Tiled map loading with procedural tileset
+- Phase 3b ✅: Tile-based collision with boundary enforcement
+- Phase 3c ✅: Water speed modification and tile properties
+- Phase 3d: Multiplayer testing (ready for testing)
+
+**Files Added:**
+- `clients/seacat/assets/maps/example-map.tmj` - Example 20×20 map
+- `clients/seacat/assets/maps/tilesets/terrain.tsj` - Terrain tileset definition
+- `clients/seacat/assets/maps/README.md` - Map creation guide
+- `spec/seacat/proposals/t4m-tiled-maps/` - Complete proposal
+
+**Files Modified:**
+- `clients/seacat/src/game/GameScene.ts` - Map loading, collision, rendering
+- `spec/seacat/implementation-plan.md` - Milestone 3 complete
+
 ## [v0.5.1] - 2025-01-06
 
 ### Fixed
