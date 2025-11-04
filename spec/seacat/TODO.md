@@ -7,9 +7,12 @@
 - [ ] controller support
 
 - [ ] breaking waves near shoreline with shallow water tile that combines a slightly translucent water tile and sand tile just underneath
+- [ ] Allow characters to surf wave into shore
 
 - [ ] Ships collisions
 - [ ] On sail down, show sails position change
+
+- [ ] Control points on ship should be a different ship sprite to show the item highlighted. Having separate control point sprites will be too floaty.
 
 - [ ] Character sprites (multiple with option to pick)
 - [ ] Seperate the ship's mast/sail sprites  so when characters walk behind the mast/sail, they appear behind it.
