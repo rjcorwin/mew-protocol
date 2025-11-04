@@ -93,9 +93,11 @@
     "dist",
     "templates",
     "clients/seacat/dist",
+    "clients/seacat/src",
     "clients/seacat/assets",
     "clients/seacat/index.html",
     "clients/seacat/package.json",
+    "clients/seacat/tsconfig.json",
     "README.md",
     "CHANGELOG.md"
   ],
