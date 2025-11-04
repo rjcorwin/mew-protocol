@@ -60,6 +60,7 @@ export class ShipInputHandler {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private interactKey: Phaser.Input.Keyboard.Key;
   private spaceKey: Phaser.Input.Keyboard.Key;
+  private gamepad: (() => Phaser.Input.Gamepad.Gamepad | null) | null = null; // g4p Phase 1
 
   // Control state
   private controllingShip: string | null = null;
@@ -68,10 +69,19 @@ export class ShipInputHandler {
   private currentWheelDirection: 'left' | 'right' | null = null;
   private currentCannonAim: number = 0;
 
+  // Gamepad button state tracking (g4p Phase 1)
+  private lastInteractButtonState = false;
+  private lastFireButtonState = false;
+  private lastSailUpState = false;
+  private lastSailDownState = false;
+  private lastElevationUpState = false;
+  private lastElevationDownState = false;
+
   // UI indicators
   public nearControlPoints: Set<string> = new Set();
 
   private static readonly INTERACTION_DISTANCE = 30; // pixels
+  private static readonly DPAD_THRESHOLD = 0.5; // D-pad axis threshold
 
   constructor(
     scene: Phaser.Scene,
@@ -91,6 +101,228 @@ export class ShipInputHandler {
     this.cursors = cursors;
     this.interactKey = interactKey;
     this.spaceKey = spaceKey;
+  }
+
+  /**
+   * Set gamepad accessor function (g4p Phase 1)
+   */
+  public setGamepadAccessor(accessor: () => Phaser.Input.Gamepad.Gamepad | null): void {
+    this.gamepad = accessor;
+  }
+
+  /**
+   * Check if interact button was just pressed (keyboard E or gamepad A) (g4p Phase 1)
+   */
+  private isInteractJustPressed(): boolean {
+    // Check keyboard
+    if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      return true;
+    }
+
+    // Check gamepad A button (button 0)
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.A) {
+        const pressed = pad.A;
+        const justPressed = pressed && !this.lastInteractButtonState;
+        this.lastInteractButtonState = pressed;
+        return justPressed;
+      }
+    }
+
+    this.lastInteractButtonState = false;
+    return false;
+  }
+
+  /**
+   * Check if fire button was just pressed (keyboard Space or gamepad R2) (g4p Phase 1)
+   */
+  private isFireJustPressed(): boolean {
+    // Check keyboard
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      return true;
+    }
+
+    // Check gamepad R2 trigger (threshold for "pressed")
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.R2 > 0.5) {
+        const pressed = true;
+        const justPressed = pressed && !this.lastFireButtonState;
+        this.lastFireButtonState = pressed;
+        return justPressed;
+      }
+    }
+
+    this.lastFireButtonState = false;
+    return false;
+  }
+
+  /**
+   * Get steering input (keyboard arrows or gamepad left stick) (g4p Phase 1)
+   * @returns 'left', 'right', or null
+   */
+  private getSteeringInput(): 'left' | 'right' | null {
+    // Check keyboard
+    if (this.cursors.left?.isDown) return 'left';
+    if (this.cursors.right?.isDown) return 'right';
+
+    // Check gamepad left stick horizontal
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.leftStick) {
+        if (pad.leftStick.x < -ShipInputHandler.DPAD_THRESHOLD) return 'left';
+        if (pad.leftStick.x > ShipInputHandler.DPAD_THRESHOLD) return 'right';
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get cannon aiming input (keyboard arrows or gamepad left stick) (g4p Phase 1)
+   * @returns analog value -1 to 1, or 0 for no input
+   */
+  private getCannonAimInput(): number {
+    // Check keyboard (discrete input)
+    if (this.cursors.left?.isDown) return -1;
+    if (this.cursors.right?.isDown) return 1;
+
+    // Check gamepad left stick horizontal (analog input)
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.leftStick) {
+        const value = pad.leftStick.x;
+        if (Math.abs(value) > 0.15) { // Small deadzone
+          return value;
+        }
+      }
+    }
+
+    return 0;
+  }
+
+  /**
+   * Check if sail up was just pressed (keyboard up or gamepad D-pad up) (g4p Phase 1)
+   */
+  private isSailUpJustPressed(): boolean {
+    // Check keyboard
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
+      return true;
+    }
+
+    // Check gamepad D-pad up (button 12)
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.up) {
+        const pressed = pad.up;
+        const justPressed = pressed && !this.lastSailUpState;
+        this.lastSailUpState = pressed;
+        return justPressed;
+      }
+    }
+
+    this.lastSailUpState = false;
+    return false;
+  }
+
+  /**
+   * Check if sail down was just pressed (keyboard down or gamepad D-pad down) (g4p Phase 1)
+   */
+  private isSailDownJustPressed(): boolean {
+    // Check keyboard
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
+      return true;
+    }
+
+    // Check gamepad D-pad down (button 13)
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.down) {
+        const pressed = pad.down;
+        const justPressed = pressed && !this.lastSailDownState;
+        this.lastSailDownState = pressed;
+        return justPressed;
+      }
+    }
+
+    this.lastSailDownState = false;
+    return false;
+  }
+
+  /**
+   * Get cannon elevation input (keyboard arrows, D-pad, or left stick vertical) (g4p Phase 1)
+   * @returns 'up', 'down', or null
+   */
+  private getElevationInput(): 'up' | 'down' | null {
+    // Check keyboard (discrete)
+    if (this.cursors.up?.isDown) return 'up';
+    if (this.cursors.down?.isDown) return 'down';
+
+    // Check gamepad left stick vertical (analog - continuous adjustment)
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.leftStick) {
+        const value = pad.leftStick.y;
+        // Inverted: negative Y = up, positive Y = down (typical gamepad convention)
+        if (value < -ShipInputHandler.DPAD_THRESHOLD) return 'up';
+        if (value > ShipInputHandler.DPAD_THRESHOLD) return 'down';
+      }
+
+      // Fallback to D-pad for discrete control
+      if (pad && pad.up) return 'up';
+      if (pad && pad.down) return 'down';
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if elevation up was just pressed (for discrete adjustments) (g4p Phase 1)
+   */
+  private isElevationUpJustPressed(): boolean {
+    // Check keyboard
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
+      return true;
+    }
+
+    // Check gamepad D-pad up
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.up) {
+        const pressed = pad.up;
+        const justPressed = pressed && !this.lastElevationUpState;
+        this.lastElevationUpState = pressed;
+        return justPressed;
+      }
+    }
+
+    this.lastElevationUpState = false;
+    return false;
+  }
+
+  /**
+   * Check if elevation down was just pressed (for discrete adjustments) (g4p Phase 1)
+   */
+  private isElevationDownJustPressed(): boolean {
+    // Check keyboard
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
+      return true;
+    }
+
+    // Check gamepad D-pad down
+    if (this.gamepad) {
+      const pad = this.gamepad();
+      if (pad && pad.down) {
+        const pressed = pad.down;
+        const justPressed = pressed && !this.lastElevationDownState;
+        this.lastElevationDownState = pressed;
+        return justPressed;
+      }
+    }
+
+    this.lastElevationDownState = false;
+    return false;
   }
 
   /**
@@ -301,8 +533,8 @@ export class ShipInputHandler {
       }
     }
 
-    // Handle E key press
-    if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+    // Handle E key or gamepad A button press (g4p Phase 1)
+    if (this.isInteractJustPressed()) {
       if (this.controllingPoint) {
         // Release current control (no distance check - always allow disengagement)
         this.shipCommands.releaseControl(this.controllingShip, this.controllingPoint, this.controllingCannon);
@@ -324,46 +556,51 @@ export class ShipInputHandler {
       }
     }
 
-    // Handle ship control inputs (when controlling wheel or sails)
+    // Handle ship control inputs (when controlling wheel or sails) (g4p Phase 1: keyboard + gamepad)
     if (this.controllingShip && this.controllingPoint) {
       if (this.controllingPoint === 'wheel') {
-        // w3l-wheel-steering: Use isDown for continuous wheel turning
-        if (this.cursors.left?.isDown) {
+        // w3l-wheel-steering: Use isDown for continuous wheel turning (keyboard or left stick)
+        const steerInput = this.getSteeringInput();
+
+        if (steerInput === 'left') {
           if (!this.currentWheelDirection || this.currentWheelDirection !== 'left') {
             this.shipCommands.wheelTurnStart(this.controllingShip, 'left');
             this.currentWheelDirection = 'left';
           }
-        } else if (this.cursors.right?.isDown) {
+        } else if (steerInput === 'right') {
           if (!this.currentWheelDirection || this.currentWheelDirection !== 'right') {
             this.shipCommands.wheelTurnStart(this.controllingShip, 'right');
             this.currentWheelDirection = 'right';
           }
         } else {
-          // Neither key pressed - stop turning if we were turning
+          // No input - stop turning if we were turning
           if (this.currentWheelDirection) {
             this.shipCommands.wheelTurnStop(this.controllingShip);
             this.currentWheelDirection = null;
           }
         }
       } else if (this.controllingPoint === 'sails') {
-        // Up/down arrows to adjust speed
-        if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
+        // Up/down arrows or D-pad to adjust speed
+        if (this.isSailUpJustPressed()) {
           this.shipCommands.adjustSails(this.controllingShip, 'up');
         }
-        if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
+        if (this.isSailDownJustPressed()) {
           this.shipCommands.adjustSails(this.controllingShip, 'down');
         }
       } else if (this.controllingPoint === 'cannon' && this.controllingCannon) {
-        // c5x-ship-combat: Left/right arrows to aim cannon
+        // c5x-ship-combat: Left/right arrows or right stick to aim cannon (g4p Phase 1)
         const aimSpeed = 0.02; // radians per frame (about 1.15 degrees)
         const maxAim = Math.PI / 4; // ±45°
         let aimChanged = false;
 
-        if (this.cursors.left?.isDown) {
-          this.currentCannonAim = Math.max(-maxAim, this.currentCannonAim - aimSpeed);
+        const aimInput = this.getCannonAimInput();
+        if (aimInput < 0) {
+          // Aim left (analog value -1 to 0)
+          this.currentCannonAim = Math.max(-maxAim, this.currentCannonAim + (aimInput * aimSpeed));
           aimChanged = true;
-        } else if (this.cursors.right?.isDown) {
-          this.currentCannonAim = Math.min(maxAim, this.currentCannonAim + aimSpeed);
+        } else if (aimInput > 0) {
+          // Aim right (analog value 0 to 1)
+          this.currentCannonAim = Math.min(maxAim, this.currentCannonAim + (aimInput * aimSpeed));
           aimChanged = true;
         }
 
@@ -378,15 +615,16 @@ export class ShipInputHandler {
           );
         }
 
-        // Up/down arrows to adjust elevation (Option 3: True elevation control)
-        if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
+        // Up/down arrows, D-pad, or left stick vertical to adjust elevation (g4p Phase 1)
+        const elevationInput = this.getElevationInput();
+        if (elevationInput === 'up') {
           this.shipCommands.adjustElevation(
             this.controllingShip,
             this.controllingCannon.side,
             this.controllingCannon.index,
             'up'
           );
-        } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
+        } else if (elevationInput === 'down') {
           this.shipCommands.adjustElevation(
             this.controllingShip,
             this.controllingCannon.side,
@@ -395,8 +633,8 @@ export class ShipInputHandler {
           );
         }
 
-        // Space bar to fire cannon
-        if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+        // Space bar or R2 trigger to fire cannon (g4p Phase 1)
+        if (this.isFireJustPressed()) {
           this.shipCommands.fireCannon(
             this.controllingShip,
             this.controllingCannon.side,
