@@ -2,6 +2,23 @@
 
 All notable changes to the MEW Protocol CLI will be documented in this file.
 
+## [0.6.2] - 2025-11-03
+
+### Fixed
+
+#### `mew seacat` Command - Missing Build Files
+**Critical bugfix for seacat client build**
+
+Fixed issue where `tsc` would show help text instead of compiling when building the seacat client. The npm package was missing the TypeScript source files and configuration.
+
+**Issue:** The package.json files list included `clients/seacat/dist` but not `clients/seacat/src` or `clients/seacat/tsconfig.json`. When users ran `mew seacat` for the first time, the build would fail because TypeScript couldn't find what to compile.
+
+**Fix:** Added to npm package:
+- `clients/seacat/src` - All TypeScript source files
+- `clients/seacat/tsconfig.json` - TypeScript configuration
+
+Now the seacat client can successfully rebuild from source if needed.
+
 ## [0.6.1] - 2025-11-03
 
 ### Fixed
