@@ -24,6 +24,8 @@
 
 - [ ] Make a build that I can install on my steamdeck
 
+- [ ] Support player jump with mid-air dash
+
 - [ ] Basic NPC that takes directions via MCP tool calls
 - [ ] AI controlled NPC inspired by the text-based maze space that MEWAgent is able to path find given a goal
 
