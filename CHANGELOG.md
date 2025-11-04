@@ -2,6 +2,64 @@
 
 All notable changes to the MEW Protocol CLI will be documented in this file.
 
+## [0.6.0] - 2025-11-03
+
+### Added
+
+#### `mew seacat` Command
+**New CLI command to launch the Seacat multiplayer sailing game client**
+
+A new command that makes it easy to launch the Seacat game client directly from the mew CLI without navigating to the client directory.
+
+**Usage:**
+```bash
+mew seacat
+```
+
+**Features:**
+- 🚀 One-command launch of the Electron-based game client
+- 🔧 Auto-builds client on first run if not already built
+- 📦 Auto-installs dependencies if missing
+- 🎮 Seamless integration with MEW CLI ecosystem
+- 🛑 Graceful shutdown handling (Ctrl+C)
+
+**Package Updates:**
+- Added seacat client files to npm package distribution
+- New `build:seacat` script for building the game client
+- Updated `build:all` to include seacat in full build pipeline
+
+**Documentation:**
+- Added comprehensive command documentation to CLI spec
+- Usage examples and technical details included
+
+See `spec/cli/SPEC.md` for full documentation.
+
+### Seacat Game Client
+
+#### Included in Package
+The complete Seacat multiplayer sailing game is now included with the @mew-protocol/mew package:
+- 🐱 Cozy multiplayer isometric sailing game
+- ⛵ Ship control with realistic wheel steering
+- 💣 Ship-to-ship combat with cannons
+- 🎨 Refactored codebase with manager pattern architecture
+- 📦 Built with Electron, Phaser 3, and TypeScript
+
+**Game Features:**
+- Real-time multiplayer position synchronization
+- Multi-crew ship coordination
+- 8-directional character animations
+- Isometric rendering with pre-rendered 3D ship sprites
+- Combat system with physics-based projectiles
+- Sound effects (cannon fire, impacts, water splashes)
+
+**Technical Architecture:**
+- 15 focused modules (managers, renderers, input handlers, network)
+- Comprehensive JSDoc documentation
+- ~500 line orchestrator GameScene
+- Manager pattern for clean separation of concerns
+
+See `spec/seacat/SPEC.md` for complete game specification.
+
 ## [Unreleased]
 
 ### Seacat

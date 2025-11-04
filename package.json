@@ -1,6 +1,6 @@
 {
   "name": "@mew-protocol/mew",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "MEW Protocol - Multi-Entity Workspace Protocol SDK and CLI",
   "type": "module",
   "bin": {
