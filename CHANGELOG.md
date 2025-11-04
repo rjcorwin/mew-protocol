@@ -2,6 +2,24 @@
 
 All notable changes to the MEW Protocol CLI will be documented in this file.
 
+## [0.6.1] - 2025-11-03
+
+### Fixed
+
+#### `mew seacat` Command - Dependency Installation
+**Critical bugfix for first-time launch after npm install**
+
+Fixed issue where `mew seacat` would fail with "tsc: command not found" when launched for the first time after installing via npm. The command now properly checks for and installs node_modules before attempting to build the seacat client.
+
+**Issue:** When the package is installed via npm, the seacat `dist/` directory is included but `node_modules/` are not. The previous version only checked if `dist/` existed, causing it to skip dependency installation and fail when trying to run build commands.
+
+**Fix:** Now checks for both `node_modules/` and `dist/` directories:
+- If `node_modules/` missing: runs `npm install`
+- If `dist/` missing after install: runs `npm run build`
+- Only then launches Electron
+
+This ensures a smooth first-run experience for users installing the package globally.
+
 ## [0.6.0] - 2025-11-03
 
 ### Added
