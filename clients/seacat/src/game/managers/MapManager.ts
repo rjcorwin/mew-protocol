@@ -382,8 +382,8 @@ export class MapManager {
         // Calculate target alpha
         const targetAlpha = shouldBeVisible ? 1.0 : 0.0;
 
-        // Animate toward target (fast lerp: 0.3 per frame = ~3 frames to complete)
-        const newAlpha = currentAlpha + (targetAlpha - currentAlpha) * 0.3;
+        // Animate toward target (slow lerp: 0.05 per frame = ~20 frames to complete at 60fps)
+        const newAlpha = currentAlpha + (targetAlpha - currentAlpha) * 0.05;
 
         // Update sprite
         if (newAlpha > 0.01) {
@@ -453,8 +453,8 @@ export class MapManager {
         // Calculate target alpha
         const targetAlpha = shouldBeVisible ? 1.0 : 0.0;
 
-        // Animate toward target (fast lerp: 0.3 per frame = ~3 frames to complete at 60fps)
-        const newAlpha = currentAlpha + (targetAlpha - currentAlpha) * 0.3;
+        // Animate toward target (slow lerp: 0.05 per frame = ~20 frames to complete at 60fps)
+        const newAlpha = currentAlpha + (targetAlpha - currentAlpha) * 0.05;
 
         // Update tile
         if (newAlpha > 0.01) {
