@@ -515,6 +515,7 @@ export class ShipManager {
 
   /**
    * Updates visibility of ships based on diamond viewport culling (d7v-diamond-viewport)
+   * Uses hard cutoff (no fade) to avoid ghostly appearance
    * Call this from GameScene.update() with player position
    *
    * @param centerX - Player world X coordinate (viewport center)

@@ -214,6 +214,7 @@ export class PlayerManager {
 
   /**
    * Updates visibility of remote players based on diamond viewport culling (d7v-diamond-viewport)
+   * Uses hard cutoff (no fade) to avoid ghostly appearance
    * Call this from GameScene.update() with player position
    *
    * @param centerX - Player world X coordinate (viewport center)

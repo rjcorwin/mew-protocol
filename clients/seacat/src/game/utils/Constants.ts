@@ -65,6 +65,9 @@ export const VIEWPORT = {
   DIAMOND_BORDER_LEFT_TILES: 3,   // Symmetric sides
   DIAMOND_BORDER_RIGHT_TILES: 3,
 
+  // Fade zone for smooth visibility transitions (smooth-visibility-transitions)
+  FADE_ZONE_TILES: 3,  // 3-tile fade zone at diamond edge for smooth transitions
+
   // Aspect ratio (informational, not enforced)
   TARGET_ASPECT_RATIO: 16 / 9,
 } as const;

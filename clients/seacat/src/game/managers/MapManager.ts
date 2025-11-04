@@ -43,6 +43,10 @@ export class MapManager {
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
   private visibilityUpdateCounter = 0; // d7v-diamond-viewport: Performance optimization
 
+  // Tile alpha tracking for smooth fade animations (smooth-visibility-transitions)
+  private tileAlphaState: Map<string, number> = new Map(); // Key: "layer:x:y", Value: current alpha
+  private spriteAlphaState: Map<Phaser.GameObjects.Sprite, number> = new Map(); // Track sprite alphas
+
   constructor(
     private scene: Phaser.Scene,
     private client: MEWClient
@@ -202,8 +206,43 @@ export class MapManager {
 
     console.log(`Map loaded: ${this.map.width}×${this.map.height} tiles`);
 
+    // Initialize all tiles as hidden (smooth-visibility-transitions)
+    // They will be shown by updateVisibleTiles() based on viewport
+    this.initializeTileVisibility();
+
     // Send map navigation data to ships
     this.sendMapDataToShips();
+  }
+
+  /**
+   * Initialize all tiles as hidden (smooth-visibility-transitions)
+   * Called once when map loads to ensure only viewport tiles are visible
+   */
+  private initializeTileVisibility(): void {
+    // Hide all tiles in all layers
+    const layers = [this.groundLayer, this.obstacleLayer, this.waterLayer, this.secondLayer].filter(Boolean);
+
+    layers.forEach((layer) => {
+      if (!layer) return;
+
+      for (let tileY = 0; tileY < this.map.height; tileY++) {
+        for (let tileX = 0; tileX < this.map.width; tileX++) {
+          const tile = layer.getTileAt(tileX, tileY);
+          if (tile) {
+            tile.setVisible(false);
+            tile.setAlpha(0);
+          }
+        }
+      }
+    });
+
+    // Hide all second layer sprites
+    this.secondLayerSprites.forEach((sprite) => {
+      sprite.setVisible(false);
+      sprite.setAlpha(0);
+    });
+
+    console.log('All tiles initialized as hidden - will fade in based on viewport');
   }
 
   /**
@@ -287,50 +326,96 @@ export class MapManager {
 
   /**
    * Updates visible tiles based on diamond viewport culling (d7v-diamond-viewport)
-   * Call this from GameScene.update() with player position
-   *
-   * Performance: Updates visibility every 5 frames to reduce overhead on large maps
+   * Animates tiles in/out smoothly (smooth-visibility-transitions)
+   * Call this from GameScene.update() with player position every frame
    *
    * @param centerX - Player world X coordinate (viewport center)
    * @param centerY - Player world Y coordinate (viewport center)
    */
   updateVisibleTiles(centerX: number, centerY: number): void {
-    // Performance optimization: Only update visibility every 5 frames (12 times/sec instead of 60)
-    this.visibilityUpdateCounter++;
-    if (this.visibilityUpdateCounter < 5) {
-      return;
-    }
-    this.visibilityUpdateCounter = 0;
-
     if (!this.map) return;
 
     // Update ground layer visibility
     if (this.groundLayer) {
-      this.updateLayerVisibility(this.groundLayer, centerX, centerY);
+      this.updateLayerVisibility(this.groundLayer, 'ground', centerX, centerY);
     }
 
-    // Update second layer sprites visibility
-    this.secondLayerSprites.forEach((sprite) => {
-      const isVisible = ViewportManager.isInDiamond(sprite.x, sprite.y, centerX, centerY);
-      sprite.setVisible(isVisible);
-    });
+    // Update second layer sprites visibility with animated fade (smooth-visibility-transitions)
+    // OPTIMIZED: Only check sprites that could be near viewport
+    const centerTilePos = this.map.worldToTileXY(centerX, centerY);
+    if (centerTilePos) {
+      // Ensure integer tile coordinates
+      const centerTileX = Math.floor(centerTilePos.x);
+      const centerTileY = Math.floor(centerTilePos.y);
+      const radiusTiles = ViewportManager.getDiamondRadiusTiles();
+
+      this.secondLayerSprites.forEach((sprite) => {
+        // Convert sprite world position to tile coordinates
+        const spriteTilePos = this.map.worldToTileXY(sprite.x, sprite.y);
+        if (!spriteTilePos) return;
+
+        // Ensure integer tile coordinates
+        const spriteTileX = Math.floor(spriteTilePos.x);
+        const spriteTileY = Math.floor(spriteTilePos.y);
+
+        // Quick distance check - skip sprites far from viewport (OPTIMIZATION)
+        const dx = Math.abs(spriteTileX - centerTileX);
+        const dy = Math.abs(spriteTileY - centerTileY);
+        const margin = 2;
+
+        // Skip sprites that are definitely too far away
+        if (dx > radiusTiles + margin || dy > radiusTiles + margin) {
+          // Ensure sprite is hidden if it's far away
+          if (sprite.visible) {
+            sprite.setVisible(false);
+            this.spriteAlphaState.set(sprite, 0);
+          }
+          return;
+        }
+
+        // Check if sprite should be visible (inside diamond)
+        const shouldBeVisible = (dx <= radiusTiles) && (dy <= radiusTiles);
+
+        // Get current alpha (default to 0 for new sprites)
+        const currentAlpha = this.spriteAlphaState.get(sprite) ?? 0;
+
+        // Calculate target alpha
+        const targetAlpha = shouldBeVisible ? 1.0 : 0.0;
+
+        // Animate toward target (fast lerp: 0.3 per frame = ~3 frames to complete)
+        const newAlpha = currentAlpha + (targetAlpha - currentAlpha) * 0.3;
+
+        // Update sprite
+        if (newAlpha > 0.01) {
+          sprite.setVisible(true);
+          sprite.setAlpha(newAlpha);
+          this.spriteAlphaState.set(sprite, newAlpha);
+        } else {
+          sprite.setVisible(false);
+          this.spriteAlphaState.set(sprite, 0);
+        }
+      });
+    }
 
     // Update obstacle layer visibility
     if (this.obstacleLayer) {
-      this.updateLayerVisibility(this.obstacleLayer, centerX, centerY);
+      this.updateLayerVisibility(this.obstacleLayer, 'obstacle', centerX, centerY);
     }
 
     // Update water layer visibility
     if (this.waterLayer) {
-      this.updateLayerVisibility(this.waterLayer, centerX, centerY);
+      this.updateLayerVisibility(this.waterLayer, 'water', centerX, centerY);
     }
   }
 
   /**
    * Helper method to update visibility for a tilemap layer
+   * Animates tiles in/out smoothly (smooth-visibility-transitions)
+   * OPTIMIZED: Only checks tiles near viewport, not entire map
    */
   private updateLayerVisibility(
     layer: Phaser.Tilemaps.TilemapLayer,
+    layerName: string,
     centerX: number,
     centerY: number
   ): void {
@@ -338,23 +423,48 @@ export class MapManager {
     const centerTilePos = this.map.worldToTileXY(centerX, centerY);
     if (!centerTilePos) return;
 
-    const centerTileX = centerTilePos.x;
-    const centerTileY = centerTilePos.y;
+    // Ensure integer tile coordinates (worldToTileXY can return floats)
+    const centerTileX = Math.floor(centerTilePos.x);
+    const centerTileY = Math.floor(centerTilePos.y);
     const radiusTiles = ViewportManager.getDiamondRadiusTiles();
 
-    // Iterate all tiles in the layer
-    for (let tileY = 0; tileY < this.map.height; tileY++) {
-      for (let tileX = 0; tileX < this.map.width; tileX++) {
+    // OPTIMIZATION: Only check tiles within viewport + small margin (2 tiles for fade transition)
+    const margin = 2;
+    const minTileX = Math.max(0, Math.floor(centerTileX - radiusTiles - margin));
+    const maxTileX = Math.min(this.map.width - 1, Math.ceil(centerTileX + radiusTiles + margin));
+    const minTileY = Math.max(0, Math.floor(centerTileY - radiusTiles - margin));
+    const maxTileY = Math.min(this.map.height - 1, Math.ceil(centerTileY + radiusTiles + margin));
+
+    // Only iterate tiles in viewport area (not entire map!)
+    for (let tileY = minTileY; tileY <= maxTileY; tileY++) {
+      for (let tileX = minTileX; tileX <= maxTileX; tileX++) {
         const tile = layer.getTileAt(tileX, tileY);
         if (!tile) continue;
 
-        // For isometric maps: check if tile is within square range in tile space
-        // (a square in tile space creates a diamond in world/screen space)
+        // Check if tile should be visible (inside diamond)
         const dx = Math.abs(tileX - centerTileX);
         const dy = Math.abs(tileY - centerTileY);
-        const isVisible = (dx <= radiusTiles) && (dy <= radiusTiles);
+        const shouldBeVisible = (dx <= radiusTiles) && (dy <= radiusTiles);
 
-        tile.setVisible(isVisible);
+        // Get current alpha (default to 0 for new tiles)
+        const tileKey = `${layerName}:${tileX}:${tileY}`;
+        const currentAlpha = this.tileAlphaState.get(tileKey) ?? 0;
+
+        // Calculate target alpha
+        const targetAlpha = shouldBeVisible ? 1.0 : 0.0;
+
+        // Animate toward target (fast lerp: 0.3 per frame = ~3 frames to complete at 60fps)
+        const newAlpha = currentAlpha + (targetAlpha - currentAlpha) * 0.3;
+
+        // Update tile
+        if (newAlpha > 0.01) {
+          tile.setVisible(true);
+          tile.setAlpha(newAlpha);
+          this.tileAlphaState.set(tileKey, newAlpha);
+        } else {
+          tile.setVisible(false);
+          this.tileAlphaState.set(tileKey, 0);
+        }
       }
     }
   }

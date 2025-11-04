@@ -142,4 +142,97 @@ export class ViewportManager {
       { x: centerX - halfWidth, y: centerY },         // Left
     ];
   }
+
+  /**
+   * Calculate fade alpha for smooth visibility transitions at diamond edges
+   * (smooth-visibility-transitions)
+   *
+   * Returns alpha value (0.0-1.0) based on distance from diamond edge:
+   * - 1.0: Inside fade zone (fully visible)
+   * - 0.0-1.0: In fade zone (linearly interpolated)
+   * - 0.0: Outside diamond (fully invisible)
+   *
+   * @param tileX - Tile X coordinate
+   * @param tileY - Tile Y coordinate
+   * @param centerTileX - Center tile X coordinate (viewport center)
+   * @param centerTileY - Center tile Y coordinate (viewport center)
+   * @param radiusTiles - Diamond radius in tiles
+   * @param fadeZoneTiles - Size of fade zone in tiles (default: from VIEWPORT config)
+   * @returns Alpha value 0.0-1.0
+   */
+  static getFadeAlpha(
+    tileX: number,
+    tileY: number,
+    centerTileX: number,
+    centerTileY: number,
+    radiusTiles: number,
+    fadeZoneTiles: number = VIEWPORT.FADE_ZONE_TILES
+  ): number {
+    // Calculate Chebyshev distance (max of dx, dy) for square diamond
+    const dx = Math.abs(tileX - centerTileX);
+    const dy = Math.abs(tileY - centerTileY);
+    const maxDist = Math.max(dx, dy);
+
+    // Calculate distance from edge (positive = inside, negative = outside)
+    const distanceFromEdge = radiusTiles - maxDist;
+
+    if (distanceFromEdge <= 0) {
+      // Outside diamond
+      return 0.0;
+    } else if (distanceFromEdge >= fadeZoneTiles) {
+      // Inside fade zone (fully visible)
+      return 1.0;
+    } else {
+      // In fade zone - linear interpolation
+      return distanceFromEdge / fadeZoneTiles;
+    }
+  }
+
+  /**
+   * Calculate fade alpha for entities using world coordinates
+   * (smooth-visibility-transitions)
+   *
+   * This is a convenience method for entities that use world coordinates
+   * instead of tile coordinates. Uses Manhattan distance approximation
+   * for the diamond shape in world space.
+   *
+   * @param worldX - Entity world X coordinate
+   * @param worldY - Entity world Y coordinate
+   * @param centerWorldX - Center world X coordinate
+   * @param centerWorldY - Center world Y coordinate
+   * @returns Alpha value 0.0-1.0
+   */
+  static getFadeAlphaWorld(
+    worldX: number,
+    worldY: number,
+    centerWorldX: number,
+    centerWorldY: number
+  ): number {
+    // Calculate world-space distance from center
+    const dx = Math.abs(worldX - centerWorldX);
+    const dy = Math.abs(worldY - centerWorldY);
+
+    // Diamond dimensions in pixels (world space)
+    const { width, height } = this.getDiamondDimensions();
+    const maxDx = width / 2;
+    const maxDy = height / 2;
+
+    // Use Manhattan distance in world space for diamond shape
+    const normalizedDist = (dx / maxDx) + (dy / maxDy);
+
+    // Fade zone as percentage of radius
+    const fadeZonePercent = VIEWPORT.FADE_ZONE_TILES / this.getDiamondRadiusTiles();
+
+    if (normalizedDist >= 1.0) {
+      // Outside diamond
+      return 0.0;
+    } else if (normalizedDist <= (1.0 - fadeZonePercent)) {
+      // Inside fade zone (fully visible)
+      return 1.0;
+    } else {
+      // In fade zone - linear interpolation
+      const distanceIntoFadeZone = 1.0 - normalizedDist;
+      return distanceIntoFadeZone / fadeZonePercent;
+    }
+  }
 }
