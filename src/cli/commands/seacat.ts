@@ -27,13 +27,25 @@ seacat
       process.exit(1);
     }
 
-    // Check if seacat is built
-    const distDir = path.join(seacatDir, 'dist');
-    if (!fs.existsSync(distDir)) {
-      console.error('❌ Seacat client not built. Building now...');
+    // Check if dependencies are installed
+    const nodeModulesDir = path.join(seacatDir, 'node_modules');
+    const needsInstall = !fs.existsSync(nodeModulesDir);
 
-      // Build seacat
-      const buildProcess = spawn('npm', ['run', 'build'], {
+    // Check if seacat needs building
+    const distDir = path.join(seacatDir, 'dist');
+    const needsBuild = !fs.existsSync(distDir);
+
+    if (needsInstall || needsBuild) {
+      if (needsInstall) {
+        console.log('📦 Installing dependencies...');
+      }
+      if (needsBuild) {
+        console.log('🔨 Building Seacat client...');
+      }
+      console.log('');
+
+      // Install and build
+      const buildProcess = spawn('npm', ['install'], {
         cwd: seacatDir,
         stdio: 'inherit',
         shell: true
@@ -41,15 +53,34 @@ seacat
 
       buildProcess.on('exit', (code) => {
         if (code !== 0) {
-          console.error('❌ Failed to build Seacat client');
+          console.error('❌ Failed to install dependencies');
           process.exit(code || 1);
         }
 
-        // Launch after build
-        launchElectron(seacatDir);
+        // Build if needed
+        if (needsBuild) {
+          const buildProc = spawn('npm', ['run', 'build'], {
+            cwd: seacatDir,
+            stdio: 'inherit',
+            shell: true
+          });
+
+          buildProc.on('exit', (buildCode) => {
+            if (buildCode !== 0) {
+              console.error('❌ Failed to build Seacat client');
+              process.exit(buildCode || 1);
+            }
+
+            // Launch after build
+            launchElectron(seacatDir);
+          });
+        } else {
+          // Dependencies installed, dist exists, just launch
+          launchElectron(seacatDir);
+        }
       });
     } else {
-      // Already built, just launch
+      // Already installed and built, just launch
       launchElectron(seacatDir);
     }
   });

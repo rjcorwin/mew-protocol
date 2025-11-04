@@ -4,6 +4,10 @@
 - [ ] Fix the bug in cannon tragectories (when pointing south with cannon all the way up, immediately hits water on firing but should be up in the air for a while)
 - [ ] Cannon ball shadows
 
+- [ ] controller support
+
+- [ ] breaking waves near shoreline with shallow water tile that combines a slightly translucent water tile and sand tile just underneath
+
 - [ ] Ships collisions
 - [ ] On sail down, show sails position change
 
