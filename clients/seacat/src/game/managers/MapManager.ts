@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { MEWClient } from '@mew-protocol/mew/client';
 import { TILE_WIDTH, TILE_HEIGHT, TILE_VISUAL_HEIGHT } from '../utils/Constants.js';
+import { ViewportManager } from '../utils/ViewportManager.js';
 
 /**
  * Manages map loading, tileset generation, and navigation data for the isometric game world.
@@ -40,6 +41,7 @@ export class MapManager {
   private secondLayerSprites: Phaser.GameObjects.Sprite[] = [];
   private obstacleLayer?: Phaser.Tilemaps.TilemapLayer;
   private waterLayer?: Phaser.Tilemaps.TilemapLayer;
+  private visibilityUpdateCounter = 0; // d7v-diamond-viewport: Performance optimization
 
   constructor(
     private scene: Phaser.Scene,
@@ -281,5 +283,79 @@ export class MapManager {
 
   getWaterLayer(): Phaser.Tilemaps.TilemapLayer | undefined {
     return this.waterLayer;
+  }
+
+  /**
+   * Updates visible tiles based on diamond viewport culling (d7v-diamond-viewport)
+   * Call this from GameScene.update() with player position
+   *
+   * Performance: Updates visibility every 5 frames to reduce overhead on large maps
+   *
+   * @param centerX - Player world X coordinate (viewport center)
+   * @param centerY - Player world Y coordinate (viewport center)
+   */
+  updateVisibleTiles(centerX: number, centerY: number): void {
+    // Performance optimization: Only update visibility every 5 frames (12 times/sec instead of 60)
+    this.visibilityUpdateCounter++;
+    if (this.visibilityUpdateCounter < 5) {
+      return;
+    }
+    this.visibilityUpdateCounter = 0;
+
+    if (!this.map) return;
+
+    // Update ground layer visibility
+    if (this.groundLayer) {
+      this.updateLayerVisibility(this.groundLayer, centerX, centerY);
+    }
+
+    // Update second layer sprites visibility
+    this.secondLayerSprites.forEach((sprite) => {
+      const isVisible = ViewportManager.isInDiamond(sprite.x, sprite.y, centerX, centerY);
+      sprite.setVisible(isVisible);
+    });
+
+    // Update obstacle layer visibility
+    if (this.obstacleLayer) {
+      this.updateLayerVisibility(this.obstacleLayer, centerX, centerY);
+    }
+
+    // Update water layer visibility
+    if (this.waterLayer) {
+      this.updateLayerVisibility(this.waterLayer, centerX, centerY);
+    }
+  }
+
+  /**
+   * Helper method to update visibility for a tilemap layer
+   */
+  private updateLayerVisibility(
+    layer: Phaser.Tilemaps.TilemapLayer,
+    centerX: number,
+    centerY: number
+  ): void {
+    // Convert center world position to tile coordinates using Phaser's isometric conversion
+    const centerTilePos = this.map.worldToTileXY(centerX, centerY);
+    if (!centerTilePos) return;
+
+    const centerTileX = centerTilePos.x;
+    const centerTileY = centerTilePos.y;
+    const radiusTiles = ViewportManager.getDiamondRadiusTiles();
+
+    // Iterate all tiles in the layer
+    for (let tileY = 0; tileY < this.map.height; tileY++) {
+      for (let tileX = 0; tileX < this.map.width; tileX++) {
+        const tile = layer.getTileAt(tileX, tileY);
+        if (!tile) continue;
+
+        // For isometric maps: check if tile is within square range in tile space
+        // (a square in tile space creates a diamond in world/screen space)
+        const dx = Math.abs(tileX - centerTileX);
+        const dy = Math.abs(tileY - centerTileY);
+        const isVisible = (dx <= radiusTiles) && (dy <= radiusTiles);
+
+        tile.setVisible(isVisible);
+      }
+    }
   }
 }

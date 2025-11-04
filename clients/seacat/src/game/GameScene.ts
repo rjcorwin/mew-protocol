@@ -12,6 +12,7 @@ import { EffectsRenderer } from './rendering/EffectsRenderer.js';
 import { WaterRenderer } from './rendering/WaterRenderer.js';
 import { PlayerRenderer } from './rendering/PlayerRenderer.js';
 import { ShipRenderer } from './rendering/ShipRenderer.js';
+import { ViewportRenderer } from './rendering/ViewportRenderer.js';
 import { ShipCommands } from './network/ShipCommands.js';
 import { NetworkClient } from './network/NetworkClient.js';
 import { PlayerInputHandler } from './input/PlayerInputHandler.js';
@@ -61,6 +62,7 @@ export class GameScene extends Phaser.Scene {
   private waterRenderer!: WaterRenderer;
   private playerRenderer!: PlayerRenderer;
   private shipRenderer!: ShipRenderer;
+  private viewportRenderer!: ViewportRenderer; // d7v-diamond-viewport
 
   // Network & Input
   private shipCommands!: ShipCommands;
@@ -174,6 +176,8 @@ export class GameScene extends Phaser.Scene {
     this.effectsRenderer = new EffectsRenderer(this);
     this.playerRenderer = new PlayerRenderer(this);
     this.shipRenderer = new ShipRenderer(this);
+    this.viewportRenderer = new ViewportRenderer(this); // d7v-diamond-viewport
+    this.viewportRenderer.initialize();
 
     // Create 8-direction walk animations
     this.playerRenderer.createPlayerAnimations();
@@ -192,12 +196,17 @@ export class GameScene extends Phaser.Scene {
 
     // Set up camera to follow player
     const camera = this.cameras.main;
-    const minX = -(this.map.height - 1) * (TILE_WIDTH / 2);
-    const maxX = (this.map.width - 1) * (TILE_WIDTH / 2);
-    const maxY = (this.map.width + this.map.height - 1) * (TILE_HEIGHT / 2);
-    camera.setBounds(minX, 0, maxX - minX, maxY);
+
+    // d7v-diamond-viewport: Remove camera bounds to allow background to show beyond map edges
+    // (Or set very large bounds to avoid clipping background)
+    camera.setBounds(undefined, undefined, undefined, undefined);
     camera.startFollow(this.localPlayer, true, 0.1, 0.1);
-    camera.setZoom(1.5);
+
+    // d7v-diamond-viewport: Calculate and apply camera zoom to fit diamond viewport in window
+    this.updateCameraZoom();
+
+    // d7v-diamond-viewport: Listen for window resize events
+    this.scale.on('resize', this.updateCameraZoom, this);
 
     // Create sound instances BEFORE managers that need them (c5x-ship-combat)
     // Howler.js works in Electron where Phaser's audio loader crashes
@@ -370,6 +379,17 @@ export class GameScene extends Phaser.Scene {
     this.shipInputHandler.update();
     this.playerManager.interpolateRemotePlayers(delta, time);
     this.projectileManager.updateProjectiles(delta, this.ships);
+
+    // d7v-diamond-viewport: Update visibility based on diamond viewport culling
+    const centerX = this.localPlayer.x;
+    const centerY = this.localPlayer.y;
+    this.mapManager.updateVisibleTiles(centerX, centerY);
+    this.shipManager.updateVisibility(centerX, centerY);
+    this.playerManager.updateVisibility(centerX, centerY);
+    this.projectileManager.updateVisibility(centerX, centerY);
+
+    // d7v-diamond-viewport: Border rendering disabled (remove if you want the white diamond outline)
+    // this.viewportRenderer.renderBorder(centerX, centerY);
   }
 
 
@@ -397,5 +417,48 @@ export class GameScene extends Phaser.Scene {
     }
     // DON'T update shipRelativePosition while on ship - it gets rotated when ship turns
     // and recalculated from world position each frame in the update loop
+  }
+
+  /**
+   * Updates camera zoom to fit diamond viewport in window (d7v-diamond-viewport Phase 4.4)
+   * Called on init and when window is resized
+   */
+  private updateCameraZoom(): void {
+    const windowWidth = this.scale.width;
+    const windowHeight = this.scale.height;
+
+    const zoom = Constants.VIEWPORT.DIAMOND_SIZE_TILES > 0
+      ? this.calculateZoomForDiamond(windowWidth, windowHeight)
+      : 1.5; // Fallback to old zoom if viewport not configured
+
+    this.cameras.main.setZoom(zoom);
+
+    // Also update background size on resize
+    this.viewportRenderer?.updateBackgroundOnResize();
+
+    console.log(`[d7v] Window: ${windowWidth}x${windowHeight}, Zoom: ${zoom.toFixed(2)}`);
+  }
+
+  /**
+   * Helper method to calculate zoom using ViewportManager (d7v-diamond-viewport)
+   */
+  private calculateZoomForDiamond(windowWidth: number, windowHeight: number): number {
+    // Calculate world dimensions including diamond and borders
+    const diamondWidthPx = Constants.VIEWPORT.DIAMOND_SIZE_TILES * TILE_WIDTH;
+    const diamondHeightPx = Constants.VIEWPORT.DIAMOND_SIZE_TILES * TILE_HEIGHT;
+    const borderTopPx = Constants.VIEWPORT.DIAMOND_BORDER_TOP_TILES * TILE_HEIGHT;
+    const borderBottomPx = Constants.VIEWPORT.DIAMOND_BORDER_BOTTOM_TILES * TILE_HEIGHT;
+    const borderLeftPx = Constants.VIEWPORT.DIAMOND_BORDER_LEFT_TILES * TILE_WIDTH;
+    const borderRightPx = Constants.VIEWPORT.DIAMOND_BORDER_RIGHT_TILES * TILE_WIDTH;
+
+    const worldWidth = diamondWidthPx + borderLeftPx + borderRightPx;
+    const worldHeight = diamondHeightPx + borderTopPx + borderBottomPx;
+
+    // Calculate zoom to fit world in window (best fit, no clipping)
+    const zoomX = windowWidth / worldWidth;
+    const zoomY = windowHeight / worldHeight;
+
+    // Use minimum to ensure entire world fits
+    return Math.min(zoomX, zoomY);
   }
 }
