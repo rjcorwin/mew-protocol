@@ -4,6 +4,7 @@ import { MEWClient } from '@mew-protocol/mew/client';
 import { Player, Ship, Direction, Projectile } from '../types.js';
 import * as Constants from './utils/Constants.js';
 import { CollisionManager } from './managers/CollisionManager.js';
+import { GamepadManager } from './managers/GamepadManager.js';
 import { MapManager } from './managers/MapManager.js';
 import { PlayerManager } from './managers/PlayerManager.js';
 import { ProjectileManager } from './managers/ProjectileManager.js';
@@ -52,6 +53,7 @@ export class GameScene extends Phaser.Scene {
   // Managers
   private mapManager!: MapManager;
   private collisionManager!: CollisionManager;
+  private gamepadManager!: GamepadManager;
   private playerManager!: PlayerManager;
   private projectileManager!: ProjectileManager;
   private shipManager!: ShipManager;
@@ -67,10 +69,6 @@ export class GameScene extends Phaser.Scene {
   private networkClient!: NetworkClient;
   private playerInputHandler!: PlayerInputHandler;
   private shipInputHandler!: ShipInputHandler;
-
-  // Controller support (g4p-controller-support Phase 1)
-  private gamepad: Phaser.Input.Gamepad.Gamepad | null = null;
-  private gamepadNotificationText?: Phaser.GameObjects.Text;
 
   // State
   private onShip: string | null = null; // Track if local player is on a ship
@@ -168,6 +166,10 @@ export class GameScene extends Phaser.Scene {
       this.obstacleLayer,
       this.waterLayer
     );
+
+    // Initialize gamepad manager (g4p-controller-support Phase 1)
+    this.gamepadManager = new GamepadManager(this);
+    this.gamepadManager.initialize();
 
     // Create graphics for shallow water overlay (renders on top of sand)
     this.shallowWaterGraphics = this.add.graphics();
@@ -279,7 +281,7 @@ export class GameScene extends Phaser.Scene {
     (this.shipInputHandler as any).shipCommands = this.shipCommands;
 
     // Connect gamepad to ship input handler (g4p Phase 1)
-    this.shipInputHandler.setGamepadAccessor(() => this.gamepad);
+    this.shipInputHandler.setGamepadAccessor(() => this.gamepadManager.getGamepad());
 
     // Initialize managers
     this.playerManager = new PlayerManager(this, this.map, this.groundLayer, this.secondLayer, this.waterRenderer, this.remotePlayers);
@@ -327,7 +329,7 @@ export class GameScene extends Phaser.Scene {
     );
 
     // Connect gamepad to player input handler (g4p Phase 1)
-    this.playerInputHandler.setGamepadAccessor(() => this.gamepad);
+    this.playerInputHandler.setGamepadAccessor(() => this.gamepadManager.getGamepad());
 
     // Initialize network client
     this.networkClient = new NetworkClient(
@@ -347,88 +349,15 @@ export class GameScene extends Phaser.Scene {
     // Initialize network communication
     this.networkClient.initialize();
 
-    // Controller support (g4p-controller-support Phase 1)
-    this.setupGamepadSupport();
-
     console.log(`Game started as ${this.playerId}`);
   }
 
   /**
-   * Set up gamepad/controller support (g4p-controller-support Phase 1)
+   * Phaser game loop callback - runs every frame.
+   *
+   * @param time - Total elapsed time since game started (milliseconds)
+   * @param delta - Time elapsed since last frame (milliseconds)
    */
-  private setupGamepadSupport() {
-    if (!this.input.gamepad) {
-      console.warn('⚠ Gamepad plugin not available');
-      return;
-    }
-
-    // Check for already-connected gamepads
-    if (this.input.gamepad.total > 0) {
-      this.gamepad = this.input.gamepad.getPad(0);
-      this.onGamepadConnected(this.gamepad!);
-    }
-
-    // Listen for gamepad connections
-    this.input.gamepad.on('connected', (pad: Phaser.Input.Gamepad.Gamepad) => {
-      console.log('🎮 Gamepad connected:', pad.id);
-      this.gamepad = pad;
-      this.onGamepadConnected(pad);
-    });
-
-    // Listen for gamepad disconnections
-    this.input.gamepad.on('disconnected', (pad: Phaser.Input.Gamepad.Gamepad) => {
-      console.log('🎮 Gamepad disconnected');
-      this.gamepad = null;
-      this.showGamepadNotification('Controller disconnected', 3000);
-    });
-  }
-
-  /**
-   * Handle gamepad connection
-   */
-  private onGamepadConnected(pad: Phaser.Input.Gamepad.Gamepad) {
-    console.log('🎮 Controller ready:', pad.id);
-    console.log('   Buttons:', pad.buttons.length);
-    console.log('   Axes:', pad.axes.length);
-
-    this.showGamepadNotification('Controller connected!', 3000);
-  }
-
-  /**
-   * Show gamepad notification message
-   */
-  private showGamepadNotification(message: string, duration: number) {
-    // Remove existing notification if any
-    if (this.gamepadNotificationText) {
-      this.gamepadNotificationText.destroy();
-    }
-
-    // Create notification text (fixed to camera)
-    const camera = this.cameras.main;
-    this.gamepadNotificationText = this.add.text(
-      camera.centerX,
-      camera.height - 100,
-      message,
-      {
-        fontSize: '24px',
-        color: '#00ff00',
-        backgroundColor: '#000000aa',
-        padding: { x: 20, y: 10 },
-      }
-    );
-    this.gamepadNotificationText.setOrigin(0.5, 0.5);
-    this.gamepadNotificationText.setScrollFactor(0);
-    this.gamepadNotificationText.setDepth(10000);
-
-    // Auto-hide after duration
-    this.time.delayedCall(duration, () => {
-      if (this.gamepadNotificationText) {
-        this.gamepadNotificationText.destroy();
-        this.gamepadNotificationText = undefined;
-      }
-    });
-  }
-
   update(time: number, delta: number) {
     // Rendering
     this.waterRenderer.animateVisibleWaterTiles(time);
