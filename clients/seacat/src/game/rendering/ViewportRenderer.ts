@@ -54,7 +54,7 @@ export class ViewportRenderer {
 
     // Create Graphics for gradient background
     const graphics = this.scene.add.graphics();
-    graphics.setDepth(-100); // Behind everything
+    graphics.setDepth(-2000); // Behind custom background image (-1000)
     graphics.setScrollFactor(0); // Fixed to camera (doesn't scroll)
 
     // Calculate horizon line position

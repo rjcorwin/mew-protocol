@@ -91,6 +91,9 @@ export class GameScene extends Phaser.Scene {
   preload() {
     console.log('[GameScene] Starting preload...');
 
+    // Load background image
+    this.load.image('background', 'assets/backgrounds/background.png');
+
     // Load actual tileset image
     this.load.image('terrain', 'assets/maps/terrain.png');
 
@@ -144,6 +147,16 @@ export class GameScene extends Phaser.Scene {
       console.warn('⚠ Ship sprite sheet not found: assets/sprites/ship1.png');
       console.warn('  Ships will use fallback placeholder rendering');
     }
+
+    // Add background image (renders behind everything)
+    const background = this.add.image(0, 0, 'background');
+    background.setOrigin(0, 0);
+    background.setDepth(-1000); // Behind everything
+    background.setScrollFactor(0); // Fixed to camera (doesn't scroll with world)
+    // Scale to fill viewport window
+    const scaleX = this.scale.width / background.width;
+    const scaleY = this.scale.height / background.height;
+    background.setScale(Math.max(scaleX, scaleY)); // Cover viewport
 
     // Initialize MapManager and load map
     this.mapManager = new MapManager(this, this.client);
