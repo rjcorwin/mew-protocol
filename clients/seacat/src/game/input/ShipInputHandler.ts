@@ -72,10 +72,6 @@ export class ShipInputHandler {
   // Gamepad button state tracking (g4p Phase 1)
   private lastInteractButtonState = false;
   private lastFireButtonState = false;
-  private lastSailUpState = false;
-  private lastSailDownState = false;
-  private lastElevationUpState = false;
-  private lastElevationDownState = false;
 
   // UI indicators
   public nearControlPoints: Set<string> = new Set();
@@ -203,55 +199,30 @@ export class ShipInputHandler {
   }
 
   /**
-   * Check if sail up was just pressed (keyboard up or gamepad D-pad up) (g4p Phase 1)
+   * Get sail adjustment input (keyboard up/down or gamepad left stick Y-axis) (g4p Phase 1)
+   * @returns 'up', 'down', or null
    */
-  private isSailUpJustPressed(): boolean {
+  private getSailInput(): 'up' | 'down' | null {
     // Check keyboard
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
-      return true;
-    }
+    if (this.cursors.up?.isDown) return 'up';
+    if (this.cursors.down?.isDown) return 'down';
 
-    // Check gamepad D-pad up (button 12)
+    // Check gamepad left stick vertical
     if (this.gamepad) {
       const pad = this.gamepad();
-      if (pad && pad.up) {
-        const pressed = pad.up;
-        const justPressed = pressed && !this.lastSailUpState;
-        this.lastSailUpState = pressed;
-        return justPressed;
+      if (pad && pad.leftStick) {
+        const value = pad.leftStick.y;
+        // Inverted: negative Y = up, positive Y = down (typical gamepad convention)
+        if (value < -ShipInputHandler.DPAD_THRESHOLD) return 'up';
+        if (value > ShipInputHandler.DPAD_THRESHOLD) return 'down';
       }
     }
 
-    this.lastSailUpState = false;
-    return false;
+    return null;
   }
 
   /**
-   * Check if sail down was just pressed (keyboard down or gamepad D-pad down) (g4p Phase 1)
-   */
-  private isSailDownJustPressed(): boolean {
-    // Check keyboard
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
-      return true;
-    }
-
-    // Check gamepad D-pad down (button 13)
-    if (this.gamepad) {
-      const pad = this.gamepad();
-      if (pad && pad.down) {
-        const pressed = pad.down;
-        const justPressed = pressed && !this.lastSailDownState;
-        this.lastSailDownState = pressed;
-        return justPressed;
-      }
-    }
-
-    this.lastSailDownState = false;
-    return false;
-  }
-
-  /**
-   * Get cannon elevation input (keyboard arrows, D-pad, or left stick vertical) (g4p Phase 1)
+   * Get cannon elevation input (keyboard arrows or left stick vertical) (g4p Phase 1)
    * @returns 'up', 'down', or null
    */
   private getElevationInput(): 'up' | 'down' | null {
@@ -268,61 +239,9 @@ export class ShipInputHandler {
         if (value < -ShipInputHandler.DPAD_THRESHOLD) return 'up';
         if (value > ShipInputHandler.DPAD_THRESHOLD) return 'down';
       }
-
-      // Fallback to D-pad for discrete control
-      if (pad && pad.up) return 'up';
-      if (pad && pad.down) return 'down';
     }
 
     return null;
-  }
-
-  /**
-   * Check if elevation up was just pressed (for discrete adjustments) (g4p Phase 1)
-   */
-  private isElevationUpJustPressed(): boolean {
-    // Check keyboard
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
-      return true;
-    }
-
-    // Check gamepad D-pad up
-    if (this.gamepad) {
-      const pad = this.gamepad();
-      if (pad && pad.up) {
-        const pressed = pad.up;
-        const justPressed = pressed && !this.lastElevationUpState;
-        this.lastElevationUpState = pressed;
-        return justPressed;
-      }
-    }
-
-    this.lastElevationUpState = false;
-    return false;
-  }
-
-  /**
-   * Check if elevation down was just pressed (for discrete adjustments) (g4p Phase 1)
-   */
-  private isElevationDownJustPressed(): boolean {
-    // Check keyboard
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
-      return true;
-    }
-
-    // Check gamepad D-pad down
-    if (this.gamepad) {
-      const pad = this.gamepad();
-      if (pad && pad.down) {
-        const pressed = pad.down;
-        const justPressed = pressed && !this.lastElevationDownState;
-        this.lastElevationDownState = pressed;
-        return justPressed;
-      }
-    }
-
-    this.lastElevationDownState = false;
-    return false;
   }
 
   /**
@@ -580,11 +499,11 @@ export class ShipInputHandler {
           }
         }
       } else if (this.controllingPoint === 'sails') {
-        // Up/down arrows or D-pad to adjust speed
-        if (this.isSailUpJustPressed()) {
+        // Up/down arrows or left stick Y-axis to adjust speed
+        const sailInput = this.getSailInput();
+        if (sailInput === 'up') {
           this.shipCommands.adjustSails(this.controllingShip, 'up');
-        }
-        if (this.isSailDownJustPressed()) {
+        } else if (sailInput === 'down') {
           this.shipCommands.adjustSails(this.controllingShip, 'down');
         }
       } else if (this.controllingPoint === 'cannon' && this.controllingCannon) {
@@ -615,7 +534,7 @@ export class ShipInputHandler {
           );
         }
 
-        // Up/down arrows, D-pad, or left stick vertical to adjust elevation (g4p Phase 1)
+        // Up/down arrows or left stick vertical to adjust elevation (g4p Phase 1)
         const elevationInput = this.getElevationInput();
         if (elevationInput === 'up') {
           this.shipCommands.adjustElevation(
