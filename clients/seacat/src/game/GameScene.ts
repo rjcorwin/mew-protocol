@@ -13,6 +13,7 @@ import { WaterRenderer } from './rendering/WaterRenderer.js';
 import { PlayerRenderer } from './rendering/PlayerRenderer.js';
 import { ShipRenderer } from './rendering/ShipRenderer.js';
 import { ViewportRenderer } from './rendering/ViewportRenderer.js';
+import { ViewportManager } from './utils/ViewportManager.js';
 import { ShipCommands } from './network/ShipCommands.js';
 import { NetworkClient } from './network/NetworkClient.js';
 import { PlayerInputHandler } from './input/PlayerInputHandler.js';
@@ -214,6 +215,12 @@ export class GameScene extends Phaser.Scene {
     // (Or set very large bounds to avoid clipping background)
     camera.setBounds(undefined, undefined, undefined, undefined);
     camera.startFollow(this.localPlayer, true, 0.1, 0.1);
+
+    // d7v-diamond-viewport: Offset camera to position player lower in window (more sky above)
+    // Positive Y offset moves camera down, making player appear lower in viewport
+    const borders = ViewportManager.getBorderDimensions();
+    const verticalOffset = (borders.top - borders.bottom) / 2;
+    camera.setFollowOffset(0, verticalOffset);
 
     // d7v-diamond-viewport: Calculate and apply camera zoom to fit diamond viewport in window
     this.updateCameraZoom();

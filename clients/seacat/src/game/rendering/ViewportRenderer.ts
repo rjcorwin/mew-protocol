@@ -58,9 +58,9 @@ export class ViewportRenderer {
     graphics.setScrollFactor(0); // Fixed to camera (doesn't scroll)
 
     // Calculate horizon line position
-    // Simplified approach: Put horizon at ~40% down from top (roughly where diamond top will be)
+    // Adjusted for pulled-down diamond: Put horizon at ~50% down from top (roughly where diamond top will be)
     // This can be fine-tuned based on border settings
-    const horizonY = windowHeight * 0.4;
+    const horizonY = windowHeight * 0.5;
 
     // Draw sky gradient (top to horizon)
     // Phaser Graphics doesn't support native gradients, so we'll approximate with multiple horizontal lines

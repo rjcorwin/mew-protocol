@@ -60,8 +60,8 @@ export const VIEWPORT = {
   DIAMOND_SIZE_TILES: 35,  // 35×35 tile square = larger diamond for better visibility
 
   // Border padding (in tiles) - asymmetric for better aesthetics
-  DIAMOND_BORDER_TOP_TILES: 4,    // More space for sky
-  DIAMOND_BORDER_BOTTOM_TILES: 2, // Less space for sea
+  DIAMOND_BORDER_TOP_TILES: 7,    // More space for sky (pulled diamond down)
+  DIAMOND_BORDER_BOTTOM_TILES: 1, // Less space for sea (diamond closer to bottom)
   DIAMOND_BORDER_LEFT_TILES: 3,   // Symmetric sides
   DIAMOND_BORDER_RIGHT_TILES: 3,
 
