@@ -683,9 +683,13 @@ export class ShipServer {
     const verticalComponent = CANNON_SPEED * Math.sin(elevation);
 
     // Inherit ship velocity (moving platform physics)
+    // NOTE: We only inherit X velocity. The ship's Y velocity represents horizontal movement
+    // in 3D space (north/south on the map), not vertical elevation. The verticalComponent
+    // from cannon elevation represents true Z-axis velocity, so mixing ship.velocity.y
+    // would incorrectly affect the projectile's vertical arc in isometric screen space.
     const vel: Velocity = {
       x: Math.cos(fireAngle) * horizontalSpeed + this.state.velocity.x,
-      y: Math.sin(fireAngle) * horizontalSpeed + this.state.velocity.y - verticalComponent,
+      y: Math.sin(fireAngle) * horizontalSpeed - verticalComponent,
     };
 
     // 4. Generate unique projectile ID
