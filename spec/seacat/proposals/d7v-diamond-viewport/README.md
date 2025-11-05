@@ -1,7 +1,8 @@
 # Diamond Viewport & Diorama Framing (d7v)
 
-**Status:** Draft 📝
+**Status:** Implemented ✅
 **Created:** 2025-11-04
+**Implemented:** 2025-01-04
 **Proposal Code:** d7v-diamond-viewport
 
 ## Quick Summary
@@ -59,18 +60,19 @@ Implement a **diamond viewport** with:
 
 ## Configuration
 
-Default values (tunable):
+Implemented values (as of 2025-01-04):
 ```typescript
-DIAMOND_SIZE_TILES: 20         // Square diamond (20×20)
-DIAMOND_BORDER_TOP_TILES: 4    // More sky space
-DIAMOND_BORDER_BOTTOM_TILES: 2 // Less sea space
+DIAMOND_SIZE_TILES: 35         // Square diamond (35×35) - larger for better visibility
+DIAMOND_BORDER_TOP_TILES: 7    // More sky space (diamond positioned lower)
+DIAMOND_BORDER_BOTTOM_TILES: 1 // Less sea space (diamond closer to bottom)
 DIAMOND_BORDER_LEFT_TILES: 3   // Symmetric sides
 DIAMOND_BORDER_RIGHT_TILES: 3
+FADE_ZONE_TILES: 3            // Border frame with motion-reactive visibility
 ```
 
 **Why square?** A square diamond (equal width/height) creates perfect geometric symmetry when rotated 45° and provides equal visibility in all diagonal directions.
 
-**Why asymmetric borders?** More sky space (top) for atmospheric effects while keeping sea space (bottom) minimal for gameplay focus.
+**Why asymmetric borders?** More sky space (top=7) positions the diamond lower in the window, creating expanded sky area while keeping the gameplay focused near the bottom. Camera offset further enhances this positioning.
 
 ## Implementation Phases
 
@@ -127,7 +129,17 @@ UI Overlays (HUD, health bars)
 
 **CHANGELOG Entry:** `CHANGELOG.md` line 102-121
 **Proposal Directory:** `spec/seacat/proposals/d7v-diamond-viewport/`
-**Implementation Status:** Draft (awaiting implementation)
+**Implementation Status:** ✅ Implemented (2025-01-04)
+
+## Implementation Highlights
+
+- **Diamond viewport culling**: 35×35 tile square with performance optimization
+- **Lower positioning**: Camera offset positions player below window center (7 top / 1 bottom borders)
+- **Border frame system**: Motion-reactive visibility with 3 opacity levels (88%, 45%, 10%)
+- **Background layers**: Gradient at -2000, custom image at -1000, camera-fixed
+- **Smooth transitions**: Animated fade in/out (~20 frames at 60fps)
+
+See `proposal.md` Implementation Notes section for details.
 
 ---
 

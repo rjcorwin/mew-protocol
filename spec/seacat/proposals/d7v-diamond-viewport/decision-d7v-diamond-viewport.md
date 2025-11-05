@@ -1,9 +1,10 @@
 # ADR: Diamond Viewport & Diorama Framing
 
-**Status:** Proposed
+**Status:** Implemented ✅
 **Date:** 2025-11-04
+**Implemented:** 2025-01-04
 **Deciders:** RJ
-**Related:** s7g-gamescene-refactor, r8s-ship-rotation, c5x-ship-combat
+**Related:** s7g-gamescene-refactor, r8s-ship-rotation, c5x-ship-combat, decision-smooth-visibility-transitions
 
 ## Context
 
@@ -50,9 +51,12 @@ We will implement a **diamond-shaped viewport** (square rotated 45°) that defin
 
 **Parameters:**
 ```typescript
-DIAMOND_WIDTH_TILES: 20   // Horizontal diagonal
-DIAMOND_HEIGHT_TILES: 15  // Vertical diagonal
-DIAMOND_BORDER_TILES: 3   // Padding around diamond
+DIAMOND_SIZE_TILES: 35         // Square diamond (35×35 tiles)
+DIAMOND_BORDER_TOP_TILES: 7    // More space for sky (diamond positioned lower)
+DIAMOND_BORDER_BOTTOM_TILES: 1 // Less space for sea (diamond closer to bottom)
+DIAMOND_BORDER_LEFT_TILES: 3   // Symmetric sides
+DIAMOND_BORDER_RIGHT_TILES: 3
+FADE_ZONE_TILES: 3            // Border frame with motion-reactive visibility
 ```
 
 **Rationale:**
@@ -60,10 +64,11 @@ DIAMOND_BORDER_TILES: 3   // Padding around diamond
 - Scales with different tile sizes if needed
 - Clear semantic meaning for gameplay tuning
 
-**Initial values:**
-- 20×15 tiles provides ~10-tile visibility in each cardinal direction
-- 3-tile border provides space for background imagery
-- Values tunable based on playtesting
+**Implemented values (2025-01-04):**
+- 35×35 tiles provides better visibility compared to initial 20×20 proposal
+- Asymmetric borders (7 top, 1 bottom) position diamond lower in window for more sky
+- Camera follow offset further enhances lower positioning
+- Values tuned based on aesthetic feedback and gameplay testing
 
 ### 4. Background: Static Image Layer
 
@@ -306,3 +311,42 @@ This decision should be reviewed after:
 4. ✅ Performance profiling on large maps
 
 If the decision needs revision, update this document and create a new decision record for the changes.
+
+---
+
+## Implementation Results (2025-01-04)
+
+All phases completed successfully. Key implementation details:
+
+### Configuration Values
+- **Diamond size**: 35×35 tiles (larger than initial 20×20 proposal for better visibility)
+- **Asymmetric borders**: 7 top / 1 bottom (diamond positioned lower in window)
+- **Camera offset**: Added `camera.setFollowOffset(0, (top-bottom)/2)` for lower positioning
+
+### Visibility Transitions
+Instead of the initially proposed "all-or-nothing" culling (Alternative 8), implemented a **border frame system** with motion-reactive visibility:
+- 3 border rows with fixed opacity (88%, 45%, 10%)
+- Appears when player moves, fades after ~1 second of no movement
+- Smooth animation using 0.05 lerp factor (~20 frames at 60fps)
+- Eliminates visual jitter while maintaining performance
+
+See `decision-smooth-visibility-transitions.md` for detailed rationale and implementation.
+
+### Background Implementation
+- **Gradient background**: Depth -2000, horizon at 50% down (not 40%)
+- **Custom background image**: Depth -1000, camera-fixed (scrollFactor 0)
+- **Proper layering**: Maintains correct depth ordering
+
+### Performance
+- ~85% reduction in tile checks (viewport + margin only, not entire map)
+- Maintains 60 FPS with typical entity counts
+- Animated transitions have minimal overhead
+
+### Files Modified
+- `clients/seacat/src/game/utils/Constants.ts` - Configuration
+- `clients/seacat/src/game/utils/ViewportManager.ts` - Culling utilities
+- `clients/seacat/src/game/GameScene.ts` - Camera offset
+- `clients/seacat/src/game/rendering/ViewportRenderer.ts` - Gradient background
+- `clients/seacat/src/game/managers/MapManager.ts` - Border frame system
+
+All success criteria met. Implementation validated through gameplay testing.

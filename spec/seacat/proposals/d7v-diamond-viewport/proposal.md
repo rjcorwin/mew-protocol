@@ -1,7 +1,8 @@
 # d7v-diamond-viewport
 
-**Status:** Draft
+**Status:** Implemented ✅
 **Created:** 2025-11-04
+**Implemented:** 2025-01-04
 **Related:** s7g-gamescene-refactor (rendering architecture)
 
 ## Problem
@@ -73,10 +74,10 @@ Implement a **diamond-shaped viewport** (square rotated 45°) that defines the v
 
 **Configuration approach**:
 ```typescript
-// Example configuration
-const DIAMOND_SIZE_TILES = 20;         // Square diamond (20×20 tiles)
-const DIAMOND_BORDER_TOP_TILES = 4;    // More space for sky
-const DIAMOND_BORDER_BOTTOM_TILES = 2; // Less space for sea
+// Implemented configuration (as of 2025-01-04)
+const DIAMOND_SIZE_TILES = 35;         // Square diamond (35×35 tiles) - larger for better visibility
+const DIAMOND_BORDER_TOP_TILES = 7;    // More space for sky (diamond positioned lower)
+const DIAMOND_BORDER_BOTTOM_TILES = 1; // Less space for sea (diamond closer to bottom)
 const DIAMOND_BORDER_LEFT_TILES = 3;   // Symmetric sides
 const DIAMOND_BORDER_RIGHT_TILES = 3;
 const TILE_WIDTH = 32;                 // Isometric tile width
@@ -160,15 +161,18 @@ function isInDiamond(tileX: number, tileY: number, centerX: number, centerY: num
 ```typescript
 export const VIEWPORT = {
   // Square diamond viewport (rotated 45°)
-  DIAMOND_SIZE_TILES: 20,  // 20×20 tile square = perfect diamond
+  DIAMOND_SIZE_TILES: 35,  // 35×35 tile square = larger diamond for better visibility
 
-  // Asymmetric borders for aesthetic balance
-  DIAMOND_BORDER_TOP_TILES: 4,    // More space for sky
-  DIAMOND_BORDER_BOTTOM_TILES: 2, // Less space for sea
+  // Asymmetric borders for aesthetic balance (diamond positioned lower in window)
+  DIAMOND_BORDER_TOP_TILES: 7,    // More space for sky (diamond pulled down)
+  DIAMOND_BORDER_BOTTOM_TILES: 1, // Less space for sea (diamond closer to bottom)
   DIAMOND_BORDER_LEFT_TILES: 3,   // Symmetric sides
   DIAMOND_BORDER_RIGHT_TILES: 3,
 
-  ASPECT_RATIO: 16 / 9,  // Informational only
+  // Fade zone for smooth visibility transitions
+  FADE_ZONE_TILES: 3,  // Border frame system with motion-reactive visibility
+
+  TARGET_ASPECT_RATIO: 16 / 9,  // Informational only
 } as const;
 ```
 
@@ -319,6 +323,46 @@ export const VIEWPORT = {
 - **r8s-ship-rotation**: Ships may rotate in/out of viewport
 - **c5x-ship-combat**: Projectiles must be culled correctly
 - **i2m-true-isometric**: Diamond shape complements isometric perspective
+
+## Implementation Notes (2025-01-04)
+
+### Camera Offset for Lower Positioning
+
+To achieve more sky space, the diamond is positioned lower in the window using camera follow offset:
+
+```typescript
+// In GameScene.create()
+const borders = ViewportManager.getBorderDimensions();
+const verticalOffset = (borders.top - borders.bottom) / 2;
+camera.setFollowOffset(0, verticalOffset);
+```
+
+This shifts the camera down, making the player appear lower in the viewport with expanded sky area above.
+
+### Border Frame System with Motion-Reactive Visibility
+
+Instead of static fade zones, the implementation uses a **border frame system**:
+
+- **3 border rows** with fixed opacity levels (88%, 45%, 10%)
+- **Motion detection**: Border appears when player is moving
+- **Auto-fade**: Border fades out after ~1 second of no movement
+- **Smooth animation**: Tiles animate in/out using 0.05 lerp factor (~20 frames at 60fps)
+
+See `decision-smooth-visibility-transitions.md` for full details.
+
+### Background Positioning
+
+- **Gradient background**: Positioned at depth -2000, horizon at 50% down
+- **Custom background image**: Positioned at depth -1000, camera-fixed (scrollFactor 0)
+- **Proper layering**: Gradient → Custom background → Diamond viewport → Border → UI
+
+### Key Files
+
+- `clients/seacat/src/game/utils/Constants.ts` - Viewport configuration
+- `clients/seacat/src/game/utils/ViewportManager.ts` - Diamond culling utilities
+- `clients/seacat/src/game/GameScene.ts` - Camera offset implementation
+- `clients/seacat/src/game/rendering/ViewportRenderer.ts` - Gradient background
+- `clients/seacat/src/game/managers/MapManager.ts` - Border frame system
 
 ## Future Enhancements
 
