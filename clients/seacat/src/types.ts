@@ -106,16 +106,19 @@ export interface Ship {
   controlPoints: {
     wheel: {
       sprite: Phaser.GameObjects.Graphics;
+      indicator: Phaser.GameObjects.Graphics; // Hover indicator when in range
       relativePosition: { x: number; y: number }; // Position relative to ship center
       controlledBy: string | null;
     };
     sails: {
       sprite: Phaser.GameObjects.Graphics;
+      indicator: Phaser.GameObjects.Graphics; // Hover indicator when in range
       relativePosition: { x: number; y: number }; // Position relative to ship center
       controlledBy: string | null;
     };
     mast: {
       sprite: Phaser.GameObjects.Graphics;
+      indicator: Phaser.GameObjects.Graphics; // Hover indicator when in range
       relativePosition: { x: number; y: number }; // Position relative to ship center (center of ship)
       controlledBy: string | null; // Local-only, for camera zoom
     };
@@ -124,6 +127,7 @@ export interface Ship {
   cannons?: {
     port: Array<{
       sprite: Phaser.GameObjects.Graphics;
+      indicator: Phaser.GameObjects.Graphics; // Hover indicator when in range
       relativePosition: { x: number; y: number };
       controlledBy: string | null;
       aimAngle: number;
@@ -132,6 +136,7 @@ export interface Ship {
     }>;
     starboard: Array<{
       sprite: Phaser.GameObjects.Graphics;
+      indicator: Phaser.GameObjects.Graphics; // Hover indicator when in range
       relativePosition: { x: number; y: number };
       controlledBy: string | null;
       aimAngle: number;

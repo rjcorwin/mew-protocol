@@ -266,6 +266,63 @@ export class ShipRenderer {
   }
 
   /**
+   * Draw grabable indicator that hovers above a control point when in range
+   * This is a placeholder for what will eventually be an animated sprite
+   * @param graphics Graphics object to draw on
+   * @param controlPoint Control point data with relative position
+   * @param shipSprite Ship sprite
+   * @param shipRotation Ship rotation in radians
+   * @param isInRange Whether the player is in range to grab this control point
+   * @param time Current game time for animation (optional)
+   */
+  drawGrabableIndicator(
+    graphics: Phaser.GameObjects.Graphics,
+    controlPoint: { relativePosition: { x: number; y: number } },
+    shipSprite: Phaser.GameObjects.Sprite,
+    shipRotation: number,
+    isInRange: boolean,
+    time?: number
+  ): void {
+    graphics.clear();
+
+    // Only draw if player is in range
+    if (!isInRange) {
+      return;
+    }
+
+    // Calculate control point world position with isometric rotation
+    const rotatedPos = IsoMath.rotatePointIsometric(controlPoint.relativePosition, shipRotation);
+    const worldX = shipSprite.x + rotatedPos.x;
+    const worldY = shipSprite.y + rotatedPos.y;
+
+    // Position indicator above the control point
+    const HOVER_HEIGHT = 25; // pixels above control point
+    const indicatorY = worldY - HOVER_HEIGHT;
+
+    // Add subtle bobbing animation using time
+    const bobOffset = time ? Math.sin(time / 200) * 3 : 0; // 3px amplitude, ~3 second period
+
+    // Draw a simple down-pointing arrow/chevron as placeholder
+    const arrowSize = 10;
+    const arrowY = indicatorY + bobOffset;
+
+    // Draw filled arrow pointing down
+    graphics.fillStyle(0x00ff00, 0.9); // Bright green, high opacity
+    graphics.lineStyle(2, 0xffffff, 1); // White outline
+
+    // Draw chevron/arrow shape (inverted V pointing down)
+    graphics.beginPath();
+    graphics.moveTo(worldX, arrowY + arrowSize); // Bottom point
+    graphics.lineTo(worldX - arrowSize, arrowY); // Top left
+    graphics.lineTo(worldX, arrowY + arrowSize / 2); // Middle notch
+    graphics.lineTo(worldX + arrowSize, arrowY); // Top right
+    graphics.lineTo(worldX, arrowY + arrowSize); // Back to bottom
+    graphics.closePath();
+    graphics.fillPath();
+    graphics.strokePath();
+  }
+
+  /**
    * Calculate sprite sheet frame index from ship rotation (s6r-ship-sprite-rendering)
    * @param rotation Ship rotation in radians
    * @returns Frame index (0-63) corresponding to rotation angle

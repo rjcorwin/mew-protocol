@@ -151,6 +151,14 @@ export class ShipManager {
       const sailsGraphics = this.scene.add.graphics();
       const mastGraphics = this.scene.add.graphics();
 
+      // Create hover indicators (for grabable range indication)
+      const wheelIndicator = this.scene.add.graphics();
+      const sailsIndicator = this.scene.add.graphics();
+      const mastIndicator = this.scene.add.graphics();
+      wheelIndicator.setDepth(10); // Above other elements
+      sailsIndicator.setDepth(10);
+      mastIndicator.setDepth(10);
+
       // Calculate relative positions from world positions
       const wheelRelative = {
         x: update.shipData.controlPoints.wheel.worldPosition.x - update.worldCoords.x,
@@ -182,44 +190,57 @@ export class ShipManager {
         controlPoints: {
           wheel: {
             sprite: wheelGraphics,
+            indicator: wheelIndicator,
             relativePosition: wheelRelative,
             controlledBy: update.shipData.controlPoints.wheel.controlledBy,
           },
           sails: {
             sprite: sailsGraphics,
+            indicator: sailsIndicator,
             relativePosition: sailsRelative,
             controlledBy: update.shipData.controlPoints.sails.controlledBy,
           },
           mast: {
             sprite: mastGraphics,
+            indicator: mastIndicator,
             relativePosition: mastRelative,
             controlledBy: null, // Client-side only, not synced
           },
         },
         // c5x-ship-combat: Initialize cannons if present
         cannons: update.shipData.cannons ? {
-          port: update.shipData.cannons.port.map((cannonData) => ({
-            sprite: this.scene.add.graphics(),
-            relativePosition: {
-              x: cannonData.worldPosition.x - update.worldCoords.x,
-              y: cannonData.worldPosition.y - update.worldCoords.y,
-            },
-            controlledBy: cannonData.controlledBy,
-            aimAngle: cannonData.aimAngle,
-            elevationAngle: cannonData.elevationAngle || Math.PI / 6, // Default 30° if not present
-            cooldownRemaining: cannonData.cooldownRemaining,
-          })),
-          starboard: update.shipData.cannons.starboard.map((cannonData) => ({
-            sprite: this.scene.add.graphics(),
-            relativePosition: {
-              x: cannonData.worldPosition.x - update.worldCoords.x,
-              y: cannonData.worldPosition.y - update.worldCoords.y,
-            },
-            controlledBy: cannonData.controlledBy,
-            aimAngle: cannonData.aimAngle,
-            elevationAngle: cannonData.elevationAngle || Math.PI / 6, // Default 30° if not present
-            cooldownRemaining: cannonData.cooldownRemaining,
-          })),
+          port: update.shipData.cannons.port.map((cannonData) => {
+            const cannonIndicator = this.scene.add.graphics();
+            cannonIndicator.setDepth(10); // Above other elements
+            return {
+              sprite: this.scene.add.graphics(),
+              indicator: cannonIndicator,
+              relativePosition: {
+                x: cannonData.worldPosition.x - update.worldCoords.x,
+                y: cannonData.worldPosition.y - update.worldCoords.y,
+              },
+              controlledBy: cannonData.controlledBy,
+              aimAngle: cannonData.aimAngle,
+              elevationAngle: cannonData.elevationAngle || Math.PI / 6, // Default 30° if not present
+              cooldownRemaining: cannonData.cooldownRemaining,
+            };
+          }),
+          starboard: update.shipData.cannons.starboard.map((cannonData) => {
+            const cannonIndicator = this.scene.add.graphics();
+            cannonIndicator.setDepth(10); // Above other elements
+            return {
+              sprite: this.scene.add.graphics(),
+              indicator: cannonIndicator,
+              relativePosition: {
+                x: cannonData.worldPosition.x - update.worldCoords.x,
+                y: cannonData.worldPosition.y - update.worldCoords.y,
+              },
+              controlledBy: cannonData.controlledBy,
+              aimAngle: cannonData.aimAngle,
+              elevationAngle: cannonData.elevationAngle || Math.PI / 6, // Default 30° if not present
+              cooldownRemaining: cannonData.cooldownRemaining,
+            };
+          }),
         } : undefined,
         speedLevel: update.shipData.speedLevel,
         deckBoundary: update.shipData.deckBoundary,
@@ -355,6 +376,12 @@ export class ShipManager {
     this.shipRenderer.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`), 'sails', ship.rotation);
     this.shipRenderer.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast', ship.rotation);
 
+    // Draw grabable indicators (hover above control points when in range)
+    const currentTime = Date.now();
+    this.shipRenderer.drawGrabableIndicator(ship.controlPoints.wheel.indicator, ship.controlPoints.wheel, ship.sprite, ship.rotation, this.nearControlPoints.has(`${ship.id}:wheel`), currentTime);
+    this.shipRenderer.drawGrabableIndicator(ship.controlPoints.sails.indicator, ship.controlPoints.sails, ship.sprite, ship.rotation, this.nearControlPoints.has(`${ship.id}:sails`), currentTime);
+    this.shipRenderer.drawGrabableIndicator(ship.controlPoints.mast.indicator, ship.controlPoints.mast, ship.sprite, ship.rotation, this.nearControlPoints.has(`${ship.id}:mast`), currentTime);
+
     // c5x-ship-combat: Draw cannon control points
     if (ship.cannons) {
       ship.cannons.port.forEach((cannon, index) => {
@@ -364,6 +391,8 @@ export class ShipManager {
           this.getControllingCannon()?.side === 'port' &&
           this.getControllingCannon()?.index === index;
         this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.getCurrentCannonAim());
+        // Draw grabable indicator for cannon
+        this.shipRenderer.drawGrabableIndicator(cannon.indicator, cannon, ship.sprite, ship.rotation, isPlayerNear, currentTime);
       });
       ship.cannons.starboard.forEach((cannon, index) => {
         const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
@@ -372,6 +401,8 @@ export class ShipManager {
           this.getControllingCannon()?.side === 'starboard' &&
           this.getControllingCannon()?.index === index;
         this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.getCurrentCannonAim());
+        // Draw grabable indicator for cannon
+        this.shipRenderer.drawGrabableIndicator(cannon.indicator, cannon, ship.sprite, ship.rotation, isPlayerNear, currentTime);
       });
     }
 
@@ -453,6 +484,12 @@ export class ShipManager {
       this.shipRenderer.drawControlPoint(ship.controlPoints.sails.sprite, ship.controlPoints.sails, ship.sprite, this.nearControlPoints.has(`${ship.id}:sails`), 'sails', ship.rotation);
       this.shipRenderer.drawControlPoint(ship.controlPoints.mast.sprite, ship.controlPoints.mast, ship.sprite, this.nearControlPoints.has(`${ship.id}:mast`), 'mast', ship.rotation);
 
+      // Draw grabable indicators (hover above control points when in range)
+      const currentTime = Date.now();
+      this.shipRenderer.drawGrabableIndicator(ship.controlPoints.wheel.indicator, ship.controlPoints.wheel, ship.sprite, ship.rotation, this.nearControlPoints.has(`${ship.id}:wheel`), currentTime);
+      this.shipRenderer.drawGrabableIndicator(ship.controlPoints.sails.indicator, ship.controlPoints.sails, ship.sprite, ship.rotation, this.nearControlPoints.has(`${ship.id}:sails`), currentTime);
+      this.shipRenderer.drawGrabableIndicator(ship.controlPoints.mast.indicator, ship.controlPoints.mast, ship.sprite, ship.rotation, this.nearControlPoints.has(`${ship.id}:mast`), currentTime);
+
       // c5x-ship-combat: Draw cannon control points
       if (ship.cannons) {
         ship.cannons.port.forEach((cannon, index) => {
@@ -462,6 +499,8 @@ export class ShipManager {
             this.getControllingCannon()?.side === 'port' &&
             this.getControllingCannon()?.index === index;
           this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.getCurrentCannonAim());
+          // Draw grabable indicator for cannon
+          this.shipRenderer.drawGrabableIndicator(cannon.indicator, cannon, ship.sprite, ship.rotation, isPlayerNear, currentTime);
         });
         ship.cannons.starboard.forEach((cannon, index) => {
           const isPlayerNear = this.nearControlPoints.has(`${ship.id}:cannon-starboard-${index}`);
@@ -470,6 +509,8 @@ export class ShipManager {
             this.getControllingCannon()?.side === 'starboard' &&
             this.getControllingCannon()?.index === index;
           this.shipRenderer.drawCannon(cannon.sprite, cannon, ship.sprite, ship.rotation, isPlayerNear, isControlledByUs, this.getCurrentCannonAim());
+          // Draw grabable indicator for cannon
+          this.shipRenderer.drawGrabableIndicator(cannon.indicator, cannon, ship.sprite, ship.rotation, isPlayerNear, currentTime);
         });
       }
 

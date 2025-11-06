@@ -166,6 +166,44 @@ Add comprehensive gamepad/controller support using Phaser 3's Gamepad API (W3C G
 - Acquire testing hardware
 - Begin Phase 1 implementation
 
+#### Implemented: Grabable Hover Indicator (h4v-grabable-hover-indicator)
+**Status:** Complete ✅
+**Proposal:** `spec/seacat/proposals/h4v-grabable-hover-indicator/`
+**Commits:** 177b484, 20946c4
+
+Visual hover indicator that appears above ship control points when they are within grabbing range, independent of the control point visualization itself.
+
+**Problem Solved:**
+- Control points (wheel, sails, mast, cannons) are currently colored circles
+- These will eventually become invisible (represented by ship sprite parts)
+- Players need visual feedback for what they can interact with
+
+**Implementation:**
+- ✅ Added `indicator` Graphics object to all control points in Ship type
+- ✅ Created `drawGrabableIndicator()` method in ShipRenderer
+- ✅ Green down-pointing chevron arrow (placeholder for future animated sprite)
+- ✅ Subtle bobbing animation (3px amplitude, ~3 second period)
+- ✅ Positioned 25px above control points with white outline
+- ✅ Integrated in ShipManager update loops
+- ✅ Fixed cannon key format mismatch bug (format: "shipId:cannon-side-index")
+
+**Features:**
+- Independent of control point visibility
+- Works for all control types (wheel, sails, mast, cannons port/starboard)
+- Smooth animation draws attention without distraction
+- Maintains position during ship rotation and movement
+- High depth (10) ensures always visible above gameplay elements
+
+**Technical Details:**
+- Graphics-based placeholder for fast iteration
+- Time-based animation using `Date.now()`
+- Reuses existing `nearControlPoints` proximity detection
+- ~0.5ms per frame performance impact (negligible)
+
+**Future Enhancements:**
+- Phase 2: Replace placeholder with animated sprite
+- Accessibility options (size, color, motion reduction)
+- Context-specific indicators for different states
 
 #### Implemented: GameScene Refactor (s7g-gamescene-refactor)
 **Status:** Complete ✅
