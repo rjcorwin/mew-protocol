@@ -99,6 +99,74 @@ See `spec/seacat/SPEC.md` for complete game specification.
 
 ### Seacat
 
+#### Draft: Diamond Viewport & Diorama Framing (d7v-diamond-viewport)
+**Status:** Draft 📝
+**Proposal:** `spec/seacat/proposals/d7v-diamond-viewport/`
+
+Performance and aesthetic improvements to rendering system by limiting visible area to a diamond-shaped (rotated square) proximity zone around the player.
+
+**Planned Features:**
+- Square diamond render boundary (20×20 tiles, rotated 45°)
+- Diorama-style presentation with visible draw distance edges
+- Asymmetric border padding (more sky, less sea) for aesthetic balance
+- Static background image as foundation (sky/sea separation at horizon)
+- Configurable viewport size and borders for gameplay tuning
+- Dynamic window sizing based on viewport configuration
+- Future support for animated backgrounds (day/night cycle, weather)
+
+**Goals:**
+- Improve rendering performance by culling distant tiles/entities
+- Create aesthetically pleasing "model ship in a box" presentation
+- Enable future dynamic backgrounds without affecting world rendering
+- Maintain fair gameplay with consistent view distance for all players
+
+#### Proposed: Gamepad/Controller Support (g4p-controller-support)
+**Status:** Research Complete, Awaiting Review 📋
+**Proposal:** `spec/seacat/proposals/g4p-controller-support/`
+**Research:** `spec/seacat/proposals/g4p-controller-support/research.md`
+
+Add comprehensive gamepad/controller support using Phaser 3's Gamepad API (W3C Gamepad API wrapper).
+
+**Platforms:**
+- ✅ Web browsers (Chrome, Firefox, Edge)
+- ✅ Electron desktop (Windows, macOS, Linux)
+- ✅ Steam / Steam Deck
+
+**Supported Controllers:**
+- Xbox One/Series controllers
+- PlayStation DualShock 4/DualSense
+- Nintendo Switch Pro Controller
+- Generic USB gamepads
+- Steam Deck built-in controls
+
+**Planned Features:**
+- Full gameplay with controller-only (no keyboard/mouse required)
+- Analog stick movement and aiming
+- Ship steering and cannon control via gamepad
+- Controller-specific button prompts (e.g., "[A]" vs "[✕]")
+- Seamless keyboard ↔ controller switching
+- Multiple controller support for local multiplayer
+- Proper deadzone handling for analog sticks
+- Connect/disconnect handling
+
+**Implementation Phases:**
+- Phase 1: Foundation (basic character movement)
+- Phase 2: Ship Controls (steering, sails, cannons)
+- Phase 3: Input Abstraction (unified keyboard + gamepad system)
+- Phase 4: Polish (button prompts, settings, testing)
+- Phase 5: Multi-Controller (optional local multiplayer)
+- Phase 6: Steam Integration (optional Steam Input API)
+
+**Estimated Effort:** 2-3 weeks (Phases 1-4)
+
+**Next Steps:**
+- Review proposal and research
+- Answer open questions (rebinding, Steam API, multiplayer priority)
+- Create implementation plan
+- Acquire testing hardware
+- Begin Phase 1 implementation
+
+
 #### Implemented: GameScene Refactor (s7g-gamescene-refactor)
 **Status:** Complete ✅
 **Proposal:** `spec/seacat/proposals/s7g-gamescene-refactor/`

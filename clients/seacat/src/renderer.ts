@@ -88,6 +88,9 @@ function startGame(config: ConnectionConfig) {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
+    input: {
+      gamepad: true,
+    },
   };
 
   game = new Phaser.Game(phaserConfig);

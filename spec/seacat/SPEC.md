@@ -63,6 +63,7 @@ clients/seacat/src/game/
 │   ├── EffectsRenderer.ts   # VFX (cannon blasts, splashes, particles)
 │   ├── PlayerRenderer.ts     # 8-directional player animations
 │   ├── ShipRenderer.ts       # Ship sprites, control points, boundaries
+│   ├── ViewportRenderer.ts   # Diamond border & gradient background (d7v)
 │   └── WaterRenderer.ts      # Wave animation & height calculation
 │
 ├── input/                    # Input handling
@@ -74,8 +75,9 @@ clients/seacat/src/game/
 │   └── ShipCommands.ts       # Ship control protocol messages
 │
 └── utils/                    # Shared utilities
-    ├── Constants.ts          # Game constants (speeds, dimensions)
-    └── IsometricMath.ts      # Coordinate transforms & rotation
+    ├── Constants.ts          # Game constants (speeds, dimensions, viewport config)
+    ├── IsometricMath.ts      # Coordinate transforms & rotation
+    └── ViewportManager.ts    # Diamond culling & camera calculations (d7v)
 ```
 
 **Design Principles:**
@@ -142,6 +144,74 @@ export class GameScene extends Phaser.Scene {
 - No file exceeds 500 lines
 
 See `spec/seacat/proposals/s7g-gamescene-refactor/` for full refactor specification and implementation plan.
+
+### Rendering System: Diamond Viewport & Diorama Framing (d7v-diamond-viewport)
+
+The game uses a **diamond-shaped viewport** (square rotated 45°) that defines the visible play area, creating a distinctive "diorama" aesthetic with visible boundaries and static background layers. This system provides performance optimization through distance-based culling while establishing a unique visual identity.
+
+**Core Architecture:**
+
+**Diamond Viewport Configuration:**
+```typescript
+DIAMOND_SIZE_TILES: 35         // Square diamond (35×35 tiles)
+DIAMOND_BORDER_TOP_TILES: 7    // More space for sky (diamond positioned lower)
+DIAMOND_BORDER_BOTTOM_TILES: 1 // Less space for sea (diamond closer to bottom)
+DIAMOND_BORDER_LEFT_TILES: 3   // Symmetric sides
+DIAMOND_BORDER_RIGHT_TILES: 3
+```
+
+**Camera Positioning:**
+- Diamond positioned **below window center** for expanded sky area
+- Camera follow offset: `(topBorder - bottomBorder) / 2` pixels downward
+- Creates more visual space for atmospheric backgrounds
+- Player appears in lower portion of window with sky above
+
+**Background Layers (depth ordering):**
+1. **Gradient background** (depth -2000): Sky-to-sea gradient, horizon at 50% down
+2. **Custom background image** (depth -1000): PNG overlay, camera-fixed (scrollFactor 0)
+3. **Game world** (depth 0+): Tiles, ships, players, projectiles
+4. **Diamond border** (depth 100): Visual frame (rendered by ViewportRenderer)
+5. **UI elements** (depth 1000+): Health bars, interaction prompts
+
+**Visibility System - Border Frame with Motion Detection:**
+
+Instead of static fade zones, the viewport uses a **motion-reactive border frame system**:
+
+- **Core area** (inside diamond): Always fully visible (alpha 1.0)
+- **Border rows** (outside diamond): 3 rows with fixed opacity levels
+  - Row 1 (distance 1): 88% opacity
+  - Row 2 (distance 2): 45% opacity
+  - Row 3 (distance 3): 10% opacity
+- **Motion detection**: Border appears when player is moving
+- **Auto-fade**: Border fades out after ~1 second (60 frames) of no movement
+- **Smooth animation**: Tiles animate using 0.05 lerp factor (~20 frames at 60fps)
+
+**Performance Optimization:**
+- Only checks tiles within viewport + 3-tile margin (not entire map)
+- ~85% reduction in tile visibility checks on large maps
+- Entities use hard cutoff (no fade) to avoid ghostly appearance
+- Maintains 60 FPS with typical entity counts
+
+**Culling Implementation:**
+- **Tiles**: Animated fade with state tracking (MapManager)
+- **Ships**: Hard cutoff (ShipManager)
+- **Players**: Hard cutoff (PlayerManager)
+- **Projectiles**: Hard cutoff (ProjectileManager)
+
+**Files:**
+- `clients/seacat/src/game/utils/Constants.ts` - Viewport configuration
+- `clients/seacat/src/game/utils/ViewportManager.ts` - Diamond culling utilities
+- `clients/seacat/src/game/GameScene.ts` - Camera offset setup
+- `clients/seacat/src/game/rendering/ViewportRenderer.ts` - Border and gradient rendering
+- `clients/seacat/src/game/managers/MapManager.ts` - Border frame system implementation
+
+**Benefits:**
+- **Performance**: 50-70% reduction in tile rendering on large maps
+- **Visual Identity**: Unique "model ship in a box" diorama aesthetic
+- **Smooth Transitions**: No visual jitter from tile popping
+- **Future-Ready**: Foundation for dynamic backgrounds (weather, day/night cycle)
+
+See `spec/seacat/proposals/d7v-diamond-viewport/` for full specification and implementation details.
 
 ### Audio System
 
@@ -1498,3 +1568,165 @@ Client sends map navigation data to ship server.
    - Crew count affects reload speed
    - Wind direction affects projectile trajectory
    - Boarding actions (grappling hooks)
+
+---
+
+## Planned: Gamepad/Controller Support (g4p-controller-support)
+
+### Status
+**Proposal:** `spec/seacat/proposals/g4p-controller-support/`
+**Status:** Research Complete, Awaiting Review
+**Created:** 2025-11-03
+
+### Overview
+
+Add comprehensive gamepad/controller support to Seacat, enabling players to use Xbox, PlayStation, Nintendo Switch, and generic USB controllers across all deployment platforms (browsers, Electron desktop, Steam/Steam Deck). Implementation uses Phaser 3's Gamepad API, which wraps the W3C Gamepad API standard.
+
+### Current State
+
+The game currently supports keyboard-only input:
+- **Arrow keys** for character movement
+- **WASD** alternate movement (not yet implemented)
+- **E key** for interactions (board ship, grab controls)
+- **Space bar** for firing cannons
+- **Arrow keys** for ship steering and sail adjustment when controlling
+
+The 8-directional character movement system (from milestone 7) was **designed with controller support in mind**, using angle-based direction calculation that works identically for both digital (keyboard) and analog (gamepad stick) input sources.
+
+### Motivation
+
+**Player Experience:**
+- Controllers provide superior analog control for sailing and cannon aiming
+- Essential for Steam Deck compatibility
+- More comfortable for extended play sessions
+- Expected feature for couch gaming and console-like experiences
+
+**Platform Requirements:**
+- Steam Deck players expect native controller support
+- Many players prefer gamepad over keyboard/mouse for action games
+- Foundation for eventual Steam release
+
+**Technical Preparation:**
+- Movement system already supports 360° input quantized to 8 directions
+- Input handlers are modular and abstraction-ready
+- Phaser 3 provides excellent built-in gamepad support
+
+### Planned Features
+
+1. **Full Gameplay with Controller**
+   - All actions accessible without keyboard/mouse
+   - Character movement via left analog stick
+   - Ship steering via analog stick or D-pad
+   - Cannon aiming via right analog stick
+   - Face button interactions (A/Cross = interact, B/Circle = cancel)
+
+2. **Analog Control**
+   - Smooth stick-based movement (deadzone handling)
+   - Right stick cannon aiming (replaces mouse)
+   - Trigger buttons for firing cannons
+   - Bumpers for switching cannons
+
+3. **Platform Support**
+   - Web browsers (Chrome, Firefox, Edge)
+   - Electron desktop (Windows, macOS, Linux)
+   - Steam / Steam Deck
+   - Works with multiple controller types simultaneously
+
+4. **User Experience**
+   - Controller-specific button prompts ("Press [A]" vs "Press [✕]")
+   - Seamless keyboard ↔ controller switching
+   - Connect/disconnect handling
+   - Support for multiple controllers (local multiplayer foundation)
+
+### Control Mapping
+
+#### On Foot
+| Action | Keyboard | Controller |
+|--------|----------|-----------|
+| Move | Arrow Keys | Left Stick |
+| Interact | E | A (Xbox) / Cross (PS) |
+| Cancel | Escape | B (Xbox) / Circle (PS) |
+| Menu | M | Start |
+
+#### Ship Controls
+| Action | Keyboard | Controller |
+|--------|----------|-----------|
+| Steer Ship | A/D | Left Stick Horizontal |
+| Sails Up/Down | W/S | D-Pad Up/Down |
+| Walk on Deck | Arrow Keys | Left Stick |
+| Interact | E | A Button |
+
+#### Cannons
+| Action | Keyboard | Controller |
+|--------|----------|-----------|
+| Aim Cannon | Mouse | Right Stick |
+| Fire | Space | R2 Trigger |
+| Next/Prev Cannon | [ / ] | L1/R1 Bumpers |
+| Exit | Escape | B Button |
+
+### Implementation Phases
+
+See detailed proposal at `spec/seacat/proposals/g4p-controller-support/proposal.md`
+
+1. **Phase 1: Foundation** - Basic character movement with left stick
+2. **Phase 2: Ship Controls** - Steering, sails, and cannon controls
+3. **Phase 3: Input Abstraction** - Unified keyboard + gamepad system
+4. **Phase 4: Polish** - Button prompts, settings, multi-controller testing
+5. **Phase 5: Multi-Controller** (Optional) - Local multiplayer support
+6. **Phase 6: Steam Integration** (Optional) - Steam Input API
+
+**Estimated Effort:** 2-3 weeks (Phases 1-4)
+
+### Technical Approach
+
+**Core Technology:** W3C Gamepad API via Phaser 3 Input.Gamepad Plugin
+
+**Key Components:**
+- `InputManager.ts` - Unified input abstraction for keyboard + gamepad
+- `GamepadProvider.ts` - Gamepad state tracking and event handling
+- `KeyboardProvider.ts` - Keyboard input (refactored to use abstraction)
+- `ButtonPrompts.ts` - Controller-specific UI prompts
+
+**Deadzone Handling:**
+- Inner deadzone: 0.15 (ignore stick drift)
+- Outer deadzone: 0.95 (smooth to maximum)
+- Radial deadzone calculation (check magnitude, not per-axis)
+
+**State Tracking:**
+- Manual "just pressed" detection (Phaser gamepads don't provide it)
+- Per-frame button state comparison
+- Connection/disconnection event handling
+
+### Platform Compatibility
+
+| Platform | Technology | Status |
+|----------|-----------|--------|
+| Browser | W3C Gamepad API | ✅ Fully supported |
+| Electron | Chromium Gamepad API | ✅ Fully supported |
+| Steam | W3C Gamepad API | ✅ Basic support |
+| Steam (Enhanced) | Steam Input API | ⏳ Optional future |
+
+### Supported Controllers
+
+- Xbox One / Series X|S controllers
+- PlayStation DualShock 4 / DualSense
+- Nintendo Switch Pro Controller
+- Generic USB gamepads
+- Steam Deck built-in controls
+
+All controllers work via the W3C standard gamepad mapping.
+
+### Future Enhancements
+
+- **Controller rebinding** - Player-configurable button mappings
+- **Vibration/rumble** - Haptic feedback for cannon fire, impacts
+- **Steam Input API** - Enhanced Steam Deck features (gyro, trackpads, back buttons)
+- **Local multiplayer** - Multiple players with individual controllers
+
+### References
+
+- **Proposal:** `spec/seacat/proposals/g4p-controller-support/proposal.md`
+- **Research:** `spec/seacat/proposals/g4p-controller-support/research.md`
+- **CHANGELOG Entry:** See "Unreleased" section
+- **Phaser 3 Gamepad API:** https://docs.phaser.io/api-documentation/class/input-gamepad-gamepadplugin
+- **W3C Gamepad Spec:** https://w3c.github.io/gamepad/

@@ -71,8 +71,12 @@ export class PlayerInputHandler {
   private waterRenderer: WaterRenderer;
 
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+  private gamepad: (() => Phaser.Input.Gamepad.Gamepad | null) | null = null; // g4p Phase 1
   private lastFacing: Direction = 'south';
   private lastPlayerWaveOffset: number = 0;
+
+  // Deadzone for analog stick (g4p Phase 1)
+  private static readonly STICK_DEADZONE = 0.15;
 
   constructor(
     scene: Phaser.Scene,
@@ -94,6 +98,13 @@ export class PlayerInputHandler {
     this.playerRenderer = playerRenderer;
     this.waterRenderer = waterRenderer;
     this.cursors = cursors;
+  }
+
+  /**
+   * Set gamepad accessor function (g4p Phase 1)
+   */
+  public setGamepadAccessor(accessor: () => Phaser.Input.Gamepad.Gamepad | null): void {
+    this.gamepad = accessor;
   }
 
   /**
@@ -119,6 +130,27 @@ export class PlayerInputHandler {
   }
 
   /**
+   * Get gamepad left stick input with deadzone (g4p Phase 1)
+   * @returns stick vector or null if no gamepad/within deadzone
+   */
+  private getGamepadStick(): { x: number; y: number } | null {
+    if (!this.gamepad) return null;
+
+    const pad = this.gamepad();
+    if (!pad) return null;
+
+    const stick = pad.leftStick;
+    const length = Math.sqrt(stick.x * stick.x + stick.y * stick.y);
+
+    // Apply deadzone
+    if (length < PlayerInputHandler.STICK_DEADZONE) {
+      return null;
+    }
+
+    return { x: stick.x, y: stick.y };
+  }
+
+  /**
    * Handle player movement input and return velocity
    * @returns velocity vector for this frame
    */
@@ -131,27 +163,42 @@ export class PlayerInputHandler {
 
     // Only allow player movement if NOT currently controlling ship
     if (!controllingShip) {
-      // Isometric movement: screen-aligned controls (cardinal screen directions)
-      // Each arrow key moves straight in its screen direction by combining two diamond axes
-      // UP = north (straight up) = northwest + northeast
-      // RIGHT = east (straight right) = northeast + southeast
-      // DOWN = south (straight down) = southeast + southwest
-      // LEFT = west (straight left) = southwest + northwest
-      if (this.cursors.up?.isDown) {
-        velocity.x += ISO_NORTHWEST.x + ISO_NORTHEAST.x;
-        velocity.y += ISO_NORTHWEST.y + ISO_NORTHEAST.y;
-      }
-      if (this.cursors.right?.isDown) {
-        velocity.x += ISO_NORTHEAST.x + ISO_SOUTHEAST.x;
-        velocity.y += ISO_NORTHEAST.y + ISO_SOUTHEAST.y;
-      }
-      if (this.cursors.down?.isDown) {
-        velocity.x += ISO_SOUTHEAST.x + ISO_SOUTHWEST.x;
-        velocity.y += ISO_SOUTHEAST.y + ISO_SOUTHWEST.y;
-      }
-      if (this.cursors.left?.isDown) {
-        velocity.x += ISO_SOUTHWEST.x + ISO_NORTHWEST.x;
-        velocity.y += ISO_SOUTHWEST.y + ISO_NORTHWEST.y;
+      // g4p Phase 1: Check gamepad stick first (takes priority if detected)
+      const stickInput = this.getGamepadStick();
+
+      if (stickInput) {
+        // Gamepad stick input detected - convert to screen-space velocity
+        // Stick X = horizontal screen movement (left/right)
+        // Stick Y = vertical screen movement (up/down)
+        // Each screen direction combines isometric diamond axes
+        velocity.x = stickInput.x * (ISO_NORTHEAST.x + ISO_SOUTHEAST.x) +
+                     stickInput.y * (ISO_SOUTHEAST.x + ISO_SOUTHWEST.x);
+        velocity.y = stickInput.x * (ISO_NORTHEAST.y + ISO_SOUTHEAST.y) +
+                     stickInput.y * (ISO_SOUTHEAST.y + ISO_SOUTHWEST.y);
+      } else {
+        // No gamepad input - use keyboard
+        // Isometric movement: screen-aligned controls (cardinal screen directions)
+        // Each arrow key moves straight in its screen direction by combining two diamond axes
+        // UP = north (straight up) = northwest + northeast
+        // RIGHT = east (straight right) = northeast + southeast
+        // DOWN = south (straight down) = southeast + southwest
+        // LEFT = west (straight left) = southwest + northwest
+        if (this.cursors.up?.isDown) {
+          velocity.x += ISO_NORTHWEST.x + ISO_NORTHEAST.x;
+          velocity.y += ISO_NORTHWEST.y + ISO_NORTHEAST.y;
+        }
+        if (this.cursors.right?.isDown) {
+          velocity.x += ISO_NORTHEAST.x + ISO_SOUTHEAST.x;
+          velocity.y += ISO_NORTHEAST.y + ISO_SOUTHEAST.y;
+        }
+        if (this.cursors.down?.isDown) {
+          velocity.x += ISO_SOUTHEAST.x + ISO_SOUTHWEST.x;
+          velocity.y += ISO_SOUTHEAST.y + ISO_SOUTHWEST.y;
+        }
+        if (this.cursors.left?.isDown) {
+          velocity.x += ISO_SOUTHWEST.x + ISO_NORTHWEST.x;
+          velocity.y += ISO_SOUTHWEST.y + ISO_NORTHWEST.y;
+        }
       }
 
       // Normalize diagonal movement

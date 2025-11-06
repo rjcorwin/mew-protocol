@@ -53,3 +53,21 @@ export const ISO_NORTHEAST = { x: ISO_Y_AXIS.x / isoYLength, y: ISO_Y_AXIS.y / i
 export const ISO_SOUTHEAST = { x: ISO_X_AXIS.x / isoXLength, y: ISO_X_AXIS.y / isoXLength };
 export const ISO_SOUTHWEST = { x: -ISO_NORTHEAST.x, y: -ISO_NORTHEAST.y };
 export const ISO_NORTHWEST = { x: -ISO_SOUTHEAST.x, y: -ISO_SOUTHEAST.y };
+
+// Viewport configuration (d7v-diamond-viewport)
+export const VIEWPORT = {
+  // Square diamond viewport (rotated 45°)
+  DIAMOND_SIZE_TILES: 35,  // 35×35 tile square = larger diamond for better visibility
+
+  // Border padding (in tiles) - asymmetric for better aesthetics
+  DIAMOND_BORDER_TOP_TILES: 7,    // More space for sky (pulled diamond down)
+  DIAMOND_BORDER_BOTTOM_TILES: 1, // Less space for sea (diamond closer to bottom)
+  DIAMOND_BORDER_LEFT_TILES: 3,   // Symmetric sides
+  DIAMOND_BORDER_RIGHT_TILES: 3,
+
+  // Fade zone for smooth visibility transitions (smooth-visibility-transitions)
+  FADE_ZONE_TILES: 3,  // 3-tile fade zone at diamond edge for smooth transitions
+
+  // Aspect ratio (informational, not enforced)
+  TARGET_ASPECT_RATIO: 16 / 9,
+} as const;

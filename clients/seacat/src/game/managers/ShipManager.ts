@@ -7,6 +7,7 @@ import { PlayerManager } from './PlayerManager.js';
 import { EffectsRenderer } from '../rendering/EffectsRenderer.js';
 import * as IsoMath from '../utils/IsometricMath.js';
 import { Howl } from 'howler';
+import { ViewportManager } from '../utils/ViewportManager.js';
 
 /**
  * Manages ship lifecycle, synchronization, physics, and interactive elements.
@@ -551,5 +552,37 @@ export class ShipManager {
    */
   getShips(): Map<string, Ship> {
     return this.ships;
+  }
+
+  /**
+   * Updates visibility of ships based on diamond viewport culling (d7v-diamond-viewport)
+   * Uses hard cutoff (no fade) to avoid ghostly appearance
+   * Call this from GameScene.update() with player position
+   *
+   * @param centerX - Player world X coordinate (viewport center)
+   * @param centerY - Player world Y coordinate (viewport center)
+   */
+  updateVisibility(centerX: number, centerY: number): void {
+    for (const ship of this.ships.values()) {
+      const isVisible = ViewportManager.isInDiamond(
+        ship.sprite.x,
+        ship.sprite.y,
+        centerX,
+        centerY
+      );
+
+      // Update visibility for ship sprite and all related graphics
+      ship.sprite.setVisible(isVisible);
+      ship.boundaryGraphics.setVisible(isVisible);
+      ship.controlPoints.wheel.sprite.setVisible(isVisible);
+      ship.controlPoints.sails.sprite.setVisible(isVisible);
+      ship.controlPoints.mast.sprite.setVisible(isVisible);
+
+      // Update cannon visibility if present
+      if (ship.cannons) {
+        ship.cannons.port.forEach(c => c.sprite.setVisible(isVisible));
+        ship.cannons.starboard.forEach(c => c.sprite.setVisible(isVisible));
+      }
+    }
   }
 }
