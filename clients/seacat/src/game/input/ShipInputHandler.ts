@@ -447,7 +447,14 @@ export class ShipInputHandler {
 
         // Only show yellow if we're not controlling it (otherwise it will show red)
         if (!isControlledByUs) {
-          this.nearControlPoints.add(`${nearestControlPoint.shipId}:${nearestControlPoint.controlPoint}`);
+          // For cannons, include side and index in the key
+          if (nearestControlPoint.controlPoint === 'cannon' &&
+              nearestControlPoint.cannonSide !== undefined &&
+              nearestControlPoint.cannonIndex !== undefined) {
+            this.nearControlPoints.add(`${nearestControlPoint.shipId}:cannon-${nearestControlPoint.cannonSide}-${nearestControlPoint.cannonIndex}`);
+          } else {
+            this.nearControlPoints.add(`${nearestControlPoint.shipId}:${nearestControlPoint.controlPoint}`);
+          }
         }
       }
     }
