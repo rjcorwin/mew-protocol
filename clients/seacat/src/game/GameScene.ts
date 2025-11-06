@@ -197,7 +197,7 @@ export class GameScene extends Phaser.Scene {
     const maxY = (this.map.width + this.map.height - 1) * (TILE_HEIGHT / 2);
     camera.setBounds(minX, 0, maxX - minX, maxY);
     camera.startFollow(this.localPlayer, true, 0.1, 0.1);
-    camera.setZoom(1.5);
+    camera.setZoom(0.8); // Zoomed out for better projectile visibility
 
     // Create sound instances BEFORE managers that need them (c5x-ship-combat)
     // Howler.js works in Electron where Phaser's audio loader crashes

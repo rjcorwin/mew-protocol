@@ -706,7 +706,7 @@ export class ShipServer {
     // Calculate 3D velocity in ground-space
     const groundVx = horizontalSpeed * cos_azimuth;
     const groundVy = horizontalSpeed * sin_azimuth;
-    const heightVz = -verticalComponent; // Negative = upward (screen Y increases downward)
+    const heightVz = verticalComponent; // Positive = upward (heightZ increases upward)
 
     // Inherit ship's ground velocity (moving platform physics)
     // Note: Ship velocity is currently in screen-space (legacy), so we add it directly
@@ -805,7 +805,9 @@ export class ShipServer {
 
     const groundX = spawnGroundX + projectile.initialVelocity.groundVx * elapsed;
     const groundY = spawnGroundY + projectile.initialVelocity.groundVy * elapsed;
-    const heightZ = spawnHeightZ + projectile.initialVelocity.heightVz * elapsed + (0.5 * GRAVITY * elapsed * elapsed);
+    // Physics: heightVz decreases due to gravity (heightVz -= GRAVITY * t)
+    // Integrated: heightZ = h0 + v0*t - 0.5*g*t^2 (standard ballistic equation)
+    const heightZ = spawnHeightZ + projectile.initialVelocity.heightVz * elapsed - (0.5 * GRAVITY * elapsed * elapsed);
 
     // Convert back to screen coordinates
     const pos = {

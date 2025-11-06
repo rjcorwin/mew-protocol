@@ -166,7 +166,9 @@ export class ProjectileManager {
       proj.groundY += proj.groundVy * deltaS;
 
       // Update height (with gravity - only affects vertical component)
-      proj.heightVz += this.GRAVITY * deltaS; // Gravity accelerates downward (positive = down)
+      // Sign convention: heightVz > 0 = upward, heightZ > 0 = above ground
+      // Gravity reduces upward velocity (decelerates when going up, accelerates when going down)
+      proj.heightVz -= this.GRAVITY * deltaS; // Gravity decreases heightVz
       proj.heightZ += proj.heightVz * deltaS;
 
       // Convert ground position + height to screen coordinates for rendering
@@ -253,9 +255,9 @@ export class ProjectileManager {
       if (hitShip) return; // Skip water check if we hit a ship
 
       // Phase 2c: Check for water surface collision using 3D height
-      // ONLY check if: (1) past grace period AND (2) descending (heightVz > 0)
+      // ONLY check if: (1) past grace period AND (2) descending (heightVz < 0, since positive = upward)
       // Grace period prevents instant despawn from deck-level downward shots
-      if (age > proj.minFlightTime && proj.heightVz > 0) {
+      if (age > proj.minFlightTime && proj.heightVz < 0) {
         const tilePos = this.map.worldToTileXY(proj.sprite.x, proj.sprite.y);
         if (tilePos) {
           const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
