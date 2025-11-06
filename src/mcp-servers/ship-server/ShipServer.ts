@@ -672,6 +672,10 @@ export class ShipServer {
     const perpendicular = this.state.rotation + (isPort ? -Math.PI / 2 : Math.PI / 2);
     const fireAngle = perpendicular + cannon.aimAngle;
 
+    console.log(`[CANNON DEBUG] Ship rotation: ${(this.state.rotation * 180 / Math.PI).toFixed(1)}°`);
+    console.log(`[CANNON DEBUG] Side: ${side}, Perpendicular: ${(perpendicular * 180 / Math.PI).toFixed(1)}°`);
+    console.log(`[CANNON DEBUG] Aim angle: ${(cannon.aimAngle * 180 / Math.PI).toFixed(1)}°, Fire angle: ${(fireAngle * 180 / Math.PI).toFixed(1)}°`);
+
     // 3. Calculate velocity with elevation (Option 3: True 3D ballistics)
     const CANNON_SPEED = 300; // px/s total muzzle velocity
     const elevation = cannon.elevationAngle;
@@ -682,15 +686,44 @@ export class ShipServer {
     // Vertical component (upward, negative Y in screen space) = CANNON_SPEED * sin(elevation)
     const verticalComponent = CANNON_SPEED * Math.sin(elevation);
 
-    // Inherit ship velocity (moving platform physics)
-    // NOTE: We only inherit X velocity. The ship's Y velocity represents horizontal movement
-    // in 3D space (north/south on the map), not vertical elevation. The verticalComponent
-    // from cannon elevation represents true Z-axis velocity, so mixing ship.velocity.y
-    // would incorrectly affect the projectile's vertical arc in isometric screen space.
-    const vel: Velocity = {
-      x: Math.cos(fireAngle) * horizontalSpeed + this.state.velocity.x,
-      y: Math.sin(fireAngle) * horizontalSpeed - verticalComponent,
+    // TRUE 3D ISOMETRIC PHYSICS (p2v-projectile-velocity Option 2)
+    // Convert screen-space fireAngle to ground-space azimuth
+    const cos_fire = Math.cos(fireAngle);
+    const sin_fire = Math.sin(fireAngle);
+
+    // Transform screen direction to ground direction using isometric projection inverse
+    const cos_azimuth_unnorm = cos_fire + 2 * sin_fire;
+    const sin_azimuth_unnorm = 2 * sin_fire - cos_fire;
+
+    // Normalize to unit vector
+    const azimuth_norm = Math.sqrt(
+      cos_azimuth_unnorm * cos_azimuth_unnorm +
+      sin_azimuth_unnorm * sin_azimuth_unnorm
+    );
+    const cos_azimuth = cos_azimuth_unnorm / azimuth_norm;
+    const sin_azimuth = sin_azimuth_unnorm / azimuth_norm;
+
+    // Calculate 3D velocity in ground-space
+    const groundVx = horizontalSpeed * cos_azimuth;
+    const groundVy = horizontalSpeed * sin_azimuth;
+    const heightVz = -verticalComponent; // Negative = upward (screen Y increases downward)
+
+    // Inherit ship's ground velocity (moving platform physics)
+    // Note: Ship velocity is currently in screen-space (legacy), so we add it directly
+    // TODO: Convert ship velocity to ground-space as well in future refactor
+    const vel: import('./types.js').Velocity3D = {
+      groundVx: groundVx + this.state.velocity.x,
+      groundVy: groundVy + this.state.velocity.y,
+      heightVz: heightVz,
     };
+
+    console.log(`[CANNON DEBUG] ========== 3D BALLISTIC VELOCITY ==========`);
+    console.log(`[CANNON DEBUG] Fire angle (screen): ${(fireAngle * 180 / Math.PI).toFixed(1)}°`);
+    console.log(`[CANNON DEBUG] Ground azimuth: ${(Math.atan2(sin_azimuth, cos_azimuth) * 180 / Math.PI).toFixed(1)}°`);
+    console.log(`[CANNON DEBUG] Ground velocity: (${groundVx.toFixed(1)}, ${groundVy.toFixed(1)})`);
+    console.log(`[CANNON DEBUG] Height velocity: ${heightVz.toFixed(1)}`);
+    console.log(`[CANNON DEBUG] Ship velocity: (${this.state.velocity.x.toFixed(1)}, ${this.state.velocity.y.toFixed(1)})`);
+    console.log(`[CANNON DEBUG] Final 3D velocity: ground(${vel.groundVx.toFixed(1)}, ${vel.groundVy.toFixed(1)}), height ${vel.heightVz.toFixed(1)}`);
 
     // 4. Generate unique projectile ID
     const projectileId = `${this.state.participantId}-${side}-${index}-${now}`;
@@ -715,7 +748,7 @@ export class ShipServer {
 
     console.log(`  Projectile spawned at (${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)})`);
     console.log(`  Fire angle (horiz): ${(fireAngle * 180 / Math.PI).toFixed(1)}°, Elevation: ${(elevation * 180 / Math.PI).toFixed(1)}°`);
-    console.log(`  Initial velocity: (${vel.x.toFixed(1)}, ${vel.y.toFixed(1)}) px/s`);
+    console.log(`  Initial 3D velocity: ground(${vel.groundVx.toFixed(1)}, ${vel.groundVy.toFixed(1)}), height ${vel.heightVz.toFixed(1)} px/s`);
     console.log(`  Ship velocity: (${this.state.velocity.x.toFixed(1)}, ${this.state.velocity.y.toFixed(1)}) px/s`);
 
     return projectile;
@@ -759,13 +792,25 @@ export class ShipServer {
       return false;
     }
 
-    // Replay physics from spawn to claim timestamp
+    // Replay physics from spawn to claim timestamp using 3D ballistics
     const elapsed = (claimTimestamp - projectile.spawnTime) / 1000; // seconds
     const GRAVITY = 150; // Must match client
 
+    // Convert spawn position to ground coordinates (inverse isometric transform)
+    // Forward: screenX = groundX - groundY, screenY = (groundX + groundY) / 2 - heightZ
+    // Inverse: groundX = screenX/2 + screenY + heightZ, groundY = screenY - screenX/2 + heightZ
+    const spawnHeightZ = 0;
+    const spawnGroundX = projectile.spawnPosition.x / 2 + projectile.spawnPosition.y + spawnHeightZ;
+    const spawnGroundY = projectile.spawnPosition.y - projectile.spawnPosition.x / 2 + spawnHeightZ;
+
+    const groundX = spawnGroundX + projectile.initialVelocity.groundVx * elapsed;
+    const groundY = spawnGroundY + projectile.initialVelocity.groundVy * elapsed;
+    const heightZ = spawnHeightZ + projectile.initialVelocity.heightVz * elapsed + (0.5 * GRAVITY * elapsed * elapsed);
+
+    // Convert back to screen coordinates
     const pos = {
-      x: projectile.spawnPosition.x + projectile.initialVelocity.x * elapsed,
-      y: projectile.spawnPosition.y + projectile.initialVelocity.y * elapsed + (0.5 * GRAVITY * elapsed * elapsed)
+      x: groundX - groundY,
+      y: (groundX + groundY) / 2 - heightZ
     };
 
     // Check if replayed position is within TARGET ship's OBB
