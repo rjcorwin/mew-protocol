@@ -99,6 +99,52 @@ See `spec/seacat/SPEC.md` for complete game specification.
 
 ### Seacat
 
+#### Proposed: Gamepad/Controller Support (g4p-controller-support)
+**Status:** Research Complete, Awaiting Review 📋
+**Proposal:** `spec/seacat/proposals/g4p-controller-support/`
+**Research:** `spec/seacat/proposals/g4p-controller-support/research.md`
+
+Add comprehensive gamepad/controller support using Phaser 3's Gamepad API (W3C Gamepad API wrapper).
+
+**Platforms:**
+- ✅ Web browsers (Chrome, Firefox, Edge)
+- ✅ Electron desktop (Windows, macOS, Linux)
+- ✅ Steam / Steam Deck
+
+**Supported Controllers:**
+- Xbox One/Series controllers
+- PlayStation DualShock 4/DualSense
+- Nintendo Switch Pro Controller
+- Generic USB gamepads
+- Steam Deck built-in controls
+
+**Planned Features:**
+- Full gameplay with controller-only (no keyboard/mouse required)
+- Analog stick movement and aiming
+- Ship steering and cannon control via gamepad
+- Controller-specific button prompts (e.g., "[A]" vs "[✕]")
+- Seamless keyboard ↔ controller switching
+- Multiple controller support for local multiplayer
+- Proper deadzone handling for analog sticks
+- Connect/disconnect handling
+
+**Implementation Phases:**
+- Phase 1: Foundation (basic character movement)
+- Phase 2: Ship Controls (steering, sails, cannons)
+- Phase 3: Input Abstraction (unified keyboard + gamepad system)
+- Phase 4: Polish (button prompts, settings, testing)
+- Phase 5: Multi-Controller (optional local multiplayer)
+- Phase 6: Steam Integration (optional Steam Input API)
+
+**Estimated Effort:** 2-3 weeks (Phases 1-4)
+
+**Next Steps:**
+- Review proposal and research
+- Answer open questions (rebinding, Steam API, multiplayer priority)
+- Create implementation plan
+- Acquire testing hardware
+- Begin Phase 1 implementation
+
 #### Implemented: GameScene Refactor (s7g-gamescene-refactor)
 **Status:** Complete ✅
 **Proposal:** `spec/seacat/proposals/s7g-gamescene-refactor/`

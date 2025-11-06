@@ -1498,3 +1498,165 @@ Client sends map navigation data to ship server.
    - Crew count affects reload speed
    - Wind direction affects projectile trajectory
    - Boarding actions (grappling hooks)
+
+---
+
+## Planned: Gamepad/Controller Support (g4p-controller-support)
+
+### Status
+**Proposal:** `spec/seacat/proposals/g4p-controller-support/`
+**Status:** Research Complete, Awaiting Review
+**Created:** 2025-11-03
+
+### Overview
+
+Add comprehensive gamepad/controller support to Seacat, enabling players to use Xbox, PlayStation, Nintendo Switch, and generic USB controllers across all deployment platforms (browsers, Electron desktop, Steam/Steam Deck). Implementation uses Phaser 3's Gamepad API, which wraps the W3C Gamepad API standard.
+
+### Current State
+
+The game currently supports keyboard-only input:
+- **Arrow keys** for character movement
+- **WASD** alternate movement (not yet implemented)
+- **E key** for interactions (board ship, grab controls)
+- **Space bar** for firing cannons
+- **Arrow keys** for ship steering and sail adjustment when controlling
+
+The 8-directional character movement system (from milestone 7) was **designed with controller support in mind**, using angle-based direction calculation that works identically for both digital (keyboard) and analog (gamepad stick) input sources.
+
+### Motivation
+
+**Player Experience:**
+- Controllers provide superior analog control for sailing and cannon aiming
+- Essential for Steam Deck compatibility
+- More comfortable for extended play sessions
+- Expected feature for couch gaming and console-like experiences
+
+**Platform Requirements:**
+- Steam Deck players expect native controller support
+- Many players prefer gamepad over keyboard/mouse for action games
+- Foundation for eventual Steam release
+
+**Technical Preparation:**
+- Movement system already supports 360° input quantized to 8 directions
+- Input handlers are modular and abstraction-ready
+- Phaser 3 provides excellent built-in gamepad support
+
+### Planned Features
+
+1. **Full Gameplay with Controller**
+   - All actions accessible without keyboard/mouse
+   - Character movement via left analog stick
+   - Ship steering via analog stick or D-pad
+   - Cannon aiming via right analog stick
+   - Face button interactions (A/Cross = interact, B/Circle = cancel)
+
+2. **Analog Control**
+   - Smooth stick-based movement (deadzone handling)
+   - Right stick cannon aiming (replaces mouse)
+   - Trigger buttons for firing cannons
+   - Bumpers for switching cannons
+
+3. **Platform Support**
+   - Web browsers (Chrome, Firefox, Edge)
+   - Electron desktop (Windows, macOS, Linux)
+   - Steam / Steam Deck
+   - Works with multiple controller types simultaneously
+
+4. **User Experience**
+   - Controller-specific button prompts ("Press [A]" vs "Press [✕]")
+   - Seamless keyboard ↔ controller switching
+   - Connect/disconnect handling
+   - Support for multiple controllers (local multiplayer foundation)
+
+### Control Mapping
+
+#### On Foot
+| Action | Keyboard | Controller |
+|--------|----------|-----------|
+| Move | Arrow Keys | Left Stick |
+| Interact | E | A (Xbox) / Cross (PS) |
+| Cancel | Escape | B (Xbox) / Circle (PS) |
+| Menu | M | Start |
+
+#### Ship Controls
+| Action | Keyboard | Controller |
+|--------|----------|-----------|
+| Steer Ship | A/D | Left Stick Horizontal |
+| Sails Up/Down | W/S | D-Pad Up/Down |
+| Walk on Deck | Arrow Keys | Left Stick |
+| Interact | E | A Button |
+
+#### Cannons
+| Action | Keyboard | Controller |
+|--------|----------|-----------|
+| Aim Cannon | Mouse | Right Stick |
+| Fire | Space | R2 Trigger |
+| Next/Prev Cannon | [ / ] | L1/R1 Bumpers |
+| Exit | Escape | B Button |
+
+### Implementation Phases
+
+See detailed proposal at `spec/seacat/proposals/g4p-controller-support/proposal.md`
+
+1. **Phase 1: Foundation** - Basic character movement with left stick
+2. **Phase 2: Ship Controls** - Steering, sails, and cannon controls
+3. **Phase 3: Input Abstraction** - Unified keyboard + gamepad system
+4. **Phase 4: Polish** - Button prompts, settings, multi-controller testing
+5. **Phase 5: Multi-Controller** (Optional) - Local multiplayer support
+6. **Phase 6: Steam Integration** (Optional) - Steam Input API
+
+**Estimated Effort:** 2-3 weeks (Phases 1-4)
+
+### Technical Approach
+
+**Core Technology:** W3C Gamepad API via Phaser 3 Input.Gamepad Plugin
+
+**Key Components:**
+- `InputManager.ts` - Unified input abstraction for keyboard + gamepad
+- `GamepadProvider.ts` - Gamepad state tracking and event handling
+- `KeyboardProvider.ts` - Keyboard input (refactored to use abstraction)
+- `ButtonPrompts.ts` - Controller-specific UI prompts
+
+**Deadzone Handling:**
+- Inner deadzone: 0.15 (ignore stick drift)
+- Outer deadzone: 0.95 (smooth to maximum)
+- Radial deadzone calculation (check magnitude, not per-axis)
+
+**State Tracking:**
+- Manual "just pressed" detection (Phaser gamepads don't provide it)
+- Per-frame button state comparison
+- Connection/disconnection event handling
+
+### Platform Compatibility
+
+| Platform | Technology | Status |
+|----------|-----------|--------|
+| Browser | W3C Gamepad API | ✅ Fully supported |
+| Electron | Chromium Gamepad API | ✅ Fully supported |
+| Steam | W3C Gamepad API | ✅ Basic support |
+| Steam (Enhanced) | Steam Input API | ⏳ Optional future |
+
+### Supported Controllers
+
+- Xbox One / Series X|S controllers
+- PlayStation DualShock 4 / DualSense
+- Nintendo Switch Pro Controller
+- Generic USB gamepads
+- Steam Deck built-in controls
+
+All controllers work via the W3C standard gamepad mapping.
+
+### Future Enhancements
+
+- **Controller rebinding** - Player-configurable button mappings
+- **Vibration/rumble** - Haptic feedback for cannon fire, impacts
+- **Steam Input API** - Enhanced Steam Deck features (gyro, trackpads, back buttons)
+- **Local multiplayer** - Multiple players with individual controllers
+
+### References
+
+- **Proposal:** `spec/seacat/proposals/g4p-controller-support/proposal.md`
+- **Research:** `spec/seacat/proposals/g4p-controller-support/research.md`
+- **CHANGELOG Entry:** See "Unreleased" section
+- **Phaser 3 Gamepad API:** https://docs.phaser.io/api-documentation/class/input-gamepad-gamepadplugin
+- **W3C Gamepad Spec:** https://w3c.github.io/gamepad/

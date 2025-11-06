@@ -4,6 +4,7 @@ import { MEWClient } from '@mew-protocol/mew/client';
 import { Player, Ship, Direction, Projectile } from '../types.js';
 import * as Constants from './utils/Constants.js';
 import { CollisionManager } from './managers/CollisionManager.js';
+import { GamepadManager } from './managers/GamepadManager.js';
 import { MapManager } from './managers/MapManager.js';
 import { PlayerManager } from './managers/PlayerManager.js';
 import { ProjectileManager } from './managers/ProjectileManager.js';
@@ -52,6 +53,7 @@ export class GameScene extends Phaser.Scene {
   // Managers
   private mapManager!: MapManager;
   private collisionManager!: CollisionManager;
+  private gamepadManager!: GamepadManager;
   private playerManager!: PlayerManager;
   private projectileManager!: ProjectileManager;
   private shipManager!: ShipManager;
@@ -165,6 +167,10 @@ export class GameScene extends Phaser.Scene {
       this.waterLayer
     );
 
+    // Initialize gamepad manager (g4p-controller-support Phase 1)
+    this.gamepadManager = new GamepadManager(this);
+    this.gamepadManager.initialize();
+
     // Create graphics for shallow water overlay (renders on top of sand)
     this.shallowWaterGraphics = this.add.graphics();
     this.shallowWaterGraphics.setDepth(0.5); // Between ground (0) and ships (0)
@@ -274,6 +280,9 @@ export class GameScene extends Phaser.Scene {
     // Connect shipCommands to shipInputHandler
     (this.shipInputHandler as any).shipCommands = this.shipCommands;
 
+    // Connect gamepad to ship input handler (g4p Phase 1)
+    this.shipInputHandler.setGamepadAccessor(() => this.gamepadManager.getGamepad());
+
     // Initialize managers
     this.playerManager = new PlayerManager(this, this.map, this.groundLayer, this.secondLayer, this.waterRenderer, this.remotePlayers);
     this.projectileManager = new ProjectileManager(
@@ -319,6 +328,9 @@ export class GameScene extends Phaser.Scene {
       this.cursors
     );
 
+    // Connect gamepad to player input handler (g4p Phase 1)
+    this.playerInputHandler.setGamepadAccessor(() => this.gamepadManager.getGamepad());
+
     // Initialize network client
     this.networkClient = new NetworkClient(
       this.client,
@@ -340,6 +352,12 @@ export class GameScene extends Phaser.Scene {
     console.log(`Game started as ${this.playerId}`);
   }
 
+  /**
+   * Phaser game loop callback - runs every frame.
+   *
+   * @param time - Total elapsed time since game started (milliseconds)
+   * @param delta - Time elapsed since last frame (milliseconds)
+   */
   update(time: number, delta: number) {
     // Rendering
     this.waterRenderer.animateVisibleWaterTiles(time);
