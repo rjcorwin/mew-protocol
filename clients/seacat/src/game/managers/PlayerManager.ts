@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PositionUpdate, Player } from '../../types.js';
 import { WaterRenderer } from '../rendering/WaterRenderer.js';
+import { ViewportManager } from '../utils/ViewportManager.js';
 
 /**
  * Manages remote player lifecycle, synchronization, and rendering in the multiplayer game.
@@ -209,5 +210,26 @@ export class PlayerManager {
    */
   getRemotePlayers(): Map<string, Player> {
     return this.remotePlayers;
+  }
+
+  /**
+   * Updates visibility of remote players based on diamond viewport culling (d7v-diamond-viewport)
+   * Uses hard cutoff (no fade) to avoid ghostly appearance
+   * Call this from GameScene.update() with player position
+   *
+   * @param centerX - Player world X coordinate (viewport center)
+   * @param centerY - Player world Y coordinate (viewport center)
+   */
+  updateVisibility(centerX: number, centerY: number): void {
+    for (const player of this.remotePlayers.values()) {
+      const isVisible = ViewportManager.isInDiamond(
+        player.sprite.x,
+        player.sprite.y,
+        centerX,
+        centerY
+      );
+
+      player.sprite.setVisible(isVisible);
+    }
   }
 }

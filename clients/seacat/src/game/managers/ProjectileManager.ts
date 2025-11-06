@@ -5,6 +5,7 @@ import { EffectsRenderer } from '../rendering/EffectsRenderer.js';
 import { ShipCommands } from '../network/ShipCommands.js';
 import { TILE_VISUAL_HEIGHT } from '../utils/Constants.js';
 import { Howl } from 'howler';
+import { ViewportManager } from '../utils/ViewportManager.js';
 
 /**
  * Manages projectile lifecycle, physics simulation, and collision detection for ship combat.
@@ -257,5 +258,26 @@ export class ProjectileManager {
    */
   getProjectiles(): Map<string, Projectile> {
     return this.projectiles;
+  }
+
+  /**
+   * Updates visibility of projectiles based on diamond viewport culling (d7v-diamond-viewport)
+   * Uses hard cutoff (no fade) to avoid ghostly appearance
+   * Call this from GameScene.update() with player position
+   *
+   * @param centerX - Player world X coordinate (viewport center)
+   * @param centerY - Player world Y coordinate (viewport center)
+   */
+  updateVisibility(centerX: number, centerY: number): void {
+    for (const projectile of this.projectiles.values()) {
+      const isVisible = ViewportManager.isInDiamond(
+        projectile.sprite.x,
+        projectile.sprite.y,
+        centerX,
+        centerY
+      );
+
+      projectile.sprite.setVisible(isVisible);
+    }
   }
 }

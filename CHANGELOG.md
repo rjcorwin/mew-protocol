@@ -99,6 +99,27 @@ See `spec/seacat/SPEC.md` for complete game specification.
 
 ### Seacat
 
+#### Draft: Diamond Viewport & Diorama Framing (d7v-diamond-viewport)
+**Status:** Draft 📝
+**Proposal:** `spec/seacat/proposals/d7v-diamond-viewport/`
+
+Performance and aesthetic improvements to rendering system by limiting visible area to a diamond-shaped (rotated square) proximity zone around the player.
+
+**Planned Features:**
+- Square diamond render boundary (20×20 tiles, rotated 45°)
+- Diorama-style presentation with visible draw distance edges
+- Asymmetric border padding (more sky, less sea) for aesthetic balance
+- Static background image as foundation (sky/sea separation at horizon)
+- Configurable viewport size and borders for gameplay tuning
+- Dynamic window sizing based on viewport configuration
+- Future support for animated backgrounds (day/night cycle, weather)
+
+**Goals:**
+- Improve rendering performance by culling distant tiles/entities
+- Create aesthetically pleasing "model ship in a box" presentation
+- Enable future dynamic backgrounds without affecting world rendering
+- Maintain fair gameplay with consistent view distance for all players
+
 #### Proposed: Gamepad/Controller Support (g4p-controller-support)
 **Status:** Research Complete, Awaiting Review 📋
 **Proposal:** `spec/seacat/proposals/g4p-controller-support/`
@@ -144,6 +165,7 @@ Add comprehensive gamepad/controller support using Phaser 3's Gamepad API (W3C G
 - Create implementation plan
 - Acquire testing hardware
 - Begin Phase 1 implementation
+
 
 #### Implemented: GameScene Refactor (s7g-gamescene-refactor)
 **Status:** Complete ✅
