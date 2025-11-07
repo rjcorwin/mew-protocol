@@ -717,10 +717,16 @@ export class ShipServer {
       heightVz: heightVz,
     };
 
+    // Calculate total ground speed for debugging
+    const totalGroundSpeed = Math.sqrt(groundVx * groundVx + groundVy * groundVy);
+
     console.log(`[CANNON DEBUG] ========== 3D BALLISTIC VELOCITY ==========`);
+    console.log(`[CANNON DEBUG] Elevation angle: ${(elevation * 180 / Math.PI).toFixed(1)}°`);
     console.log(`[CANNON DEBUG] Fire angle (screen): ${(fireAngle * 180 / Math.PI).toFixed(1)}°`);
+    console.log(`[CANNON DEBUG] Horizontal speed (after elevation cos): ${horizontalSpeed.toFixed(1)}`);
+    console.log(`[CANNON DEBUG] Vertical component (after elevation sin): ${verticalComponent.toFixed(1)}`);
     console.log(`[CANNON DEBUG] Ground azimuth: ${(Math.atan2(sin_azimuth, cos_azimuth) * 180 / Math.PI).toFixed(1)}°`);
-    console.log(`[CANNON DEBUG] Ground velocity: (${groundVx.toFixed(1)}, ${groundVy.toFixed(1)})`);
+    console.log(`[CANNON DEBUG] Ground velocity: (${groundVx.toFixed(1)}, ${groundVy.toFixed(1)}) | magnitude: ${totalGroundSpeed.toFixed(1)}`);
     console.log(`[CANNON DEBUG] Height velocity: ${heightVz.toFixed(1)}`);
     console.log(`[CANNON DEBUG] Ship velocity: (${this.state.velocity.x.toFixed(1)}, ${this.state.velocity.y.toFixed(1)})`);
     console.log(`[CANNON DEBUG] Final 3D velocity: ground(${vel.groundVx.toFixed(1)}, ${vel.groundVy.toFixed(1)}), height ${vel.heightVz.toFixed(1)}`);
@@ -743,8 +749,8 @@ export class ShipServer {
     // 7. Auto-cleanup after 3 seconds (gives clients 1s grace period for validation)
     setTimeout(() => {
       this.activeProjectiles.delete(projectileId);
-      console.log(`Projectile ${projectileId} expired (3s lifetime)`);
-    }, 3000);
+      console.log(`Projectile ${projectileId} expired (5s lifetime)`);
+    }, 5000);
 
     console.log(`  Projectile spawned at (${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)})`);
     console.log(`  Fire angle (horiz): ${(fireAngle * 180 / Math.PI).toFixed(1)}°, Elevation: ${(elevation * 180 / Math.PI).toFixed(1)}°`);

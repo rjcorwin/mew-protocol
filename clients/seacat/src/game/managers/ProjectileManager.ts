@@ -52,7 +52,7 @@ import { Howl } from 'howler';
  */
 export class ProjectileManager {
   private readonly GRAVITY = 150; // px/s² (must match server)
-  private readonly LIFETIME = 2000; // ms
+  private readonly LIFETIME = 5000; // ms
 
   constructor(
     private scene: Phaser.Scene,
@@ -70,7 +70,7 @@ export class ProjectileManager {
     },
     private getOnShip: () => string | null,
     private shipCommands: ShipCommands
-  ) {}
+  ) { }
 
   /**
    * Spawn a projectile from a cannon (c5x-ship-combat Phase 2)
