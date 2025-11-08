@@ -1,7 +1,8 @@
 # Decision: Projectile Velocity Coordinate System (p2v-projectile-velocity)
 
-**Status:** Under Review
+**Status:** ✅ Implemented (Option 2)
 **Date:** 2025-11-06
+**Implementation Date:** 2025-11-08
 **Context:** c5x-ship-combat implementation revealed fundamental coordinate system mismatch
 
 ## Problem Statement
@@ -233,21 +234,33 @@ Fall back to **Option 1 (Simplified)** with explicit documentation that this is 
 
 ## Decision
 
-**TBD** - Awaiting stakeholder input
+**✅ Option 2 Selected and Implemented** - True 3D Isometric Physics
 
-**If Option 2 is approved:**
-- [ ] Create implementation plan
-- [ ] Update protocol spec
-- [ ] Implement server changes
-- [ ] Implement client changes
-- [ ] Add integration tests
-- [ ] Update CHANGELOG
+### Rationale
 
-**If Option 1 is chosen:**
-- [ ] Document limitation in code comments
-- [ ] Add issue to track future 3D physics work
-- [ ] Implement simplified formula
-- [ ] Update CHANGELOG
+We chose correctness over convenience. This is foundational game mechanics, and getting it right now prevents compounding technical debt and enables future features like terrain elevation, jumping, and multi-level maps.
+
+### Implementation Completed
+
+- [x] Create implementation plan
+- [x] Update protocol types (Velocity → Velocity3D with groundVx, groundVy, heightVz)
+- [x] Implement server changes (ShipServer.ts:689-719)
+- [x] Implement client changes (ProjectileManager.ts:163-172)
+- [x] Add server hit validation with physics replay (ShipServer.ts:784-870)
+- [x] Add height threshold validation (prevents high-arc exploits)
+- [x] Add unit tests for physics synchronization (ShipServer.test.ts)
+- [x] Update CHANGELOG
+
+### Additional Work: Server Hit Validation Sync
+
+During implementation, we discovered the server's hit validation was using an analytical ballistic formula while the client used iterative Euler integration. This could cause valid hits to be rejected or invalid hits to be accepted.
+
+**Fix applied:**
+- Server now uses iterative physics replay matching client's 60 FPS simulation
+- Added height threshold validation (`abs(heightZ) < 30px`) to prevent exploits
+- Created comprehensive unit tests (11 tests) ensuring physics stay synchronized
+
+See `implementation.md` for full details.
 
 ---
 
