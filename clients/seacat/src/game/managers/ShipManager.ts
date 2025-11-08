@@ -520,7 +520,9 @@ export class ShipManager {
       }
 
       // Phase 3: Draw health bar above ship
-      this.effectsRenderer.drawHealthBar(ship.sprite.x, ship.sprite.y - 40, ship.health, ship.maxHealth);
+      if (DEBUG_MODE) {
+        this.effectsRenderer.drawHealthBar(ship.sprite.x, ship.sprite.y - 40, ship.health, ship.maxHealth);
+      }
 
       // Phase 4: Apply sinking animation
       if (ship.sinking && ship.sinkStartTime > 0) {
