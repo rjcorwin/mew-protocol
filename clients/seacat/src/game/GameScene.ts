@@ -14,6 +14,7 @@ import { WaterRenderer } from './rendering/WaterRenderer.js';
 import { PlayerRenderer } from './rendering/PlayerRenderer.js';
 import { ShipRenderer } from './rendering/ShipRenderer.js';
 import { ViewportRenderer } from './rendering/ViewportRenderer.js';
+import { ShimmerRenderer } from './rendering/ShimmerRenderer.js';
 import { ViewportManager } from './utils/ViewportManager.js';
 import { ShipCommands } from './network/ShipCommands.js';
 import { NetworkClient } from './network/NetworkClient.js';
@@ -66,6 +67,7 @@ export class GameScene extends Phaser.Scene {
   private playerRenderer!: PlayerRenderer;
   private shipRenderer!: ShipRenderer;
   private viewportRenderer!: ViewportRenderer; // d7v-diamond-viewport
+  private shimmerRenderer!: ShimmerRenderer; // Animated shimmer particles
 
   // Network & Input
   private shipCommands!: ShipCommands;
@@ -198,6 +200,8 @@ export class GameScene extends Phaser.Scene {
     this.shipRenderer = new ShipRenderer(this);
     this.viewportRenderer = new ViewportRenderer(this); // d7v-diamond-viewport
     this.viewportRenderer.initialize();
+    this.shimmerRenderer = new ShimmerRenderer(this); // Animated shimmer particles
+    this.shimmerRenderer.initialize();
 
     // Create 8-direction walk animations
     this.playerRenderer.createPlayerAnimations();
@@ -390,6 +394,7 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number) {
     // Rendering
     this.waterRenderer.animateVisibleWaterTiles(time);
+    this.shimmerRenderer.update(time); // Animate shimmer particles
     this.playerInputHandler.updatePlayerDepth();
 
     // Local player input & movement
@@ -473,6 +478,7 @@ export class GameScene extends Phaser.Scene {
 
     // Also update background size on resize
     this.viewportRenderer?.updateBackgroundOnResize();
+    this.shimmerRenderer?.updateOnResize();
 
     console.log(`[d7v] Window: ${windowWidth}x${windowHeight}, Zoom: ${zoom.toFixed(2)}`);
   }

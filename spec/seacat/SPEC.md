@@ -171,9 +171,28 @@ DIAMOND_BORDER_RIGHT_TILES: 3
 **Background Layers (depth ordering):**
 1. **Gradient background** (depth -2000): Sky-to-sea gradient, horizon at 50% down
 2. **Custom background image** (depth -1000): PNG overlay, camera-fixed (scrollFactor 0)
-3. **Game world** (depth 0+): Tiles, ships, players, projectiles
-4. **Diamond border** (depth 100): Visual frame (rendered by ViewportRenderer)
-5. **UI elements** (depth 1000+): Health bars, interaction prompts
+3. **Shimmer particles** (depth -900): Animated underwater light effects (s8m-shimmer-particles)
+4. **Game world** (depth 0+): Tiles, ships, players, projectiles
+5. **Diamond border** (depth 100): Visual frame (rendered by ViewportRenderer)
+6. **UI elements** (depth 1000+): Health bars, interaction prompts
+
+**Shimmer Particle System (s8m-shimmer-particles):**
+
+Animated white particles that create underwater light shimmer effects in the water area:
+
+- **Particle Count**: 200 particles distributed across viewport width
+- **Boundary**: Constrained to water area (y >= 190px, below horizon line)
+- **Animation**: Time-based sine wave fading for smooth, frame-rate-independent twinkling
+- **Size**: Random 1-3 pixel radius per particle
+- **Speed**: Random 0.00015-0.0006 multiplier (slow, subtle twinkling)
+- **Opacity**: Random 0.2-0.9 maximum alpha (never fully opaque)
+- **Rendering**: Phaser Graphics, camera-fixed (scrollFactor 0)
+- **Glow Effect**: Particles > 2px include subtle glow for depth
+- **Responsive**: Automatically repositions on window resize
+
+The shimmer system replaces static dots from the background image, enabling dynamic animation that enhances the underwater atmosphere while respecting the horizon boundary.
+
+See `spec/seacat/proposals/s8m-shimmer-particles/` for complete specification.
 
 **Visibility System - Border Frame with Motion Detection:**
 
@@ -203,8 +222,9 @@ Instead of static fade zones, the viewport uses a **motion-reactive border frame
 **Files:**
 - `clients/seacat/src/game/utils/Constants.ts` - Viewport configuration
 - `clients/seacat/src/game/utils/ViewportManager.ts` - Diamond culling utilities
-- `clients/seacat/src/game/GameScene.ts` - Camera offset setup
+- `clients/seacat/src/game/GameScene.ts` - Camera offset setup, shimmer integration
 - `clients/seacat/src/game/rendering/ViewportRenderer.ts` - Border and gradient rendering
+- `clients/seacat/src/game/rendering/ShimmerRenderer.ts` - Animated shimmer particles (s8m)
 - `clients/seacat/src/game/managers/MapManager.ts` - Border frame system implementation
 
 **Benefits:**
