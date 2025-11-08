@@ -30,11 +30,21 @@ export interface Position {
 }
 
 /**
- * Velocity vector
+ * Velocity vector (2D screen-space, legacy)
  */
 export interface Velocity {
   x: number;
   y: number;
+}
+
+/**
+ * 3D velocity in isometric space (p2v-projectile-velocity)
+ * Separates ground movement from height/elevation
+ */
+export interface Velocity3D {
+  groundVx: number; // Ground X velocity (east/west movement on map)
+  groundVy: number; // Ground Y velocity (north/south movement on map)
+  heightVz: number; // Height velocity (up/down in 3D space, negative = upward)
 }
 
 /**
@@ -192,13 +202,14 @@ export interface FireCannonPayload {
 
 /**
  * Projectile data (c5x-ship-combat Phase 2)
+ * Updated to use 3D velocity (p2v-projectile-velocity)
  */
 export interface Projectile {
   id: string;
   sourceShip: string;
   spawnTime: number;
   spawnPosition: Position;
-  initialVelocity: Velocity;
+  initialVelocity: Velocity3D; // Changed from Velocity to Velocity3D
 }
 
 /**

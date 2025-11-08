@@ -157,11 +157,22 @@ export interface Ship {
 
 /**
  * Projectile entity managed by the game (c5x-ship-combat Phase 2)
+ * Updated to use 3D physics (p2v-projectile-velocity Option 2)
  */
 export interface Projectile {
   id: string;
   sprite: Phaser.GameObjects.Arc;
-  velocity: { x: number; y: number };
+
+  // Ground position and velocity (horizontal movement on isometric map)
+  groundX: number;
+  groundY: number;
+  groundVx: number;
+  groundVy: number;
+
+  // Height position and velocity (vertical elevation in 3D space)
+  heightZ: number; // Height above ground (0 = water/ground level)
+  heightVz: number; // Vertical velocity (negative = upward)
+
   spawnTime: number;
   sourceShip: string;
   minFlightTime: number; // Minimum ms before water collision can trigger (prevents instant despawn from deck-level firing)

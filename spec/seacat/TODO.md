@@ -1,7 +1,7 @@
 # To Do
 
 - [ ] Show control points above the ship sprite
-- [ ] Fix the bug in cannon tragectories (when pointing south with cannon all the way up, immediately hits water on firing but should be up in the air for a while)
+- [x] Fix the bug in cannon trajectories (when pointing south with cannon all the way up, immediately hits water on firing but should be up in the air for a while) - Fixed by removing ship Y-velocity inheritance from projectile calculations
 - [ ] Cannon ball shadows
 
 - [ ] controller support

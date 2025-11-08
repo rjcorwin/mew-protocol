@@ -53,7 +53,7 @@ import { ViewportManager } from '../utils/ViewportManager.js';
  */
 export class ProjectileManager {
   private readonly GRAVITY = 150; // px/s² (must match server)
-  private readonly LIFETIME = 2000; // ms
+  private readonly LIFETIME = 5000; // ms
 
   constructor(
     private scene: Phaser.Scene,
@@ -71,7 +71,7 @@ export class ProjectileManager {
     },
     private getOnShip: () => string | null,
     private shipCommands: ShipCommands
-  ) {}
+  ) { }
 
   /**
    * Spawn a projectile from a cannon (c5x-ship-combat Phase 2)
@@ -86,8 +86,17 @@ export class ProjectileManager {
       return;
     }
 
-    console.log(`[GameScene] Spawning projectile ${id} at (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
-    console.log(`  Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) px/s`);
+    // Convert spawn position to ground coordinates (inverse isometric transform)
+    // Forward: screenX = groundX - groundY, screenY = (groundX + groundY) / 2 - heightZ
+    // Inverse: groundX = screenX/2 + screenY + heightZ, groundY = screenY - screenX/2 + heightZ
+    const spawnHeightZ = 0; // Cannons fire from deck level (water surface)
+    const spawnGroundX = position.x / 2 + position.y + spawnHeightZ;
+    const spawnGroundY = position.y - position.x / 2 + spawnHeightZ;
+
+    console.log(`[GameScene] Spawning projectile ${id} at screen(${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
+    console.log(`  Ground position: (${spawnGroundX.toFixed(1)}, ${spawnGroundY.toFixed(1)}), height ${spawnHeightZ.toFixed(1)}`);
+    console.log(`  Ground velocity: (${velocity.groundVx.toFixed(1)}, ${velocity.groundVy.toFixed(1)}) px/s`);
+    console.log(`  Height velocity: ${velocity.heightVz.toFixed(1)} px/s`);
 
     // Create cannonball sprite (black circle, 8px diameter)
     const sprite = this.scene.add.circle(
@@ -99,11 +108,21 @@ export class ProjectileManager {
     );
     sprite.setDepth(100); // Above ships and players
 
-    // Store projectile
+    // Store projectile with 3D physics data
     const projectile: Projectile = {
       id,
       sprite,
-      velocity: { ...velocity }, // Copy velocity
+
+      // Initialize ground position and velocity
+      groundX: spawnGroundX,
+      groundY: spawnGroundY,
+      groundVx: velocity.groundVx,
+      groundVy: velocity.groundVy,
+
+      // Initialize height position and velocity
+      heightZ: spawnHeightZ,
+      heightVz: velocity.heightVz,
+
       spawnTime: timestamp,
       sourceShip,
       minFlightTime: 200, // 200ms grace period before water collision check (prevents instant despawn from deck-level shots)
@@ -142,12 +161,24 @@ export class ProjectileManager {
         return;
       }
 
-      // Apply gravity (downward acceleration)
-      proj.velocity.y += this.GRAVITY * deltaS;
+      // TRUE 3D PHYSICS (p2v-projectile-velocity Option 2)
+      // Update ground position (no gravity - only horizontal movement)
+      proj.groundX += proj.groundVx * deltaS;
+      proj.groundY += proj.groundVy * deltaS;
 
-      // Update position (Euler integration)
-      proj.sprite.x += proj.velocity.x * deltaS;
-      proj.sprite.y += proj.velocity.y * deltaS;
+      // Update height (with gravity - only affects vertical component)
+      // Sign convention: heightVz > 0 = upward, heightZ > 0 = above ground
+      // Gravity reduces upward velocity (decelerates when going up, accelerates when going down)
+      proj.heightVz -= this.GRAVITY * deltaS; // Gravity decreases heightVz
+      proj.heightZ += proj.heightVz * deltaS;
+
+      // Convert ground position + height to screen coordinates for rendering
+      // Isometric projection: screenX = groundX - groundY, screenY = (groundX + groundY) / 2 - heightZ
+      const screenX = proj.groundX - proj.groundY;
+      const screenY = (proj.groundX + proj.groundY) / 2 - proj.heightZ;
+
+      proj.sprite.x = screenX;
+      proj.sprite.y = screenY;
 
       // Phase 2c: Add smoke trail effect (30% chance per frame ~18 puffs/sec at 60fps)
       if (Math.random() < 0.3) {
@@ -175,6 +206,13 @@ export class ProjectileManager {
       ships.forEach((ship) => {
         if (ship.id === proj.sourceShip) return; // Don't hit own ship
         if (hitShip) return; // Already hit a ship this frame
+
+        // Only hit ships if projectile is at deck height (within threshold)
+        // This prevents high arcing shots from hitting ships they pass over
+        const DECK_HEIGHT_THRESHOLD = 30; // px tolerance for deck-level hits
+        if (Math.abs(proj.heightZ) > DECK_HEIGHT_THRESHOLD) {
+          return; // Projectile is too high or too low to hit ship
+        }
 
         // Use existing OBB collision with generous hitbox
         const hitboxPadding = 1.2; // 20% generous hitbox
@@ -217,35 +255,27 @@ export class ProjectileManager {
 
       if (hitShip) return; // Skip water check if we hit a ship
 
-      // Phase 2c: Check for water surface collision
-      // ONLY check if: (1) past grace period AND (2) descending
+      // Phase 2c: Check for water surface collision using 3D height
+      // ONLY check if: (1) past grace period AND (2) descending (heightVz < 0, since positive = upward)
       // Grace period prevents instant despawn from deck-level downward shots
-      if (age > proj.minFlightTime && proj.velocity.y > 0) {
+      if (age > proj.minFlightTime && proj.heightVz < 0) {
         const tilePos = this.map.worldToTileXY(proj.sprite.x, proj.sprite.y);
         if (tilePos) {
           const tile = this.groundLayer.getTileAt(Math.floor(tilePos.x), Math.floor(tilePos.y));
 
           if (tile && tile.properties?.navigable === true) {
-            // Projectile is over water - calculate water surface Y coordinate
-            const worldPos = this.map.tileToWorldXY(Math.floor(tilePos.x), Math.floor(tilePos.y));
-            if (worldPos) {
-              // Water surface is at the tile's world Y position
-              // Add half tile visual height to get the center/surface of the water tile
-              const waterSurfaceY = worldPos.y + (TILE_VISUAL_HEIGHT / 2);
+            // Over water - check if height has reached water surface (heightZ <= 0)
+            if (proj.heightZ <= 0) {
+              // HIT WATER! Show splash and despawn
+              this.effectsRenderer.createWaterSplash(proj.sprite.x, proj.sprite.y);
 
-              // Check if cannonball has hit the water (with small margin for cannonball radius)
-              if (proj.sprite.y >= waterSurfaceY - 5) {
-                // HIT WATER! Show splash and despawn
-                this.effectsRenderer.createWaterSplash(proj.sprite.x, proj.sprite.y);
+              // Phase 5: Play water splash sound (c5x-ship-combat)
+              this.sounds?.waterSplash?.play();
 
-                // Phase 5: Play water splash sound (c5x-ship-combat)
-                this.sounds?.waterSplash?.play();
-
-                proj.sprite.destroy();
-                this.projectiles.delete(id);
-                console.log(`[GameScene] Projectile ${id} hit water at (${proj.sprite.x.toFixed(1)}, ${proj.sprite.y.toFixed(1)}). Total: ${this.projectiles.size}`);
-                return;
-              }
+              proj.sprite.destroy();
+              this.projectiles.delete(id);
+              console.log(`[GameScene] Projectile ${id} hit water at ground(${proj.groundX.toFixed(1)}, ${proj.groundY.toFixed(1)}), screen(${proj.sprite.x.toFixed(1)}, ${proj.sprite.y.toFixed(1)}). Total: ${this.projectiles.size}`);
+              return;
             }
           }
         }
