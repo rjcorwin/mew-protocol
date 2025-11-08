@@ -1,6 +1,7 @@
 import { MEWClient } from '@mew-protocol/mew/client';
 import { ConnectionConfig } from './types.js';
 import { GameScene } from './game/GameScene.js';
+import { DEBUG_MODE } from './game/utils/Constants.js';
 import Phaser from 'phaser';
 
 let client: MEWClient | null = null;
@@ -81,7 +82,7 @@ function startGame(config: ConnectionConfig) {
       default: 'arcade',
       arcade: {
         gravity: { x: 0, y: 0 },
-        debug: false,
+        debug: DEBUG_MODE,
       },
     },
     scale: {
