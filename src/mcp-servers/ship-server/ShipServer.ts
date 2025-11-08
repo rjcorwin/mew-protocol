@@ -783,6 +783,7 @@ export class ShipServer {
 
   /**
    * Phase 3: Validate projectile hit using physics replay
+   * Uses iterative Euler integration to match client physics exactly
    */
   public validateProjectileHit(
     projectileId: string,
@@ -798,9 +799,12 @@ export class ShipServer {
       return false;
     }
 
-    // Replay physics from spawn to claim timestamp using 3D ballistics
+    // Replay physics from spawn to claim timestamp using iterative integration
+    // This matches the client's Euler integration approach (ProjectileManager.ts:163-172)
     const elapsed = (claimTimestamp - projectile.spawnTime) / 1000; // seconds
-    const GRAVITY = 150; // Must match client
+    const GRAVITY = 150; // Must match client (ProjectileManager.ts:54)
+    const DECK_HEIGHT_THRESHOLD = 30; // Must match client (ProjectileManager.ts:211)
+    const FRAME_TIME = 1 / 60; // Simulate at 60 FPS like client
 
     // Convert spawn position to ground coordinates (inverse isometric transform)
     // Forward: screenX = groundX - groundY, screenY = (groundX + groundY) / 2 - heightZ
@@ -809,11 +813,32 @@ export class ShipServer {
     const spawnGroundX = projectile.spawnPosition.x / 2 + projectile.spawnPosition.y + spawnHeightZ;
     const spawnGroundY = projectile.spawnPosition.y - projectile.spawnPosition.x / 2 + spawnHeightZ;
 
-    const groundX = spawnGroundX + projectile.initialVelocity.groundVx * elapsed;
-    const groundY = spawnGroundY + projectile.initialVelocity.groundVy * elapsed;
-    // Physics: heightVz decreases due to gravity (heightVz -= GRAVITY * t)
-    // Integrated: heightZ = h0 + v0*t - 0.5*g*t^2 (standard ballistic equation)
-    const heightZ = spawnHeightZ + projectile.initialVelocity.heightVz * elapsed - (0.5 * GRAVITY * elapsed * elapsed);
+    // Initialize simulation state
+    let groundX = spawnGroundX;
+    let groundY = spawnGroundY;
+    let heightZ = spawnHeightZ;
+    let heightVz = projectile.initialVelocity.heightVz;
+
+    // Simulate physics frame-by-frame using Euler integration (matches client)
+    const numSteps = Math.ceil(elapsed / FRAME_TIME);
+    const actualDt = elapsed / numSteps; // Actual timestep (may differ slightly from FRAME_TIME)
+
+    for (let i = 0; i < numSteps; i++) {
+      // Update ground position (no gravity - only horizontal movement)
+      groundX += projectile.initialVelocity.groundVx * actualDt;
+      groundY += projectile.initialVelocity.groundVy * actualDt;
+
+      // Update height (with gravity - only affects vertical component)
+      heightVz -= GRAVITY * actualDt; // Gravity decreases heightVz
+      heightZ += heightVz * actualDt;
+    }
+
+    // Check height threshold - projectile must be at deck level to hit
+    // This prevents high-arcing shots from hitting ships they pass over
+    if (Math.abs(heightZ) > DECK_HEIGHT_THRESHOLD) {
+      console.log(`Rejected hit claim: projectile ${projectileId} at heightZ ${heightZ.toFixed(1)} (threshold: ${DECK_HEIGHT_THRESHOLD})`);
+      return false;
+    }
 
     // Convert back to screen coordinates
     const pos = {
@@ -836,7 +861,7 @@ export class ShipServer {
     if (isHit) {
       // Mark projectile as consumed (prevent double-hit)
       this.activeProjectiles.delete(projectileId);
-      console.log(`Validated hit: projectile ${projectileId} at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) on target at (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)})`);
+      console.log(`Validated hit: projectile ${projectileId} at screen(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) ground(${groundX.toFixed(1)}, ${groundY.toFixed(1)}) height ${heightZ.toFixed(1)} on target at (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)})`);
     } else {
       console.log(`Rejected hit claim: projectile ${projectileId} at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) vs target at (${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)})`);
     }
