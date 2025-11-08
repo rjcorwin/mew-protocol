@@ -28,6 +28,8 @@ Ships are movable platforms implemented as MEW participants backed by a ship ser
 
 The game implements a hybrid coordinate system combining Cartesian physics with isometric rendering. **Server-side physics** use Cartesian coordinates (simple, proven approach used by industry-standard isometric games like StarCraft and Age of Empires). **Client-side rendering** uses isometric transforms for all visual elements, collision detection, and player movement input. This "cosmetic isometric" approach provides visual consistency while keeping physics simple.
 
+**Projectile Physics (p2v-projectile-velocity):** Cannon projectiles use a **3D coordinate system** that separates ground movement (groundX, groundY) from height (heightZ). This ensures gravity only affects vertical elevation, not horizontal ground movement, producing uniform trajectories in all directions. The server calculates 3D velocity using inverse isometric transforms to convert screen-space fire angles to ground-space azimuth angles. Both client and server simulate physics using identical iterative Euler integration to prevent desync. See Milestone 9 Phase 2 for detailed implementation.
+
 **Platform Coordinates:** The game also implements platform-relative coordinates to handle players on moving ships. World coordinates are absolute positions in the game world, while platform coordinates are relative offsets from a platform's origin point (used when standing on a ship). Each player's state includes a `platform_ref` field that is null when on solid ground or references a ship participant ID when aboard. When a player is on a ship, their world position is calculated as `ship.world_position + player.platform_offset` (using isometric rotation), recalculated every frame as the ship moves and rotates. Movement commands from players on ships are interpreted as relative movements within the ship's coordinate frame, with collision detection checking against the ship's deck boundaries (using isometric OBB) rather than world terrain. The rendering system uses isometric transforms to position players correctly on rotating platforms, ensuring players stay within visual ship bounds during rotation.
 
 ## Current Client Implementation
@@ -1039,20 +1041,118 @@ Add cannon-based ship combat enabling multiplayer PvP and cooperative multi-crew
 - `ShipParticipant.ts` - Message handlers for player control messages
 - `GameScene.ts` - Cannon rendering, input handling, visual feedback
 
-### Phase 2: Projectile Physics ✅ COMPLETE
+### Phase 2: Projectile Physics (p2v-projectile-velocity) ✅ COMPLETE
 
-**Ballistics System:**
-- Gravity: 150 px/s² (downward acceleration)
-- Initial velocity: ~300 px/s (based on elevation and aim angle)
-- Velocity inheritance: Projectiles inherit ship's velocity vector
-- Deterministic physics: Same equations on client and server
+**True 3D Isometric Ballistics:**
+
+Projectiles use a **3D coordinate system** that separates ground movement from height, ensuring uniform trajectories in all directions regardless of isometric projection.
+
+**Coordinate Separation:**
+- **Ground position** (groundX, groundY): Horizontal movement on the map plane
+- **Height** (heightZ): Vertical elevation affected by gravity
+- **Screen rendering**: Converts ground + height to isometric coordinates
+
+**Physics Constants:**
+- Gravity: 150 px/s² (only affects heightVz, not ground movement)
+- Initial speed: 300 px/s (before decomposition into horizontal/vertical components)
+- Deck height threshold: 30px (projectiles only hit ships at deck level)
+
+**Velocity Calculation (Server):**
+
+Server calculates 3D velocity in ground-space coordinates:
+
+```typescript
+// 1. Calculate fire direction (perpendicular to ship)
+const perpendicular = shipRotation + (isPort ? -π/2 : π/2);
+const fireAngle = perpendicular + cannon.aimAngle;
+
+// 2. Decompose into horizontal and vertical components
+const elevation = cannon.elevationAngle;
+const horizontalSpeed = CANNON_SPEED * cos(elevation);  // Ground-plane speed
+const verticalComponent = CANNON_SPEED * sin(elevation);  // Upward velocity
+
+// 3. Convert screen angle to ground azimuth (inverse isometric transform)
+const cos_fire = cos(fireAngle);
+const sin_fire = sin(fireAngle);
+const cos_azimuth = (cos_fire + 2 * sin_fire) / norm;
+const sin_azimuth = (2 * sin_fire - cos_fire) / norm;
+
+// 4. Calculate 3D velocity (includes ship velocity inheritance)
+velocity = {
+  groundVx: horizontalSpeed * cos_azimuth + ship.velocity.x,
+  groundVy: horizontalSpeed * sin_azimuth + ship.velocity.y,
+  heightVz: verticalComponent  // Positive = upward
+};
+```
+
+**Physics Simulation (Client):**
+
+Client simulates projectiles frame-by-frame at 60 FPS using iterative Euler integration:
+
+```typescript
+// Update ground position (NO gravity - horizontal only)
+proj.groundX += proj.groundVx * deltaS;
+proj.groundY += proj.groundVy * deltaS;
+
+// Update height (WITH gravity - vertical only)
+proj.heightVz -= GRAVITY * deltaS;  // Gravity decreases upward velocity
+proj.heightZ += proj.heightVz * deltaS;
+
+// Convert to screen coordinates for rendering
+proj.sprite.x = proj.groundX - proj.groundY;
+proj.sprite.y = (proj.groundX + proj.groundY) / 2 - proj.heightZ;
+```
+
+**Hit Validation (Server):**
+
+Server validates hits by replaying the exact physics simulation:
+
+```typescript
+// Iterative Euler integration (matches client's frame-by-frame simulation)
+const FRAME_TIME = 1 / 60;  // 60 FPS
+const numSteps = ceil(elapsed / FRAME_TIME);
+const dt = elapsed / numSteps;
+
+for (let i = 0; i < numSteps; i++) {
+  groundX += velocity.groundVx * dt;
+  groundY += velocity.groundVy * dt;
+  heightVz -= GRAVITY * dt;
+  heightZ += heightVz * dt;
+}
+
+// Height threshold check (prevents high-arc exploits)
+if (abs(heightZ) > DECK_HEIGHT_THRESHOLD) {
+  return false;  // Projectile too high or too low
+}
+```
+
+**Key Benefits:**
+- ✅ Uniform distances: All directions travel equal ground distance (~10-12 tiles)
+- ✅ Physically accurate: Gravity only affects height, not ground movement
+- ✅ Consistent trajectories: Same arc shape in all directions
+- ✅ Cheat-resistant: Server validates using same physics as client
+- ✅ Extensible: Enables future terrain elevation, multi-level maps
+
+**Why Iterative Integration (Not Analytical)?**
+
+Using the analytical ballistic formula `h = h₀ + v₀t - ½gt²` would diverge from the client's iterative Euler integration over time due to numerical precision differences. Server MUST use frame-by-frame simulation to match client exactly, preventing false hit rejections.
+
+**Constants Synchronization:**
+
+Critical that these constants stay synchronized between client and server:
+
+| Constant | Value | Client Location | Server Location |
+|----------|-------|-----------------|-----------------|
+| GRAVITY | 150 px/s² | ProjectileManager.ts:54 | ShipServer.ts:805 |
+| DECK_HEIGHT_THRESHOLD | 30 px | ProjectileManager.ts:211 | ShipServer.ts:806 |
+| CANNON_SPEED | 300 px/s | - | ShipServer.ts:680 |
 
 **Projectile Lifecycle:**
-1. Spawn at cannon muzzle position (rotated with ship)
-2. Server calculates initial velocity from aim/elevation angles
-3. Server broadcasts `game/projectile_spawn` to all clients
-4. All clients simulate identical physics (gravity + initial velocity)
-5. Lifetime: 2 seconds client-side, 3 seconds server-side (1s grace for validation)
+1. Spawn at cannon muzzle position (rotated with ship, converted to ground coordinates)
+2. Server calculates 3D velocity from aim/elevation angles using inverse isometric transform
+3. Server broadcasts `game/projectile_spawn` to all clients with Velocity3D
+4. All clients simulate identical physics using iterative Euler integration
+5. Lifetime: 2 seconds client-side, 5 seconds server-side (3s grace for validation)
 
 **Visual Effects:**
 - Cannonballs: Black circles (8px diameter, 4px radius)
@@ -1061,10 +1161,15 @@ Add cannon-based ship combat enabling multiplayer PvP and cooperative multi-crew
 - Water splash: Blue particles on water impact (8 particles)
 
 **Implementation:**
-- `ShipServer.ts:596-717` - Projectile spawn logic, physics constants
-- `GameScene.ts:759-796` - Projectile spawn handling
-- `GameScene.ts:1606-1721` - Client-side physics simulation
-- `GameScene.ts:800-863` - Visual effects (cannon blast, water splash, hit impact)
+- Server velocity calculation: `ShipServer.ts:689-719`
+- Server hit validation with physics replay: `ShipServer.ts:784-870`
+- Client physics simulation: `ProjectileManager.ts:163-172`
+- Client hit detection with height threshold: `ProjectileManager.ts:210-214`
+- Unit tests (11 tests verifying physics sync): `ShipServer.test.ts`
+- Visual effects: `EffectsRenderer.ts`
+
+**Related Proposals:**
+- `spec/seacat/proposals/p2v-projectile-velocity/` - Full specification and implementation details
 
 ### Phase 3: Damage & Health ✅ COMPLETE
 
@@ -1181,8 +1286,10 @@ Add cannon-based ship combat enabling multiplayer PvP and cooperative multi-crew
 ### Related Proposals
 
 - `c5x-ship-combat`: Full specification with 5 implementation phases
-- See detailed documentation in `spec/seacat/proposals/c5x-ship-combat/`
-- Implementation plan: `spec/seacat/proposals/c5x-ship-combat/implementation.md`
+- `p2v-projectile-velocity`: True 3D isometric projectile physics (Phase 2 implementation)
+- See detailed documentation in:
+  - `spec/seacat/proposals/c5x-ship-combat/` - Overall combat system
+  - `spec/seacat/proposals/p2v-projectile-velocity/` - Physics implementation details
 
 ### Phase 5: Polish & Sound Effects ⚠️ PARTIAL
 
