@@ -1,6 +1,6 @@
 {
   "name": "@mew-protocol/mew",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "MEW Protocol - Multi-Entity Workspace Protocol SDK and CLI",
   "type": "module",
   "bin": {
@@ -19,8 +19,6 @@
   "scripts": {
     "build": "tsc && chmod +x dist/cli/index.js",
     "build:bin": "tsup",
-    "build:seacat": "cd clients/seacat && npm install && npm run build",
-    "build:all": "npm run build && npm run build:bin && npm run build:seacat",
     "build:watch": "tsc --watch",
     "dev": "tsc --watch",
     "test": "vitest run",
@@ -36,7 +34,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "clean": "rm -rf dist && rm -f *.tsbuildinfo",
-    "prepublishOnly": "npm run clean && npm run build:all"
+    "prepublishOnly": "npm run clean && npm run build && npm run build:bin"
   },
   "keywords": [
     "mew",
@@ -92,12 +90,6 @@
   "files": [
     "dist",
     "templates",
-    "clients/seacat/dist",
-    "clients/seacat/src",
-    "clients/seacat/assets",
-    "clients/seacat/index.html",
-    "clients/seacat/package.json",
-    "clients/seacat/tsconfig.json",
     "README.md",
     "CHANGELOG.md"
   ],

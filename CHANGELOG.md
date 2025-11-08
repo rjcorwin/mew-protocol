@@ -1,318 +1,45 @@
-# CLI Changelog
+# MEW Protocol Changelog
 
-All notable changes to the MEW Protocol CLI will be documented in this file.
-
-## [0.6.2] - 2025-11-03
-
-### Fixed
-
-#### `mew seacat` Command - Missing Build Files
-**Critical bugfix for seacat client build**
-
-Fixed issue where `tsc` would show help text instead of compiling when building the seacat client. The npm package was missing the TypeScript source files and configuration.
-
-**Issue:** The package.json files list included `clients/seacat/dist` but not `clients/seacat/src` or `clients/seacat/tsconfig.json`. When users ran `mew seacat` for the first time, the build would fail because TypeScript couldn't find what to compile.
-
-**Fix:** Added to npm package:
-- `clients/seacat/src` - All TypeScript source files
-- `clients/seacat/tsconfig.json` - TypeScript configuration
-
-Now the seacat client can successfully rebuild from source if needed.
-
-## [0.6.1] - 2025-11-03
-
-### Fixed
-
-#### `mew seacat` Command - Dependency Installation
-**Critical bugfix for first-time launch after npm install**
-
-Fixed issue where `mew seacat` would fail with "tsc: command not found" when launched for the first time after installing via npm. The command now properly checks for and installs node_modules before attempting to build the seacat client.
-
-**Issue:** When the package is installed via npm, the seacat `dist/` directory is included but `node_modules/` are not. The previous version only checked if `dist/` existed, causing it to skip dependency installation and fail when trying to run build commands.
-
-**Fix:** Now checks for both `node_modules/` and `dist/` directories:
-- If `node_modules/` missing: runs `npm install`
-- If `dist/` missing after install: runs `npm run build`
-- Only then launches Electron
-
-This ensures a smooth first-run experience for users installing the package globally.
-
-## [0.6.0] - 2025-11-03
-
-### Added
-
-#### `mew seacat` Command
-**New CLI command to launch the Seacat multiplayer sailing game client**
-
-A new command that makes it easy to launch the Seacat game client directly from the mew CLI without navigating to the client directory.
-
-**Usage:**
-```bash
-mew seacat
-```
-
-**Features:**
-- 🚀 One-command launch of the Electron-based game client
-- 🔧 Auto-builds client on first run if not already built
-- 📦 Auto-installs dependencies if missing
-- 🎮 Seamless integration with MEW CLI ecosystem
-- 🛑 Graceful shutdown handling (Ctrl+C)
-
-**Package Updates:**
-- Added seacat client files to npm package distribution
-- New `build:seacat` script for building the game client
-- Updated `build:all` to include seacat in full build pipeline
-
-**Documentation:**
-- Added comprehensive command documentation to CLI spec
-- Usage examples and technical details included
-
-See `spec/cli/SPEC.md` for full documentation.
-
-### Seacat Game Client
-
-#### Included in Package
-The complete Seacat multiplayer sailing game is now included with the @mew-protocol/mew package:
-- 🐱 Cozy multiplayer isometric sailing game
-- ⛵ Ship control with realistic wheel steering
-- 💣 Ship-to-ship combat with cannons
-- 🎨 Refactored codebase with manager pattern architecture
-- 📦 Built with Electron, Phaser 3, and TypeScript
-
-**Game Features:**
-- Real-time multiplayer position synchronization
-- Multi-crew ship coordination
-- 8-directional character animations
-- Isometric rendering with pre-rendered 3D ship sprites
-- Combat system with physics-based projectiles
-- Sound effects (cannon fire, impacts, water splashes)
-
-**Technical Architecture:**
-- 15 focused modules (managers, renderers, input handlers, network)
-- Comprehensive JSDoc documentation
-- ~500 line orchestrator GameScene
-- Manager pattern for clean separation of concerns
-
-See `spec/seacat/SPEC.md` for complete game specification.
+All notable changes to the MEW Protocol will be documented in this file.
 
 ## [Unreleased]
 
-### Seacat
+### Next
 
-#### Draft: Diamond Viewport & Diorama Framing (d7v-diamond-viewport)
-**Status:** Draft 📝
-**Proposal:** `spec/seacat/proposals/d7v-diamond-viewport/`
+## [0.7.0] - 2025-11-08
 
-Performance and aesthetic improvements to rendering system by limiting visible area to a diamond-shaped (rotated square) proximity zone around the player.
+### Changed
 
-**Planned Features:**
-- Square diamond render boundary (20×20 tiles, rotated 45°)
-- Diorama-style presentation with visible draw distance edges
-- Asymmetric border padding (more sky, less sea) for aesthetic balance
-- Static background image as foundation (sky/sea separation at horizon)
-- Configurable viewport size and borders for gameplay tuning
-- Dynamic window sizing based on viewport configuration
-- Future support for animated backgrounds (day/night cycle, weather)
+#### Seacat Graduated to Standalone Repository
+**Seacat game is now an independent project!** 🎉
 
-**Goals:**
-- Improve rendering performance by culling distant tiles/entities
-- Create aesthetically pleasing "model ship in a box" presentation
-- Enable future dynamic backgrounds without affecting world rendering
-- Maintain fair gameplay with consistent view distance for all players
+The Seacat multiplayer sailing game has been moved to its own repository at [github.com/rjcorwin/seacat](https://github.com/rjcorwin/seacat).
 
-#### Proposed: Gamepad/Controller Support (g4p-controller-support)
-**Status:** Research Complete, Awaiting Review 📋
-**Proposal:** `spec/seacat/proposals/g4p-controller-support/`
-**Research:** `spec/seacat/proposals/g4p-controller-support/research.md`
+**What changed:**
+- Removed `mew seacat` command from CLI
+- Removed `clients/seacat/` directory
+- Removed `spec/seacat/` directory
+- Removed `templates/seacat/` template
+- Removed `src/mcp-servers/ship-server/` (moved to seacat repo)
+- Removed seacat-related build scripts and package.json entries
 
-Add comprehensive gamepad/controller support using Phaser 3's Gamepad API (W3C Gamepad API wrapper).
+**For Seacat users:**
+- Clone the new repository: `git clone https://github.com/rjcorwin/seacat.git`
+- Follow setup instructions in the seacat repo's README
+- Seacat continues to use MEW Protocol as a dependency (`@mew-protocol/mew`)
 
-**Platforms:**
-- ✅ Web browsers (Chrome, Firefox, Edge)
-- ✅ Electron desktop (Windows, macOS, Linux)
-- ✅ Steam / Steam Deck
+This change allows both projects to evolve independently while maintaining seacat as a demonstration of MEW Protocol's capabilities for real-time multiplayer games.
 
-**Supported Controllers:**
-- Xbox One/Series controllers
-- PlayStation DualShock 4/DualSense
-- Nintendo Switch Pro Controller
-- Generic USB gamepads
-- Steam Deck built-in controls
+For seacat's full history, see the seacat repository's CHANGELOG or mew-protocol versions 0.6.0-0.6.2.
 
-**Planned Features:**
-- Full gameplay with controller-only (no keyboard/mouse required)
-- Analog stick movement and aiming
-- Ship steering and cannon control via gamepad
-- Controller-specific button prompts (e.g., "[A]" vs "[✕]")
-- Seamless keyboard ↔ controller switching
-- Multiple controller support for local multiplayer
-- Proper deadzone handling for analog sticks
-- Connect/disconnect handling
+---
 
-**Implementation Phases:**
-- Phase 1: Foundation (basic character movement)
-- Phase 2: Ship Controls (steering, sails, cannons)
-- Phase 3: Input Abstraction (unified keyboard + gamepad system)
-- Phase 4: Polish (button prompts, settings, testing)
-- Phase 5: Multi-Controller (optional local multiplayer)
-- Phase 6: Steam Integration (optional Steam Input API)
+## [0.6.2] - 2025-11-03
 
-**Estimated Effort:** 2-3 weeks (Phases 1-4)
+### Note
+This version and v0.6.0-0.6.1 were seacat-specific releases. Seacat has now graduated to its own repository. See v0.7.0 changelog above.
 
-**Next Steps:**
-- Review proposal and research
-- Answer open questions (rebinding, Steam API, multiplayer priority)
-- Create implementation plan
-- Acquire testing hardware
-- Begin Phase 1 implementation
-
-#### Implemented: Grabable Hover Indicator (h4v-grabable-hover-indicator)
-**Status:** Complete ✅
-**Proposal:** `spec/seacat/proposals/h4v-grabable-hover-indicator/`
-**Commits:** 177b484, 20946c4
-
-Visual hover indicator that appears above ship control points when they are within grabbing range, independent of the control point visualization itself.
-
-**Problem Solved:**
-- Control points (wheel, sails, mast, cannons) are currently colored circles
-- These will eventually become invisible (represented by ship sprite parts)
-- Players need visual feedback for what they can interact with
-
-**Implementation:**
-- ✅ Added `indicator` Graphics object to all control points in Ship type
-- ✅ Created `drawGrabableIndicator()` method in ShipRenderer
-- ✅ Green down-pointing chevron arrow (placeholder for future animated sprite)
-- ✅ Subtle bobbing animation (3px amplitude, ~3 second period)
-- ✅ Positioned 25px above control points with white outline
-- ✅ Integrated in ShipManager update loops
-- ✅ Fixed cannon key format mismatch bug (format: "shipId:cannon-side-index")
-
-**Features:**
-- Independent of control point visibility
-- Works for all control types (wheel, sails, mast, cannons port/starboard)
-- Smooth animation draws attention without distraction
-- Maintains position during ship rotation and movement
-- High depth (10) ensures always visible above gameplay elements
-
-**Technical Details:**
-- Graphics-based placeholder for fast iteration
-- Time-based animation using `Date.now()`
-- Reuses existing `nearControlPoints` proximity detection
-- ~0.5ms per frame performance impact (negligible)
-
-**Future Enhancements:**
-- Phase 2: Replace placeholder with animated sprite
-- Accessibility options (size, color, motion reduction)
-- Context-specific indicators for different states
-
-#### Implemented: GameScene Refactor (s7g-gamescene-refactor)
-**Status:** Complete ✅
-**Proposal:** `spec/seacat/proposals/s7g-gamescene-refactor/`
-**Implementation Plan:** `spec/seacat/proposals/s7g-gamescene-refactor/IMPLEMENTATION_PLAN.md`
-
-Refactored the monolithic GameScene.ts (2603 lines) into 15 focused, maintainable modules using the manager pattern.
-
-**Completed:**
-- ✅ GameScene.ts reduced from 2603 lines to ~500 lines (orchestrator pattern)
-- ✅ 15 single-responsibility modules extracted:
-  - `managers/` - CollisionManager, MapManager, PlayerManager, ProjectileManager, ShipManager
-  - `rendering/` - EffectsRenderer, PlayerRenderer, ShipRenderer, WaterRenderer
-  - `input/` - PlayerInputHandler, ShipInputHandler
-  - `network/` - NetworkClient, ShipCommands
-  - `utils/` - Constants, IsometricMath
-- ✅ Comprehensive JSDoc documentation for all public APIs
-- ✅ TypeScript compilation with no errors
-- ✅ All game features working identically (no regressions)
-- ✅ No performance degradation observed
-
-**Implementation Phases:**
-- Phase 1 (Foundation): ✅ Utils & Constants
-- Phase 2 (Low-Dependency): ✅ Collision & Map managers
-- Phase 3 (Rendering): ✅ All 4 renderers
-- Phase 4 (Game Logic): ✅ All 3 core managers
-- Phase 5 (Input & Network): ✅ All 4 modules
-- Phase 6 (Documentation): ✅ JSDoc for all modules
-- Phase 7 (Testing): ⏸️ Unit tests deferred to future iteration
-
-**Benefits Realized:**
-- Drastically improved code organization and maintainability
-- Clear separation of concerns enables parallel development
-- Easier to locate and modify specific functionality
-- Foundation for future testing infrastructure
-
-#### Implemented: Ship-to-Ship Combat (c5x-ship-combat)
-**Status:** Complete ✅ (All 5 Phases)
-**Proposal:** `spec/seacat/proposals/c5x-ship-combat/`
-**Implementation Plan:** `spec/seacat/proposals/c5x-ship-combat/implementation.md`
-
-Full cannon-based ship combat for multiplayer PvP and cooperative multi-crew gameplay.
-
-**Features Implemented:**
-- ✅ Cannon control points (3 per side: port/starboard)
-- ✅ Manual aiming system (±45° arc adjustment)
-- ✅ Physics-based projectiles (gravity, momentum inheritance)
-- ✅ Damage/health system (100 HP, sinking at 0)
-- ✅ Hit detection with client claims & server validation
-- ✅ Visual effects (cannonball trails, explosions, water splash, damage smoke)
-- ✅ Audio effects (5 sounds via Howler.js: cannon fire, impact, splash, sinking, respawn)
-- ✅ Ship sinking animation and respawn mechanics
-- ✅ Multi-crew coordination support
-
-**Implementation Phases:**
-- Phase 1 (Control points & aiming): ✅ COMPLETE
-- Phase 2 (Firing & projectiles): ✅ COMPLETE
-- Phase 3 (Collision & damage): ✅ COMPLETE
-- Phase 4 (Sinking & respawn): ✅ COMPLETE
-- Phase 5 (Polish & sounds): ✅ COMPLETE
-
-**New Protocol Messages:**
-- `ship/aim_cannon` - Adjust cannon aim angle
-- `ship/fire_cannon` - Fire cannonball
-- `game/projectile_spawn` - Broadcast projectile creation
-- `game/projectile_hit` - Client hit claim
-- `ship/damage` - Damage notification
-- `ship/respawn` - Ship respawn after sinking
-
-**Technical Notes:**
-- Audio system uses Howler.js instead of Phaser audio (Phaser's XHR loader crashes in Electron)
-- Solution: HTML5 Audio + absolute file paths via `window.location.href`
-- All 5 combat sounds working in Electron production builds
-- Friendly fire disabled (ships can't damage themselves)
-- Ships respawn at original spawn location after 5 seconds
-- No speed penalty for damaged ships (keeps gameplay smooth)
-
-#### Implemented: Tiled Map Integration (t4m)
-**Status:** Complete ✅
-**Proposal:** `spec/seacat/proposals/t4m-tiled-maps/`
-
-Add support for Tiled Map Editor (.tmj) files with tile-based collision detection and gameplay properties.
-
-**Features:**
-- ✅ Load isometric maps from Tiled Map Editor (JSON format)
-- ✅ Multiple layer support (Ground, Water, Obstacles)
-- ✅ Tile-based collision detection (O(1) lookups)
-- ✅ Map boundary enforcement (prevent off-map movement)
-- ✅ Tile properties: walkable (bool), speedModifier (float), terrain (string)
-- ✅ Water tiles reduce speed to 50% (swimming mechanics)
-- ✅ Wall tiles block movement completely
-- ✅ Procedural tileset generation (5 terrain types)
-- ✅ Multiplayer position synchronization maintained
-
-**Implementation:**
-- Phase 3a ✅: Tiled map loading with procedural tileset
-- Phase 3b ✅: Tile-based collision with boundary enforcement
-- Phase 3c ✅: Water speed modification and tile properties
-- Phase 3d: Multiplayer testing (ready for testing)
-
-**Files Added:**
-- `clients/seacat/assets/maps/example-map.tmj` - Example 20×20 map
-- `clients/seacat/assets/maps/tilesets/terrain.tsj` - Terrain tileset definition
-- `clients/seacat/assets/maps/README.md` - Map creation guide
-- `spec/seacat/proposals/t4m-tiled-maps/` - Complete proposal
-
-**Files Modified:**
-- `clients/seacat/src/game/GameScene.ts` - Map loading, collision, rendering
-- `spec/seacat/implementation-plan.md` - Milestone 3 complete
+---
 
 ## [v0.5.1] - 2025-01-06
 

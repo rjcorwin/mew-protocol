@@ -104,6 +104,18 @@ See [docs/README.md](docs/README.md) for complete documentation including:
 - [All Specifications](spec/README.md) - Complete spec hub
 - [Changelog](CHANGELOG.md)
 
+## 🎮 Example: Seacat Game
+
+Want to see MEW Protocol in action? Check out [**Seacat**](https://github.com/rjcorwin/seacat) - a cozy multiplayer sailing game built on MEW Protocol!
+
+**Seacat** demonstrates how game clients can participate in MEW spaces for real-time multiplayer coordination:
+- 🐱⛵ Multiplayer sailing with cats as crew
+- 💣 Ship-to-ship combat with cannons
+- 🗺️ Tiled map exploration
+- 👥 Multi-crew ship coordination
+
+Seacat uses MEW Protocol for game state synchronization, showing how the protocol works beyond traditional AI agent use cases.
+
 ## 🐈 Why "MEW"?
 
 The name playfully evokes "herding cats" 🐈‍⬛🐈🐈‍⬛ - the quintessential challenge of coordinating multiple independent, autonomous agents. MEW Protocol provides the framework to bring order to this chaos, teaching the "cats" to work together effectively in a shared workspace. 🌠
