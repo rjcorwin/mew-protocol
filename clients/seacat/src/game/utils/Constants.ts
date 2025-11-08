@@ -71,3 +71,8 @@ export const VIEWPORT = {
   // Aspect ratio (informational, not enforced)
   TARGET_ASPECT_RATIO: 16 / 9,
 } as const;
+
+// Debug mode configuration (v9d-debug-visualization)
+// Set to true to show debug visualizations (ship boundary boxes, grabbable indicators)
+// Set to false for clean production visuals
+export const DEBUG_MODE = false;
