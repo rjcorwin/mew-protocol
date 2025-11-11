@@ -80,6 +80,7 @@ Provides low-level WebSocket connectivity and message handling for the MEW Proto
 ### Responsibilities
 - **Connection Management**: Connect, disconnect, reconnect to gateway
 - **Message Transport**: Send and receive envelopes
+- **Envelope Normalization**: Auto-populate protocol metadata and enforce correlation array semantics
 - **Protocol Compliance**: Ensure messages follow MEW Protocol format
 - **Event System**: Emit events for message types
 - **Heartbeat**: Maintain connection with periodic heartbeats
@@ -100,24 +101,33 @@ interface ClientOptions {
   capabilities?: Capability[];  // Initial capabilities
 }
 
+interface StreamFrame {
+  streamId: string;
+  payload: string;
+}
+
 class MEWClient extends EventEmitter {
   constructor(options: ClientOptions);
-  
+
   // Connection management
   connect(): Promise<void>;
   disconnect(): void;
-  
+
   // Message handling
   send(envelope: Envelope | PartialEnvelope): void;
-  
+  sendStreamData(streamId: string, payload: string | Buffer): void;
+
   // Event handlers (for subclasses)
   onConnected(handler: () => void): void;
   onDisconnected(handler: () => void): void;
   onMessage(handler: (envelope: Envelope) => void): void;
   onWelcome(handler: (data: any) => void): void;
   onError(handler: (error: Error) => void): void;
+  onStreamData(handler: (frame: StreamFrame) => void): void;
 }
 ```
+
+`MEWClient` normalizes every outbound envelope before transmission. Missing protocol metadata (`protocol`, `id`, `ts`, `from`) is filled automatically and `correlation_id` MUST already be an array or the client throws. If a `participant_id` is not supplied via options the constructor synthesizes a stable identifier of the form `client-<timestamp>-<random>`, ensuring the gateway receives a unique participant for join/leave bookkeeping. After the WebSocket opens the client immediately sends a JSON `{ type: "join", space, token, participantId, capabilities }` handshake so gateway implementations do not need bespoke SDK coordination code.
 
 ### State Management
 - `disconnected`: Not connected to gateway
@@ -133,12 +143,14 @@ class MEWClient extends EventEmitter {
 - `welcome`: Welcome message received
 - `error`: Error occurred
 - `reconnecting`: Attempting to reconnect
+- `stream/data`: Stream frame received (also mirrored to `stream/data/<streamId>`)
 
 ### Stream Support
 
 - Raw WebSocket frames prefixed with `#streamId#` are detected automatically
 - The client emits `stream/data` and `stream/data/<streamId>` events carrying `{ streamId, payload }`
-- `sendStreamData(streamId, payload)` writes framed chunks back to the gateway
+- `onStreamData(handler)` subscribes to decoded `StreamFrame` events (fired for both the generic and stream-specific channels)
+- `sendStreamData(streamId, payload)` writes framed chunks back to the gateway (string or Buffer payloads supported)
 - Envelope-based stream negotiations (`stream/request`, `stream/open`, `stream/close`) continue to flow through the standard
   `message` event pipeline
 
@@ -227,40 +239,55 @@ interface ParticipantOptions extends ClientOptions {
 type MCPProposalHandler = (envelope: Envelope) => Promise<void>;
 type MCPRequestHandler = (envelope: Envelope) => Promise<void>;
 
+interface DiscoveredTool {
+  name: string;
+  participantId: string;
+  description?: string;
+  inputSchema?: any;
+}
+
 class MEWParticipant {
   constructor(options: ParticipantOptions);
-  
+
   // Connection (delegates to client)
   connect(): Promise<void>;
   disconnect(): void;
-  
+
   // Tool & Resource Management
   registerTool(tool: Tool): void;
   registerResource(resource: Resource): void;
-  
+
   // Tool Discovery
-  discoverTools(participantId: string): Promise<Tool[]>;
-  getAvailableTools(): Tool[];
+  discoverTools(participantId: string): Promise<DiscoveredTool[]>;
+  getAvailableTools(): DiscoveredTool[];
   enableAutoDiscovery(): void;
-  
+
   // Capability checking
   canSend(envelope: Partial<Envelope>): boolean;
-  
+
   // Smart MCP request routing (uses mcp/request or mcp/proposal based on capabilities)
   mcpRequest(
     target: string | string[],
     payload: any,
     timeoutMs?: number
   ): Promise<any>;
-  
+  withdrawProposal(proposalId: string, reason?: string): void;
+
   // Direct messaging
-  chat(text: string, to?: string | string[]): void;
-  
+  chat(text: string, to?: string | string[], format?: 'plain' | 'markdown'): void;
+  acknowledgeChat(messageId: string, target?: string | string[] | null, status?: string): void;
+  cancelChat(messageId: string, target?: string | string[], reason?: string): void;
+
   // MCP event handlers
   onMCPProposal(handler: MCPProposalHandler): () => void;
   onMCPRequest(handler: MCPRequestHandler): () => void;
   onParticipantJoin(handler: (participant: any) => void): () => void;
-  
+
+  // Telemetry & control helpers
+  requestParticipantStatus(target: string | string[], fields?: string[]): void;
+  requestStream(payload: StreamRequestPayload, target?: string | string[]): string;
+  sendStreamData(streamId: string, data: string): void;
+
   // Lifecycle hooks (for subclasses)
   protected onReady(): Promise<void>;
   protected onShutdown(): Promise<void>;
@@ -268,6 +295,12 @@ class MEWParticipant {
 ```
 
 ### Key Features
+
+#### Pause-aware messaging
+`MEWParticipant` overrides `send()` to be `async` and respect pause directives. When a `participant/pause` envelope is active the
+SDK logs a warning and drops outbound traffic except for a small allow list (`participant/status`, `chat/acknowledge`,
+`participant/resume`, etc.). This matches the runtime behavior where paused participants must remain quiescent without throwing
+errors in user code that may not have pause awareness yet.
 
 #### Capability Checking
 The `canSend()` method uses the capability matcher to evaluate if a participant can send a specific message:
@@ -294,6 +327,10 @@ The `mcpRequest()` method automatically chooses the appropriate mechanism for MC
 1. If has `mcp/request` capability for the payload → send directly
 2. If has `mcp/proposal` capability → create proposal with the payload
 3. Otherwise → reject with error
+
+When the SDK falls back to proposals it tracks the pending fulfillment and will automatically emit `mcp/withdraw` with
+`payload.reason = "timeout"` if the promise times out. Fulfillments are correlated back to the original proposal so callers see
+the final `result`/`error` even when another participant executes the request on their behalf.
 
 Example:
 ```typescript
@@ -350,6 +387,7 @@ When a participant lacks capability for direct requests:
   - Use when: Timeout reached, found alternative solution, or no longer needed
   - Example: Proposer times out after 30s and sends withdrawal
   - **IMPORTANT**: Other participants CANNOT withdraw someone else's proposals
+  - The SDK exposes `withdrawProposal(proposalId, reason?)` to perform this action safely (no-op if proposal already settled)
 - **Rejection** (`mcp/reject`): Target participant declines to fulfill
   - Can be sent by any participant (typically those addressed in `to` field)
   - Use when: Unsafe operation, busy, or lacks capability
@@ -393,13 +431,13 @@ interface ParticipantDiscoveryStatus {
 }
 
 // Discovered tools stored by participant
-discoveredTools: Map<string, Tool[]>;
+discoveredTools: Map<string, DiscoveredTool[]>;
 participantDiscoveryStatus: Map<string, ParticipantDiscoveryStatus>;
 
 // Tool cache with TTL
 toolCache: {
   participant: string;
-  tools: Tool[];
+  tools: DiscoveredTool[];
   timestamp: number;
   ttl: number;
 }[];
@@ -449,13 +487,14 @@ class HumanInterface extends MEWParticipant {
 
 #### Chat Acknowledgement Helpers
 
-- `acknowledgeChat(messageId, target, status?)` wraps `chat/acknowledge` envelopes for UIs that track pending chat work
+- `chat(text, to?, format?)` emits chat envelopes with automatic capability checks; the optional `format` defaults to `"plain"` but supports `"markdown"` for rich text payloads
+- `acknowledgeChat(messageId, target, status?)` wraps `chat/acknowledge` envelopes for UIs that track pending chat work (default status = `"received"`; omitting `target` broadcasts)
 - `cancelChat(messageId, target?, reason?)` emits `chat/cancel` to clear stale tasks (used by the CLI `/cancel` command)
 - Incoming `chat` messages automatically update context usage counters so telemetry stays accurate
 
 #### Participant Control Lifecycle
 
-- Pause envelopes update internal `pauseState`; non-exempt outbound traffic throws until resumed or timeout expires
+- Pause envelopes update internal `pauseState`; non-exempt outbound traffic is suppressed with a warning until resumed or timeout expires
 - Resume clears the pause and automatically publishes a `participant/status` update noting the transition
 - Forget, clear, restart, and shutdown envelopes call overridable hooks (`onForget`, `onClear`, `onRestart`, `onShutdown`)
   so subclasses can drop scratchpads or reload models before the SDK reports completion
@@ -474,7 +513,7 @@ class HumanInterface extends MEWParticipant {
 
 #### Stream Lifecycle Helpers
 
-- `requestStream(payload, target?)` sends `stream/request` and tracks pending negotiations until `stream/open` arrives
+- `requestStream(payload, target?)` sends `stream/request`, returns the request envelope ID, and tracks pending negotiations until `stream/open` arrives
 - Active streams are recorded with metadata (description, open envelope ID, last activity) to aid CLI visualizations
 - The participant listens for `stream/open`/`stream/close` to keep bookkeeping accurate and leverages the client’s
   `sendStreamData`/`onStreamData` APIs for raw frame transfer
