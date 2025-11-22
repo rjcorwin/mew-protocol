@@ -132,7 +132,7 @@ fi
 printf "\n%b\n" "${YELLOW}Test: Read file via MCP${NC}"
 read_envelope_id=$(generate_envelope_id)
 : > "${RESPONSE_CAPTURE}"
-read_request=$(python - "$read_envelope_id" <<'PY'
+read_request=$(python3 - "$read_envelope_id" <<'PY'
 import json
 import os
 import sys
@@ -167,7 +167,7 @@ fi
 printf "\n%b\n" "${YELLOW}Test: List directory entries${NC}"
 list_dir_envelope_id=$(generate_envelope_id)
 : > "${RESPONSE_CAPTURE}"
-list_request=$(python - "$list_dir_envelope_id" <<'PY'
+list_request=$(python3 - "$list_dir_envelope_id" <<'PY'
 import json
 import os
 import sys
