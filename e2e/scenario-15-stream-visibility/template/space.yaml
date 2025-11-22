@@ -1,0 +1,33 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 15 - Stream Visibility on Join"
+  description: "Validate that late joiners see active streams in welcome message"
+
+participants:
+  client-a:
+    tokens: ["client-a-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/*"
+      - kind: "participant/status"
+    output_log: "./logs/client-a.log"
+    auto_connect: true
+
+  client-b:
+    tokens: ["client-b-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/*"
+      - kind: "participant/status"
+    output_log: "./logs/client-b.log"
+
+  client-c:
+    tokens: ["client-c-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "participant/status"
+    output_log: "./logs/client-c.log"
+
+defaults:
+  capabilities:
+    - kind: "chat"

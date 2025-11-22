@@ -814,6 +814,14 @@ When a participant connects, the gateway MUST send a welcome message addressed s
           {"kind": "chat"}
         ]
       }
+    ],
+    "active_streams": [
+      {
+        "stream_id": "stream-42",
+        "owner": "agent-1",
+        "direction": "upload",
+        "created": "2025-01-09T10:00:00Z"
+      }
     ]
   }
 }
@@ -821,6 +829,12 @@ When a participant connects, the gateway MUST send a welcome message addressed s
 
 - `you`: The joining participant's own information and authoritative capabilities
 - `participants`: Current list of other participants in the space and their capabilities
+- `active_streams` (optional): Array of currently active streams in the space. Each stream object contains:
+  - `stream_id`: Unique identifier for the stream
+  - `owner`: Participant ID that requested the stream
+  - `direction`: "upload" or "download"
+  - `created`: ISO 8601 timestamp when the stream was opened
+  - May be omitted or empty array if no streams are active
 
 **Important:** Other participants SHOULD ignore welcome messages not addressed to them when constructing prompts, as these can cause significant bloat. The message is already targeted via the `to` field.
 

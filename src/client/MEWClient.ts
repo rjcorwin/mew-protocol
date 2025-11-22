@@ -218,6 +218,13 @@ export class MEWClient extends EventEmitter {
     if (message.kind === 'system/welcome') {
       this.state = 'ready';
       this.emit('welcome', message.payload);
+
+      // Process active streams if present (j8v proposal)
+      if (message.payload?.active_streams && Array.isArray(message.payload.active_streams)) {
+        for (const stream of message.payload.active_streams) {
+          this.emit('stream/active', stream);
+        }
+      }
       return;
     }
 

@@ -936,6 +936,14 @@ gateway
             participantCapabilities.set(participantId, capabilities);
 
             // Send welcome message per MEW v0.2 spec
+            // Include active streams per [j8v] proposal
+            const activeStreams = Array.from(space.activeStreams.entries()).map(([streamId, info]) => ({
+              stream_id: streamId,
+              owner: info.participantId,
+              direction: info.direction,
+              created: info.created
+            }));
+
             const welcomeMessage = {
               protocol: 'mew/v0.4',
               id: `welcome-${Date.now()}`,
@@ -954,6 +962,7 @@ gateway
                     id: pid,
                     capabilities: participantCapabilities.get(pid) || [],
                   })),
+                active_streams: activeStreams,
               },
             };
 
