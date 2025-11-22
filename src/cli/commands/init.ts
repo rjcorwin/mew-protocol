@@ -264,7 +264,8 @@ class InitCommand {
     }
 
     // Non-interactive mode - use default template
-    if (!process.stdin.isTTY) {
+    // Check both stdin and stdout - if either is not a TTY, we can't do interactive prompts
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
       return templates.find(t => t.name === 'coder-agent') || templates[0];
     }
 
@@ -295,7 +296,8 @@ class InitCommand {
     }
 
     // Non-interactive mode - use default theme
-    if (!process.stdin.isTTY) {
+    // Check both stdin and stdout - if either is not a TTY, we can't do interactive prompts
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
       return 'neon-pulse';
     }
 
@@ -702,8 +704,9 @@ class InitCommand {
   }
 
   async promptVariable(variable, dirname, defaultValue = null) {
-    // Check if stdin is a TTY (interactive)
-    if (!process.stdin.isTTY) {
+    // Check if stdin and stdout are TTYs (interactive)
+    // If either is not a TTY, we can't do interactive prompts
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
       // Non-interactive mode - use default
       return defaultValue || this.resolveSpecialVariable(variable.default, dirname);
     }
