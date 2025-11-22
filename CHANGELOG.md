@@ -6,6 +6,19 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ### Next
 
+#### [j8v] Stream Visibility on Join (Done)
+**Proposal:** `spec/protocol/proposals/j8v-stream-visibility/`
+**Status:** Done
+
+**Problem:** When a participant joins a space with active streams, they don't receive information about those streams in their welcome message. This creates a visibility gap where new joiners receive stream data frames (`#streamID#data`) without context about what streams exist.
+
+**Solution:** Include active streams in the `system/welcome` payload so new participants have full visibility into ongoing streams.
+
+**Changes:**
+- Protocol: Add `active_streams` field to `system/welcome` payload
+- Gateway: Include stream metadata when sending welcome message
+- Client: Process active stream information on join
+
 ## [0.7.0] - 2025-11-08
 
 ### Changed

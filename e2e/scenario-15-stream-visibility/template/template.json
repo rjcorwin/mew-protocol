@@ -1,0 +1,7 @@
+{
+  "name": "scenario-15-stream-visibility",
+  "version": "1.0.0",
+  "description": "E2E test for stream visibility on participant join",
+  "author": "MEW Protocol",
+  "license": "MIT"
+}

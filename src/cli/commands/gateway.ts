@@ -158,7 +158,11 @@ gateway
       // Get or create space
       let space = spaces.get(actualSpaceName);
       if (!space) {
-        space = { participants: new Map() };
+        space = {
+          participants: new Map(),
+          streamCounter: 0,
+          activeStreams: new Map()
+        };
         spaces.set(actualSpaceName, space);
       }
       
@@ -936,6 +940,17 @@ gateway
             participantCapabilities.set(participantId, capabilities);
 
             // Send welcome message per MEW v0.2 spec
+            // Include active streams per [j8v] proposal
+            // Guard against spaces created via HTTP without activeStreams Map
+            const activeStreams = space.activeStreams
+              ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => ({
+                  stream_id: streamId,
+                  owner: info.participantId,
+                  direction: info.direction,
+                  created: info.created
+                }))
+              : [];
+
             const welcomeMessage = {
               protocol: 'mew/v0.4',
               id: `welcome-${Date.now()}`,
@@ -954,6 +969,7 @@ gateway
                     id: pid,
                     capabilities: participantCapabilities.get(pid) || [],
                   })),
+                active_streams: activeStreams,
               },
             };
 
