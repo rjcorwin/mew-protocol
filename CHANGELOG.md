@@ -6,6 +6,23 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ### Next
 
+### Changed
+- **Node.js version support** - Updated to support Node 23.x, 24.x, and 25.x (dropped Node 22.x support)
+  - Updated `package.json` engines requirement to `>=23.0.0`
+  - Updated CI matrix to test on Node 23.x, 24.x, and 25.x
+  - Future-proofs the project for Node 25 (released November 2025)
+
+### Fixed
+- **E2E test compatibility** - Fixed issues preventing e2e tests from running on local developer machines
+  - Fixed `mew init` hanging when output is redirected (e.g., `> init.log 2>&1`)
+    - Now checks both `stdin` and `stdout` for TTY detection, not just `stdin`
+    - Prevents interactive prompts from appearing when either stream is redirected
+  - Fixed Python command compatibility across different systems
+    - Replaced `python` with `python3` in all e2e test scripts (11 instances across 4 scenarios)
+    - Tests now work on systems without `python-is-python3` package installed
+    - Ensures compatibility with macOS, Ubuntu 20.04+, and other modern systems
+  - All 15 e2e scenarios now pass on local development machines
+
 ## [0.7.0] - 2025-11-08
 
 ### Changed
