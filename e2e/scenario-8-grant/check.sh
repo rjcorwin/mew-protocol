@@ -122,7 +122,7 @@ fulfill_envelope_id=""
 grant_ack_id=""
 direct_request_id=""
 
-if proposal_data=$(OUTPUT_LOG="${OUTPUT_LOG}" python - <<'PY'
+if proposal_data=$(OUTPUT_LOG="${OUTPUT_LOG}" python3 - <<'PY'
 import json
 import os
 import sys
@@ -173,7 +173,7 @@ if [[ -n "${PROPOSAL_ID}" ]]; then
   grant_envelope_id=$(generate_envelope_id)
   fulfill_envelope_id=$(generate_envelope_id)
 
-  grant_payload=$(GRANT_ID="${grant_envelope_id}" python - <<'PY'
+  grant_payload=$(GRANT_ID="${grant_envelope_id}" python3 - <<'PY'
 import json
 import os
 
@@ -201,7 +201,7 @@ print(json.dumps({
 PY
   )
 
-  fulfill_payload=$(PROPOSAL_ID="${PROPOSAL_ID}" PROPOSAL_TARGETS="${PROPOSAL_TARGETS}" PROPOSAL_PATH="${PROPOSAL_PATH}" PROPOSAL_CONTENT="${PROPOSAL_CONTENT}" FULFILL_ID="${fulfill_envelope_id}" python - <<'PY'
+  fulfill_payload=$(PROPOSAL_ID="${PROPOSAL_ID}" PROPOSAL_TARGETS="${PROPOSAL_TARGETS}" PROPOSAL_PATH="${PROPOSAL_PATH}" PROPOSAL_CONTENT="${PROPOSAL_CONTENT}" FULFILL_ID="${fulfill_envelope_id}" python3 - <<'PY'
 import json
 import os
 
@@ -297,7 +297,7 @@ else
   record_fail "Agent issued direct request"
 fi
 
-if direct_request_id=$(AGENT_LOG_PATH="${AGENT_LOG}" python - <<'PY'
+if direct_request_id=$(AGENT_LOG_PATH="${AGENT_LOG}" python3 - <<'PY'
 import json
 import os
 
@@ -350,7 +350,7 @@ fi
 if wait_for_pattern "${AGENT_LOG}" '"message":"Sent envelope","extra":{"kind":"capability/grant-ack"' 40; then
   record_pass "Grant acknowledgment originates from recipient"
 
-  if grant_ack_id=$(AGENT_LOG_PATH="${AGENT_LOG}" python - <<'PY'
+  if grant_ack_id=$(AGENT_LOG_PATH="${AGENT_LOG}" python3 - <<'PY'
 import json
 import os
 

@@ -138,7 +138,7 @@ fi
 
 printf "\n%b\n" "${YELLOW}Test 4: Large message acceptance${NC}"
 large_envelope_id=$(generate_envelope_id)
-large_payload=$(python - "$large_envelope_id" <<'PY'
+large_payload=$(python3 - "$large_envelope_id" <<'PY'
 import json, sys
 print(json.dumps({
   "id": sys.argv[1],
@@ -235,7 +235,7 @@ fi
 
 printf "\n%b\n" "${YELLOW}Test 8: Special characters${NC}"
 special_envelope_id=$(generate_envelope_id)
-special_payload=$(python - "$special_envelope_id" <<'PY'
+special_payload=$(python3 - "$special_envelope_id" <<'PY'
 import json, sys
 print(json.dumps({
   "id": sys.argv[1],

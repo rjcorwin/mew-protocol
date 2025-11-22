@@ -121,7 +121,7 @@ PROPOSAL_PATH="result.txt"
 PROPOSAL_CONTENT="16"
 FULFILL_TARGET="fulfiller-agent"
 
-if proposal_data=$(OUTPUT_LOG="${OUTPUT_LOG}" python - <<'PY'
+if proposal_data=$(OUTPUT_LOG="${OUTPUT_LOG}" python3 - <<'PY'
 import json
 import os
 
@@ -171,7 +171,7 @@ fi
 printf "\n%b\n" "${YELLOW}Test: Fulfil proposal via fulfiller agent${NC}"
 if [[ -n "${PROPOSAL_ID}" ]]; then
   fulfill_envelope_id=$(generate_envelope_id)
-  fulfill_payload=$(PROPOSAL_ID="${PROPOSAL_ID}" PROPOSAL_TARGETS="${PROPOSAL_TARGETS}" FULFILL_ID="${fulfill_envelope_id}" python - <<'PY'
+  fulfill_payload=$(PROPOSAL_ID="${PROPOSAL_ID}" PROPOSAL_TARGETS="${PROPOSAL_TARGETS}" FULFILL_ID="${fulfill_envelope_id}" python3 - <<'PY'
 import json
 import os
 
