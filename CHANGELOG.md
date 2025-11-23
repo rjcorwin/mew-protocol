@@ -4,7 +4,9 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ## [Unreleased]
 
-### Next
+## [0.8.0] - 2025-11-23
+
+### Added
 
 #### [j8v] Stream Visibility on Join with Metadata Preservation (Done)
 **Proposal:** `spec/protocol/proposals/j8v-stream-visibility/`
