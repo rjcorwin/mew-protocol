@@ -1,0 +1,8 @@
+{
+  "name": "{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scenario 15 - Stream Visibility on Join",
+  "scripts": {},
+  "dependencies": {}
+}

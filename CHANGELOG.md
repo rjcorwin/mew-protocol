@@ -6,6 +6,27 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ### Next
 
+#### [j8v] Stream Visibility on Join with Metadata Preservation (Done)
+**Proposal:** `spec/protocol/proposals/j8v-stream-visibility/`
+**Status:** Done
+
+**Problem:** When a participant joins a space with active streams, they don't receive information about those streams in their welcome message. This creates a visibility gap where new joiners receive stream data frames (`#streamID#data`) without context about what streams exist or how to parse them.
+
+**Solution:** Include active streams in the `system/welcome` payload with complete metadata preservation. All fields from the original `stream/request` (including `content_type`, `format`, `metadata`, and custom fields) are preserved and sent to late joiners, ensuring zero information loss.
+
+**Changes:**
+- Protocol: Add `active_streams` field to `system/welcome` payload with extensible metadata
+- Types: Extended `StreamRequestPayload` and `StreamMetadata` with `content_type`, `format`, `metadata` fields
+- Gateway: Preserve entire payload when creating streams (spread operator)
+- Gateway: Build active streams array by spreading all metadata fields
+- Tests: Enhanced scenario-15 to validate metadata preservation (17 assertions)
+
+**Use Cases Enabled:**
+- Real-time game movement streams with custom formats and coordinate systems
+- Voice chat transcription with language and speaker metadata
+- File transfers with MIME types, checksums, and filenames
+- AI reasoning traces with format specifications
+
 ### Changed
 - **Node.js version support** - Updated to support Node 23.x, 24.x, and 25.x (dropped Node 22.x support)
   - Updated `package.json` engines requirement to `>=23.0.0`

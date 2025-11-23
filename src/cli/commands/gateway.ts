@@ -158,10 +158,25 @@ gateway
       // Get or create space
       let space = spaces.get(actualSpaceName);
       if (!space) {
-        space = { participants: new Map() };
+        space = {
+          participants: new Map(),
+          streamCounter: 0,
+          activeStreams: new Map()
+        };
         spaces.set(actualSpaceName, space);
       }
-      
+
+      // Lazy auto-connect: if participant has output_log but not connected yet, connect them now
+      if (spaceConfig && spaceConfig.participants && spaceConfig.participants[participantId]) {
+        const participantConfig = spaceConfig.participants[participantId];
+        if (participantConfig.output_log && !space.participants.has(participantId)) {
+          if (options.logLevel === 'debug') {
+            console.log(`[HTTP] Lazy auto-connecting ${participantId} on first message`);
+          }
+          autoConnectOutputLogParticipant(participantId, participantConfig);
+        }
+      }
+
       if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
         return res.status(400).json({ error: 'Request body must be a JSON object' });
       }
@@ -360,6 +375,80 @@ gateway
         }
       }
 
+      // Handle stream/request - gateway must respond with stream/open
+      if (envelope.kind === 'stream/request') {
+        // Generate unique stream ID
+        space.streamCounter++;
+        const streamId = `stream-${space.streamCounter}`;
+
+        // Track the stream - preserve ALL metadata from request payload [j8v]
+        space.activeStreams.set(streamId, {
+          requestId: envelope.id,
+          participantId: participantId,
+          created: new Date().toISOString(),
+          ...envelope.payload  // Spread entire payload to preserve all fields
+        });
+
+        // Send stream/open response
+        const streamOpenResponse = {
+          protocol: 'mew/v0.4',
+          id: `stream-open-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          ts: new Date().toISOString(),
+          from: 'gateway',
+          to: [participantId],
+          kind: 'stream/open',
+          correlation_id: [envelope.id],
+          payload: {
+            stream_id: streamId,
+            encoding: 'text'
+          }
+        };
+
+        // Broadcast stream/open to ALL participants (MEW Protocol visibility)
+        for (const [pid, ws] of space.participants.entries()) {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(streamOpenResponse));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: streamOpenResponse.id,
+              envelope: streamOpenResponse,
+              participant: pid,
+              space_id: actualSpaceName,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                type: 'stream/open',
+                source_participant: participantId,
+                stream_id: streamId,
+              },
+            });
+          }
+        }
+
+        if (options.logLevel === 'debug') {
+          console.log(`[HTTP] Assigned stream ID ${streamId} for request from ${participantId}`);
+        }
+
+        // Return HTTP response
+        return res.json({
+          id: streamOpenResponse.id,
+          status: 'stream_opened',
+          stream_id: streamId,
+          timestamp: streamOpenResponse.ts
+        });
+      }
+
+      // Handle stream/close - clean up active streams
+      if (envelope.kind === 'stream/close' && envelope.payload?.stream_id) {
+        const streamId = envelope.payload.stream_id;
+        if (space.activeStreams.has(streamId)) {
+          space.activeStreams.delete(streamId);
+          if (options.logLevel === 'debug') {
+            console.log(`[HTTP] Closed stream ${streamId}`);
+          }
+        }
+      }
+
       // Broadcast message to space
       const envelopeStr = JSON.stringify(envelope);
       for (const [pid, ws] of space.participants) {
@@ -437,6 +526,26 @@ gateway
         }
         return null;
       }
+    }
+
+    /**
+     * Build active streams array from space.activeStreams Map [j8v]
+     * Used in welcome message construction for both HTTP and WebSocket paths
+     */
+    function buildActiveStreamsArray(space) {
+      // Guard handles edge case of legacy spaces or race conditions during initialization
+      return space.activeStreams
+        ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => {
+            // Separate internal fields from metadata to preserve in public API [j8v]
+            const { requestId, participantId, created, ...metadata } = info;
+            return {
+              stream_id: streamId,
+              owner: participantId,
+              created: created,
+              ...metadata  // Spread all metadata from original stream/request
+            };
+          })
+        : [];
     }
 
     function ensureBaselineCapabilities(capabilities = []) {
@@ -754,6 +863,46 @@ gateway
 
       space.participants.set(participantId, virtualWs);
 
+      // Send welcome message with active streams (like WebSocket join handler) [j8v]
+      const activeStreams = buildActiveStreamsArray(space);
+
+      const welcomeMessage = {
+        protocol: 'mew/v0.4',
+        id: `welcome-${Date.now()}`,
+        ts: new Date().toISOString(),
+        from: 'system:gateway',
+        to: [participantId],
+        kind: 'system/welcome',
+        payload: {
+          you: {
+            id: participantId,
+            capabilities: config.capabilities || [],
+          },
+          participants: Array.from(space.participants.keys())
+            .filter((pid) => pid !== participantId)
+            .map((pid) => ({
+              id: pid,
+              capabilities: participantCapabilities.get(pid) || [],
+            })),
+          active_streams: activeStreams,
+        },
+      };
+
+      virtualWs.send(JSON.stringify(welcomeMessage));
+      logEnvelopeEvent({
+        event: 'delivered',
+        id: welcomeMessage.id,
+        envelope: welcomeMessage,
+        participant: participantId,
+        space_id: spaceId,
+        direction: 'outbound',
+        transport: 'virtual',
+        metadata: {
+          type: 'system/welcome',
+          auto_connect: true,
+        },
+      });
+
       console.log(`${participantId} auto-connected with output to ${config.output_log}`);
     }
 
@@ -936,6 +1085,9 @@ gateway
             participantCapabilities.set(participantId, capabilities);
 
             // Send welcome message per MEW v0.2 spec
+            // Include active streams per [j8v] proposal
+            const activeStreams = buildActiveStreamsArray(space);
+
             const welcomeMessage = {
               protocol: 'mew/v0.4',
               id: `welcome-${Date.now()}`,
@@ -954,6 +1106,7 @@ gateway
                     id: pid,
                     capabilities: participantCapabilities.get(pid) || [],
                   })),
+                active_streams: activeStreams,
               },
             };
 

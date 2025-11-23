@@ -97,11 +97,31 @@ export interface Proposal {
 // ============================================================================
 
 /**
+ * Stream metadata included in welcome messages [j8v]
+ *
+ * All fields from the original stream/request payload are preserved to ensure
+ * late joiners have complete context about stream format and purpose.
+ */
+export interface StreamMetadata {
+  stream_id: string;
+  owner: string;
+  direction: 'upload' | 'download';
+  created: string; // ISO 8601 timestamp
+  expected_size_bytes?: number;
+  description?: string;
+  content_type?: string;
+  format?: string;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown; // Allow additional custom fields from stream/request
+}
+
+/**
  * Welcome message payload sent when joining a space
  */
 export interface SystemWelcomePayload {
   you: Participant;
   participants: Participant[];
+  active_streams?: StreamMetadata[]; // [j8v] Optional array of currently active streams
 }
 
 /**
@@ -274,6 +294,9 @@ export interface StreamRequestPayload {
   direction: string;
   expected_size_bytes?: number;
   description?: string;
+  content_type?: string;
+  format?: string;
+  metadata?: Record<string, unknown>;
   [key: string]: unknown;
 }
 

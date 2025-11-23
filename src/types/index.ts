@@ -30,6 +30,7 @@ export type {
   SystemWelcomePayload,
   SystemErrorPayload,
   PresencePayload,
+  StreamMetadata,
   
   // MEW payloads
   MewProposalPayload,
