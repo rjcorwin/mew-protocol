@@ -220,9 +220,15 @@ export class MEWClient extends EventEmitter {
       this.emit('welcome', message.payload);
 
       // Process active streams if present (j8v proposal)
+      // Emit 'streamDiscovered' events (not 'stream/*' to distinguish from protocol messages)
       if (message.payload?.active_streams && Array.isArray(message.payload.active_streams)) {
         for (const stream of message.payload.active_streams) {
-          this.emit('stream/active', stream);
+          // Validate required fields to prevent malformed stream objects from crashing listeners
+          if (stream.stream_id && stream.owner && stream.direction && stream.created) {
+            this.emit('streamDiscovered', stream);
+          } else {
+            console.warn('[MEWClient] Skipping malformed stream in active_streams:', stream);
+          }
         }
       }
       return;

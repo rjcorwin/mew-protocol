@@ -137,6 +137,18 @@ fi
 # Check that owner field is set correctly
 record_result "Stream owner is client-a" "${ENVELOPE_LOG}" "\"owner\":\"client-a\""
 
+# Check that direction field is set correctly
+record_result "Stream direction is upload" "${ENVELOPE_LOG}" "\"direction\":\"upload\""
+
+# Check that created timestamp has valid ISO 8601 format
+if grep -F '"kind":"system/welcome"' "${ENVELOPE_LOG}" | grep -F '"to":["client-b"]' | grep -Eq '"created":"[0-9]{4}-[0-9]{2}-[0-9]{2}T'; then
+  echo -e "Stream has valid created timestamp: ${GREEN}✓${NC}"
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+  echo -e "Stream has valid created timestamp: ${RED}✗${NC}"
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
 # Step 5: Close the stream
 echo -e "${YELLOW}-- Step 5: Close stream --${NC}"
 if [[ -n "${STREAM_ID}" ]]; then

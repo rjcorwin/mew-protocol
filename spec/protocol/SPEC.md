@@ -788,6 +788,7 @@ When a participant connects, the gateway MUST send a welcome message addressed s
 {
   "protocol": "mew/v0.4",
   "id": "env-welcome-1",
+  "ts": "2025-01-09T10:00:00Z",
   "from": "system:gateway",
   "to": ["new-participant"],
   "kind": "system/welcome",

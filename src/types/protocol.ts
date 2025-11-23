@@ -97,11 +97,22 @@ export interface Proposal {
 // ============================================================================
 
 /**
+ * Stream metadata included in welcome messages [j8v]
+ */
+export interface StreamMetadata {
+  stream_id: string;
+  owner: string;
+  direction: 'upload' | 'download';
+  created: string; // ISO 8601 timestamp
+}
+
+/**
  * Welcome message payload sent when joining a space
  */
 export interface SystemWelcomePayload {
   you: Participant;
   participants: Participant[];
+  active_streams?: StreamMetadata[]; // [j8v] Optional array of currently active streams
 }
 
 /**

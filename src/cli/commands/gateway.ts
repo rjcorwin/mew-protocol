@@ -528,6 +528,22 @@ gateway
       }
     }
 
+    /**
+     * Build active streams array from space.activeStreams Map [j8v]
+     * Used in welcome message construction for both HTTP and WebSocket paths
+     */
+    function buildActiveStreamsArray(space) {
+      // Guard handles edge case of legacy spaces or race conditions during initialization
+      return space.activeStreams
+        ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => ({
+            stream_id: streamId,
+            owner: info.participantId,
+            direction: info.direction,
+            created: info.created
+          }))
+        : [];
+    }
+
     function ensureBaselineCapabilities(capabilities = []) {
       const deduped = new Map();
 
@@ -843,15 +859,8 @@ gateway
 
       space.participants.set(participantId, virtualWs);
 
-      // Send welcome message with active streams (like WebSocket join handler)
-      const activeStreams = space.activeStreams
-        ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => ({
-            stream_id: streamId,
-            owner: info.participantId,
-            direction: info.direction,
-            created: info.created
-          }))
-        : [];
+      // Send welcome message with active streams (like WebSocket join handler) [j8v]
+      const activeStreams = buildActiveStreamsArray(space);
 
       const welcomeMessage = {
         protocol: 'mew/v0.4',
@@ -1073,15 +1082,7 @@ gateway
 
             // Send welcome message per MEW v0.2 spec
             // Include active streams per [j8v] proposal
-            // Guard against spaces created via HTTP without activeStreams Map
-            const activeStreams = space.activeStreams
-              ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => ({
-                  stream_id: streamId,
-                  owner: info.participantId,
-                  direction: info.direction,
-                  created: info.created
-                }))
-              : [];
+            const activeStreams = buildActiveStreamsArray(space);
 
             const welcomeMessage = {
               protocol: 'mew/v0.4',
