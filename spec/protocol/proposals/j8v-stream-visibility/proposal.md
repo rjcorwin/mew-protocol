@@ -33,6 +33,105 @@ This asymmetry between early and late joiners violates the unified context princ
 - Streaming data replay/history (streams are ephemeral)
 - Stream subscription/filtering mechanisms
 - Changes to stream lifecycle messages
+- Prescribing specific stream types or formats (protocol remains unopinionated)
+
+## Use Cases
+
+The metadata preservation design supports diverse application scenarios:
+
+### Real-time Game Movement
+
+```json
+{
+  "kind": "stream/request",
+  "payload": {
+    "direction": "upload",
+    "content_type": "application/x-game-positions",
+    "format": "binary-vector3",
+    "description": "Player movement updates",
+    "metadata": {
+      "update_rate_hz": 60,
+      "coordinate_system": "world-space"
+    }
+  }
+}
+```
+
+Late joiner receives in `active_streams`:
+```json
+{
+  "stream_id": "stream-1",
+  "owner": "player-1",
+  "direction": "upload",
+  "created": "2025-01-23T12:00:00Z",
+  "content_type": "application/x-game-positions",
+  "format": "binary-vector3",
+  "description": "Player movement updates",
+  "metadata": {
+    "update_rate_hz": 60,
+    "coordinate_system": "world-space"
+  }
+}
+```
+
+The late joiner knows:
+- How to parse the data (binary-vector3 format)
+- What the data represents (player positions)
+- Update frequency (60 Hz)
+- Coordinate system (world-space vs screen-space)
+
+### Voice Chat Transcription
+
+```json
+{
+  "kind": "stream/request",
+  "payload": {
+    "direction": "upload",
+    "content_type": "text/plain",
+    "format": "utf8-newline-delimited",
+    "description": "Voice chat transcription",
+    "metadata": {
+      "language": "en-US",
+      "speaker": "alice"
+    }
+  }
+}
+```
+
+### AI Reasoning Trace
+
+```json
+{
+  "kind": "stream/request",
+  "payload": {
+    "direction": "upload",
+    "content_type": "application/json",
+    "format": "jsonl",
+    "description": "Chain-of-thought reasoning",
+    "expected_size_bytes": 1048576
+  }
+}
+```
+
+### File Transfer
+
+```json
+{
+  "kind": "stream/request",
+  "payload": {
+    "direction": "upload",
+    "content_type": "image/png",
+    "description": "Screenshot",
+    "expected_size_bytes": 524288,
+    "metadata": {
+      "filename": "screenshot.png",
+      "checksum_sha256": "abc123..."
+    }
+  }
+}
+```
+
+In all cases, late joiners receive the complete context needed to understand and process the stream data.
 
 ## Technical Design
 
@@ -60,12 +159,18 @@ Add `active_streams` field to `system/welcome` payload:
         "stream_id": "stream-42",
         "owner": "agent-1",
         "direction": "upload",
-        "created": "2025-01-09T10:00:00Z"
+        "created": "2025-01-09T10:00:00Z",
+        "content_type": "application/json",
+        "format": "jsonl",
+        "description": "Chain-of-thought reasoning",
+        "expected_size_bytes": 1048576
       }
     ]
   }
 }
 ```
+
+Note: All fields from the original `stream/request` payload are preserved and included in the stream metadata.
 
 ### Field Definitions
 
@@ -79,6 +184,21 @@ Add `active_streams` field to `system/welcome` payload:
 - `owner` (string, required): Participant ID that requested the stream
 - `direction` (string, required): "upload" or "download"
 - `created` (string, required): ISO 8601 timestamp when stream was opened
+- `expected_size_bytes` (number, optional): Size hint from original request
+- `description` (string, optional): Human-readable description from original request
+- `content_type` (string, optional): MIME type or format identifier (e.g., "text/plain", "application/x-game-positions")
+- `format` (string, optional): Stream format/schema identifier (e.g., "utf8-newline-delimited", "binary-vector3")
+- `metadata` (object, optional): Arbitrary key-value pairs from original request
+- Additional fields from original `stream/request` are preserved
+
+**Design Principle: Metadata Preservation**
+
+All metadata provided in the original `stream/request` payload MUST be included in the stream metadata sent to late joiners. This ensures:
+
+1. **Zero information loss**: Late joiners get the same context as participants who witnessed the `stream/open`
+2. **Format discoverability**: Participants can determine how to parse stream data (text vs binary, encoding, schema)
+3. **Application extensibility**: Apps can define custom metadata fields without protocol changes
+4. **Use case flexibility**: Supports diverse scenarios (games, chat, file transfer, telemetry) without opinionated stream types
 
 ### Implementation Requirements
 
@@ -87,29 +207,46 @@ Add `active_streams` field to `system/welcome` payload:
 **Location:** Welcome message construction (around line 946)
 
 **Changes:**
-1. Extract active stream metadata from `space.activeStreams` Map
-2. Format as array of stream objects
-3. Include in welcome payload
 
-**Example code:**
-```typescript
-const activeStreams = Array.from(space.activeStreams.entries()).map(([streamId, info]) => ({
-  stream_id: streamId,
-  owner: info.participantId,
-  direction: info.direction,
-  created: info.created
-}));
+1. **Stream creation** (around line 385): Store entire payload when creating stream
+   ```typescript
+   // Store ALL metadata from the original request
+   space.activeStreams.set(streamId, {
+     requestId: envelope.id,
+     participantId: participantId,
+     created: new Date().toISOString(),
+     ...envelope.payload  // Preserve all fields from stream/request
+   });
+   ```
 
-const welcomeMessage = {
-  protocol: 'mew/v0.4',
-  // ... other fields
-  payload: {
-    you: { ... },
-    participants: [ ... ],
-    active_streams: activeStreams  // NEW
-  }
-};
-```
+2. **Welcome message construction**: Extract and transform stream metadata
+   ```typescript
+   function buildActiveStreamsArray(space): StreamMetadata[] {
+     return space.activeStreams
+       ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => {
+           const { requestId, participantId, created, ...metadata } = info;
+           return {
+             stream_id: streamId,
+             owner: participantId,
+             created: created,
+             ...metadata  // Spread all metadata from original request
+           };
+         })
+       : [];
+   }
+
+   const welcomeMessage = {
+     protocol: 'mew/v0.4',
+     // ... other fields
+     payload: {
+       you: { ... },
+       participants: [ ... ],
+       active_streams: buildActiveStreamsArray(space)  // NEW
+     }
+   };
+   ```
+
+This approach ensures that **all metadata** from the original `stream/request` (including `description`, `content_type`, `format`, `metadata`, and any custom fields) is preserved and sent to late joiners.
 
 #### Client (MEWClient.ts)
 
