@@ -401,7 +401,9 @@ gateway
           correlation_id: [envelope.id],
           payload: {
             stream_id: streamId,
-            encoding: 'text'
+            encoding: 'text',
+            owner: participantId,
+            authorized_writers: [participantId]
           }
         };
 
@@ -518,11 +520,13 @@ gateway
         }
 
         // Broadcast acknowledgement
+        const allParticipantIds = Array.from(space.participants.keys());
         const ackResponse = {
           protocol: 'mew/v0.4',
           id: `grant-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           ts: new Date().toISOString(),
           from: 'gateway',
+          to: allParticipantIds,
           kind: 'stream/write-granted',
           correlation_id: [envelope.id],
           payload: {
@@ -536,6 +540,18 @@ gateway
         for (const [pid, ws] of space.participants.entries()) {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(ackResponse));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: ackResponse.id,
+              envelope: ackResponse,
+              participant: pid,
+              space_id: actualSpaceName,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                source_participant: participantId,
+              },
+            });
           }
         }
 
@@ -620,11 +636,13 @@ gateway
         }
 
         // Broadcast acknowledgement
+        const allParticipantIds = Array.from(space.participants.keys());
         const ackResponse = {
           protocol: 'mew/v0.4',
           id: `revoke-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           ts: new Date().toISOString(),
           from: 'gateway',
+          to: allParticipantIds,
           kind: 'stream/write-revoked',
           correlation_id: [envelope.id],
           payload: {
@@ -638,6 +656,18 @@ gateway
         for (const [pid, ws] of space.participants.entries()) {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(ackResponse));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: ackResponse.id,
+              envelope: ackResponse,
+              participant: pid,
+              space_id: actualSpaceName,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                source_participant: participantId,
+              },
+            });
           }
         }
 
@@ -719,17 +749,25 @@ gateway
         const previousOwner = stream.participantId;
         stream.participantId = new_owner;
 
+        // Remove previous owner from authorized writers
+        const prevOwnerIndex = stream.authorizedWriters.indexOf(previousOwner);
+        if (prevOwnerIndex !== -1) {
+          stream.authorizedWriters.splice(prevOwnerIndex, 1);
+        }
+
         // Ensure new owner is in authorized writers
         if (!stream.authorizedWriters.includes(new_owner)) {
           stream.authorizedWriters.push(new_owner);
         }
 
         // Broadcast transfer event
+        const allParticipantIds = Array.from(space.participants.keys());
         const ackResponse = {
           protocol: 'mew/v0.4',
           id: `transfer-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           ts: new Date().toISOString(),
           from: 'gateway',
+          to: allParticipantIds,
           kind: 'stream/ownership-transferred',
           correlation_id: [envelope.id],
           payload: {
@@ -744,6 +782,18 @@ gateway
         for (const [pid, ws] of space.participants.entries()) {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(ackResponse));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: ackResponse.id,
+              envelope: ackResponse,
+              participant: pid,
+              space_id: actualSpaceName,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                source_participant: participantId,
+              },
+            });
           }
         }
 
@@ -1870,6 +1920,7 @@ gateway
             space.activeStreams.set(streamId, {
               requestId: envelope.id,
               participantId: participantId,
+              authorizedWriters: [participantId],
               direction: envelope.payload?.direction || 'unknown',
               created: new Date().toISOString()
             });
@@ -1885,7 +1936,9 @@ gateway
               correlation_id: [envelope.id],
               payload: {
                 stream_id: streamId,
-                encoding: 'text'
+                encoding: 'text',
+                owner: participantId,
+                authorized_writers: [participantId]
               }
             };
 
@@ -1928,6 +1981,198 @@ gateway
                   console.log(`[GATEWAY DEBUG] Closed stream ${streamId}`);
                 }
               }
+            }
+          }
+
+          // [s2w] Handle stream/grant-write via WebSocket
+          if (envelope.kind === 'stream/grant-write' && spaceId && spaces.has(spaceId)) {
+            const space = spaces.get(spaceId);
+            const { stream_id, participant_id, reason } = envelope.payload;
+            const stream = space.activeStreams.get(stream_id);
+
+            if (stream && stream.participantId === participantId) {
+              // Initialize authorized_writers if not present
+              if (!stream.authorizedWriters) {
+                stream.authorizedWriters = [stream.participantId];
+              }
+
+              // Add participant to authorized writers (idempotent)
+              if (!stream.authorizedWriters.includes(participant_id)) {
+                stream.authorizedWriters.push(participant_id);
+              }
+
+              // Broadcast acknowledgement instead of original message
+              const allParticipantIds = Array.from(space.participants.keys());
+              const ackResponse = {
+                protocol: 'mew/v0.4',
+                id: `grant-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                ts: new Date().toISOString(),
+                from: 'gateway',
+                to: allParticipantIds,
+                kind: 'stream/write-granted',
+                correlation_id: [envelope.id],
+                payload: {
+                  stream_id,
+                  participant_id,
+                  authorized_writers: stream.authorizedWriters,
+                  reason
+                }
+              };
+
+              for (const [pid, pws] of space.participants.entries()) {
+                if (pws.readyState === WebSocket.OPEN) {
+                  pws.send(JSON.stringify(ackResponse));
+                  logEnvelopeEvent({
+                    event: 'delivered',
+                    id: ackResponse.id,
+                    envelope: ackResponse,
+                    participant: pid,
+                    space_id: spaceId,
+                    direction: 'outbound',
+                    transport: 'websocket',
+                    metadata: {
+                      source_participant: participantId,
+                    },
+                  });
+                }
+              }
+
+              if (options.logLevel === 'debug') {
+                console.log(`[WS] Granted write access to ${participant_id} for stream ${stream_id}`);
+              }
+              return; // Don't broadcast original grant message
+            }
+          }
+
+          // [s2w] Handle stream/revoke-write via WebSocket
+          if (envelope.kind === 'stream/revoke-write' && spaceId && spaces.has(spaceId)) {
+            const space = spaces.get(spaceId);
+            const { stream_id, participant_id, reason } = envelope.payload;
+            const stream = space.activeStreams.get(stream_id);
+
+            if (stream && stream.participantId === participantId) {
+              // Initialize authorized_writers if not present
+              if (!stream.authorizedWriters) {
+                stream.authorizedWriters = [stream.participantId];
+              }
+
+              // Remove participant from authorized writers (idempotent)
+              const index = stream.authorizedWriters.indexOf(participant_id);
+              if (index !== -1) {
+                stream.authorizedWriters.splice(index, 1);
+              }
+
+              // Broadcast acknowledgement instead of original message
+              const allParticipantIds = Array.from(space.participants.keys());
+              const ackResponse = {
+                protocol: 'mew/v0.4',
+                id: `revoke-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                ts: new Date().toISOString(),
+                from: 'gateway',
+                to: allParticipantIds,
+                kind: 'stream/write-revoked',
+                correlation_id: [envelope.id],
+                payload: {
+                  stream_id,
+                  participant_id,
+                  authorized_writers: stream.authorizedWriters,
+                  reason
+                }
+              };
+
+              for (const [pid, pws] of space.participants.entries()) {
+                if (pws.readyState === WebSocket.OPEN) {
+                  pws.send(JSON.stringify(ackResponse));
+                  logEnvelopeEvent({
+                    event: 'delivered',
+                    id: ackResponse.id,
+                    envelope: ackResponse,
+                    participant: pid,
+                    space_id: spaceId,
+                    direction: 'outbound',
+                    transport: 'websocket',
+                    metadata: {
+                      source_participant: participantId,
+                    },
+                  });
+                }
+              }
+
+              if (options.logLevel === 'debug') {
+                console.log(`[WS] Revoked write access from ${participant_id} for stream ${stream_id}`);
+              }
+              return; // Don't broadcast original revoke message
+            }
+          }
+
+          // [s2w] Handle stream/transfer-ownership via WebSocket
+          if (envelope.kind === 'stream/transfer-ownership' && spaceId && spaces.has(spaceId)) {
+            const space = spaces.get(spaceId);
+            const { stream_id, new_owner, reason } = envelope.payload;
+            const stream = space.activeStreams.get(stream_id);
+
+            if (stream && stream.participantId === participantId) {
+              // Initialize authorized_writers if not present
+              if (!stream.authorizedWriters) {
+                stream.authorizedWriters = [stream.participantId];
+              }
+
+              // Transfer ownership
+              const previousOwner = stream.participantId;
+              stream.participantId = new_owner;
+
+              // Remove previous owner from authorized writers
+              const prevOwnerIndex = stream.authorizedWriters.indexOf(previousOwner);
+              if (prevOwnerIndex !== -1) {
+                stream.authorizedWriters.splice(prevOwnerIndex, 1);
+              }
+
+              // Ensure new owner is in authorized writers
+              if (!stream.authorizedWriters.includes(new_owner)) {
+                stream.authorizedWriters.push(new_owner);
+              }
+
+              // Broadcast transfer event instead of original message
+              const allParticipantIds = Array.from(space.participants.keys());
+              const ackResponse = {
+                protocol: 'mew/v0.4',
+                id: `transfer-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                ts: new Date().toISOString(),
+                from: 'gateway',
+                to: allParticipantIds,
+                kind: 'stream/ownership-transferred',
+                correlation_id: [envelope.id],
+                payload: {
+                  stream_id,
+                  previous_owner: previousOwner,
+                  new_owner,
+                  authorized_writers: stream.authorizedWriters,
+                  reason
+                }
+              };
+
+              for (const [pid, pws] of space.participants.entries()) {
+                if (pws.readyState === WebSocket.OPEN) {
+                  pws.send(JSON.stringify(ackResponse));
+                  logEnvelopeEvent({
+                    event: 'delivered',
+                    id: ackResponse.id,
+                    envelope: ackResponse,
+                    participant: pid,
+                    space_id: spaceId,
+                    direction: 'outbound',
+                    transport: 'websocket',
+                    metadata: {
+                      source_participant: participantId,
+                    },
+                  });
+                }
+              }
+
+              if (options.logLevel === 'debug') {
+                console.log(`[WS] Transferred ownership of stream ${stream_id} from ${previousOwner} to ${new_owner}`);
+              }
+              return; // Don't broadcast original transfer message
             }
           }
 

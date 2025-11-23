@@ -65,7 +65,7 @@ send_command() {
   local command_text="$2"
 
   local msg_id="cmd-$(date +%s%N)"
-  local body="{\"id\":\"${msg_id}\",\"kind\":\"chat\",\"payload\":{\"text\":\"cmd:${command_text}\"}}"
+  local body="{\"id\":\"${msg_id}\",\"kind\":\"chat\",\"payload\":{\"text\":\"cmd:${to_participant}:${command_text}\"}}"
 
   # Send as test-controller to avoid conflict with WebSocket-connected participants
   curl -sf -X POST "http://localhost:${TEST_PORT}/participants/test-controller/messages" \
@@ -176,8 +176,8 @@ send_command "stream-writer" "report-streams"
 if wait_for_response "stream-writer" "report-streams" 10; then
   pass "stream-writer reported streams"
 
-  # Check authorized_writers contains only stream-owner
-  WRITER_REPORT=$(grep -F "\"from\":\"stream-writer\"" "${ENVELOPE_LOG}" | grep -F "response:report-streams" | tail -1)
+  # Check authorized_writers contains only stream-owner (check just the payload data, not envelope metadata)
+  WRITER_REPORT=$(grep -F "\"from\":\"stream-writer\"" "${ENVELOPE_LOG}" | grep -F "response:report-streams" | tail -1 | sed -n 's/.*"data":\({[^}]*streams[^}]*}\).*/\1/p')
   if echo "${WRITER_REPORT}" | grep -Fq "\"stream-owner\"" && ! echo "${WRITER_REPORT}" | grep -Fq "\"stream-writer\""; then
     pass "stream-writer sees only stream-owner in authorized_writers"
   else

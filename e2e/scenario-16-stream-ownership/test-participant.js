@@ -43,7 +43,8 @@ const state = {
   myId: participantId,
   participants: new Map(),
   activeStreams: new Map(),
-  myCapabilities: []
+  myCapabilities: [],
+  pendingFramePublishes: new Map() // Map of frameData -> {streamId, authorized, timeout}
 };
 
 let ws = null;
@@ -77,8 +78,26 @@ function connect() {
   });
 
   ws.on('message', (data) => {
+    const dataStr = data.toString();
+
+    // Check if this is a raw stream frame
+    if (dataStr.startsWith('#')) {
+      // Check if we're waiting for this frame
+      if (state.pendingFramePublishes.has(dataStr)) {
+        const pending = state.pendingFramePublishes.get(dataStr);
+        clearTimeout(pending.timeout);
+        sendResponse('publish-frame-result', {
+          stream_id: pending.streamId,
+          success: true,
+          authorized: pending.authorized
+        });
+        state.pendingFramePublishes.delete(dataStr);
+      }
+      return;
+    }
+
     try {
-      const envelope = JSON.parse(data.toString());
+      const envelope = JSON.parse(dataStr);
       console.log(`[${participantId}] Received:`, envelope.kind, envelope.from);
       handleMessage(envelope);
     } catch (err) {
@@ -124,11 +143,11 @@ function handleMessage(envelope) {
     case 'stream/open':
       state.activeStreams.set(payload.stream_id, {
         stream_id: payload.stream_id,
-        owner: from === 'gateway' ? participantId : from,
-        authorized_writers: [participantId],
+        owner: payload.owner,
+        authorized_writers: payload.authorized_writers || [payload.owner],
         encoding: payload.encoding
       });
-      console.log(`[${participantId}] Stream opened: ${payload.stream_id}`);
+      console.log(`[${participantId}] Stream opened: ${payload.stream_id}, owner: ${payload.owner}`);
       break;
 
     case 'stream/write-granted':
@@ -156,6 +175,26 @@ function handleMessage(envelope) {
       }
       break;
 
+    case 'system/error':
+      // Check if this is an unauthorized frame publish error
+      if (payload.error === 'unauthorized_stream_write') {
+        // Find and complete any pending frame publish for this stream
+        for (const [frameData, pending] of state.pendingFramePublishes) {
+          if (pending.streamId === payload.stream_id) {
+            clearTimeout(pending.timeout);
+            sendResponse('publish-frame-result', {
+              stream_id: pending.streamId,
+              success: false,
+              authorized: pending.authorized,
+              error: payload.message
+            });
+            state.pendingFramePublishes.delete(frameData);
+            break;
+          }
+        }
+      }
+      break;
+
     case 'chat':
       if (payload.text && payload.text.startsWith('cmd:')) {
         handleCommand(payload.text, from);
@@ -174,8 +213,14 @@ function handleMessage(envelope) {
 
 function handleCommand(commandText, from) {
   const parts = commandText.slice(4).split(':'); // Remove 'cmd:' prefix
-  const command = parts[0];
+  const targetParticipant = parts[0];
 
+  // Ignore commands not addressed to this participant
+  if (targetParticipant !== participantId) {
+    return;
+  }
+
+  const command = parts[1];
   console.log(`[${participantId}] Received command: ${command} from ${from}`);
 
   try {
@@ -185,23 +230,23 @@ function handleCommand(commandText, from) {
         break;
 
       case 'create-stream':
-        createStream(parts[1] || 'Test stream');
+        createStream(parts[2] || 'Test stream');
         break;
 
       case 'publish-frame':
-        publishFrame(parts[1], parts[2]);
+        publishFrame(parts[2], parts[3]);
         break;
 
       case 'grant-write':
-        grantWrite(parts[1], parts[2], parts[3]);
+        grantWrite(parts[2], parts[3], parts[4]);
         break;
 
       case 'revoke-write':
-        revokeWrite(parts[1], parts[2], parts[3]);
+        revokeWrite(parts[2], parts[3], parts[4]);
         break;
 
       case 'transfer-ownership':
-        transferOwnership(parts[1], parts[2], parts[3]);
+        transferOwnership(parts[2], parts[3], parts[4]);
         break;
 
       default:
@@ -248,39 +293,53 @@ function publishFrame(streamId, data) {
   const stream = state.activeStreams.get(streamId);
   const authorized = stream?.authorized_writers?.includes(participantId);
 
-  // Attempt to publish via HTTP (since WebSocket doesn't support raw frames)
+  // Send frame via WebSocket (stream frames use raw format: #streamID#data)
   const frameData = `#${streamId}#${data}`;
 
-  const options = {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'text/plain',
-      'Content-Length': Buffer.byteLength(frameData)
-    }
-  };
-
-  const req = http.request(httpUrl, options, (res) => {
-    const success = res.statusCode === 200 || res.statusCode === 202;
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
     sendResponse('publish-frame-result', {
       stream_id: streamId,
-      success,
+      success: false,
       authorized,
-      status_code: res.statusCode
+      error: 'WebSocket not connected'
     });
+    return;
+  }
+
+  // Set up timeout for response
+  const timeout = setTimeout(() => {
+    // If no response after 2 seconds, report as failed
+    if (state.pendingFramePublishes.has(frameData)) {
+      state.pendingFramePublishes.delete(frameData);
+      sendResponse('publish-frame-result', {
+        stream_id: streamId,
+        success: false,
+        authorized,
+        error: 'Gateway did not confirm frame delivery'
+      });
+    }
+  }, 2000);
+
+  // Track this pending publish
+  state.pendingFramePublishes.set(frameData, {
+    streamId,
+    authorized,
+    timeout
   });
 
-  req.on('error', (err) => {
+  // Send the frame
+  try {
+    ws.send(frameData);
+  } catch (err) {
+    clearTimeout(timeout);
+    state.pendingFramePublishes.delete(frameData);
     sendResponse('publish-frame-result', {
       stream_id: streamId,
       success: false,
       authorized,
       error: err.message
     });
-  });
-
-  req.write(frameData);
-  req.end();
+  }
 }
 
 function grantWrite(streamId, participantToGrant, reason = '') {
