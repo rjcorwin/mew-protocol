@@ -381,12 +381,12 @@ gateway
         space.streamCounter++;
         const streamId = `stream-${space.streamCounter}`;
 
-        // Track the stream
+        // Track the stream - preserve ALL metadata from request payload [j8v]
         space.activeStreams.set(streamId, {
           requestId: envelope.id,
           participantId: participantId,
-          direction: envelope.payload?.direction || 'unknown',
-          created: new Date().toISOString()
+          created: new Date().toISOString(),
+          ...envelope.payload  // Spread entire payload to preserve all fields
         });
 
         // Send stream/open response
@@ -535,12 +535,16 @@ gateway
     function buildActiveStreamsArray(space) {
       // Guard handles edge case of legacy spaces or race conditions during initialization
       return space.activeStreams
-        ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => ({
-            stream_id: streamId,
-            owner: info.participantId,
-            direction: info.direction,
-            created: info.created
-          }))
+        ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => {
+            // Separate internal fields from metadata to preserve in public API [j8v]
+            const { requestId, participantId, created, ...metadata } = info;
+            return {
+              stream_id: streamId,
+              owner: participantId,
+              created: created,
+              ...metadata  // Spread all metadata from original stream/request
+            };
+          })
         : [];
     }
 

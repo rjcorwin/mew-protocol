@@ -108,10 +108,10 @@ CLIENT_A_MSG_ID="client-a-join-$(date +%s)"
 post_message "client-a" "client-a-token" "{\"id\":\"${CLIENT_A_MSG_ID}\",\"kind\":\"chat\",\"payload\":{\"text\":\"Hello, I am client A\"}}"
 record_result "Client A joined" "${ENVELOPE_LOG}" "\"from\":\"client-a\""
 
-# Step 2: Client A requests a stream
-echo -e "${YELLOW}-- Step 2: Client A requests stream --${NC}"
+# Step 2: Client A requests a stream with metadata
+echo -e "${YELLOW}-- Step 2: Client A requests stream with metadata --${NC}"
 STREAM_REQ_ID="stream-req-$(date +%s)"
-post_message "client-a" "client-a-token" "{\"id\":\"${STREAM_REQ_ID}\",\"kind\":\"stream/request\",\"to\":[\"gateway\"],\"payload\":{\"direction\":\"upload\",\"expected_size_bytes\":1024,\"description\":\"Test stream\"}}"
+post_message "client-a" "client-a-token" "{\"id\":\"${STREAM_REQ_ID}\",\"kind\":\"stream/request\",\"to\":[\"gateway\"],\"payload\":{\"direction\":\"upload\",\"expected_size_bytes\":1024,\"description\":\"Test stream\",\"content_type\":\"text/plain\",\"format\":\"utf8\"}}"
 record_result "Stream request sent" "${ENVELOPE_LOG}" "\"kind\":\"stream/request\""
 
 # Wait for stream/open response
@@ -174,6 +174,12 @@ else
   echo -e "Stream has valid created timestamp: ${RED}✗${NC}"
   TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
+
+# Check that metadata fields are preserved from stream/request
+record_result "Stream metadata includes description" "${ENVELOPE_LOG}" "\"description\":\"Test stream\""
+record_result "Stream metadata includes content_type" "${ENVELOPE_LOG}" "\"content_type\":\"text/plain\""
+record_result "Stream metadata includes format" "${ENVELOPE_LOG}" "\"format\":\"utf8\""
+record_result "Stream metadata includes expected_size_bytes" "${ENVELOPE_LOG}" "\"expected_size_bytes\":1024"
 
 # Step 5: Close the stream
 echo -e "${YELLOW}-- Step 5: Close stream --${NC}"
