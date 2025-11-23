@@ -385,6 +385,7 @@ gateway
         space.activeStreams.set(streamId, {
           requestId: envelope.id,
           participantId: participantId,
+          authorizedWriters: [participantId], // [s2w] Initialize with owner as sole authorized writer
           created: new Date().toISOString(),
           ...envelope.payload  // Spread entire payload to preserve all fields
         });
@@ -447,6 +448,317 @@ gateway
             console.log(`[HTTP] Closed stream ${streamId}`);
           }
         }
+      }
+
+      // [s2w] Handle stream/grant-write - grant write access to another participant
+      if (envelope.kind === 'stream/grant-write') {
+        const { stream_id, participant_id, reason } = envelope.payload;
+        const stream = space.activeStreams.get(stream_id);
+
+        if (!stream) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'stream_not_found',
+              message: `Stream ${stream_id} does not exist`
+            }
+          };
+          return res.status(404).json(errorResponse);
+        }
+
+        if (stream.participantId !== participantId) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'unauthorized',
+              message: `Only the stream owner can grant write access`
+            }
+          };
+          return res.status(403).json(errorResponse);
+        }
+
+        // Check if target participant exists in space
+        if (!space.participants.has(participant_id)) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'participant_not_found',
+              message: `Participant ${participant_id} is not in the space`
+            }
+          };
+          return res.status(404).json(errorResponse);
+        }
+
+        // Initialize authorized_writers if not present
+        if (!stream.authorizedWriters) {
+          stream.authorizedWriters = [stream.participantId];
+        }
+
+        // Add participant to authorized writers (idempotent)
+        if (!stream.authorizedWriters.includes(participant_id)) {
+          stream.authorizedWriters.push(participant_id);
+        }
+
+        // Broadcast acknowledgement
+        const ackResponse = {
+          protocol: 'mew/v0.4',
+          id: `grant-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          ts: new Date().toISOString(),
+          from: 'gateway',
+          kind: 'stream/write-granted',
+          correlation_id: [envelope.id],
+          payload: {
+            stream_id,
+            participant_id,
+            authorized_writers: stream.authorizedWriters,
+            reason
+          }
+        };
+
+        for (const [pid, ws] of space.participants.entries()) {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(ackResponse));
+          }
+        }
+
+        if (options.logLevel === 'debug') {
+          console.log(`[HTTP] Granted write access to ${participant_id} for stream ${stream_id}`);
+        }
+
+        return res.json({
+          id: ackResponse.id,
+          status: 'granted',
+          stream_id,
+          authorized_writers: stream.authorizedWriters
+        });
+      }
+
+      // [s2w] Handle stream/revoke-write - revoke write access from a participant
+      if (envelope.kind === 'stream/revoke-write') {
+        const { stream_id, participant_id, reason } = envelope.payload;
+        const stream = space.activeStreams.get(stream_id);
+
+        if (!stream) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'stream_not_found',
+              message: `Stream ${stream_id} does not exist`
+            }
+          };
+          return res.status(404).json(errorResponse);
+        }
+
+        if (stream.participantId !== participantId) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'unauthorized',
+              message: `Only the stream owner can revoke write access`
+            }
+          };
+          return res.status(403).json(errorResponse);
+        }
+
+        // Owner cannot revoke self
+        if (participant_id === stream.participantId) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'invalid_operation',
+              message: `Owner cannot revoke own write access`
+            }
+          };
+          return res.status(400).json(errorResponse);
+        }
+
+        // Initialize authorized_writers if not present
+        if (!stream.authorizedWriters) {
+          stream.authorizedWriters = [stream.participantId];
+        }
+
+        // Remove participant from authorized writers (idempotent)
+        const index = stream.authorizedWriters.indexOf(participant_id);
+        if (index !== -1) {
+          stream.authorizedWriters.splice(index, 1);
+        }
+
+        // Broadcast acknowledgement
+        const ackResponse = {
+          protocol: 'mew/v0.4',
+          id: `revoke-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          ts: new Date().toISOString(),
+          from: 'gateway',
+          kind: 'stream/write-revoked',
+          correlation_id: [envelope.id],
+          payload: {
+            stream_id,
+            participant_id,
+            authorized_writers: stream.authorizedWriters,
+            reason
+          }
+        };
+
+        for (const [pid, ws] of space.participants.entries()) {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(ackResponse));
+          }
+        }
+
+        if (options.logLevel === 'debug') {
+          console.log(`[HTTP] Revoked write access from ${participant_id} for stream ${stream_id}`);
+        }
+
+        return res.json({
+          id: ackResponse.id,
+          status: 'revoked',
+          stream_id,
+          authorized_writers: stream.authorizedWriters
+        });
+      }
+
+      // [s2w] Handle stream/transfer-ownership - transfer stream ownership
+      if (envelope.kind === 'stream/transfer-ownership') {
+        const { stream_id, new_owner, reason } = envelope.payload;
+        const stream = space.activeStreams.get(stream_id);
+
+        if (!stream) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'stream_not_found',
+              message: `Stream ${stream_id} does not exist`
+            }
+          };
+          return res.status(404).json(errorResponse);
+        }
+
+        if (stream.participantId !== participantId) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'unauthorized',
+              message: `Only the stream owner can transfer ownership`
+            }
+          };
+          return res.status(403).json(errorResponse);
+        }
+
+        // Check if new owner exists in space
+        if (!space.participants.has(new_owner)) {
+          const errorResponse = {
+            protocol: 'mew/v0.4',
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'gateway',
+            to: [participantId],
+            kind: 'system/error',
+            correlation_id: [envelope.id],
+            payload: {
+              error: 'participant_not_found',
+              message: `Participant ${new_owner} is not in the space`
+            }
+          };
+          return res.status(404).json(errorResponse);
+        }
+
+        // Initialize authorized_writers if not present
+        if (!stream.authorizedWriters) {
+          stream.authorizedWriters = [stream.participantId];
+        }
+
+        // Transfer ownership
+        const previousOwner = stream.participantId;
+        stream.participantId = new_owner;
+
+        // Ensure new owner is in authorized writers
+        if (!stream.authorizedWriters.includes(new_owner)) {
+          stream.authorizedWriters.push(new_owner);
+        }
+
+        // Broadcast transfer event
+        const ackResponse = {
+          protocol: 'mew/v0.4',
+          id: `transfer-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          ts: new Date().toISOString(),
+          from: 'gateway',
+          kind: 'stream/ownership-transferred',
+          correlation_id: [envelope.id],
+          payload: {
+            stream_id,
+            previous_owner: previousOwner,
+            new_owner,
+            authorized_writers: stream.authorizedWriters,
+            reason
+          }
+        };
+
+        for (const [pid, ws] of space.participants.entries()) {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(ackResponse));
+          }
+        }
+
+        if (options.logLevel === 'debug') {
+          console.log(`[HTTP] Transferred ownership of stream ${stream_id} from ${previousOwner} to ${new_owner}`);
+        }
+
+        return res.json({
+          id: ackResponse.id,
+          status: 'transferred',
+          stream_id,
+          previous_owner: previousOwner,
+          new_owner,
+          authorized_writers: stream.authorizedWriters
+        });
       }
 
       // Broadcast message to space
@@ -536,11 +848,12 @@ gateway
       // Guard handles edge case of legacy spaces or race conditions during initialization
       return space.activeStreams
         ? Array.from(space.activeStreams.entries()).map(([streamId, info]) => {
-            // Separate internal fields from metadata to preserve in public API [j8v]
-            const { requestId, participantId, created, ...metadata } = info;
+            // Separate internal fields from metadata to preserve in public API [j8v] [s2w]
+            const { requestId, participantId, authorizedWriters, created, ...metadata } = info;
             return {
               stream_id: streamId,
               owner: participantId,
+              authorized_writers: authorizedWriters, // [s2w] Include authorized writers list
               created: created,
               ...metadata  // Spread all metadata from original stream/request
             };
@@ -1004,9 +1317,11 @@ gateway
             if (spaceId && spaces.has(spaceId)) {
               const space = spaces.get(spaceId);
 
-              // Verify stream exists and belongs to this participant
+              // Verify stream exists and participant is authorized to write [s2w]
               const streamInfo = space.activeStreams.get(streamId);
-              if (streamInfo && streamInfo.participantId === participantId) {
+              const authorizedWriters = streamInfo?.authorizedWriters || [streamInfo?.participantId];
+
+              if (streamInfo && authorizedWriters.includes(participantId)) {
                 // Forward to all participants
                 for (const [pid, pws] of space.participants.entries()) {
                   if (pws.readyState === WebSocket.OPEN) {
@@ -1014,7 +1329,21 @@ gateway
                   }
                 }
               } else {
-                console.log(`[GATEWAY WARNING] Invalid stream ID ${streamId} from ${participantId}`);
+                console.log(`[GATEWAY WARNING] Unauthorized stream write: ${streamId} from ${participantId}`);
+                // Optionally send error to sender
+                ws.send(JSON.stringify({
+                  protocol: 'mew/v0.4',
+                  id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  ts: new Date().toISOString(),
+                  from: 'gateway',
+                  to: [participantId],
+                  kind: 'system/error',
+                  payload: {
+                    error: 'unauthorized_stream_write',
+                    stream_id: streamId,
+                    message: `You are not authorized to write to stream ${streamId}`
+                  }
+                }));
               }
             }
             return; // Don't process as JSON message
@@ -1664,6 +1993,20 @@ gateway
           participantTokens.delete(participantId);
           participantCapabilities.delete(participantId);
           runtimeCapabilities.delete(participantId);
+
+          // [s2w] Auto-revoke write access from all streams when participant disconnects
+          for (const [streamId, streamInfo] of space.activeStreams.entries()) {
+            if (streamInfo.authorizedWriters && Array.isArray(streamInfo.authorizedWriters)) {
+              const index = streamInfo.authorizedWriters.indexOf(participantId);
+              // Only revoke if participant is not the owner (owner keeps access even when disconnected)
+              if (index !== -1 && streamInfo.participantId !== participantId) {
+                streamInfo.authorizedWriters.splice(index, 1);
+                if (options.logLevel === 'debug') {
+                  console.log(`[s2w] Auto-revoked ${participantId} from stream ${streamId} (disconnect)`);
+                }
+              }
+            }
+          }
 
           // Broadcast leave presence
           const presenceMessage = {

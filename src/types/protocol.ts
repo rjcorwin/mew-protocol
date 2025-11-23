@@ -105,6 +105,7 @@ export interface Proposal {
 export interface StreamMetadata {
   stream_id: string;
   owner: string;
+  authorized_writers?: string[]; // [s2w] Optional array of authorized writers
   direction: 'upload' | 'download';
   created: string; // ISO 8601 timestamp
   expected_size_bytes?: number;
@@ -313,6 +314,51 @@ export interface StreamClosePayload {
   [key: string]: unknown;
 }
 
+// [s2w] Stream ownership transfer payloads
+export interface StreamGrantWritePayload {
+  stream_id: string;
+  participant_id: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+export interface StreamRevokeWritePayload {
+  stream_id: string;
+  participant_id: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+export interface StreamTransferOwnershipPayload {
+  stream_id: string;
+  new_owner: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+// Optional acknowledgement messages for stream ownership operations
+export interface StreamWriteGrantedPayload {
+  stream_id: string;
+  participant_id: string;
+  authorized_writers: string[];
+  [key: string]: unknown;
+}
+
+export interface StreamWriteRevokedPayload {
+  stream_id: string;
+  participant_id: string;
+  authorized_writers: string[];
+  [key: string]: unknown;
+}
+
+export interface StreamOwnershipTransferredPayload {
+  stream_id: string;
+  previous_owner: string;
+  new_owner: string;
+  authorized_writers: string[];
+  [key: string]: unknown;
+}
+
 // ============================================================================
 // Message Kind Constants
 // ============================================================================
@@ -366,6 +412,12 @@ export const MessageKinds = {
   STREAM_REQUEST: 'stream/request',
   STREAM_OPEN: 'stream/open',
   STREAM_CLOSE: 'stream/close',
+  STREAM_GRANT_WRITE: 'stream/grant-write', // [s2w]
+  STREAM_REVOKE_WRITE: 'stream/revoke-write', // [s2w]
+  STREAM_TRANSFER_OWNERSHIP: 'stream/transfer-ownership', // [s2w]
+  STREAM_WRITE_GRANTED: 'stream/write-granted', // [s2w] acknowledgement
+  STREAM_WRITE_REVOKED: 'stream/write-revoked', // [s2w] acknowledgement
+  STREAM_OWNERSHIP_TRANSFERRED: 'stream/ownership-transferred', // [s2w] acknowledgement
 } as const;
 
 export type MessageKind = typeof MessageKinds[keyof typeof MessageKinds];

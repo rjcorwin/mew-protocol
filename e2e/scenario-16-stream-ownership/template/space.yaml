@@ -1,0 +1,33 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 16 - Stream Ownership Transfer"
+  description: "Validate stream ownership grant/revoke/transfer capabilities"
+
+participants:
+  stream-owner:
+    tokens: ["stream-owner-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/*"
+      - kind: "participant/status"
+    output_log: "./logs/stream-owner.log"
+    auto_connect: true
+
+  stream-writer:
+    tokens: ["stream-writer-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/*"
+      - kind: "participant/status"
+    output_log: "./logs/stream-writer.log"
+
+  verifier:
+    tokens: ["verifier-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "participant/status"
+    output_log: "./logs/verifier.log"
+
+defaults:
+  capabilities:
+    - kind: "chat"

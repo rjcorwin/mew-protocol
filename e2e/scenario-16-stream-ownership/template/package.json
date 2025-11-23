@@ -1,0 +1,8 @@
+{
+  "name": "{{SPACE_NAME}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scenario 16 - Stream Ownership Transfer",
+  "scripts": {},
+  "dependencies": {}
+}

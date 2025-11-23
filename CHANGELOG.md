@@ -6,11 +6,11 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ## Next
 
-### Proposed
+### Implemented
 
-#### [s2w] Stream Ownership Transfer (Draft)
+#### [s2w] Stream Ownership Transfer (Implemented)
 **Proposal:** `spec/protocol/proposals/s2w-stream-ownership/`
-**Status:** Draft - needs implementation
+**Status:** Implemented
 
 **Problem:** Streams currently enforce strict single-writer semantics - only the participant who created a stream can publish frames to it. This prevents important use cases like game character control delegation (player takes control of character position stream), collaborative workflows (multiple agents write to shared output stream), and ownership transfer when the original creator disconnects.
 
@@ -21,14 +21,16 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 Additionally, extend `system/welcome.active_streams` with `authorized_writers` array showing all participants authorized to write to each stream.
 
-**Changes (when implemented):**
-- Protocol: Add three new message kinds for stream authorization
-- Protocol: Add `authorized_writers` field to `system/welcome.active_streams`
-- Gateway: Track authorized writers per stream
-- Gateway: Validate stream frame publishers against authorized writers list
-- Gateway: Auto-revoke write access when participants disconnect
-- Types: Add payload types for new message kinds
-- Types: Extend `StreamMetadata` with `authorized_writers` field
+**Changes:**
+- Protocol: Added three new message kinds for stream authorization (see SPEC.md 3.10.5-3.10.7)
+- Protocol: Added `authorized_writers` field to `system/welcome.active_streams` (SPEC.md 3.10.8)
+- Gateway: Tracks authorized writers per stream (initialized on stream creation)
+- Gateway: Validates stream frame publishers against authorized writers list
+- Gateway: Auto-revokes write access when participants disconnect (except owner)
+- Gateway: Implements grant/revoke/transfer handlers with proper authorization checks
+- Gateway: Broadcasts acknowledgement messages for all authorization operations
+- Types: Added payload types for new message kinds (StreamGrantWritePayload, StreamRevokeWritePayload, StreamTransferOwnershipPayload)
+- Types: Extended `StreamMetadata` with `authorized_writers` field
 
 **Use Cases:**
 - Game character control delegation (Seacat RTS character position streams)
@@ -40,6 +42,8 @@ Additionally, extend `system/welcome.active_streams` with `authorized_writers` a
 - Gateway validates authorized writers on every frame
 - Owner cannot revoke self (always authorized)
 - All authorization changes are broadcast for transparency
+
+### Proposed
 
 ## [0.8.0] - 2025-11-23
 

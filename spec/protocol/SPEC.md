@@ -90,6 +90,12 @@ Field semantics:
   - `stream/request` - Ask the gateway to establish a new data stream
   - `stream/open` - Gateway confirms stream creation with assigned identifier
   - `stream/close` - Close a previously opened stream
+  - `stream/grant-write` **[s2w]** - Grant write access to another participant
+  - `stream/revoke-write` **[s2w]** - Revoke write access from a participant
+  - `stream/transfer-ownership` **[s2w]** - Transfer stream ownership to another participant
+  - `stream/write-granted` **[s2w]** - Acknowledgement that write access was granted
+  - `stream/write-revoked` **[s2w]** - Notification that write access was revoked
+  - `stream/ownership-transferred` **[s2w]** - Notification that ownership was transferred
   - `chat` - Chat messages
   - `chat/acknowledge` - Confirm receipt of a chat message
   - `chat/cancel` - Withdraw attention from a chat message that no longer needs action
@@ -1200,6 +1206,128 @@ Terminates a stream and releases associated resources:
 - Either side MAY send `stream/close`
 - `payload.reason` SHOULD distinguish between normal completion and errors (e.g., `"complete"`, `"cancelled"`, `"timeout"`)
 - After closing, no additional `#streamID#...` frames MUST be sent
+
+#### 3.10.5 Stream Grant Write (kind = "stream/grant-write") **[s2w]**
+
+Grants write access to another participant, allowing them to publish frames to the stream:
+
+```json
+{
+  "protocol": "mew/v0.4",
+  "id": "grant-1",
+  "from": "stream-owner",
+  "to": ["gateway"],
+  "kind": "stream/grant-write",
+  "payload": {
+    "stream_id": "stream-42",
+    "participant_id": "player1",
+    "reason": "Player claimed character control"
+  }
+}
+```
+
+**Behavior:**
+- Only the stream owner can grant write access
+- The target participant must exist in the space
+- Granting is idempotent (re-granting to same participant has no effect)
+- Gateway broadcasts acknowledgement (`stream/write-granted`) to all participants
+
+**Error conditions:**
+- Stream does not exist → `system/error` with `stream_not_found`
+- Sender not owner → `system/error` with `unauthorized`
+- Participant not in space → `system/error` with `participant_not_found`
+
+#### 3.10.6 Stream Revoke Write (kind = "stream/revoke-write") **[s2w]**
+
+Revokes write access from a participant:
+
+```json
+{
+  "protocol": "mew/v0.4",
+  "id": "revoke-1",
+  "from": "stream-owner",
+  "to": ["gateway"],
+  "kind": "stream/revoke-write",
+  "payload": {
+    "stream_id": "stream-42",
+    "participant_id": "player1",
+    "reason": "Player disconnected"
+  }
+}
+```
+
+**Behavior:**
+- Only the stream owner can revoke write access
+- Owner cannot revoke own write access
+- Revoking is idempotent (revoking non-authorized participant has no effect)
+- Gateway broadcasts notification (`stream/write-revoked`) to all participants
+- Gateway automatically revokes write access when participants disconnect (except owner)
+
+**Error conditions:**
+- Stream does not exist → `system/error` with `stream_not_found`
+- Sender not owner → `system/error` with `unauthorized`
+- Owner attempts self-revoke → `system/error` with `invalid_operation`
+
+#### 3.10.7 Stream Transfer Ownership (kind = "stream/transfer-ownership") **[s2w]**
+
+Transfers complete ownership of a stream to another participant:
+
+```json
+{
+  "protocol": "mew/v0.4",
+  "id": "transfer-1",
+  "from": "current-owner",
+  "to": ["gateway"],
+  "kind": "stream/transfer-ownership",
+  "payload": {
+    "stream_id": "stream-42",
+    "new_owner": "ai-agent",
+    "reason": "Permanent control delegation"
+  }
+}
+```
+
+**Behavior:**
+- Only the current owner can transfer ownership
+- New owner receives all ownership privileges (grant/revoke/transfer/close)
+- Previous owner loses ownership (but may retain write access if previously granted)
+- New owner is automatically added to authorized writers if not present
+- Gateway broadcasts transfer event (`stream/ownership-transferred`) to all participants
+
+**Error conditions:**
+- Stream does not exist → `system/error` with `stream_not_found`
+- Sender not owner → `system/error` with `unauthorized`
+- New owner not in space → `system/error` with `participant_not_found`
+
+#### 3.10.8 Stream Authorization in Welcome Message **[s2w]**
+
+The `system/welcome` message includes `authorized_writers` for each active stream, showing which participants can publish frames:
+
+```json
+{
+  "kind": "system/welcome",
+  "payload": {
+    "active_streams": [
+      {
+        "stream_id": "stream-42",
+        "owner": "character-server",
+        "authorized_writers": ["character-server", "player1"],
+        "direction": "upload",
+        "created": "2025-11-23T12:00:00Z",
+        "content_type": "application/json",
+        "format": "seacat/character-position-v1",
+        "metadata": {
+          "character_id": "character-player1"
+        }
+      }
+    ]
+  }
+}
+```
+
+- `authorized_writers` (optional): Array of participant IDs authorized to write to this stream
+- If omitted, defaults to `[owner]` (backward compatible)
+- Always includes owner (owner cannot be revoked)
 
 ---
 
