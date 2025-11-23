@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 # Scenario 15 assertions - validate active_streams in welcome message for late joiners
+#
+# HOW THIS TEST WORKS:
+#
+# This test validates the stream visibility feature using HTTP POST messages and the
+# "lazy auto-connect" mechanism for participants with output_log configured.
+#
+# Flow:
+# 1. Gateway starts with client-a already auto-connected (has auto_connect: true)
+# 2. client-a POSTs a stream/request, creating an active stream
+# 3. client-b POSTs its first message (a chat message)
+# 4. Gateway detects client-b has output_log but isn't connected yet
+# 5. Gateway triggers "lazy auto-connect" (gateway.ts:169-178):
+#    - Creates a virtual WebSocket for client-b
+#    - Adds client-b to space.participants
+#    - Calls buildActiveStreamsArray(space) to get current active streams
+#    - Sends welcome message with active_streams field to client-b
+#    - Virtual WebSocket's send() writes the welcome to client-b's log file
+# 6. Test validates welcome message in log file includes client-a's active stream
+#
+# Key insight: The virtual WebSocket's send() method just appends JSON to the log file,
+# so the participant doesn't need a real WebSocket connection to receive messages.
 
 set -euo pipefail
 
@@ -109,14 +130,18 @@ fi
 
 # Step 3: Client B joins AFTER stream is active
 echo -e "${YELLOW}-- Step 3: Client B joins (late joiner) --${NC}"
+# NOTE: This HTTP POST triggers lazy auto-connect because client-b has output_log configured.
+# The gateway will create a virtual WebSocket, add client-b to space.participants, and send
+# a welcome message that includes the active_streams array (with client-a's stream in it).
+# The welcome message gets written to client-b's log file via the virtual WebSocket.
 CLIENT_B_MSG_ID="client-b-join-$(date +%s)"
 post_message "client-b" "client-b-token" "{\"id\":\"${CLIENT_B_MSG_ID}\",\"kind\":\"chat\",\"payload\":{\"text\":\"Hello, I am client B\"}}"
 record_result "Client B joined" "${ENVELOPE_LOG}" "\"from\":\"client-b\""
 
 # Step 4: Check that Client B's welcome message includes active_streams
 echo -e "${YELLOW}-- Step 4: Verify Client B sees active stream in welcome --${NC}"
-
-# Look for welcome message addressed to client-b that includes active_streams
+# The welcome message was written to client-b's log during lazy auto-connect above.
+# We check the envelope log (which records all message deliveries) for the welcome.
 sleep 2
 
 # Check envelope log for welcome message to client-b with active_streams
