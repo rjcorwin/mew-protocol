@@ -1,0 +1,7 @@
+{
+  "name": "scenario-16-stream-ownership",
+  "version": "1.0.0",
+  "description": "E2E test for stream ownership grant/revoke/transfer operations",
+  "author": "MEW Protocol",
+  "license": "MIT"
+}
