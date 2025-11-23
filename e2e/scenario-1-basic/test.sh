@@ -12,7 +12,9 @@ export SPACE_NAME="${SPACE_NAME:-scenario-1-basic}"
 export TEST_PORT="${TEST_PORT:-$((8000 + RANDOM % 1000))}"
 
 cleanup() {
+  local exit_code=$?
   "${SCENARIO_DIR}/teardown.sh" || true
+  exit $exit_code
 }
 trap cleanup EXIT
 

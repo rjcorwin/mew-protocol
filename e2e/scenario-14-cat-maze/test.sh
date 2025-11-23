@@ -9,7 +9,9 @@ export REPO_ROOT="$(cd "${SCENARIO_DIR}/../.." && pwd)"
 export WORKSPACE_DIR="${WORKSPACE_DIR:-${SCENARIO_DIR}/.workspace}"
 
 cleanup() {
+  local exit_code=$?
   "${SCENARIO_DIR}/teardown.sh" || true
+  exit $exit_code
 }
 trap cleanup EXIT
 
