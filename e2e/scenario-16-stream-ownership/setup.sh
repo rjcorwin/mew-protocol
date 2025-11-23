@@ -29,7 +29,7 @@ pushd "${WORKSPACE_DIR}" >/dev/null
 
 mew init "${TEMPLATE_NAME}" --force --name "${SPACE_NAME}" --description "Scenario 16 - Stream Ownership" > init.log 2>&1
 
-mkdir -p logs
+mkdir -p logs pids
 : > logs/stream-owner.log
 : > logs/stream-writer.log
 : > logs/verifier.log
@@ -55,6 +55,43 @@ done
 
 sleep 2
 printf "%b\n" "${GREEN}✓ Gateway is ready on port ${TEST_PORT}${NC}"
+
+# Spawn interactive test participants
+printf "%b\n" "${BLUE}Starting interactive test participants...${NC}"
+
+node "${SCENARIO_DIR}/test-participant.js" stream-owner stream-owner-token "${TEST_PORT}" > logs/stream-owner-participant.log 2>&1 &
+OWNER_PID=$!
+echo ${OWNER_PID} > pids/stream-owner.pid
+
+node "${SCENARIO_DIR}/test-participant.js" stream-writer stream-writer-token "${TEST_PORT}" > logs/stream-writer-participant.log 2>&1 &
+WRITER_PID=$!
+echo ${WRITER_PID} > pids/stream-writer.pid
+
+node "${SCENARIO_DIR}/test-participant.js" verifier verifier-token "${TEST_PORT}" > logs/verifier-participant.log 2>&1 &
+VERIFIER_PID=$!
+echo ${VERIFIER_PID} > pids/verifier.pid
+
+# Wait for participants to connect by checking for "Welcome received" in logs
+printf "%b\n" "${BLUE}Waiting for participants to connect...${NC}"
+for attempt in {1..20}; do
+  if grep -q "Welcome received" logs/stream-owner-participant.log 2>/dev/null && \
+     grep -q "Welcome received" logs/stream-writer-participant.log 2>/dev/null && \
+     grep -q "Welcome received" logs/verifier-participant.log 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+  if [[ ${attempt} -eq 20 ]]; then
+    printf "%b\n" "${YELLOW}Warning: Participants did not all connect within timeout${NC}"
+    cat logs/*-participant.log 2>/dev/null || true
+  fi
+done
+
+sleep 1
+
+printf "%b\n" "${GREEN}✓ Test participants started and connected${NC}"
+printf "  stream-owner: PID ${OWNER_PID}\n"
+printf "  stream-writer: PID ${WRITER_PID}\n"
+printf "  verifier: PID ${VERIFIER_PID}\n"
 
 cat > "${ENV_FILE}" <<ENV
 SCENARIO_DIR=${SCENARIO_DIR}

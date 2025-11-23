@@ -14,6 +14,21 @@ printf "%b\n" "${YELLOW}=== Scenario 16 Teardown ===${NC}"
 
 if [[ -d "${WORKSPACE_DIR}" ]]; then
   pushd "${WORKSPACE_DIR}" >/dev/null
+
+  # Kill test participant processes
+  if [[ -d "pids" ]]; then
+    for pid_file in pids/*.pid; do
+      if [[ -f "${pid_file}" ]]; then
+        pid=$(cat "${pid_file}")
+        if kill -0 "${pid}" 2>/dev/null; then
+          kill "${pid}" 2>/dev/null || true
+          printf "%b\n" "${GREEN}✓ Killed participant process ${pid}${NC}"
+        fi
+        rm -f "${pid_file}"
+      fi
+    done
+  fi
+
   mew space down || true
   popd >/dev/null
   printf "%b\n" "${GREEN}✓ Space stopped${NC}"
