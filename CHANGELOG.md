@@ -4,13 +4,12 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ## [Unreleased]
 
-## Next
+## [0.9.0] - 2025-11-23
 
-### Implemented
+### Added
 
-#### [s2w] Stream Ownership Transfer (Implemented)
+#### [s2w] Stream Ownership Transfer
 **Proposal:** `spec/protocol/proposals/s2w-stream-ownership/`
-**Status:** Implemented
 
 **Problem:** Streams currently enforce strict single-writer semantics - only the participant who created a stream can publish frames to it. This prevents important use cases like game character control delegation (player takes control of character position stream), collaborative workflows (multiple agents write to shared output stream), and ownership transfer when the original creator disconnects.
 
@@ -42,8 +41,6 @@ Additionally, extend `system/welcome.active_streams` with `authorized_writers` a
 - Gateway validates authorized writers on every frame
 - Owner cannot revoke self (always authorized)
 - All authorization changes are broadcast for transparency
-
-### Proposed
 
 ## [0.8.0] - 2025-11-23
 
