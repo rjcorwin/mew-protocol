@@ -206,11 +206,12 @@ npm run lint        # ✓ No linting errors
 ## Files Changed
 
 1. `spec/protocol/proposals/j8v-stream-visibility/proposal.md` - Enhanced proposal
-2. `src/types/protocol.ts` - Extended type definitions
-3. `src/cli/commands/gateway.ts` - Metadata preservation implementation
-4. `e2e/scenario-15-stream-visibility/check.sh` - Enhanced test + documentation
-5. `CHANGELOG.md` - Updated entry
-6. `PR.md` - This file
+2. `spec/protocol/SPEC.md` - Updated welcome message and stream/request sections
+3. `src/types/protocol.ts` - Extended type definitions
+4. `src/cli/commands/gateway.ts` - Metadata preservation implementation
+5. `e2e/scenario-15-stream-visibility/check.sh` - Enhanced test + documentation
+6. `CHANGELOG.md` - Updated entry
+7. `PR.md` - This file
 
 ## Checklist
 
