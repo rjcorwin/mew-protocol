@@ -821,7 +821,11 @@ When a participant connects, the gateway MUST send a welcome message addressed s
         "stream_id": "stream-42",
         "owner": "agent-1",
         "direction": "upload",
-        "created": "2025-01-09T10:00:00Z"
+        "created": "2025-01-09T10:00:00Z",
+        "content_type": "application/json",
+        "format": "jsonl",
+        "description": "Chain-of-thought reasoning",
+        "expected_size_bytes": 1048576
       }
     ]
   }
@@ -830,12 +834,19 @@ When a participant connects, the gateway MUST send a welcome message addressed s
 
 - `you`: The joining participant's own information and authoritative capabilities
 - `participants`: Current list of other participants in the space and their capabilities
-- `active_streams` (optional): Array of currently active streams in the space. Each stream object contains:
-  - `stream_id`: Unique identifier for the stream
-  - `owner`: Participant ID that requested the stream
-  - `direction`: "upload" or "download"
-  - `created`: ISO 8601 timestamp when the stream was opened
+- `active_streams` (optional): Array of currently active streams in the space [j8v]. Each stream object contains:
+  - `stream_id` (required): Unique identifier for the stream
+  - `owner` (required): Participant ID that requested the stream
+  - `direction` (required): "upload" or "download"
+  - `created` (required): ISO 8601 timestamp when the stream was opened
+  - `expected_size_bytes` (optional): Size hint from original request
+  - `description` (optional): Human-readable description from original request
+  - `content_type` (optional): MIME type or format identifier (e.g., "application/json", "application/x-game-positions")
+  - `format` (optional): Stream schema/encoding (e.g., "jsonl", "binary-vector3")
+  - `metadata` (optional): Arbitrary key-value pairs from original request
+  - Additional custom fields from the original `stream/request` are preserved
   - May be omitted or empty array if no streams are active
+  - **Design principle:** All fields from the original `stream/request` payload are preserved to ensure late joiners have complete context about stream format and purpose
 
 **Important:** Other participants SHOULD ignore welcome messages not addressed to them when constructing prompts, as these can cause significant bloat. The message is already targeted via the `to` field.
 
@@ -1112,18 +1123,35 @@ Sent by whichever entity initiates stream negotiation (typically a participant a
   "payload": {
     "direction": "upload",
     "expected_size_bytes": 10485760,
-    "description": "Large dataset export"
+    "description": "Large dataset export",
+    "content_type": "application/json",
+    "format": "jsonl",
+    "metadata": {
+      "compression": "gzip",
+      "schema_version": "1.0"
+    }
   }
 }
 ```
 
-- `direction` clarifies whether the sender will upload or download data
-- `expected_size_bytes` is advisory and MAY be omitted
-- `correlation_id` (not shown) MAY reference the message that motivated the stream (e.g., a proposal or request)
+**Payload Fields:**
+- `direction` (required): "upload" or "download" - clarifies data flow direction
+- `expected_size_bytes` (optional): Advisory size hint for the stream
+- `description` (optional): Human-readable description of stream purpose
+- `content_type` (optional): MIME type or custom format identifier (e.g., "application/json", "application/x-game-positions")
+- `format` (optional): Stream schema/encoding specification (e.g., "jsonl", "binary-vector3", "utf8-newline-delimited")
+- `metadata` (optional): Arbitrary key-value pairs for application-specific metadata
+- Additional custom fields are allowed and will be preserved [j8v]
+
+**Gateway Behavior:**
 - The gateway MUST intercept all `stream/request` messages and reply with `stream/open` containing a unique `stream_id`
+- The gateway MUST preserve ALL payload fields from the request and include them in `active_streams` when sending `system/welcome` to late joiners [j8v]
 - The gateway is responsible for stream ID allocation and management, regardless of the request's `to` field
-- Agents that expose long-form reasoning SHOULD consider issuing a `stream/request` alongside `reasoning/start` so subscribers
-  can follow high-volume traces without bloating the shared envelope log.
+- `correlation_id` (not shown) MAY reference the message that motivated the stream (e.g., a proposal or request)
+
+**Usage Notes:**
+- Agents that expose long-form reasoning SHOULD consider issuing a `stream/request` alongside `reasoning/start` so subscribers can follow high-volume traces without bloating the shared envelope log
+- Applications with custom stream formats (like games) SHOULD include `content_type` and `format` to enable late joiners to properly parse stream data
 
 #### 3.10.2 Stream Open (kind = "stream/open")
 
