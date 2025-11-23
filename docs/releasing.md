@@ -2,8 +2,6 @@
 
 This guide covers the complete process for releasing MEW Protocol to npm.
 
-> **📋 Release Documentation**: For versioned release plans and reports, see [`docs/releases/`](../docs/releases/README.md)
-
 ## Package Information
 
 MEW Protocol is published as a single npm package:
@@ -18,14 +16,40 @@ MEW Protocol is published as a single npm package:
 # Ensure all changes are committed
 git status
 
-# Ensure you're on the main branch (or release branch)
+# Ensure you're on the main branch
 git branch
 
 # Pull latest changes
 git pull origin main
 ```
 
-### 2. Run Tests and Quality Checks
+### 2. Verify CHANGELOG is Ready
+
+```bash
+# Check that CHANGELOG.md has an "Unreleased" section with content
+# The release process will convert this to a versioned section
+cat CHANGELOG.md | head -50
+```
+
+Ensure the "Unreleased" section documents all changes since the last release.
+
+### 3. Determine Version Bump
+
+Based on changes in the "Unreleased" section, decide the version bump:
+- **patch** (0.7.0 → 0.7.1): Bug fixes, documentation updates only
+- **minor** (0.7.0 → 0.8.0): New features, enhancements, breaking changes (allowed in v0.x)
+- **major** (0.7.0 → 1.0.0): First stable release
+
+```bash
+# Check current version
+node -p "require('./package.json').version"
+
+# See commits since last release tag
+CURRENT_VERSION=$(node -p "require('./package.json').version")
+git log --oneline "v${CURRENT_VERSION}..HEAD"
+```
+
+### 4. Run Tests and Quality Checks
 
 ```bash
 # Build the project
@@ -43,7 +67,7 @@ npx tsc --noEmit
 
 All tests should pass before proceeding with the release.
 
-### 3. Check npm Authentication
+### 5. Check npm Authentication
 
 ```bash
 # Verify npm login
@@ -59,7 +83,7 @@ If not logged in:
 npm login
 ```
 
-### 4. Review Package Contents
+### 6. Review Package Contents
 
 ```bash
 # Check what will be published (dry run)
@@ -74,59 +98,67 @@ npm pack --dry-run
 
 ## Release Process
 
-### Phase 1: Update Changelog
+**Important**: This process creates a single atomic commit with CHANGELOG + version bump, creates a local tag, publishes to npm, and only pushes if publishing succeeds. This ensures the repository stays consistent with npm.
 
-Review changes since the last release and update `CHANGELOG.md`:
+### Step 1: Update CHANGELOG
+
+Convert the "Unreleased" section to a versioned release with today's date:
 
 ```bash
-# See commits since last release tag
-git log --oneline v0.4.0..HEAD
+# Get today's date in YYYY-MM-DD format
+RELEASE_DATE=$(date +%Y-%m-%d)
 
-# See detailed changes
-git log v0.4.0..HEAD --pretty=format:"%h %s" --graph
+# Determine the new version (example for minor bump)
+NEW_VERSION="0.8.0"  # Replace with your target version
+
+# Edit CHANGELOG.md:
+# 1. Change "## [Unreleased]" to "## [Unreleased]\n\n## [${NEW_VERSION}] - ${RELEASE_DATE}"
+# 2. Move all content under Unreleased to the new version section
+# 3. Leave Unreleased section empty for future changes
+
+# Manual edit required - open in your editor
+$EDITOR CHANGELOG.md
 ```
 
-Update `CHANGELOG.md` with the new version section:
-
+Example transformation:
 ```markdown
-## [0.5.0] - 2025-XX-XX
+# Before:
+## [Unreleased]
 
 ### Added
-- New feature descriptions
-
-### Changed
-- Modified behavior descriptions
+- New feature X
 
 ### Fixed
-- Bug fix descriptions
+- Bug Y
 
-### Breaking Changes
-- Any breaking changes (especially important for v0.x)
+## [0.7.0] - 2025-11-08
+
+# After:
+## [Unreleased]
+
+## [0.8.0] - 2025-11-23
+
+### Added
+- New feature X
+
+### Fixed
+- Bug Y
+
+## [0.7.0] - 2025-11-08
 ```
 
-Commit the changelog:
-```bash
-git add CHANGELOG.md
-git commit -m "docs: update changelog for v0.5.0 release"
-```
-
-### Phase 2: Version Bump
-
-Choose the appropriate version bump based on changes:
-- **patch** (0.4.0 → 0.4.1): Bug fixes, minor updates
-- **minor** (0.4.0 → 0.5.0): New features, non-breaking changes
-- **major** (0.4.0 → 1.0.0): Breaking changes
+### Step 2: Version Bump
 
 ```bash
-# Bump version (choose one)
-npm version patch --no-git-tag-version  # For bug fixes
-npm version minor --no-git-tag-version  # For new features
-npm version major --no-git-tag-version  # For breaking changes
+# Bump version (choose one based on Step 3 of pre-release checklist)
+npm version patch --no-git-tag-version  # For bug fixes (0.7.0 → 0.7.1)
+npm version minor --no-git-tag-version  # For new features (0.7.0 → 0.8.0)
+npm version major --no-git-tag-version  # For stable release (0.7.0 → 1.0.0)
 
 # This updates package.json and package-lock.json
 ```
 
-### Phase 3: Build for Release
+### Step 3: Build for Release
 
 ```bash
 # Clean build
@@ -137,30 +169,44 @@ npm run build
 ls -la dist/
 ```
 
-### Phase 4: Commit Version Changes
+### Step 4: Commit CHANGELOG + Version (Atomic)
 
 ```bash
-# Check what changed
-git status
+# Stage both CHANGELOG and version files
+git add CHANGELOG.md package.json package-lock.json
 
-# Add version changes
-git add package.json package-lock.json
+# Get the new version for commit message
+VERSION=$(node -p "require('./package.json').version")
 
-# Commit the version bump
-git commit -m "chore: bump version to $(node -p "require('./package.json').version")
+# Create atomic commit
+git commit -m "chore: release v${VERSION}
+
+Updated CHANGELOG.md and bumped version to ${VERSION}.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
-# Push the version bump commit
-git push origin main
+# DO NOT PUSH YET - wait until npm publish succeeds
 ```
 
-### Phase 5: Publish to npm
+### Step 5: Create Local Git Tag
 
 ```bash
-# Get your npm OTP ready (from authenticator app)
+# Get the version from package.json
+VERSION=$(node -p "require('./package.json').version")
+
+# Create annotated tag locally (don't push yet)
+git tag -a "v${VERSION}" -m "Release v${VERSION}"
+
+# Verify tag was created
+git tag -l "v${VERSION}"
+```
+
+### Step 6: Publish to npm
+
+```bash
+# Have your npm OTP ready (from authenticator app)
 
 # Publish the package
 npm publish --access public --otp=YOUR_OTP_HERE
@@ -168,26 +214,25 @@ npm publish --access public --otp=YOUR_OTP_HERE
 # Replace YOUR_OTP_HERE with your 6-digit OTP code
 ```
 
-**Note**: npm may require 2FA (two-factor authentication). Have your authenticator app ready.
+**Note**: If publish fails, you can safely reset:
+```bash
+# Reset the commit and tag
+git reset --hard HEAD~1
+git tag -d "v${VERSION}"
 
-### Phase 6: Create Git Tag
+# Fix the issue and try again
+```
+
+### Step 7: Push Commit and Tag (Only After Successful Publish)
 
 ```bash
-# Get the version from package.json
+# If npm publish succeeded, push both commit and tag
 VERSION=$(node -p "require('./package.json').version")
-
-# Create and push the tag
-git tag "v$VERSION"
-git push origin "v$VERSION"
-
-# Or create an annotated tag with release notes
-git tag -a "v$VERSION" -m "Release v$VERSION
-
-- Feature 1
-- Feature 2
-- Bug fix 3"
-git push origin "v$VERSION"
+git push origin main
+git push origin "v${VERSION}"
 ```
+
+**Important**: Only push after npm publish succeeds. This keeps the repository in sync with npm.
 
 ## Post-Release Tasks
 
@@ -197,7 +242,7 @@ git push origin "v$VERSION"
 # Check the package on npm
 npm view @mew-protocol/mew
 
-# Verify the latest version
+# Verify the latest version matches what you just published
 npm view @mew-protocol/mew version
 
 # Check all published versions
@@ -214,7 +259,8 @@ mkdir /tmp/mew-release-test
 cd /tmp/mew-release-test
 
 # Install the published package globally
-npm install -g @mew-protocol/mew@latest
+VERSION=$(cd /Users/rj/Git/rjcorwin/mew-protocol && node -p "require('./package.json').version")
+npm install -g @mew-protocol/mew@${VERSION}
 
 # Verify CLI works
 mew --version
@@ -243,39 +289,36 @@ rm -rf /tmp/mew-release-test
 npm uninstall -g @mew-protocol/mew
 ```
 
-### 3. Update Changelog Date
-
-Update the changelog with the actual release date:
+### 3. Create GitHub Release
 
 ```bash
-# Edit CHANGELOG.md
-# Change "2025-XX-XX" to actual release date (e.g., "2025-01-15")
+# Get the version
+VERSION=$(node -p "require('./package.json').version")
 
-git add CHANGELOG.md
-git commit -m "docs: update changelog release date"
-git push origin main
+# Extract release notes from CHANGELOG.md for this version
+# You can use gh CLI to create a release with notes
+
+gh release create "v${VERSION}" \
+  --title "MEW Protocol v${VERSION}" \
+  --notes "See CHANGELOG.md for details" \
+  --verify-tag
 ```
 
-### 4. Update Documentation
+Or create manually at: https://github.com/rjcorwin/mew-protocol/releases/new
+
+### 4. Update Documentation (if needed)
 
 Update any documentation that references specific versions:
 
 ```bash
-# Check for version references
-grep -r "0.4" README.md docs/
+# Check for hardcoded version references
+grep -r "0.7.0" README.md docs/
 
 # Update as needed
 git add README.md docs/
-git commit -m "docs: update version references for release"
+git commit -m "docs: update version references for v${VERSION}"
 git push origin main
 ```
-
-### 5. Announce the Release
-
-Consider announcing the release:
-- Create a GitHub release with release notes
-- Update project documentation
-- Notify users/contributors
 
 ## Troubleshooting
 
@@ -298,7 +341,9 @@ npm login
 npm view @mew-protocol/mew versions --json
 
 # You cannot republish the same version
-# Bump to a new version and try again
+# If you haven't pushed yet, reset and bump again
+git reset --hard HEAD~1
+git tag -d "v${VERSION}"
 npm version patch --no-git-tag-version
 ```
 
@@ -322,18 +367,27 @@ ls -la dist/
 npm pack --dry-run | grep dist/
 ```
 
-**Package Too Large**
+**Publish Succeeded but Push Failed**
 ```bash
-# Check package size
-npm pack --dry-run
+# If npm publish worked but git push failed, just retry the push
+VERSION=$(node -p "require('./package.json').version")
+git push origin main
+git push origin "v${VERSION}"
+```
 
-# Review .npmignore to exclude unnecessary files
-cat .npmignore
+**Need to Rollback After Publishing**
+```bash
+# You cannot unpublish after 72 hours or if others depend on it
+# Instead, publish a new patch version with the fix
 
-# Common things to exclude:
-# - e2e/ (test scenarios)
-# - .github/ (CI configuration)
-# - src/ (if dist/ contains compiled code)
+# If within 72 hours and no dependents:
+npm unpublish @mew-protocol/mew@VERSION
+
+# Then reset git state
+git reset --hard HEAD~1
+git tag -d "v${VERSION}"
+git push origin main --force
+git push origin :refs/tags/v${VERSION}  # Delete remote tag
 ```
 
 ### Build Issues
@@ -373,8 +427,9 @@ MEW Protocol follows semantic versioning while in v0.x (experimental phase):
 
 ### Version Guidelines
 
-1. **Patch releases (0.4.x)**:
+1. **Patch releases (0.7.x)**:
    - Bug fixes only
+   - Documentation updates
    - No new features
    - No breaking changes
 
@@ -387,6 +442,7 @@ MEW Protocol follows semantic versioning while in v0.x (experimental phase):
 3. **Major release (1.0.0)**:
    - First stable release
    - After this, follow strict semantic versioning
+   - Breaking changes only in major versions
 
 ## Emergency Procedures
 
@@ -411,7 +467,7 @@ For problematic versions that can't be unpublished:
 npm deprecate @mew-protocol/mew@VERSION "Reason for deprecation. Use vX.Y.Z instead."
 
 # Example
-npm deprecate @mew-protocol/mew@0.4.5 "Contains critical bug. Use v0.4.6 instead."
+npm deprecate @mew-protocol/mew@0.7.5 "Contains critical bug. Use v0.7.6 instead."
 ```
 
 ### Hotfix Release
@@ -420,7 +476,7 @@ For critical bugs in production:
 
 1. Create hotfix branch from release tag:
    ```bash
-   git checkout -b hotfix/v0.4.6 v0.4.5
+   git checkout -b hotfix/v0.7.6 v0.7.5
    ```
 
 2. Make minimal fix:
@@ -430,17 +486,12 @@ For critical bugs in production:
    git commit -m "fix: critical bug description"
    ```
 
-3. Bump patch version:
-   ```bash
-   npm version patch --no-git-tag-version
-   ```
+3. Follow normal release process starting from Step 1 (update CHANGELOG)
 
-4. Follow normal release process (build, publish, tag)
-
-5. Merge back to main:
+4. Merge back to main:
    ```bash
    git checkout main
-   git merge hotfix/v0.4.6
+   git merge hotfix/v0.7.6
    git push origin main
    ```
 
@@ -451,17 +502,19 @@ Use this checklist for each release:
 - [ ] All changes committed and pushed
 - [ ] Tests passing (`./e2e/run-all-tests.sh`)
 - [ ] Linting passing (`npm run lint`)
-- [ ] Changelog updated with changes
+- [ ] CHANGELOG.md "Unreleased" section has content
+- [ ] Determined version bump (patch/minor/major)
+- [ ] Updated CHANGELOG.md with version and date
 - [ ] Version bumped in package.json
 - [ ] Clean build completed (`npm run clean && npm run build`)
-- [ ] Version commit pushed to main
-- [ ] Package published to npm
+- [ ] Atomic commit created (CHANGELOG + version files)
+- [ ] Local git tag created
+- [ ] Package published to npm successfully
+- [ ] Commit and tag pushed to GitHub
 - [ ] Publication verified on npm
-- [ ] Git tag created and pushed
 - [ ] Installation tested in clean environment
-- [ ] Changelog date updated
-- [ ] Documentation updated
-- [ ] Release announced (GitHub release, etc.)
+- [ ] GitHub release created
+- [ ] Documentation updated (if needed)
 
 ## Future Improvements
 
@@ -474,4 +527,4 @@ Consider implementing:
 
 ---
 
-**Note**: This release process ensures that the MEW Protocol package is published correctly and tested before being made available to users.
+**Note**: This release process ensures that the MEW Protocol package is published correctly and tested before being made available to users. The atomic commit + local tag + publish-first approach keeps the repository in sync with npm and allows easy rollback if publishing fails.
