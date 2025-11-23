@@ -4,6 +4,43 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ## [Unreleased]
 
+## Next
+
+### Proposed
+
+#### [s2w] Stream Ownership Transfer (Draft)
+**Proposal:** `spec/protocol/proposals/s2w-stream-ownership/`
+**Status:** Draft - needs implementation
+
+**Problem:** Streams currently enforce strict single-writer semantics - only the participant who created a stream can publish frames to it. This prevents important use cases like game character control delegation (player takes control of character position stream), collaborative workflows (multiple agents write to shared output stream), and ownership transfer when the original creator disconnects.
+
+**Solution:** Add three new message kinds for stream authorization management:
+- `stream/grant-write` - Owner grants write access to another participant
+- `stream/revoke-write` - Owner revokes write access from a participant
+- `stream/transfer-ownership` - Owner transfers complete ownership to another participant
+
+Additionally, extend `system/welcome.active_streams` with `authorized_writers` array showing all participants authorized to write to each stream.
+
+**Changes (when implemented):**
+- Protocol: Add three new message kinds for stream authorization
+- Protocol: Add `authorized_writers` field to `system/welcome.active_streams`
+- Gateway: Track authorized writers per stream
+- Gateway: Validate stream frame publishers against authorized writers list
+- Gateway: Auto-revoke write access when participants disconnect
+- Types: Add payload types for new message kinds
+- Types: Extend `StreamMetadata` with `authorized_writers` field
+
+**Use Cases:**
+- Game character control delegation (Seacat RTS character position streams)
+- Collaborative output streams (multiple agents writing to shared results)
+- Ownership transfer on disconnect (backup takes over critical stream)
+
+**Security:**
+- Only stream owner can grant/revoke/transfer authorization
+- Gateway validates authorized writers on every frame
+- Owner cannot revoke self (always authorized)
+- All authorization changes are broadcast for transparency
+
 ## [0.8.0] - 2025-11-23
 
 ### Added
