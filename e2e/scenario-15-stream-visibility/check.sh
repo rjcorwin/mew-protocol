@@ -97,7 +97,8 @@ record_result "Stream request sent" "${ENVELOPE_LOG}" "\"kind\":\"stream/request
 sleep 2
 
 # Extract stream ID from envelope log
-STREAM_ID=$(grep -F '"kind":"stream/open"' "${ENVELOPE_LOG}" 2>/dev/null | tail -1 | grep -oP '"stream_id":"[^"]+' | cut -d'"' -f4 | head -1 | tr -d '\n' || echo "")
+# Use sed instead of grep -P for macOS compatibility
+STREAM_ID=$(grep -F '"kind":"stream/open"' "${ENVELOPE_LOG}" 2>/dev/null | tail -1 | sed -n 's/.*"stream_id":"\([^"]*\)".*/\1/p' || echo "")
 if [[ -n "${STREAM_ID}" ]]; then
   echo -e "Stream opened with ID: ${GREEN}${STREAM_ID}${NC}"
   TESTS_PASSED=$((TESTS_PASSED + 1))
