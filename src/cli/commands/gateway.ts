@@ -377,7 +377,8 @@ gateway
 
       // Handle space/invite - generate token and respond only to inviter
       if (envelope.kind === 'space/invite') {
-        const { participant_id: newParticipantId, initial_capabilities, reason } = envelope.payload;
+        const payload = envelope.payload || {};
+        const { participant_id: newParticipantId, initial_capabilities, reason } = payload;
 
         if (!newParticipantId) {
           return res.status(400).json({
@@ -386,8 +387,17 @@ gateway
           });
         }
 
-        // Check if participant already exists
-        if (tokenMap.has(newParticipantId)) {
+        // Validate participant_id to prevent path traversal attacks
+        if (newParticipantId.includes('/') || newParticipantId.includes('\\') || newParticipantId.includes('..')) {
+          return res.status(400).json({
+            error: 'invalid_request',
+            message: 'participant_id contains invalid characters'
+          });
+        }
+
+        // Check if participant already exists (in tokenMap or spaceConfig)
+        const existsInConfig = spaceConfig?.participants && newParticipantId in spaceConfig.participants;
+        if (tokenMap.has(newParticipantId) || existsInConfig) {
           const inviteAckEnvelope = {
             protocol: 'mew/v0.4',
             id: `invite-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -1133,6 +1143,10 @@ gateway
     // Default capability resolver using space.yaml
     async function defaultCapabilityResolver(token, participantId, messageKind) {
       if (!spaceConfig) {
+        // Check if this is an invited participant with capabilities in memory
+        if (participantCapabilities.has(participantId)) {
+          return participantCapabilities.get(participantId);
+        }
         // Fallback to basic defaults
         return [{ kind: 'chat' }];
       }
@@ -1140,6 +1154,10 @@ gateway
       // Find participant by token (using tokenMap from secure storage)
       for (const [pid, storedToken] of tokenMap.entries()) {
         if (storedToken === token) {
+          // Check for invited participant capabilities first (set during space/invite)
+          if (participantCapabilities.has(pid)) {
+            return participantCapabilities.get(pid);
+          }
           const config = spaceConfig.participants[pid];
           return config?.capabilities || spaceConfig.defaults?.capabilities || [];
         }
@@ -1150,6 +1168,11 @@ gateway
         if (config.tokens && config.tokens.includes(token)) {
           return config.capabilities || spaceConfig.defaults?.capabilities || [];
         }
+      }
+
+      // Check if we have capabilities for this participant in memory (invited participants)
+      if (participantCapabilities.has(participantId)) {
+        return participantCapabilities.get(participantId);
       }
 
       // Return default capabilities if no match
@@ -2055,8 +2078,28 @@ gateway
               return;
             }
 
-            // Check if participant already exists
-            if (tokenMap.has(newParticipantId)) {
+            // Validate participant_id to prevent path traversal attacks
+            if (newParticipantId.includes('/') || newParticipantId.includes('\\') || newParticipantId.includes('..')) {
+              const errorMessage = {
+                protocol: 'mew/v0.4',
+                id: `error-${Date.now()}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                to: [participantId],
+                kind: 'system/error',
+                correlation_id: message.id ? [message.id] : undefined,
+                payload: {
+                  error: 'invalid_request',
+                  message: 'participant_id contains invalid characters',
+                },
+              };
+              ws.send(JSON.stringify(errorMessage));
+              return;
+            }
+
+            // Check if participant already exists (in tokenMap or spaceConfig)
+            const existsInConfig = spaceConfig?.participants && newParticipantId in spaceConfig.participants;
+            if (tokenMap.has(newParticipantId) || existsInConfig) {
               const inviteAckEnvelope = {
                 protocol: 'mew/v0.4',
                 id: `invite-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,

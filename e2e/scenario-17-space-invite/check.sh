@@ -226,6 +226,80 @@ else
   record_fail "Duplicate invite returns already_exists"
 fi
 
+# Test 13: Path traversal prevention - participant_id with ../
+printf "\n%b\n" "${YELLOW}Testing security: path traversal prevention${NC}"
+
+TRAVERSAL_RESPONSE=$(curl -s -X POST "http://localhost:${TEST_PORT}/participants/admin/messages?space=${SPACE_NAME}" \
+  -H "Authorization: Bearer admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "space/invite",
+    "payload": {
+      "participant_id": "../../../etc/passwd",
+      "initial_capabilities": [{"kind": "chat"}],
+      "reason": "Path traversal test"
+    }
+  }' 2>&1) || TRAVERSAL_RESPONSE=""
+
+if echo "${TRAVERSAL_RESPONSE}" | grep -q 'invalid characters'; then
+  record_pass "Path traversal blocked (../)"
+else
+  record_fail "Path traversal blocked (../)"
+fi
+
+# Test 14: Path traversal prevention - participant_id with /
+SLASH_RESPONSE=$(curl -s -X POST "http://localhost:${TEST_PORT}/participants/admin/messages?space=${SPACE_NAME}" \
+  -H "Authorization: Bearer admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "space/invite",
+    "payload": {
+      "participant_id": "foo/bar",
+      "initial_capabilities": [{"kind": "chat"}],
+      "reason": "Slash test"
+    }
+  }' 2>&1) || SLASH_RESPONSE=""
+
+if echo "${SLASH_RESPONSE}" | grep -q 'invalid characters'; then
+  record_pass "Path traversal blocked (/)"
+else
+  record_fail "Path traversal blocked (/)"
+fi
+
+# Test 15: Cannot invite existing config participant (admin)
+CONFIG_DUPE_RESPONSE=$(curl -s -X POST "http://localhost:${TEST_PORT}/participants/admin/messages?space=${SPACE_NAME}" \
+  -H "Authorization: Bearer admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "space/invite",
+    "payload": {
+      "participant_id": "observer",
+      "initial_capabilities": [{"kind": "chat"}],
+      "reason": "Try to invite config participant"
+    }
+  }' 2>&1) || CONFIG_DUPE_RESPONSE=""
+
+if echo "${CONFIG_DUPE_RESPONSE}" | grep -q '"already_exists"'; then
+  record_pass "Cannot invite existing config participant"
+else
+  record_fail "Cannot invite existing config participant"
+fi
+
+# Test 16: Missing payload handled gracefully (400 not 500)
+MISSING_PAYLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "http://localhost:${TEST_PORT}/participants/admin/messages?space=${SPACE_NAME}" \
+  -H "Authorization: Bearer admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "space/invite"
+  }' 2>&1)
+
+HTTP_CODE=$(echo "${MISSING_PAYLOAD_RESPONSE}" | tail -n1)
+if [[ "${HTTP_CODE}" == "400" ]]; then
+  record_pass "Missing payload returns 400 (not 500)"
+else
+  record_fail "Missing payload returns 400 (not 500) - got ${HTTP_CODE}"
+fi
+
 # Summary
 printf "\n%b\n" "${YELLOW}=== Scenario 17 Summary ===${NC}"
 printf "Passed: %d\n" "${tests_passed}"
