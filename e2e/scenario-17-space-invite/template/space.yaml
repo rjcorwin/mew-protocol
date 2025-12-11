@@ -1,0 +1,30 @@
+space:
+  id: "{{SPACE_NAME}}"
+  name: "Scenario 17 - Space Invite"
+  description: "Test inviting new participants with space/invite and verifying capabilities"
+
+participants:
+  # Admin participant that can invite others
+  admin:
+    tokens: ["admin-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "space/invite"
+      - kind: "mcp/response"
+      - kind: "system/*"
+    output_log: "./logs/admin-output.log"
+    auto_connect: true
+
+  # Observer to verify presence broadcasts (without invite capability)
+  observer:
+    tokens: ["observer-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "mcp/response"
+      - kind: "system/*"
+    output_log: "./logs/observer-output.log"
+    auto_connect: true
+
+defaults:
+  capabilities:
+    - kind: "chat"
