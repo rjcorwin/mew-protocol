@@ -183,6 +183,15 @@ export interface SpaceInvitePayload {
   [key: string]: unknown;
 }
 
+export interface SpaceInviteAckPayload {
+  status: 'created' | 'already_exists' | 'error' | string;
+  participant_id: string;
+  token?: string;
+  connection_url?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
 export interface SpaceKickPayload {
   participant_id: string;
   reason?: string;
@@ -383,6 +392,7 @@ export const MessageKinds = {
   CAPABILITY_REVOKE: 'capability/revoke',
   CAPABILITY_GRANT_ACK: 'capability/grant-ack',
   SPACE_INVITE: 'space/invite',
+  SPACE_INVITE_ACK: 'space/invite-ack',
   SPACE_KICK: 'space/kick',
 
   // Application messages

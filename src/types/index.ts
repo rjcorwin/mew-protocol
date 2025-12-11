@@ -39,6 +39,7 @@ export type {
   MewCapabilityGrantPayload,
   MewCapabilityRevokePayload,
   SpaceInvitePayload,
+  SpaceInviteAckPayload,
   SpaceKickPayload,
 
   // Chat

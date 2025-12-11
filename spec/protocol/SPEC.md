@@ -76,6 +76,7 @@ Field semantics:
   - `capability/revoke` - Revoke capabilities from participant
   - `capability/grant-ack` - Acknowledge capability grant
   - `space/invite` - Invite participant to space
+  - `space/invite-ack` - Gateway response to invite with credentials
   - `space/kick` - Remove participant from space
   - `participant/pause` - Pause outbound activity from a participant
   - `participant/resume` - Resume a participant after a pause
@@ -727,9 +728,44 @@ Invites new participants to the space:
 - `initial_capabilities`: Capabilities the participant will have when they join
 - `reason`: Explanation for the invitation
 
-**Note:** This message is broadcast within the space to inform existing participants. If `email` is provided, the gateway SHOULD send an invitation email with connection details. Additional notification methods (webhook, token generation, etc.) are gateway implementation-specific.
+**Gateway Behavior:**
+1. Generate authentication token for the new participant
+2. Register the participant in space configuration with initial capabilities
+3. Send `space/invite-ack` (with credentials) directly to the inviter only
+4. Broadcast a `system/presence` event (without credentials) to inform other participants
 
-#### 3.6.6 Remove Participant (kind = "space/kick")
+If `email` is provided, the gateway SHOULD send an invitation email with connection details.
+
+#### 3.6.6 Invite Acknowledgment (kind = "space/invite-ack")
+
+Gateway responds to the inviter with credentials for the new participant:
+
+```json
+{
+  "protocol": "mew/v0.4",
+  "id": "invite-ack-123",
+  "from": "system:gateway",
+  "to": ["admin"],
+  "correlation_id": ["invite-123"],
+  "kind": "space/invite-ack",
+  "payload": {
+    "status": "created",
+    "participant_id": "new-agent",
+    "token": "generated-secure-token-xyz",
+    "connection_url": "ws://localhost:8080/participants/new-agent/ws"
+  }
+}
+```
+
+**Fields:**
+- `status`: Result of the invite ("created", "already_exists", "error")
+- `participant_id`: The ID of the invited participant
+- `token`: Authentication token for the new participant (only sent to inviter)
+- `connection_url`: (optional) WebSocket URL for the new participant to connect
+
+**Security:** This message MUST only be sent to the participant who initiated the invite. The token MUST NOT be broadcast to other participants.
+
+#### 3.6.7 Remove Participant (kind = "space/kick")
 
 Removes participants from the space:
 
@@ -746,7 +782,7 @@ Removes participants from the space:
 }
 ```
 
-#### 3.6.7 Delegation Security
+#### 3.6.8 Delegation Security
 
 - Only participants with `capability/grant` capability can grant capabilities
 - Participants cannot grant capabilities they don't possess

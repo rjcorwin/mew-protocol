@@ -375,6 +375,155 @@ gateway
         }
       }
 
+      // Handle space/invite - generate token and respond only to inviter
+      if (envelope.kind === 'space/invite') {
+        const { participant_id: newParticipantId, initial_capabilities, reason } = envelope.payload;
+
+        if (!newParticipantId) {
+          return res.status(400).json({
+            error: 'invalid_request',
+            message: 'space/invite requires participant_id in payload'
+          });
+        }
+
+        // Check if participant already exists
+        if (tokenMap.has(newParticipantId)) {
+          const inviteAckEnvelope = {
+            protocol: 'mew/v0.4',
+            id: `invite-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date().toISOString(),
+            from: 'system:gateway',
+            to: [participantId],
+            correlation_id: [envelope.id],
+            kind: 'space/invite-ack',
+            payload: {
+              status: 'already_exists',
+              participant_id: newParticipantId,
+              error: `Participant ${newParticipantId} already exists in this space`
+            }
+          };
+
+          // Send only to inviter
+          const inviterWs = space.participants.get(participantId);
+          if (inviterWs && inviterWs.readyState === WebSocket.OPEN) {
+            inviterWs.send(JSON.stringify(inviteAckEnvelope));
+          }
+
+          return res.status(409).json({
+            status: 'already_exists',
+            participant_id: newParticipantId,
+            message: `Participant ${newParticipantId} already exists`
+          });
+        }
+
+        // Generate new token for the invited participant
+        const newToken = crypto.randomBytes(32).toString('base64url');
+
+        // Store token in secure storage
+        const tokensDir = path.join(mewDir, 'tokens');
+        if (!fs.existsSync(tokensDir)) {
+          fs.mkdirSync(tokensDir, { recursive: true, mode: 0o700 });
+          const tokenGitignore = path.join(tokensDir, '.gitignore');
+          fs.writeFileSync(tokenGitignore, '*\n!.gitignore\n', { mode: 0o600 });
+        }
+        const tokenPath = path.join(tokensDir, `${newParticipantId}.token`);
+        fs.writeFileSync(tokenPath, newToken, { mode: 0o600 });
+
+        // Register token in tokenMap
+        tokenMap.set(newParticipantId, newToken);
+
+        // Set initial capabilities (with baseline)
+        const capabilities = ensureBaselineCapabilities(initial_capabilities || []);
+        participantCapabilities.set(newParticipantId, capabilities);
+
+        console.log(`[HTTP] Invited new participant ${newParticipantId} with ${capabilities.length} capabilities`);
+
+        // Build connection URL
+        const connectionUrl = `ws://localhost:${port}/`;
+
+        // Create invite-ack response (only for inviter)
+        const inviteAckEnvelope = {
+          protocol: 'mew/v0.4',
+          id: `invite-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          ts: new Date().toISOString(),
+          from: 'system:gateway',
+          to: [participantId],
+          correlation_id: [envelope.id],
+          kind: 'space/invite-ack',
+          payload: {
+            status: 'created',
+            participant_id: newParticipantId,
+            token: newToken,
+            connection_url: connectionUrl
+          }
+        };
+
+        // Send invite-ack ONLY to inviter (not broadcast)
+        const inviterWs = space.participants.get(participantId);
+        if (inviterWs && inviterWs.readyState === WebSocket.OPEN) {
+          inviterWs.send(JSON.stringify(inviteAckEnvelope));
+          logEnvelopeEvent({
+            event: 'delivered',
+            id: inviteAckEnvelope.id,
+            envelope: inviteAckEnvelope,
+            participant: participantId,
+            space_id: actualSpaceName,
+            direction: 'outbound',
+            transport: 'websocket',
+            metadata: {
+              type: 'space/invite-ack',
+              invited_participant: newParticipantId,
+            },
+          });
+        }
+
+        // Broadcast presence notification (WITHOUT token) to inform others
+        const presenceEnvelope = {
+          protocol: 'mew/v0.4',
+          id: `presence-invite-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          ts: new Date().toISOString(),
+          from: 'system:gateway',
+          kind: 'system/presence',
+          payload: {
+            event: 'invited',
+            participant: {
+              id: newParticipantId,
+              capabilities: capabilities,
+            },
+            invited_by: participantId,
+            reason: reason
+          }
+        };
+
+        for (const [pid, ws] of space.participants.entries()) {
+          if (pid !== participantId && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(presenceEnvelope));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: presenceEnvelope.id,
+              envelope: presenceEnvelope,
+              participant: pid,
+              space_id: actualSpaceName,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                type: 'system/presence',
+                event: 'invited',
+                invited_participant: newParticipantId,
+              },
+            });
+          }
+        }
+
+        return res.json({
+          id: inviteAckEnvelope.id,
+          status: 'created',
+          participant_id: newParticipantId,
+          token: newToken,
+          connection_url: connectionUrl
+        });
+      }
+
       // Handle stream/request - gateway must respond with stream/open
       if (envelope.kind === 'stream/request') {
         // Generate unique stream ID
@@ -1882,6 +2031,166 @@ gateway
                 }
               }
             }
+          }
+
+          // Handle space/invite - generate token and respond only to inviter
+          if (message.kind === 'space/invite') {
+            const { participant_id: newParticipantId, initial_capabilities, reason } = message.payload || {};
+
+            if (!newParticipantId) {
+              const errorMessage = {
+                protocol: 'mew/v0.4',
+                id: `error-${Date.now()}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                to: [participantId],
+                kind: 'system/error',
+                correlation_id: message.id ? [message.id] : undefined,
+                payload: {
+                  error: 'invalid_request',
+                  message: 'space/invite requires participant_id in payload',
+                },
+              };
+              ws.send(JSON.stringify(errorMessage));
+              return;
+            }
+
+            // Check if participant already exists
+            if (tokenMap.has(newParticipantId)) {
+              const inviteAckEnvelope = {
+                protocol: 'mew/v0.4',
+                id: `invite-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                to: [participantId],
+                correlation_id: message.id ? [message.id] : undefined,
+                kind: 'space/invite-ack',
+                payload: {
+                  status: 'already_exists',
+                  participant_id: newParticipantId,
+                  error: `Participant ${newParticipantId} already exists in this space`
+                }
+              };
+
+              // Send only to inviter (not broadcast)
+              ws.send(JSON.stringify(inviteAckEnvelope));
+              logEnvelopeEvent({
+                event: 'delivered',
+                id: inviteAckEnvelope.id,
+                envelope: inviteAckEnvelope,
+                participant: participantId,
+                space_id: spaceId,
+                direction: 'outbound',
+                transport: 'websocket',
+                metadata: {
+                  type: 'space/invite-ack',
+                  status: 'already_exists',
+                  invited_participant: newParticipantId,
+                },
+              });
+              return;
+            }
+
+            // Generate new token for the invited participant
+            const newToken = crypto.randomBytes(32).toString('base64url');
+
+            // Store token in secure storage
+            const tokensDir = path.join(mewDir, 'tokens');
+            if (!fs.existsSync(tokensDir)) {
+              fs.mkdirSync(tokensDir, { recursive: true, mode: 0o700 });
+              const tokenGitignore = path.join(tokensDir, '.gitignore');
+              fs.writeFileSync(tokenGitignore, '*\n!.gitignore\n', { mode: 0o600 });
+            }
+            const tokenPath = path.join(tokensDir, `${newParticipantId}.token`);
+            fs.writeFileSync(tokenPath, newToken, { mode: 0o600 });
+
+            // Register token in tokenMap
+            tokenMap.set(newParticipantId, newToken);
+
+            // Set initial capabilities (with baseline)
+            const capabilities = ensureBaselineCapabilities(initial_capabilities || []);
+            participantCapabilities.set(newParticipantId, capabilities);
+
+            console.log(`[WS] Invited new participant ${newParticipantId} with ${capabilities.length} capabilities`);
+
+            // Build connection URL
+            const connectionUrl = `ws://localhost:${port}/`;
+
+            // Create invite-ack response (only for inviter)
+            const inviteAckEnvelope = {
+              protocol: 'mew/v0.4',
+              id: `invite-ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              ts: new Date().toISOString(),
+              from: 'system:gateway',
+              to: [participantId],
+              correlation_id: message.id ? [message.id] : undefined,
+              kind: 'space/invite-ack',
+              payload: {
+                status: 'created',
+                participant_id: newParticipantId,
+                token: newToken,
+                connection_url: connectionUrl
+              }
+            };
+
+            // Send invite-ack ONLY to inviter (not broadcast)
+            ws.send(JSON.stringify(inviteAckEnvelope));
+            logEnvelopeEvent({
+              event: 'delivered',
+              id: inviteAckEnvelope.id,
+              envelope: inviteAckEnvelope,
+              participant: participantId,
+              space_id: spaceId,
+              direction: 'outbound',
+              transport: 'websocket',
+              metadata: {
+                type: 'space/invite-ack',
+                invited_participant: newParticipantId,
+              },
+            });
+
+            // Broadcast presence notification (WITHOUT token) to inform others
+            const space = spaces.get(spaceId);
+            if (space) {
+              const presenceEnvelope = {
+                protocol: 'mew/v0.4',
+                id: `presence-invite-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                ts: new Date().toISOString(),
+                from: 'system:gateway',
+                kind: 'system/presence',
+                payload: {
+                  event: 'invited',
+                  participant: {
+                    id: newParticipantId,
+                    capabilities: capabilities,
+                  },
+                  invited_by: participantId,
+                  reason: reason
+                }
+              };
+
+              for (const [pid, pws] of space.participants.entries()) {
+                if (pid !== participantId && pws.readyState === WebSocket.OPEN) {
+                  pws.send(JSON.stringify(presenceEnvelope));
+                  logEnvelopeEvent({
+                    event: 'delivered',
+                    id: presenceEnvelope.id,
+                    envelope: presenceEnvelope,
+                    participant: pid,
+                    space_id: spaceId,
+                    direction: 'outbound',
+                    transport: 'websocket',
+                    metadata: {
+                      type: 'system/presence',
+                      event: 'invited',
+                      invited_participant: newParticipantId,
+                    },
+                  });
+                }
+              }
+            }
+
+            return; // Don't broadcast the original invite message
           }
 
           // Add protocol envelope fields if missing
