@@ -1,0 +1,12 @@
+{
+  "name": "scenario-17-space-invite",
+  "description": "Space invite workflow with token generation and capability assignment",
+  "version": "0.1.0",
+  "variables": [
+    {
+      "name": "SPACE_NAME",
+      "description": "Space identifier used for the scenario",
+      "default": "scenario-17-space-invite"
+    }
+  ]
+}
