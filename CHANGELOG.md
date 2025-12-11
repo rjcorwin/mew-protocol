@@ -4,6 +4,38 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ## [Unreleased]
 
+## [0.10.0] - 2025-12-10
+
+### Added
+
+#### [i7k] Space Invite Acknowledgment with Secure Token Generation
+**Proposal:** N/A (implementation follows existing `space/invite` spec pattern)
+
+**Problem:** When a participant with `space/invite` capability invites a new participant, the gateway needed to respond with credentials for the new participant. However, this response should only go to the inviter, not be broadcast to all participants (which would expose tokens).
+
+**Solution:** Add `space/invite-ack` message kind for secure credential delivery:
+- Gateway generates cryptographically secure tokens for invited participants
+- Stores tokens in `.mew/tokens/` directory with restricted permissions
+- Sends `space/invite-ack` only to the inviter with token and connection URL
+- Broadcasts `system/presence` with `event: 'invited'` to other participants (no credentials)
+
+**Changes:**
+- Protocol: Added `space/invite-ack` to message kinds list (SPEC.md)
+- Protocol: Updated `space/invite` section with gateway behavior requirements
+- Protocol: Added section 3.6.6 documenting `space/invite-ack` format and security
+- Types: Added `SpaceInviteAckPayload` interface and `SPACE_INVITE_ACK` message kind
+- Gateway: HTTP and WebSocket handlers for `space/invite`
+- Gateway: Token generation using `crypto.randomBytes(32).toString('base64url')`
+- Gateway: Secure token storage in `.mew/tokens/` with 0o600 permissions
+- Gateway: Capability resolver updated to honor invited participants' capabilities
+- E2E: Added scenario-17-space-invite with 16 comprehensive tests
+
+**Security:**
+- Token only sent to inviter (never broadcast)
+- Path traversal prevention (rejects `/`, `\`, `..` in participant_id)
+- Validates against both tokenMap and spaceConfig for existing participants
+- Missing payload returns 400 (not 500)
+
 ## [0.9.0] - 2025-11-23
 
 ### Added
