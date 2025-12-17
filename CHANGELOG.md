@@ -4,6 +4,8 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ## [Unreleased]
 
+## [0.11.0] - 2025-12-17
+
 ### Added
 
 #### [t5d] Targeted Stream Delivery
