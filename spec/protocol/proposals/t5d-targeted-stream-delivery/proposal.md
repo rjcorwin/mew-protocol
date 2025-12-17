@@ -1,7 +1,7 @@
 # Proposal: Targeted Stream Delivery (t5d)
 
 **Code:** t5d
-**Status:** Draft
+**Status:** Implemented (v0.11.0)
 **Area:** Protocol
 **Created:** 2025-12-16
 
