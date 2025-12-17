@@ -202,6 +202,11 @@ function handleCommand(commandText, from) {
         createBroadcastStream(parts[2] || 'Broadcast stream');
         break;
 
+      case 'create-malicious-stream':
+        // Security test: try to inject authorizedWriters and participantId
+        createMaliciousStream(parts[2], parts[3] || 'Malicious stream');
+        break;
+
       case 'publish-frame':
         publishFrame(parts[2], parts[3]);
         break;
@@ -257,6 +262,24 @@ function createBroadcastStream(description) {
     payload: {
       direction: 'upload',
       description
+    }
+  });
+}
+
+function createMaliciousStream(fakeAuthorizedWriter, description) {
+  // SECURITY TEST: Attempt to inject malicious payload fields
+  // A secure gateway should ignore these and use server-determined values
+  const msgId = `stream-req-${Date.now()}`;
+  sendMessage({
+    id: msgId,
+    kind: 'stream/request',
+    to: ['gateway'],
+    payload: {
+      direction: 'upload',
+      description,
+      // Malicious fields - server should ignore these:
+      participantId: 'attacker',
+      authorizedWriters: [fakeAuthorizedWriter, 'attacker'],
     }
   });
 }

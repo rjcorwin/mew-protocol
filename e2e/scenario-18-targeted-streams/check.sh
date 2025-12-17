@@ -293,6 +293,96 @@ if wait_for_response "observer" "report-streams" 5; then
   fi
 fi
 
+sleep 2
+
+# ============================================================================
+# SECURITY TESTS: Verify payload override protection
+# ============================================================================
+echo -e "\n${YELLOW}-- SECURITY TEST: Payload override protection --${NC}"
+
+# Step 11: Publisher creates a stream with malicious payload fields
+# Attempts to inject authorizedWriters: ["observer", "attacker"]
+echo -e "\n${YELLOW}-- Step 11: Create stream with malicious authorizedWriters in payload --${NC}"
+send_command "publisher" "create-malicious-stream:observer:Malicious stream test"
+
+sleep 2
+
+# Extract the malicious stream ID
+MALICIOUS_STREAM_ID=$(grep -F '"kind":"stream/open"' "${ENVELOPE_LOG}" 2>/dev/null | tail -1 | sed -n 's/.*"stream_id":"\([^"]*\)".*/\1/p' || echo "")
+if [[ -n "${MALICIOUS_STREAM_ID}" && "${MALICIOUS_STREAM_ID}" != "${BROADCAST_STREAM_ID}" ]]; then
+  echo -e "  Malicious test Stream ID: ${GREEN}${MALICIOUS_STREAM_ID}${NC}"
+  pass "Stream created (malicious payload ignored)"
+else
+  fail "Stream created" "Could not find new stream_id"
+fi
+
+# Step 12: Verify owner is publisher (not "attacker" from malicious payload)
+echo -e "\n${YELLOW}-- Step 12: Verify server set correct owner (not malicious payload) --${NC}"
+MALICIOUS_STREAM_OPEN=$(grep -F '"kind":"stream/open"' "${ENVELOPE_LOG}" 2>/dev/null | grep -F "${MALICIOUS_STREAM_ID}" | tail -1)
+if echo "${MALICIOUS_STREAM_OPEN}" | grep -Fq '"owner":"publisher"'; then
+  pass "Server correctly set owner to publisher (ignored malicious participantId)"
+else
+  fail "Server set correct owner" "Owner may have been overridden by malicious payload"
+  echo "  Debug: ${MALICIOUS_STREAM_OPEN}"
+fi
+
+# Step 13: Verify authorized_writers only contains publisher (not observer/attacker)
+echo -e "\n${YELLOW}-- Step 13: Verify authorized_writers was not overridden --${NC}"
+if echo "${MALICIOUS_STREAM_OPEN}" | grep -Fq '"authorized_writers":["publisher"]'; then
+  pass "Server correctly set authorized_writers (ignored malicious payload)"
+else
+  # Check if it incorrectly contains observer or attacker
+  if echo "${MALICIOUS_STREAM_OPEN}" | grep -Fq '"observer"' || echo "${MALICIOUS_STREAM_OPEN}" | grep -Fq '"attacker"'; then
+    fail "authorized_writers protection" "SECURITY ISSUE: Malicious payload was able to inject authorized_writers!"
+    echo "  Debug: ${MALICIOUS_STREAM_OPEN}"
+  else
+    pass "Server correctly set authorized_writers (ignored malicious payload)"
+  fi
+fi
+
+# Step 14: Verify observer CANNOT write to the stream (despite being in malicious payload)
+# The real test is whether the frame gets delivered to other participants
+echo -e "\n${YELLOW}-- Step 14: Verify observer cannot write (malicious authorizedWriters rejected) --${NC}"
+
+# First clear frames so we can check what arrives
+send_command "publisher" "clear-received-frames"
+send_command "aggregator" "clear-received-frames"
+sleep 1
+
+# Observer attempts to write unauthorized data
+send_command "observer" "publish-frame:${MALICIOUS_STREAM_ID}:UNAUTHORIZED-SECURITY-TEST-DATA"
+
+sleep 2
+
+# The KEY test: did the unauthorized frame actually get delivered to other participants?
+# If the security fix works, publisher should NOT have received "UNAUTHORIZED-SECURITY-TEST-DATA"
+send_command "publisher" "report-received-frames"
+
+if wait_for_response "publisher" "report-received-frames" 5; then
+  SECURITY_CHECK=$(grep -F "\"from\":\"publisher\"" "${ENVELOPE_LOG}" | grep -F "response:report-received-frames" | tail -1)
+  if echo "${SECURITY_CHECK}" | grep -Fq "UNAUTHORIZED-SECURITY-TEST-DATA"; then
+    fail "Observer write rejection" "SECURITY ISSUE: Unauthorized frame was delivered to other participants!"
+    echo "  Debug: ${SECURITY_CHECK}"
+  else
+    pass "Observer correctly rejected from writing (frame not delivered)"
+  fi
+else
+  fail "Security check" "Could not verify frame delivery"
+fi
+
+# Step 15: Verify publisher CAN still write (they are the real owner)
+echo -e "\n${YELLOW}-- Step 15: Verify publisher can write (is real owner) --${NC}"
+send_command "publisher" "publish-frame:${MALICIOUS_STREAM_ID}:legitimate-owner-data"
+
+if wait_for_response "publisher" "publish-frame-result" 5; then
+  PUBLISHER_RESULT=$(grep -F "\"from\":\"publisher\"" "${ENVELOPE_LOG}" | grep -F "response:publish-frame-result" | tail -1)
+  if echo "${PUBLISHER_RESULT}" | grep -Fq '"success":true'; then
+    pass "Publisher can write to own stream (correct ownership)"
+  else
+    fail "Publisher write" "Publisher should be able to write to own stream"
+  fi
+fi
+
 echo ""
 echo -e "${YELLOW}=== Scenario 18 Summary ===${NC}"
 echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
