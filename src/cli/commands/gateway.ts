@@ -564,12 +564,13 @@ gateway
         const streamId = `stream-${space.streamCounter}`;
 
         // Track the stream - preserve ALL metadata from request payload [j8v]
+        // SECURITY: Spread payload FIRST, then set security-critical fields to prevent override
         space.activeStreams.set(streamId, {
+          ...envelope.payload,  // Spread first to preserve metadata (including target [t5d])
           requestId: envelope.id,
-          participantId: participantId,
-          authorizedWriters: [participantId], // [s2w] Initialize with owner as sole authorized writer
+          participantId: participantId,  // Server-determined, cannot be overridden
+          authorizedWriters: [participantId], // [s2w] Server-determined, cannot be overridden
           created: new Date().toISOString(),
-          ...envelope.payload  // Spread entire payload to preserve all fields (including target [t5d])
         });
 
         // Send stream/open response
@@ -2329,12 +2330,13 @@ gateway
             const streamId = `stream-${space.streamCounter}`;
 
             // Track the stream - preserve ALL metadata from request payload [j8v] [t5d]
+            // SECURITY: Spread payload FIRST, then set security-critical fields to prevent override
             space.activeStreams.set(streamId, {
+              ...envelope.payload,  // Spread first to preserve metadata (including target [t5d])
               requestId: envelope.id,
-              participantId: participantId,
-              authorizedWriters: [participantId],
+              participantId: participantId,  // Server-determined, cannot be overridden
+              authorizedWriters: [participantId],  // Server-determined, cannot be overridden
               created: new Date().toISOString(),
-              ...envelope.payload  // Spread entire payload to preserve all fields (including target [t5d])
             });
 
             // Send stream/open response
