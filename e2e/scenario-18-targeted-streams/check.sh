@@ -157,35 +157,44 @@ else
   fail "Publisher sent frames" "No response received"
 fi
 
-# Step 4: Verify aggregator received frames
+# Step 4: Verify aggregator received ALL targeted frames
 echo -e "\n${YELLOW}-- Step 4: Verify aggregator received targeted frames --${NC}"
 send_command "aggregator" "report-received-frames"
 
 if wait_for_response "aggregator" "report-received-frames" 5; then
   AGGREGATOR_FRAMES=$(grep -F "\"from\":\"aggregator\"" "${ENVELOPE_LOG}" | grep -F "response:report-received-frames" | tail -1)
-  if echo "${AGGREGATOR_FRAMES}" | grep -Fq "position-data-1"; then
-    pass "Aggregator received targeted frames"
+
+  # Check aggregator received all 3 frames
+  if echo "${AGGREGATOR_FRAMES}" | grep -Fq "position-data-1" && \
+     echo "${AGGREGATOR_FRAMES}" | grep -Fq "position-data-2" && \
+     echo "${AGGREGATOR_FRAMES}" | grep -Fq "position-data-3"; then
+    pass "Aggregator received all 3 targeted frames"
   else
-    fail "Aggregator received targeted frames" "Frames not found in aggregator's received list"
+    fail "Aggregator received targeted frames" "Missing one or more frames"
     echo "  Debug: ${AGGREGATOR_FRAMES}"
   fi
 else
   fail "Aggregator report received" "No response"
 fi
 
-# Step 5: Verify observer did NOT receive targeted frames (THE KEY TEST)
+# Step 5: Verify observer did NOT receive ANY targeted frames (THE KEY TEST)
 echo -e "\n${YELLOW}-- Step 5: Verify observer did NOT receive targeted frames --${NC}"
 send_command "observer" "report-received-frames"
 
 if wait_for_response "observer" "report-received-frames" 5; then
   OBSERVER_FRAMES=$(grep -F "\"from\":\"observer\"" "${ENVELOPE_LOG}" | grep -F "response:report-received-frames" | tail -1)
 
-  # Check if observer received any frames from the targeted stream
-  if echo "${OBSERVER_FRAMES}" | grep -Fq "position-data-1"; then
-    fail "Observer excluded from targeted stream" "Observer received targeted frames (should not have)"
-    echo "  Debug: ${OBSERVER_FRAMES}"
+  # Check observer received NONE of the targeted frames
+  OBSERVER_LEAKED=0
+  if echo "${OBSERVER_FRAMES}" | grep -Fq "position-data-1"; then OBSERVER_LEAKED=1; fi
+  if echo "${OBSERVER_FRAMES}" | grep -Fq "position-data-2"; then OBSERVER_LEAKED=1; fi
+  if echo "${OBSERVER_FRAMES}" | grep -Fq "position-data-3"; then OBSERVER_LEAKED=1; fi
+
+  if [[ "${OBSERVER_LEAKED}" -eq 0 ]]; then
+    pass "Observer correctly excluded from targeted stream (received 0 targeted frames)"
   else
-    pass "Observer excluded from targeted stream"
+    fail "Observer excluded from targeted stream" "LEAK: Observer received targeted frames that should have been private!"
+    echo "  Debug: ${OBSERVER_FRAMES}"
   fi
 else
   fail "Observer report received" "No response"
