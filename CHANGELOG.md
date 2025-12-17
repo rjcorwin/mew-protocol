@@ -4,6 +4,41 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+#### [t5d] Targeted Stream Delivery
+**Proposal:** `spec/protocol/proposals/t5d-targeted-stream-delivery/`
+
+**Problem:** MEW Protocol's current design broadcasts all stream data to all participants in a space. While this aligns with the "Unified Context" goal, it creates O(N²) message fan-out for high-frequency telemetry streams. With N entities publishing streams at R Hz, total deliveries = N × R × (N-1), which becomes unworkable at scale (e.g., 50 entities × 10 Hz = 24,500 deliveries/sec).
+
+**Solution:** Add an optional `target` field to streams:
+- `target` (array of participant IDs): When specified, gateway delivers stream data frames only to listed participants
+- When omitted/null/empty, gateway broadcasts to all (existing behavior preserved)
+
+This enables the **aggregation pattern**: multiple publishers send data to a single aggregator (O(N)), which broadcasts combined results (O(N)), achieving O(N) total instead of O(N²).
+
+**Changes:**
+- Protocol: Added `target` field to `stream/request` payload (SPEC.md 3.10.1)
+- Protocol: Added `target` field to `stream/open` response (SPEC.md 3.10.2)
+- Protocol: Added `target` field to `active_streams` in welcome message (SPEC.md 3.8.1)
+- Protocol: Updated stream data frames section with targeted delivery behavior (SPEC.md 3.10.3)
+- Gateway: Validates target participants exist at stream creation
+- Gateway: Routes stream data frames to targets only (or broadcasts if no target)
+- Gateway: Returns `system/error` with `error: "target_not_found"` for invalid targets
+- Types: Added `target` field to `StreamRequestPayload`, `StreamOpenPayload`, `StreamMetadata`
+- E2E: Added scenario-18-targeted-streams with 14 comprehensive tests
+
+**Use Cases:**
+- Game networking: Players send position updates to game server, which broadcasts world state
+- Sensor networks: Sensors report to collector, which broadcasts dashboards
+- Log aggregation: Services send logs to aggregator, which broadcasts alerts
+- Private AI reasoning: Agent shares reasoning trace with orchestrator only
+
+**Backward Compatibility:**
+- Existing clients work unchanged (missing target = broadcast)
+- Existing gateways ignore unknown `target` field (degraded but functional)
+- No version bump required (additive change)
+
 ## [0.10.0] - 2025-12-10
 
 ### Added

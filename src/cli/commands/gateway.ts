@@ -536,17 +536,41 @@ gateway
 
       // Handle stream/request - gateway must respond with stream/open
       if (envelope.kind === 'stream/request') {
+        // [t5d] Validate target participants exist if specified
+        const target = envelope.payload?.target;
+        if (target && Array.isArray(target) && target.length > 0) {
+          const missingTargets = target.filter(t => !space.participants.has(t));
+          if (missingTargets.length > 0) {
+            const errorResponse = {
+              protocol: 'mew/v0.4',
+              id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              ts: new Date().toISOString(),
+              from: 'system:gateway',
+              to: [participantId],
+              kind: 'system/error',
+              correlation_id: [envelope.id],
+              payload: {
+                error: 'target_not_found',
+                targets: missingTargets,
+                message: 'One or more target participants do not exist in space'
+              }
+            };
+            return res.status(400).json(errorResponse);
+          }
+        }
+
         // Generate unique stream ID
         space.streamCounter++;
         const streamId = `stream-${space.streamCounter}`;
 
         // Track the stream - preserve ALL metadata from request payload [j8v]
+        // SECURITY: Spread payload FIRST, then set security-critical fields to prevent override
         space.activeStreams.set(streamId, {
+          ...envelope.payload,  // Spread first to preserve metadata (including target [t5d])
           requestId: envelope.id,
-          participantId: participantId,
-          authorizedWriters: [participantId], // [s2w] Initialize with owner as sole authorized writer
+          participantId: participantId,  // Server-determined, cannot be overridden
+          authorizedWriters: [participantId], // [s2w] Server-determined, cannot be overridden
           created: new Date().toISOString(),
-          ...envelope.payload  // Spread entire payload to preserve all fields
         });
 
         // Send stream/open response
@@ -562,7 +586,8 @@ gateway
             stream_id: streamId,
             encoding: 'text',
             owner: participantId,
-            authorized_writers: [participantId]
+            authorized_writers: [participantId],
+            ...(target && target.length > 0 ? { target } : {}) // [t5d] Echo target if specified
           }
         };
 
@@ -1544,10 +1569,22 @@ gateway
               const authorizedWriters = streamInfo?.authorizedWriters || [streamInfo?.participantId];
 
               if (streamInfo && authorizedWriters.includes(participantId)) {
-                // Forward to all participants
-                for (const [pid, pws] of space.participants.entries()) {
-                  if (pws.readyState === WebSocket.OPEN) {
-                    pws.send(data); // Send raw data frame
+                // [t5d] Check if stream has target(s) for targeted delivery
+                const target = streamInfo.target;
+                if (target && Array.isArray(target) && target.length > 0) {
+                  // Targeted delivery - only send to specified participants
+                  for (const targetId of target) {
+                    const targetWs = space.participants.get(targetId);
+                    if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                      targetWs.send(data); // Send raw data frame to target
+                    }
+                  }
+                } else {
+                  // Broadcast to all participants (existing behavior)
+                  for (const [pid, pws] of space.participants.entries()) {
+                    if (pws.readyState === WebSocket.OPEN) {
+                      pws.send(data); // Send raw data frame
+                    }
                   }
                 }
               } else {
@@ -2264,17 +2301,42 @@ gateway
           if (envelope.kind === 'stream/request' && spaceId && spaces.has(spaceId)) {
             const space = spaces.get(spaceId);
 
+            // [t5d] Validate target participants exist if specified
+            const target = envelope.payload?.target;
+            if (target && Array.isArray(target) && target.length > 0) {
+              const missingTargets = target.filter(t => !space.participants.has(t));
+              if (missingTargets.length > 0) {
+                const errorResponse = {
+                  protocol: 'mew/v0.4',
+                  id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  ts: new Date().toISOString(),
+                  from: 'system:gateway',
+                  to: [participantId],
+                  kind: 'system/error',
+                  correlation_id: [envelope.id],
+                  payload: {
+                    error: 'target_not_found',
+                    targets: missingTargets,
+                    message: 'One or more target participants do not exist in space'
+                  }
+                };
+                ws.send(JSON.stringify(errorResponse));
+                return;
+              }
+            }
+
             // Generate unique stream ID
             space.streamCounter++;
             const streamId = `stream-${space.streamCounter}`;
 
-            // Track the stream
+            // Track the stream - preserve ALL metadata from request payload [j8v] [t5d]
+            // SECURITY: Spread payload FIRST, then set security-critical fields to prevent override
             space.activeStreams.set(streamId, {
+              ...envelope.payload,  // Spread first to preserve metadata (including target [t5d])
               requestId: envelope.id,
-              participantId: participantId,
-              authorizedWriters: [participantId],
-              direction: envelope.payload?.direction || 'unknown',
-              created: new Date().toISOString()
+              participantId: participantId,  // Server-determined, cannot be overridden
+              authorizedWriters: [participantId],  // Server-determined, cannot be overridden
+              created: new Date().toISOString(),
             });
 
             // Send stream/open response
@@ -2290,7 +2352,8 @@ gateway
                 stream_id: streamId,
                 encoding: 'text',
                 owner: participantId,
-                authorized_writers: [participantId]
+                authorized_writers: [participantId],
+                ...(target && target.length > 0 ? { target } : {}) // [t5d] Echo target if specified
               }
             };
 

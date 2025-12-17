@@ -1,0 +1,41 @@
+space:
+  id: "scenario-18-targeted-streams"
+  name: "Scenario 18 - Targeted Stream Delivery"
+  description: "Validate targeted stream delivery [t5d]"
+
+participants:
+  # Publisher creates streams targeted to aggregator
+  publisher:
+    tokens: ["publisher-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/*"
+      - kind: "participant/status"
+
+  # Aggregator receives targeted stream data, creates broadcast stream
+  aggregator:
+    tokens: ["aggregator-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/*"
+      - kind: "participant/status"
+
+  # Observer should NOT receive targeted stream data, but should receive broadcast
+  observer:
+    tokens: ["observer-token"]
+    capabilities:
+      - kind: "chat"
+      - kind: "stream/*"
+      - kind: "participant/status"
+
+  # Test controller for sending commands
+  test-controller:
+    tokens: ["test-controller-token"]
+    capabilities:
+      - kind: "chat"
+    output_log: "./logs/test-controller.log"
+    auto_connect: true
+
+defaults:
+  capabilities:
+    - kind: "chat"

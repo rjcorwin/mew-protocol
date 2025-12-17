@@ -885,6 +885,7 @@ When a participant connects, the gateway MUST send a welcome message addressed s
   - `description` (optional): Human-readable description from original request
   - `content_type` (optional): MIME type or format identifier (e.g., "application/json", "application/x-game-positions")
   - `format` (optional): Stream schema/encoding (e.g., "jsonl", "binary-vector3")
+  - `target` (optional): Array of participant IDs receiving stream data frames [t5d]. If present, only listed participants receive frames; if absent, stream broadcasts to all
   - `metadata` (optional): Arbitrary key-value pairs from original request
   - Additional custom fields from the original `stream/request` are preserved
   - May be omitted or empty array if no streams are active
@@ -1168,6 +1169,7 @@ Sent by whichever entity initiates stream negotiation (typically a participant a
     "description": "Large dataset export",
     "content_type": "application/json",
     "format": "jsonl",
+    "target": ["aggregator"],
     "metadata": {
       "compression": "gzip",
       "schema_version": "1.0"
@@ -1182,6 +1184,7 @@ Sent by whichever entity initiates stream negotiation (typically a participant a
 - `description` (optional): Human-readable description of stream purpose
 - `content_type` (optional): MIME type or custom format identifier (e.g., "application/json", "application/x-game-positions")
 - `format` (optional): Stream schema/encoding specification (e.g., "jsonl", "binary-vector3", "utf8-newline-delimited")
+- `target` (optional): Array of participant IDs for targeted delivery [t5d]. If specified and non-empty, stream data frames are delivered only to listed participants. If omitted, null, or empty, frames are broadcast to all participants (default behavior)
 - `metadata` (optional): Arbitrary key-value pairs for application-specific metadata
 - Additional custom fields are allowed and will be preserved [j8v]
 
@@ -1190,6 +1193,7 @@ Sent by whichever entity initiates stream negotiation (typically a participant a
 - The gateway MUST preserve ALL payload fields from the request and include them in `active_streams` when sending `system/welcome` to late joiners [j8v]
 - The gateway is responsible for stream ID allocation and management, regardless of the request's `to` field
 - `correlation_id` (not shown) MAY reference the message that motivated the stream (e.g., a proposal or request)
+- If `target` is specified, the gateway MUST validate all target participants exist in the space; if any target does not exist, return a `system/error` with `error: "target_not_found"` [t5d]
 
 **Usage Notes:**
 - Agents that expose long-form reasoning SHOULD consider issuing a `stream/request` alongside `reasoning/start` so subscribers can follow high-volume traces without bloating the shared envelope log
@@ -1209,17 +1213,26 @@ Confirms that a stream has been established and assigns the identifier used for 
   "correlation_id": ["stream-req-1"],
   "payload": {
     "stream_id": "stream-42",
-    "encoding": "binary"
+    "encoding": "binary",
+    "target": ["aggregator"]
   }
 }
 ```
 
 - `payload.stream_id` MUST be unique per active stream on the connection
+- `payload.target` echoes the target from the request if specified [t5d]. Clients can use this to confirm targeted delivery is active
 - Additional metadata such as `encoding` or `compression` MAY be provided for the receiver
+- Note: The `stream/open` message itself is broadcast to all participants for observability (per MEW Protocol visibility). Only the stream data frames are affected by targeting [t5d]
 
 #### 3.10.3 Stream Data Frames (no envelope)
 
 Once a stream is open, binary or chunked data travels on the same WebSocket without the JSON envelope wrapper. Frames are prefixed using the pattern `#streamID#data`, matching the `#streamID#data` example provided with this update. Implementations MUST ensure framing preserves boundaries so receivers can demultiplex concurrent streams.
+
+**Targeted Delivery [t5d]:**
+- If the stream has a `target` specified, the gateway delivers data frames only to the listed participant(s)
+- If the stream has no target (or empty target), data frames are broadcast to all participants in the space
+- This enables O(N) delivery for aggregation patterns instead of O(N²) broadcast
+- Example: Multiple players send position updates targeted to a game server, which broadcasts world state to all
 
 #### 3.10.4 Stream Close (kind = "stream/close")
 

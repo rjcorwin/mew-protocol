@@ -106,6 +106,7 @@ export interface StreamMetadata {
   stream_id: string;
   owner: string;
   authorized_writers?: string[]; // [s2w] Optional array of authorized writers
+  target?: string[]; // [t5d] Optional array of participant IDs for targeted delivery
   direction: 'upload' | 'download';
   created: string; // ISO 8601 timestamp
   expected_size_bytes?: number;
@@ -306,6 +307,7 @@ export interface StreamRequestPayload {
   description?: string;
   content_type?: string;
   format?: string;
+  target?: string[]; // [t5d] Optional array of participant IDs for targeted delivery
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -315,6 +317,7 @@ export interface StreamOpenPayload {
   encoding?: string;
   compression?: string;
   description?: string;
+  target?: string[]; // [t5d] Echoed from stream/request - participants receiving stream data
   [key: string]: unknown;
 }
 
