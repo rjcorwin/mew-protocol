@@ -1,0 +1,6 @@
+{
+  "name": "scenario-18-targeted-streams",
+  "version": "1.0.0",
+  "description": "End-to-end test scenario for t5d targeted stream delivery",
+  "author": "MEW Protocol"
+}
