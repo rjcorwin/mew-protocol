@@ -632,9 +632,24 @@ This ensures the agent has the most complete set of tools before reasoning, avoi
 ```typescript
 interface Thought {
   reasoning: string;     // Analysis of the current situation
-  action: string;        // Next action to take: "tool_call", "respond", or "continue"
-  actionInput: any;      // Parameters for the action
+  action: string;        // Next action to take: "tool", "respond", or "cancelled"
+  actionInput: ToolCallInput | string | CancelledInput;  // Parameters for the action (structure depends on action)
   observation?: string;  // Result of the action (filled after execution)
+}
+
+// When action === 'tool'
+interface ToolCallInput {
+  tool: string;          // Tool name in "participant/tool" format (e.g., "calculator/add")
+  arguments: any;        // Tool-specific arguments matching the tool's input schema
+  toolCallId: string;    // OpenAI tool call ID for native format correlation
+}
+
+// When action === 'respond'
+// actionInput is simply a string containing the final response text
+
+// When action === 'cancelled'
+interface CancelledInput {
+  reason: string;        // Why reasoning was cancelled
 }
 
 interface ReActContext {
