@@ -1200,7 +1200,13 @@ gateway
         return participantCapabilities.get(participantId);
       }
 
-      // Return default capabilities if no match
+      // If tokens are configured but none matched, deny capabilities
+      if (tokenMap.size > 0 && token) {
+        console.log(`[GATEWAY] No matching token for participant ${participantId}, denying capabilities`);
+        return [];
+      }
+
+      // Return default capabilities only when no token system is configured
       return spaceConfig.defaults?.capabilities || [{ kind: 'chat' }];
     }
 
@@ -1632,13 +1638,54 @@ gateway
 
           // Handle join (special case - before capability check)
           if (message.kind === 'system/join' || message.type === 'join') {
-            participantId =
+            const requestedParticipantId =
               message.participantId ||
               message.payload?.participantId ||
               `participant-${Date.now()}`;
             spaceId =
               message.space || message.payload?.space || spaceConfig?.space?.id || 'default';
             const token = message.token || message.payload?.token;
+
+            // Validate token before allowing join
+            if (tokenMap.size > 0) {
+              const expectedToken = tokenMap.get(requestedParticipantId);
+              if (!token) {
+                console.log(`[GATEWAY] Join rejected for ${requestedParticipantId}: no token provided`);
+                ws.send(JSON.stringify({
+                  protocol: 'mew/v0.4',
+                  id: `error-${Date.now()}`,
+                  ts: new Date().toISOString(),
+                  from: 'system:gateway',
+                  to: [requestedParticipantId],
+                  kind: 'system/error',
+                  payload: {
+                    error: 'auth_failed',
+                    message: 'Authentication token is required',
+                  },
+                }));
+                ws.close(4001, 'Authentication token required');
+                return;
+              }
+              if (!expectedToken || expectedToken !== token) {
+                console.log(`[GATEWAY] Join rejected for ${requestedParticipantId}: invalid token`);
+                ws.send(JSON.stringify({
+                  protocol: 'mew/v0.4',
+                  id: `error-${Date.now()}`,
+                  ts: new Date().toISOString(),
+                  from: 'system:gateway',
+                  to: [requestedParticipantId],
+                  kind: 'system/error',
+                  payload: {
+                    error: 'auth_failed',
+                    message: 'Invalid authentication token',
+                  },
+                }));
+                ws.close(4003, 'Invalid authentication token');
+                return;
+              }
+            }
+
+            participantId = requestedParticipantId;
 
             // Create space if it doesn't exist
             if (!spaces.has(spaceId)) {
