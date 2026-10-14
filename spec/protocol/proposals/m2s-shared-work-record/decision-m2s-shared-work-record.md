@@ -3,6 +3,8 @@
 Status: revised proposal for review. The decisions below define the intended
 shape; detailed interfaces and defaults still need review before implementation.
 
+Refinement: expose desired versus applied configuration and readiness, include shared supporting-resource limits, disclose adapter differences, and validate typed targets and applicable approvals with attributable outcomes.
+
 ## D1. Compose modern primitives
 
 Use existing workspace authentication/access and modern harness/provider tools,

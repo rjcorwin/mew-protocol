@@ -100,10 +100,13 @@ A runtime adapter SHOULD expose, where supported:
 - Queue, steer, cancel, pause, resume, or close only with the semantics the
   harness/provider actually supports.
 
-Every adapter MUST describe its support and limits for session persistence,
-concurrency, context/compaction visibility, interruption, tool permissions,
-outcome lookup, and movement between workers. Unsupported means unsupported;
-queueing a new message is not equivalent to interrupting a running operation.
+Every adapter MUST describe its support and limits for input/output modalities,
+instruction delivery and updates, native tool permission/approval behavior, session
+persistence, concurrency, context/compaction visibility, interruption, outcome
+lookup, and movement between workers. Unsupported means unsupported. Queueing
+input for a later turn is not active steering or interruption; requested
+cancellation is not confirmed cancellation. A ready bridge does not establish
+runtime readiness or prove that instructions were applied.
 
 Input MUST preserve the verified speaker and conversation provenance. A message
 from another entity that says a human approved something is still that entity's
@@ -193,6 +196,13 @@ A configuration identifies:
 - Operational limits such as concurrency, queue size, resource/spend ceilings,
   and scale bounds where the operator has authorized them.
 
+A configured entity identity MAY exist without an active runtime. The integration
+MUST distinguish desired configuration from observed state: the applied revision,
+runtime association (including none), readiness, and any blocker or uncertainty.
+Saving configuration or accepting a request does not establish that the requested
+change was applied or that the entity is ready to work. Partial application must
+remain visible rather than being reported as complete success.
+
 Configuration MUST reference approved credential mechanisms rather than copy
 secrets into conversations. Changing access or provider permission settings is
 an administrative action governed by the real platform/provider and operator
@@ -244,10 +254,17 @@ is separate from merely replacing a process. The deployment defines its demand
 signal, minimum/maximum capacity, concurrency policy, idle/stop policy, and
 operator overrides. No bespoke scheduler or autoscaling algorithm is mandated.
 
-Placement MUST respect approved budgets, provider quotas/rate limits, resource
-requirements, and actually available capacity. If those bounds prevent scale-up,
-work remains queued, is redirected only to an authorized alternative, or reports
-a blocker. Elasticity MUST NOT silently raise a budget or grant provider access.
+Placement MUST respect resource requirements and available capacity, including
+supporting resources required by that placement, such as bridge connections,
+verified workspace identities, storage, routing, or browser/preview resources.
+Available compute alone does not establish readiness.
+Approved budgets and shared quotas/rate limits apply across concurrent entities
+and their supporting resources, not just to each worker in isolation.
+
+If prerequisites, aggregate budgets, quotas, or available capacity prevent
+scale-up, work remains queued, is redirected only to an authorized alternative,
+or reports a blocker. Scaling within authorized capacity does not authorize
+enrolling another provider, expanding access, or raising a budget.
 Interchangeable adapters allow different runtime/provider choices; they do not
 make prices, capacity, or capabilities interchangeable.
 
@@ -307,6 +324,14 @@ tool name, workspace membership, or a message saying "I am the administrator"
 MUST NOT substitute for that authorization. Agent administrators can have bounded
 administrative roles; no default all-entities or self-escalation authority is implied.
 
+Targets MUST be validated against the operation's expected type and allowed
+scope before mutation; malformed, ambiguous, or wrong-type targets are refused.
+Where approval is required, verifying its author alone is insufficient: the
+approval must apply to the authenticated caller, requested action, target, and
+limits under the configured approval policy. Unrelated, negated, or superseded
+approval MUST NOT authorize the operation. This uses the applicable service/platform approval
+mechanism rather than defining a universal MEW approval protocol.
+
 Changing a prompt does not itself grant new tools or permissions. Attaching a tool
 does not itself authorize use of its credentials. Membership changes that affect
 platform access require the platform's own permission checks, and runtime/tool
@@ -314,9 +339,11 @@ changes require the relevant provider/harness authorization. The management
 service MUST NOT silently widen access or treat a local configuration update as
 proof that an external change succeeded.
 
-Administrative operations MUST preserve attributable action/target records and
-report the applied result or an explicit failure/uncertain state without exposing
-secrets. Configuration revisions and application timing must be explicit: a change
+Administrative operations MUST preserve records attributed to the authenticated
+caller, with the action, target, and actual outcome, including partial application,
+refusal, failure, or uncertainty. Audit output MUST redact secrets and sensitive
+payloads; an accepted request must not be logged as successful application.
+Configuration revisions and application timing must be explicit: a change
 may apply to a future turn, require supported live reconfiguration, or wait for
 an authorized session transition. Prompt edits, tool changes, and membership
 changes MUST NOT silently reset a work scope, move its channel mapping, or mix
@@ -541,6 +568,31 @@ Additional positive and negative cases for the two tool-based patterns:
   membership changes during queued work, stale configuration revisions, and
   partial external failures. An unavailable enforcement or confirmation mechanism
   must produce a bounded refusal/uncertain outcome, not an assumed grant.
+
+Five bounded lifecycle/adapter/administration scenarios refine those cases:
+
+1. **Configured but idle:** create an allowed entity configuration without
+   starting a runtime. Its identity and desired revision exist; observed runtime
+   association is none, and it is not reported as ready for execution.
+2. **Supporting-resource limit:** compute is available but a required bridge,
+   identity, storage, routing, or browser/preview resource is unavailable, or
+   concurrent use exceeds a shared quota/aggregate budget. Report the specific
+   blocker without adding providers, expanding access, or raising limits.
+3. **Partially applied configuration:** save an authorized revision while a
+   runtime or workspace update fails or awaits its declared application boundary.
+   Show the desired and actually applied state separately, with partial/blocked
+   status, without silently changing the work scope or claiming the requested
+   revision is fully applied or ready; an earlier applied revision may still run.
+4. **Adapter differences:** compare adapters with different modality, instruction
+   update, and permission behavior. Exercise queued input versus active steering,
+   unconfirmed cancellation, and a ready bridge with an unavailable runtime;
+   disclose unsupported behavior rather than reporting equivalent success.
+5. **Target and approval refusal:** an authorized caller with applicable approval
+   can change a valid typed target within limits. Refuse malformed, ambiguous,
+   or wrong-type targets and approvals for another caller, unrelated, negated,
+   or superseded approvals, even from a recognized approver. Verify redacted,
+   caller-attributed records of the actual applied, partial, refused, or uncertain
+   outcome.
 
 Mocks can validate interface/routing behavior. They cannot validate modern-model
 coordination, native provider behavior, live permissions, or workspace API behavior.

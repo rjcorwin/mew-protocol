@@ -64,6 +64,8 @@ These are uses of existing tool primitives, not a universal protocol-level tool
 bus. Resource collaboration belongs to adapters and participation; administration
 belongs to entity lifecycle. Neither pattern changes work-scope/session boundaries.
 
+The draft also distinguishes configured from ready entities, includes shared resource limits, and requires accurate adapter reporting and action/target matching for any required approval.
+
 ## What changes from the earlier design
 
 The focus is integration and participation, not MEW-enforced control of every
