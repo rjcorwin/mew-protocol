@@ -1,51 +1,54 @@
-# [m2s] MEW v2: shared work record
+# [m2s] MEW v2: glue for a multi-entity workspace
 
-Status: Draft for discussion. Spec first; no implementation approval is implied.
+Status: **revised proposal for review; specification only**.
 
-## Intent
+## The proposal
 
-Make the conversation where humans and agents collaborate the authoritative work
-record. An agent's visible request starts another agent's turn; that agent's
-visible result continues the conversation. A separate private delegation system
-must not decide what happened and merely mirror a summary into the conversation.
+MEW v2 connects places where people talk to the runtimes where entities work.
+Humans and agents share ordinary conversations. Each entity can participate,
+work, report back, hand something to another entity, or stay quiet.
 
-MEW v0.4 already establishes the right foundation: authenticated participants,
-gateway-enforced capabilities, shared context, and proposal/fulfillment chains.
-This proposal extends that foundation to durable, transport-independent work
-conversations. Slack is the first proposed binding, not the protocol itself.
+Modern harnesses already provide tools, permission controls, execution sessions,
+and provider-specific lifecycle operations. MEW should compose those primitives
+instead of recreating a general tool gateway, capability language, or mandatory
+proposal/approval protocol.
 
-## Documents
+The design has three pieces:
 
-- [Draft normative contract](SPEC-v2-DRAFT.md)
-- [Source research and compatibility assessment](research.md)
-- [Decisions and open questions](decision-m2s-shared-work-record.md)
+1. **Workspace/runtime adapters.** Pluggable interfaces connect workspaces such
+   as Slack or Discourse with runtimes such as Claude Code, Codex, ACP-compatible
+   agents, or a managed-agent provider. Messages enter through the workspace;
+   replies return under the entity's configured identity. Another entity engages
+   with the shared conversation, rather than a hidden delegation channel.
+2. **Entity lifecycle and work scope.** Configure an entity, give it explicitly
+   authorized workspace access, map its channels/topics, and start or end a work
+   scope. A worker pool can place or scale entities on local or managed providers.
+   Session policy belongs here. A topic/thread is context, not automatically a
+   new runtime session; an ongoing scope can preserve one entity's session across
+   several conversations when their access boundaries are compatible.
+3. **Participation.** Instructions, classifiers, messaging tools, and shared
+   social norms help an entity decide when to engage, stay quiet, ask a question,
+   or hand work over. Modern models' ability to coordinate this way is a hypothesis
+   to evaluate. Prompts and classifiers are not authentication or authorization.
 
-## Scope
+## What changes from the earlier design
 
-The draft separates four concerns:
+The focus is integration and participation, not MEW-enforced control of every
+operation. Workspace platforms govern conversation identity/access. Harnesses and
+providers govern tools, permissions, and execution. MEW keeps the mappings and
+lifecycle coherent and makes adapter limitations visible.
 
-1. Core protocol: identity, envelopes, authority, shared records, causality,
-   admission, delivery, and visible outcomes.
-2. Work-conversation profile: explicit turn activation, loop bounds, late work,
-   and participation by humans and agents.
-3. Slack binding: platform identity, message/thread mapping, observed posts,
-   metadata, retries, edits, and bounded history.
-4. Runtime profile: lifecycle-scoped sessions, turn serialization, capabilities,
-   cancellation, and uncertain outcomes across local or managed providers.
+This deliberately gives up a universal MEW capability/proposal enforcement layer,
+complete protocol-level visibility of every native tool call, and uniform
+persistence/recovery guarantees. It does not promise exactly-once effects or
+identical interruption behavior across providers. Ordinary conversations do not
+need a mandatory envelope, two-part exchange, or special subthread hierarchy.
 
-The existing MCP action/proposal semantics remain a first-class protocol profile.
-Binary streaming, hosting, provider SDKs, deployment, model selection, credential
-custody, and worker-pool recovery are separate implementation concerns. This is
-not a new implementation of the current CLI or a replacement for the released
-v0.4 specification.
+## Review first
 
-## Review sequence
+- [Draft contract and scenarios](SPEC-v2-DRAFT.md)
+- [Existing primitives and responsibilities](research.md)
+- [Design decisions and remaining questions](decision-m2s-shared-work-record.md)
 
-1. Agree on protocol boundaries and the open decisions.
-2. Review example traces and conformance scenarios independently of code.
-3. Define schemas and state-machine fixtures from the accepted specification.
-4. Only then implement a narrow binding and runtime conformance slice.
-
-Exploratory implementation work is not normative and is not included in this
-specification proposal. An implementation must be evaluated against the eventual
-contract, rather than the contract being shaped to ratify existing code.
+Review the adapter boundaries, work-scope lifecycle, and participation examples
+before implementation. This revision contains no implementation or deployment.

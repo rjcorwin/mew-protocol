@@ -1,524 +1,383 @@
-# MEW v2 draft: shared workspaces, visible coordination
-
-Status: **specification proposal for review; not accepted or implemented**.  
-Working identifier: `mew/v2-draft`.  
-Baseline: MEW wire protocol v0.4 at repository commit
-`898f32e1a233bbd42a4fda0c4feb2367ea1c2b46`.
-
-MUST, MUST NOT, SHOULD, and MAY express proposed normative requirements. They do
-not turn an unresolved decision into an accepted one. The accompanying decision
-document identifies the choices still requiring review.
-
-## 1. Purpose
-
-MEW gives humans, agents, and tools a shared workspace in which identity and
-capability enforcement belong to the protocol boundary. V2 extends that model
-to durable work conversations: participants coordinate through the record that
-humans can read and join, rather than through hidden delegation later summarized
-into a chat feed.
-
-The protocol MUST distinguish four things:
-
-1. **Visibility:** who can inspect a record.
-2. **Addressing:** which participants a message concerns.
-3. **Activation:** whether it requests a participant's next turn or operation.
-4. **Authority:** whether that participant may perform the requested operation.
-
-None implies the next. A visible request from another agent is not human approval;
-receiving or reading it does not grant capabilities.
-
-## 2. Layers and conformance
-
-### 2.1 Core
-
-Core defines authenticated participants, versioned envelopes, capability checks,
-context and correlation, record references, and observable protocol outcomes.
-Core MUST NOT depend on Slack IDs, ACP methods, model providers, database products,
-container runtimes, or a particular hosting service.
-
-### 2.2 Profiles
-
-- **Shared work record:** durable admission, observable coordination, replay,
-  bounded activation, history completeness, and uncertain-outcome handling.
-- **MCP action/proposal:** v0.4-compatible request/proposal/fulfillment concepts
-  with explicit operation authorization and effect reconciliation.
-- **Runtime lifecycle:** maps admitted work to local or managed runtime turns,
-  without equating context with a runtime session.
-- **Streaming:** optional high-volume stream lifecycle and writer/target controls.
-  It MUST NOT be an unrecorded delegation channel in a shared-work space.
-
-A participant and gateway MUST advertise supported profiles and versions before
-accepting their messages. Unsupported operations MUST fail explicitly. A system
-MUST NOT claim full action-profile enforcement if some effectful tools bypass it.
-Whether the shared-work profile is mandatory for every v2 space remains open.
-
-### 2.3 Bindings
-
-A binding maps core identities and records to a transport. The Slack binding in
-§11 is an initial proposed binding. WebSocket/HTTP bindings can continue to exist;
-they must satisfy the same advertised profile rather than silently weaken it.
-
-## 3. Identity, workspace, context, and lifecycle
-
-A **participant** is an authenticated human, agent, or tool principal. Its stable
-ID MUST be assigned or verified by the gateway; names in message text, claimed
-roles, and copied metadata MUST NOT establish identity.
-
-A **workspace** is an authorized shared collaboration scope. A **context** groups
-related records within it, such as a ticket conversation. A **lifecycle** is an
-application-defined period of work, such as a sprint. A **runtime session** is a
-provider-owned execution state for one participant.
-
-These identifiers MUST remain distinct. In the initial runtime profile, the
-session key is `(workspace, lifecycle, participant)`; each turn also carries its
-context. Two ticket threads in the same sprint therefore share the participant's
-runtime session, while retaining separate conversation history cursors. A new
-lifecycle does not silently reuse the previous lifecycle's session.
-
-A lifecycle session MUST have one compatible information-access boundary.
-Sharing a session across contexts MUST NOT carry restricted history into a
-conversation whose audience cannot receive it. The initial profile therefore
-requires compatible readership and data-use permissions across its contexts;
-otherwise the binding blocks the mapping or uses a separately authorized
-lifecycle/isolation profile. A private message is not implicitly part of a shared
-session, and thread-specific prompt filtering alone is not proof that earlier
-runtime memory cannot leak. Visibility/grant changes require revalidation.
-
-Bindings MUST enforce workspace membership, sender identity, allowed recipients,
-and the relevant lifecycle mapping. Reassignment of an identity or lifecycle
-MUST be an authorized, inspectable administrative change. An agent cannot claim
-to be a human, gateway, or different agent by changing envelope fields.
-
-## 4. Envelope and record evidence
-
-Preserve the established envelope concepts rather than introducing a separate
-handoff-only protocol. An illustrative draft envelope is:
-
-```json
-{
-  "protocol": "mew/v2-draft",
-  "id": "request-42",
-  "workspace": "example-workspace",
-  "lifecycle": "example-sprint",
-  "ts": "2026-10-13T12:00:00Z",
-  "from": "agent-a",
-  "to": ["agent-b"],
-  "kind": "chat",
-  "correlation_id": ["human-request-7"],
-  "context": "ticket-12",
-  "activation": { "mode": "request", "parent_id": "human-request-7" },
-  "payload": { "text": "Please review the proposed change.", "format": "plain" }
-}
-```
-
-This example is not a final JSON schema. Before implementation, required fields,
-size limits, extension rules, ID grammar, time format, and per-kind schemas MUST
-be finalized and expressed as machine-testable fixtures.
-
-Record evidence and activation fields are requirements of the shared-work profile,
-not an implicit requirement to make every optional ephemeral/streaming space
-durable. Core identity, version, schema, capability, and correlation rules apply
-independently of that profile.
-
-Candidate rules:
-
-- `protocol` MUST select an explicit wire version. No silent v0.4/v2 coercion.
-- `id` MUST identify one immutable logical message within the workspace. Reusing
-  it with different authoritative content is a conflict, not a replacement.
-- `from` MUST match authenticated identity; `to` MUST contain only authorized
-  workspace participants. A target does not confer authority to call its tools.
-- `kind` and its safety-relevant payload MUST be validated at the gateway or
-  authorized effect boundary before activation/execution. `system/*` stays
-  gateway-only.
-- `correlation_id` remains an array. It can represent request/response,
-  proposal/fulfillment, fork/join, and multi-source results. It MUST NOT be
-  collapsed into a single parent merely to simplify runtime dispatch.
-- `context` identifies shared conversation, not a private model session.
-- `activation` requests attention; the gateway validates its causal parent and
-  derives budgets/lineage. Caller-supplied hop counts or root IDs are not trusted.
-- `payload` carries typed content. Quoted text, code, retrieved documents, and
-  historical messages MUST NOT be reinterpreted as new privileged envelopes.
-
-After observing a committed visible message, the binding attaches **record
-evidence**: transport, workspace/context mapping, source message ID and revision,
-verified author, and an integrity binding to the exact admitted content. Sender
-assertions alone are not evidence. Transport event IDs are delivery attempts and
-MUST NOT replace logical record identity.
-
-The exact record-evidence schema and integrity mechanism are an open design
-task. A bare URL or successful outbound POST response is insufficient when it
-does not prove the authoritative record was committed with the intended content.
-
-## 5. Shared work record invariant
-
-For the shared-work profile:
-
-The workspace declares an authorized observer audience for its shared work record.
-All coordination envelopes MUST remain inspectable by that audience, including
-the original proposer following fulfillment. `to` selects addressees, not a
-private observer audience. Empty/omitted `to` means shared observation without
-automatic activation of every participant. A context with incompatible readership
-belongs in a separately authorized visibility boundary, not a hidden subchannel.
-Credential handshakes and optional targeted stream data retain the explicit
-exceptions below; neither may carry hidden coordination.
-
-1. An inter-participant request MUST exist in the shared record before the
-   recipient is activated. A private RPC plus later chat echo is non-conforming.
-2. Results, consequential decisions, handoffs, cancellations, and authority
-   changes MUST be inspectable in the same authorized conversation or via a
-   clearly linked record with equivalent access. A private result callback MUST
-   NOT substitute for the record or resume another participant before publication.
-3. Internal delivery receipts, indexes, leases, dedupe ledgers, runtime session
-   handles, and checkpoints MAY exist. They are operational state, not an
-   alternative conversation or a source of new task authority.
-4. Large artifacts MAY be stored separately, provided their visible record
-   identifies the artifact/version and authorized participants can inspect it.
-   A link MUST NOT grant wider access than the user authorized.
-5. Secrets and credentials MUST NOT enter the shared work record. Authentication
-   handshakes may use private secure channels; their non-sensitive lifecycle can
-   be visible without exposing credentials.
-6. Visibility requires useful action/status/evidence summaries, not disclosure of
-   private model reasoning. No profile requires private chain-of-thought output.
-
-MEW-coordinated tool requests and results are participant interactions and follow
-the same invariant. Runtime-native tools are a declared conformance boundary
-(§10), not an exception that can be hidden behind a full-enforcement claim.
-
-## 6. Activation and human participation
-
-Applicability: shared-work profile. Other profiles must separately define their
-activation behavior and cannot claim these guarantees by default.
-
-An addressed message MAY request a turn only when sender, recipient, context,
-lifecycle, capability, record evidence, and causal constraints all pass. Merely
-observing another participant's message MUST NOT require a model turn.
-
-The initial proposed defaults are:
-
-- Explicit human addressing can initiate work within existing capabilities.
-- An authorized agent request/handoff can activate the named peer after record
-  observation. Agent-created roots require an explicit standing capability;
-  otherwise the activation must descend from admitted work.
-- A result can request continuation by its recipient, but results are not
-  automatically activating solely because they are results.
-- Acknowledgements, presence, status, repeated delivery, and an agent's own echo
-  MUST NOT recursively activate that agent by default.
-- Unaddressed human contributions remain part of context. Automatic thread
-  affinity is not assumed; a binding may define an explicit, tested policy.
-
-The gateway MUST enforce bounded causal depth, fan-out, outstanding work, and
-per-root activation budgets. A fresh message ID, runtime restart, delivery retry,
-or transport reconnection MUST NOT reset a causal budget. Multi-parent
-correlation remains valid, but does not mint additional activation authority.
-Budgets and limits are profile/deployment settings and MUST be inspectable.
-
-Human approval, capability grant, and ordinary human chat are distinct. A claimed
-approval relayed by an agent MUST NOT become an approval by the human. Approval
-and high-impact execution semantics remain subject to the action profile and
-deployment policy, not informal natural-language claims.
-
-## 7. Capabilities, proposals, and effects
-
-Applicability: MCP action/proposal profile. The visible-record and durable-outcome
-requirements below additionally apply when shared-work is negotiated. Core
-identity and capability checks always apply.
-
-V2 retains the v0.4 proposal sequence:
-
-1. A proposal-only participant emits `mcp/proposal` with the proposed operation.
-2. An authorized fulfiller may emit `mcp/request`, correlated to that proposal.
-3. The effect boundary verifies the fulfiller's current capability and the exact
-   operation/target before executing.
-4. `mcp/response` correlates to the actual request. The original proposer can
-   follow the visible chain without receiving a secret internal completion.
-
-`mcp/withdraw` and `mcp/reject` remain distinct. Neither proves that an operation
-already executing was rolled back. A capability revocation prevents new
-unauthorized admissions/executions; it is not evidence of canceling work already
-in flight. Authority MUST be revalidated at the point an effect can still be
-prevented, including after queue delay or reconnection.
-
-Capability changes MUST be authorized and visible. A payload MUST NOT override
-gateway-owned identity, authorization, routing, or budget fields. Correlation to
-an approved proposal alone MUST NOT authorize a changed operation. The profile
-must bind fulfillment to the approved operation, target, and relevant limits.
-
-Multiple authorized fulfillers racing to accept one proposal MUST NOT create
-multiple executions of the same approved operation. The action profile MUST
-define a stable operation identity and an atomic claim/idempotency rule at the
-effect boundary, including recovery of an unknown first attempt. A new fulfillment
-message ID alone is not a new authorization to repeat the operation.
-
-No delivery mechanism can guarantee exactly-once arbitrary effects. Adapters
-MUST declare their idempotency and reconciliation support. If an effect's outcome
-is unknown, the system MUST hold dependent work and expose uncertainty rather
-than infer success, failure, or permission to repeat it.
-
-## 8. Durable admission, ordering, and replay
-
-Applicability: shared-work profile. Ephemeral profiles must advertise weaker
-guarantees explicitly and must not report these durable states without evidence.
-
-### 8.1 Acceptance
-
-Transport receipt, durable admission, runtime start, visible result publication,
-and verified task completion are different states. An “accepted” receipt MUST
-state what has actually been persisted. A transport success MUST NOT be reported
-as work completion.
-
-The shared-work binding MUST persist authenticated intake and dedupe identity
-before acknowledging responsibility for eventual processing. Delivery may be
-at least once. Per-recipient admission MUST be idempotent across restarts and
-transport retry/app-event variants. Conflicting content with the same logical
-record identity MUST be rejected and surfaced.
-
-### 8.2 Ordering and late work
-
-The profile MUST define an ordering domain, normally a conversation, without
-pretending there is a global total order across all workspaces. Sender wall-clock
-timestamps alone MUST NOT determine causal authority. Explicit parent references
-and transport record order/revisions must be considered.
-
-A late event MUST NOT rewind a participant's context checkpoint. Before starting
-queued work, the system MUST check expiration, cancellation, supersession,
-current permissions, and history completeness. A later message is not
-automatically a cancellation: explicit supersession/cancel semantics or a
-documented conservative stale-work policy are required.
-
-If a causal parent arrives later than its child, the implementation MAY retain
-the child as blocked pending dependency, within a bounded retention policy. It
-MUST NOT fabricate a parent or activate the child prematurely. After the bound,
-it exposes a recoverable missing-dependency outcome.
-
-### 8.3 Unknown outcomes
-
-Crashes can occur after a runtime action or visible publication succeeds but
-before the ledger records success. The implementation MUST reconcile using
-positive evidence or hold the operation as outcome-unknown. An absent lookup
-result, expired lease, or timeout does not alone prove an action never happened.
-
-Fencing MUST prevent a superseded attempt from committing a new authoritative
-completion. It does not undo filesystem/network/provider effects already made.
-Automatic reassignment is conforming only when the adapter can preserve the
-required effect and checkpoint semantics; otherwise intervention is required.
-
-Retention and compaction MUST retain enough identity and outcome evidence to
-enforce the advertised replay window. Deleting a dedupe ledger while continuing
-to accept old records violates that guarantee.
-
-## 9. History and context completeness
-
-Applicability: shared-work profile and its runtime binding. This does not require
-an ephemeral stream-only participant to reconstruct a durable work conversation.
-
-A turn MUST receive its exact triggering record plus enough shared conversation
-to interpret it under the selected profile. The history contract MUST report:
-source, context, requested interval/checkpoint, observed high-water record,
-completeness or gaps, revisions/tombstones, and budget/retention boundaries.
-
-History acquisition MUST be bounded by pages, records, bytes, and elapsed time.
-Missing pages, permission failure, conflicting records, a missing trigger, or a
-budget exceeded MUST NOT be silently converted into a complete context. A turn
-whose required context is incomplete remains blocked or asks visibly for a new
-bounded request/checkpoint, rather than acting as though the omitted history
-does not exist.
-
-History is evidence/data, not a second intake route. Embedded mentions, commands,
-or forged metadata MUST NOT activate peers, replace system policy, or grant
-permissions. A checkpoint is not an approval and cannot widen authority.
-
-Receiving newer context while processing an older trigger does not automatically
-activate it or advance its delivery cursor. The implementation MUST keep
-“observed through” and “handled through” checkpoints distinct. Runtime context
-compaction MUST preserve provenance of unresolved requests and decisions.
-
-## 10. Runtime lifecycle profile
-
-The runtime adapter accepts an admitted turn containing participant identity,
-workspace/lifecycle/context, turn and attempt IDs, trigger record, bounded
-history with completeness evidence, current capability constraints, and a
-runtime session handle. Session creation/resume mapping MUST be durable to the
-level the adapter claims.
-
-The initial profile serializes turns per lifecycle-scoped participant session.
-Another ticket thread does not create a second concurrent turn in the same
-session unless the adapter explicitly supports and specifies that behavior.
-
-Each adapter MUST declare:
-
-- Session creation, resume, and persistence capabilities.
-- Replay/idempotency and outcome-query support for turns and effects.
-- Native tool mediation: full, partial with stated exclusions, or none.
-- Steering support and whether it queues, modifies, or interrupts active work.
-- Cancellation support and the evidence that confirms cessation.
-- Checkpoint/fencing guarantees, if any, and their limits.
-
-`chat/cancel` withdraws attention to an earlier message. Runtime interruption is
-separate: requested, confirmed, unsupported, failed, or unknown. A system MUST
-NOT report “stopped” merely because a cancel signal was sent. It MUST also state
-whether already-issued external actions may continue. Late output after a
-confirmed supersession/cancel MUST NOT reactivate peers as current work.
-
-Local ACP and managed-provider adapters can implement this same contract. This
-draft does not claim they have identical steering, persistence, tool mediation,
-or recovery behavior. A mock demonstrates only the semantics it simulates.
-
-## 11. Proposed Slack binding
-
-Slack is the shared work surface in this binding. All tasks below are design
-requirements, not claims that Slack APIs or permissions have been validated.
-
-### 11.1 Mapping and authentication
-
-- Workspace ID maps to an authorized Slack team and channel set.
-- Context maps to a specific channel and root-thread timestamp.
-- Human and agent participants map to verified platform identities. Each agent
-  has its own distinguishable identity; custom names/avatars are not verification.
-- The receiving Slack app is distinct from the authoring agent app. Authentication
-  of a callback does not establish the callback receiver as message author.
-- The binding MUST verify transport authenticity/freshness against raw input,
-  then validate workspace, author identity, channel/lifecycle, recipients, and
-  current capabilities. It MUST handle duplicates across event forms/apps.
-
-### 11.2 Visible record and activation
-
-An agent sends a visible message in the ticket thread with versioned MEW metadata
-and visible addressee information. Metadata is part of that record; it MUST NOT
-become a private authoritative envelope that bypasses Slack observation.
-
-Only verified observation of the committed Slack record permits peer activation.
-An Events API callback or a bounded authoritative reconciliation fetch may
-provide that observation. A successful outbound publish call alone MUST NOT
-directly invoke the recipient. If callbacks omit required metadata, the binding
-must retrieve and validate it or block, not invent it from an internal send.
-
-The exact Slack metadata schema, its relationship to the core envelope, and the
-visible rendering of typed MCP actions/control requests must be specified before
-implementation. Human plain-text addressing can map to `chat` activation under
-an explicit policy; quoted/code mentions remain context-only. Human participation
-must not require hand-authoring JSON.
-
-### 11.3 Retries, edits, deletion, and history
-
-The durable identity key includes team, channel, source message identity/revision,
-and logical envelope identity where applicable. Event IDs identify delivery
-attempts. A repeated app mention plus message event MUST NOT start two turns.
-
-An edit MUST NOT silently replay an old request as new authority. A binding must
-define whether it is a new revision requiring fresh admission or a correction
-that blocks pending work. Deletion/redaction produces an observable tombstone
-where permitted; it MUST NOT be interpreted as proof that prior effects vanished.
-Exact revision/admission policy is an open decision.
-
-Thread history must be paginated completely within declared bounds. Retention
-limits, access loss, missing replies, and rate-limit exhaustion are explicit gaps.
-An operational mirror can preserve admitted records for recovery, but MUST NOT
-manufacture conversations or silently override the shared surface's later
-corrections. Retention/privacy policies must govern that mirror.
-
-### 11.4 Human controls
-
-UI buttons or text controls must resolve to authenticated protocol actions and
-the exact target request/attempt. Text that quotes a control is not a control.
-Approvals must name the consequential operation and bind to its current contents.
-Acknowledgement, reaction, cancellation, and approval MUST remain distinct.
-
-## 12. Example traces
-
-### A. Two agents and a human
-
-1. Human posts an addressed request to agent A in a ticket thread.
-2. Binding observes and durably admits it. A reads bounded thread context in its
-   existing lifecycle session.
-3. A publishes an addressed review request to B, correlated to the human request.
-4. Until the visible record is observed and validated, B does not run.
-5. Human adds a correction in that same conversation. It becomes shared context;
-   explicit addressing or supersession determines its activation effect.
-6. B publishes its result, with a continuation request to A when appropriate.
-7. A's next turn follows observation of that result. No private worker completion
-   callback substitutes for steps 6–7.
-
-### B. A proposal needs authority
-
-1. B can propose a tool operation but cannot execute it.
-2. Human or authorized fulfiller publishes the exact fulfillment request.
-3. Effect boundary revalidates current capability and approved contents.
-4. Result is recorded and correlated before another participant continues.
-5. If operation contents changed or approval was withdrawn before execution,
-   it remains blocked; correlation alone does not rescue authorization.
-
-### C. Publication outcome is unknown
-
-1. A's visible post commits but the publish response is lost.
-2. Sender records uncertainty; it does not immediately post another copy.
-3. A verified callback or authoritative read finds the existing record.
-4. Intake dedupes it and activates B once under the admission contract.
-5. If evidence is unavailable, dependent work remains visibly blocked.
-
-### D. Runtime cancellation is unsupported
-
-1. Human withdraws a request while the runtime is working.
-2. Gateway records attention withdrawal and asks the adapter to cancel.
-3. Adapter reports unsupported or uncertain rather than “stopped.”
-4. Late output is prevented from reviving canceled work. Possible already-issued
-   effects are reported for reconciliation.
-
-## 13. Conformance scenarios to define before coding
-
-The eventual executable suite MUST derive from these contracts, not merely
-exercise an implementation's convenient paths:
-
-1. Two distinct agents and one human share a thread; only observed visible
-   requests/results advance the coordination.
-2. Authenticated identity mismatch, unknown channel, forbidden peer edge, or
-   forged gateway fields cannot activate work.
-3. Duplicate callbacks, app-event variants, restart, and replay preserve one
-   logical admission per recipient; conflicting reuse is rejected.
-4. Private outbound intent and an outbound receipt without record evidence do
-   not invoke a peer.
-5. Correlation preserves proposal/fulfillment/result and fork/join history while
-   activation lineage/budgets cannot be reset.
-6. Missing parent, stale event, explicit supersession, edit, delete, and late
-   completion produce declared states, not silent reordered work.
-7. Incomplete pagination, missing trigger, permission loss, retention gap, and
-   bounded-history exhaustion block action with inspectable reasons.
-8. Historical authored instructions remain data; they cannot mint an identity,
-   capability, approval, or separate activation.
-9. Several contexts in one lifecycle preserve one participant session; a new
-   lifecycle does not inherit it accidentally.
-10. Crash before/after intake persistence, runtime dispatch, effect, publication,
-    and receipt persistence is reconciled without unsupported retry guarantees.
-11. Revocation while queued and operation changes after approval are enforced at
-    the effect boundary.
-12. Cancellation requested/confirmed/unsupported/unknown states match actual
-    adapter behavior; old attempts are fenced from new authoritative completion.
-13. Streams and credentials cannot become hidden inter-agent coordination routes
-    or accidentally leak into the shared record.
-14. Unsupported profiles/versions fail explicitly; v0.4 traffic is not silently
-    granted durable-work or operation-control guarantees.
-
-## 14. Migration and next review
-
-V0.4 remains authoritative for existing deployments. This proposal does not alter
-its wire marker, CLI, SDK, MCP bridge, stream behavior, or current sessions.
-Migration requires explicit version/profile negotiation and a bridge or native
-binding that states which guarantees are preserved or unavailable.
-
-The schema review MUST include a kind-by-kind compatibility inventory:
-
-- `mcp/*`, proposal withdrawal/rejection, and capability grant/revoke: preserve
-  the existing concepts, tightening authorization and replay semantics as above.
-- `chat`, acknowledgement, and cancellation: preserve their distinct meanings;
-  specify explicit activation instead of treating every observation as a turn.
-- `participant/*` and `space/*`: classify each discovery, membership, lifecycle,
-  status, and context-management operation as core, profile-specific, deferred,
-  or removed with a migration reason. No current kind is silently discarded.
-- `reasoning/*`: map useful public progress/conclusion summaries without requiring
-  private model reasoning; final compatibility names remain to be reviewed.
-- `stream/*` and raw frames: optional streaming profile with visible lifecycle,
-  explicit ownership/targets, and no hidden work-coordination escape route.
-
-Review D1–D8 before finalizing wire schemas. Then produce accepted state machines,
-example traces, and conformance fixtures. Only afterward choose a first
-implementation slice. Hosting and worker recovery plans can consume those
-contracts; they must not dictate the protocol's authority or visibility model.
+# MEW v2 draft: multi-entity workspace integration
+
+Status: **revised design contract for review; not a released wire protocol or
+implementation**. This draft replaces the earlier control-plane-centered proposal.
+The existing released specification remains unchanged.
+
+MUST, SHOULD, and MAY below describe candidate integration requirements. They do
+not imply that an adapter or provider already implements a capability.
+
+## 1. Purpose and boundary
+
+MEW connects shared human workspaces to autonomous entities running in modern
+agent harnesses. Humans and entities communicate in the same ordinary channels,
+topics, and threads. MEW's job is to connect those conversations to suitable
+runtimes, manage entity/work-scope lifecycle, and support useful participation.
+
+The design consists of three pieces:
+
+1. Pluggable **workspace/runtime adapters**.
+2. **Entity configuration, work scopes, session policy, and worker placement**.
+3. A **participation model** using instructions, classifiers, messaging tools,
+   and social conventions.
+
+MEW is not, by default, a replacement permission system, tool execution gateway,
+MCP resource mediator, or universal approval/proposal engine. The configured
+workspace, harness, and provider remain the enforcement boundaries for their
+own identities, access, tools, and operations. An integration MUST NOT claim that
+participation instructions provide a security boundary.
+
+MEW does not require a new public message envelope, request/ack/result handshake,
+private coordination bus, or special subthread structure. Adapters can normalize
+records internally without turning an internal record into a hidden conversation
+or a new source of authority.
+
+## 2. Terms that must remain distinct
+
+- **Entity:** a configured participant with a stable identity and role. It may be
+  backed by an agent runtime; humans remain ordinary workspace participants.
+- **Workspace:** a collaboration service/account and its accessible surfaces.
+- **Conversation:** an ordinary channel, topic, thread, or equivalent surface.
+- **Work scope:** an explicitly started and ended period of related work. A
+  sprint, project phase, or bounded assignment is an example.
+- **Runtime session:** the harness/provider handle for continuing one entity's
+  execution and conversation state.
+- **Context window:** the finite information available to a model invocation.
+  It can change or be compacted without ending the runtime session or work scope.
+- **Worker:** a local process/host slot or managed execution allocation capable
+  of running a runtime. A worker is not the entity identity or its session.
+- **Participation policy:** the configured instructions and mechanisms used to
+  choose engagement, silence, or handoff inside an authorized workspace.
+
+A stable entity ID does not imply a permanent worker, infinite context, or a
+portable provider session. A new thread does not imply a new entity or session.
+
+## 3. Piece one: adapter interfaces
+
+### 3.1 Workspace adapter
+
+A workspace adapter SHOULD expose the following conceptual operations. These
+are interface responsibilities, not a prescribed SDK or wire schema:
+
+- Discover/read the conversations the configured account can actually access.
+- Observe new messages and relevant changes with platform identity and references.
+- Read conversation history with pagination, provenance, and explicit gaps.
+- Send/reply under the configured entity's verified platform identity.
+- Report delivery evidence, platform errors, and uncertain publication outcomes.
+- Stop observation for a closed or revoked work-scope mapping.
+
+An observed message MUST carry enough information to identify its workspace,
+conversation/thread, source message/revision, author, and observation time. The
+adapter MUST distinguish verified platform fields from author-written text.
+These internal fields do not require humans or agents to author protocol JSON.
+
+Slack and Discourse illustrate different conversation structures and bot/user
+capabilities. Their adapters MUST declare the mapping and access available on
+that platform instead of assuming every platform behaves like a Slack thread.
+
+### 3.2 Runtime adapter
+
+A runtime adapter SHOULD expose, where supported:
+
+- Create or attach to a session using approved entity configuration.
+- Deliver selected conversation input and relevant context to that session.
+- Observe output, status, tool/permission prompts, and terminal outcomes.
+- Provide messaging tools that publish to the configured workspace.
+- Queue, steer, cancel, pause, resume, or close only with the semantics the
+  harness/provider actually supports.
+
+Every adapter MUST describe its support and limits for session persistence,
+concurrency, context/compaction visibility, interruption, tool permissions,
+outcome lookup, and movement between workers. Unsupported means unsupported;
+queueing a new message is not equivalent to interrupting a running operation.
+
+Input MUST preserve the verified speaker and conversation provenance. A message
+from another entity that says a human approved something is still that entity's
+message; it MUST NOT be translated into a native permission approval from the
+human. Native approval prompts must reach an authenticated authorized operator
+through the configured integration.
+
+Claude Code and Codex are harness choices. ACP can provide an adapter protocol
+for compatible agents. A managed-agent API can provide another runtime boundary.
+MEW SHOULD reuse their existing permission and lifecycle interfaces rather than
+wrap every native tool call in a new MEW approval exchange.
+
+### 3.3 Message flow
+
+The ordinary flow is:
+
+1. A human or entity posts in the shared workspace.
+2. The workspace adapter observes the platform record.
+3. Scope/access routing identifies eligible entities.
+4. Each eligible entity's participation policy chooses whether/how to engage.
+5. The runtime receives the selected input in its configured session.
+6. Its response or messaging-tool call publishes back to the workspace under
+   that entity's identity.
+
+A handoff is a visible workspace message to another participant. The recipient's
+engagement follows the workspace observation path. An internal tool return can
+confirm that a message was sent, but MUST NOT secretly deliver a different task
+or a private peer result. The implementation MAY keep queues, references, session
+maps, and receipt ledgers as operational state; those are not a substitute team
+conversation.
+
+This boundary applies between configured MEW workspace entities. A harness may
+use its own internal tools or subagents as runtime implementation details; MEW
+does not require those to become separate workspace participants or publish every
+internal exchange. If such a worker is configured as an independent MEW entity,
+its coordination with other MEW entities uses the shared workspace path.
+
+MEW does not require every native runtime tool invocation to be a workspace
+message. Important progress, decisions, requests, handoffs, and results should
+be communicated according to the participation policy. This is a different
+visibility promise from complete protocol-level tool mediation.
+
+## 4. Piece two: entity configuration and lifecycle
+
+### 4.1 Entity configuration
+
+A configuration identifies:
+
+- Stable entity identity, role, and participation instructions.
+- Workspace adapter/account identity and authorized conversation access.
+- Runtime adapter, harness/provider selection, and applicable existing settings.
+- Work-scope membership and exact channel/topic/conversation mapping.
+- Session policy, context retrieval policy, and permitted worker/provider placement.
+- Operational limits such as concurrency, queue size, resource/spend ceilings,
+  and scale bounds where the operator has authorized them.
+
+Configuration MUST reference approved credential mechanisms rather than copy
+secrets into conversations. Changing access or provider permission settings is
+an administrative action governed by the real platform/provider and operator
+policy. An entity cannot expand its own access by changing its prompt or by
+claiming another role in a message.
+
+### 4.2 Explicit work-scope start
+
+Starting a scope MUST establish, before work is routed:
+
+1. Scope identity, purpose, lifecycle generation, and participating entities.
+2. The exact workspace/channel/topic mapping and compatible access boundary.
+3. The event boundary/checkpoint from which this scope accepts conversation input.
+4. Whether each entity starts fresh or attaches to an existing authorized session.
+5. Worker placement and behavior when a required runtime or workspace is unavailable.
+
+The channel mapping is part of the scope, not an incidental lookup made from the
+latest incoming message. It can include several conversations, with defined
+thread/topic selection. If a channel is reused for a later scope, delayed events
+from the earlier scope MUST NOT silently become new work in the later one.
+Mapping changes require an explicit administrative update and a new routing
+boundary; queued events retain the scope under which they were admitted.
+
+### 4.3 Session policy
+
+The initial proposed default is one continuing session per entity and work scope,
+with turns serialized when the runtime requires it. Several ticket threads can
+supply context to that same session. Deployments MAY choose per-conversation or
+other explicit policies, but MEW does not mandate a session per thread.
+
+Session reuse MUST respect information-access boundaries. Restricted/private
+conversations cannot silently be mixed into a shared session that later speaks
+to a broader audience. Either the configured scope has compatible readership and
+data-use permissions, or the mapping must isolate the sessions/scopes or remain
+blocked. Prompt filtering alone does not prove earlier runtime memory is absent.
+
+Context retrieval and compaction are separate from scope lifecycle. The adapter
+SHOULD expose what it can about context limits and compaction, but MUST NOT claim
+lossless memory when a provider only offers a summary or opaque session state.
+The workspace conversation, retrieved history, runtime transcript, and current
+model context can differ; those differences must be visible when they affect work.
+
+### 4.4 Worker pool and scaling
+
+The pool allocates eligible local or managed capacity to configured entities.
+It can create/start entities, move work to available capacity when supported,
+and scale capacity or entity instances up/down within approved limits.
+
+Scaling workers does not itself grant workspace access or create new authority.
+Distinct simultaneous participants SHOULD have distinct configured identities.
+Replicas of one entity require an explicit single-active/session-concurrency
+policy so the same message does not accidentally start competing turns.
+
+A replacement worker MAY resume a session only when the runtime/provider offers
+that capability and the required state/access is available. Otherwise it starts
+fresh under an explicit recovery choice, waits, or reports a blocker. Provider
+session IDs, context, credentials, and in-flight effects are not assumed portable
+between local and managed runtimes.
+
+The pool's implementation, scheduler, storage, host topology, and provider APIs
+are not standardized by this draft. The observable placement/lifecycle contract
+is the part MEW owns.
+
+### 4.5 Scope end and scale-down
+
+Ending a scope MUST stop admitting new work to that scope and retire its active
+conversation mapping. The configured end policy MUST say what happens to queued
+input and active turns: drain, cancel where supported, or hold for intervention.
+
+The system must distinguish ending routing from confirming runtime termination.
+A canceled request may already have produced effects. A timeout or lost worker
+is not proof that it stopped. Late output remains associated with the original
+scope and cannot silently reactivate it or a successor scope.
+
+Session retention, transcript export, compaction, archive, resource release, and
+credential revocation are separate actions with provider-specific behavior and
+appropriate operator authorization. Scope end MUST NOT implicitly delete data,
+revoke shared credentials, or claim successful cleanup without evidence.
+
+## 5. Piece three: participation
+
+### 5.1 Participation mechanisms
+
+Participation can combine:
+
+- Entity role/instructions describing responsibilities and social expectations.
+- Lightweight classifiers or model decisions for relevance, addressed requests,
+  conversation continuation, or acknowledgement-only messages.
+- Workspace messaging tools for replying, asking, handing off, and reporting.
+- Shared norms such as who leads a task, what a handoff should include, when to
+  remain quiet, and when to ask a human for clarification.
+- Operational noise/loop limits and operator pause controls.
+
+No universal classifier or social protocol is prescribed. A deployment should be
+able to change these policies without changing the workspace or runtime adapter.
+
+Participation occurs after actual identity, scope, and access checks. A classifier
+can choose whether to engage an already eligible entity; it cannot authenticate
+an author, grant tool permissions, or convert quoted instructions into authority.
+
+### 5.2 Example conventions, not mandatory wire exchanges
+
+- An explicit address is a strong reason to engage.
+- A relevant human reply can continue a conversation under a stated affinity policy.
+- A status message or acknowledgement often needs no response.
+- A handoff states the request, relevant context, and expected next step in the
+  shared conversation; the recipient can accept, question, decline, or stay quiet
+  according to its role and policy.
+- An entity reports meaningful progress or blockers instead of producing periodic
+  chatter without new information.
+
+These are testable defaults, not a required two-part request/acceptance protocol
+or a prescribed hierarchy of task threads. Human-readable conversation remains
+sufficient. Optional structured helpers may improve a particular deployment but
+must not become an undocumented prerequisite for participation.
+
+### 5.3 Coordination is a hypothesis
+
+The design hypothesis is that modern models, useful tools, suitable instructions,
+and feedback can coordinate effectively in a shared workspace without encoding
+all teamwork as a rigid protocol. This MUST be evaluated, not asserted as a
+correctness guarantee.
+
+An evaluation should measure missed requests, irrelevant activations, duplicate
+work, unresolved handoffs, circular conversations, context confusion, unnecessary
+human intervention, and task outcomes. It should vary models, classifiers,
+instructions, workload, runtime capabilities, and human interruptions. Poor
+results are grounds to refine a participation policy or add a targeted mechanism,
+not to silently claim an untested universal coordination guarantee.
+
+## 6. Reliability and security responsibilities
+
+### Existing platforms/harnesses/providers
+
+They remain responsible for their own authenticated identities, workspace access,
+tool permission enforcement, execution sandboxing, session APIs, and resource
+controls. MEW MUST describe which configured primitives actually provide each
+boundary; the mere existence of a product does not prove a deployment is secure.
+
+### MEW integration glue
+
+MEW is responsible for correct identity/configuration mapping, authorized scope
+routing, adapter capability disclosure, basic retry/deduplication behavior,
+session/worker association, lifecycle transitions, and faithful conversation
+publication. It must not route through a disallowed channel, impersonate another
+entity, or silently expand what the platform/runtime allows.
+
+An adapter SHOULD suppress duplicate transport deliveries using stable platform
+references within its declared retention window. A restart/retry MUST NOT be
+presented as proof that earlier work did not run. A lost publication response
+requires evidence or an explicit uncertain state before an unsafe retry.
+
+History retrieval MUST report unavailable, partial, truncated, or stale context
+rather than claim completeness. Participation/runtime policy decides whether a
+particular task can proceed with that information, needs a smaller context, or
+should ask a human. Missing history is not permission to invent context.
+
+Workspace text, attachments, quoted instructions, and model output are content,
+not new authentication or permission grants. A model choosing to engage does not
+replace the harness's required approval. Administrative controls must come from
+an authenticated authorized operator, not from a claim embedded in a message.
+
+### Deliberately not guaranteed by MEW
+
+- Exactly-once arbitrary external effects or lossless cross-provider replay.
+- Identical persistence, steering, cancellation, or compaction across runtimes.
+- Automatic recovery of uncheckpointed work after worker loss.
+- A custom, universal MEW capability/proposal/approval layer for native tools.
+- Complete shared visibility or mediation of every runtime-native tool operation.
+- Perfect participation decisions or safe authorization implemented through prompts.
+
+An optional integration may add stronger guarantees, but must name the concrete
+mechanism and tests. It cannot transfer one provider's guarantee to every adapter.
+
+## 7. Examples to review before implementation
+
+### A. Shared conversation
+
+A human asks entity A for a change in a workspace thread. A's participation policy
+engages its current scope session. A posts a visible review request to B. B sees
+that conversation through its workspace adapter, decides to engage, and replies
+there. The human adds a correction in the same thread. No private peer-result
+callback between A and B supplies information absent from that shared conversation.
+
+### B. One scope, several threads
+
+A scope maps a project channel to two configured entities. One entity handles a
+question in one thread and later works on a ticket in another using its continuing
+session. Thread history is selected for each turn; its context window may be
+compacted. Neither the new thread nor compaction implicitly ends the scope.
+
+### C. Scope rollover
+
+An operator ends a scope and starts a new one in the same channel. The mapping
+records the boundary and new generation. A delayed old event stays associated
+with the closed scope. Pending work follows the configured end policy; it is not
+replayed into the new session as a fresh request.
+
+### D. Local and managed placement
+
+The pool starts A on local capacity and B through a managed provider. The adapters
+use each provider's own session/permission mechanisms. If A's worker disappears,
+the system resumes only if the adapter can verify support; otherwise it reports
+uncertainty and follows the configured recovery choice. It does not imply that
+B's managed session has the same recovery semantics.
+
+### E. Noise and human intervention
+
+Two entities exchange acknowledgements. Participation policy suppresses further
+chatter; a configured operational limit can pause additional engagement. A human
+can redirect work. If cancellation is unsupported, the adapter says so and holds
+late output appropriately rather than claiming the runtime was interrupted.
+
+## 8. Validation plan and implementation gate
+
+First review these contracts, mappings, and examples. Then define minimal adapter
+interfaces and scenario fixtures. Implementation remains a separate next step.
+
+The first evaluation should cover:
+
+1. Two independent entity identities and a human in the same ordinary conversation.
+2. Both a synchronous-chat-style and a topic/post-style workspace mapping.
+3. At least two runtime adapters with different declared capabilities.
+4. Explicit scope start/end, channel reuse, delayed events, and mapping changes.
+5. Scope-scoped session continuity across threads; compaction versus lifecycle.
+6. Access-boundary isolation, authenticated authors, and rejected route/identity spoofing.
+7. Worker allocation, single-active behavior, scale-down, and unsupported resume.
+8. Duplicate input, uncertain output publication, and partial history disclosure.
+9. Engagement/silence/handoff behavior under varied policies, including loops,
+   missed requests, human corrections, and provider interruption limits.
+
+Mocks can validate interface/routing behavior. They cannot validate modern-model
+coordination, real provider recovery, live permissions, or workspace API behavior.
+No deployment, model/provider call, worker operation, or implementation is part
+of this specification-only revision.

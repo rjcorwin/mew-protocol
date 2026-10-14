@@ -1,86 +1,89 @@
-# [m2s] Decisions for review
+# [m2s] Design decisions and remaining questions
 
-Status: Proposed, not accepted. The draft uses MUST/SHOULD to make candidate
-contracts reviewable; that language does not assert user approval.
+Status: revised proposal for review. The decisions below define the intended
+shape; detailed interfaces and defaults still need review before implementation.
 
-## D1. Keep MEW's vocabulary and authority model
+## D1. Compose modern primitives
 
-Propose retaining participants, spaces/workspaces, `from`, `to`, `kind`,
-`correlation_id[]`, `context`, capabilities, and proposal/fulfillment. Do not reduce
-the protocol to Slack handoffs or conflate addressing with permission.
+Use existing workspace authentication/access and modern harness/provider tools,
+permissions, sessions, and lifecycle APIs. MEW owns integration glue, not a blanket
+replacement capability language, MCP resource mediation layer, or proposal engine.
 
-Reason: these are existing MEW semantics and preserve tools, human control, and
-multi-party workflows beyond a two-agent chat.
+Consequence: MEW cannot claim universal gateway control over every native tool
+operation. Optional stronger integrations must identify their actual mechanism.
 
-## D2. Shared work record is a profile; Slack is a binding
+## D2. Three pieces
 
-Propose a transport-independent core and an opt-in durable work-conversation
-profile. Slack is the first binding. A binding must prove a visible record exists
-before activating a peer. Private indexes, queues, leases, and runtime state are
-allowed; private team conversation that bypasses the record is not.
+Separate workspace/runtime adapters; entity configuration, work scopes, sessions,
+and worker placement; and participation policy. This keeps provider/platform
+specifics and social behavior out of each other's contracts.
 
-Open: should durable work-record semantics become mandatory for every v2 space,
-or remain a profile so game/telemetry use cases retain an ephemeral mode?
+Remaining question: the smallest useful interface for each adapter, including
+how permission prompts and unsupported lifecycle operations reach the operator.
 
-## D3. Preserve operation visibility without overstating runtime control
+## D3. Ordinary conversation is the coordination surface
 
-Propose requiring shared records for all MEW participant-to-participant requests,
-decisions, tool requests/results, handoffs, and completions. Native runtime tools
-must declare whether MEW mediates them. A runtime with hidden native tools cannot
-claim full action-profile enforcement.
+Humans and entities use the same channel/topic/thread. A visible handoff can
+prompt another entity to engage through its workspace adapter. Internal queues
+and delivery receipts are acceptable; an unpublished peer task/result is not a
+substitute conversation.
 
-Open: should the initial runtime profile require full native-tool mediation, or
-allow a clearly labeled collaboration-only profile? The latter is simpler but
-offers weaker operation-level control than full MEW.
+This applies between configured workspace entities. Native harness-internal
+subagents/tools remain runtime implementation details unless explicitly exposed
+as independent MEW entities; their internal exchanges are not newly standardized.
 
-## D4. Keep runtime sessions lifecycle-scoped
+No mandatory public envelope, paired handshake, subthread protocol, or rigid
+coordinator/worker role hierarchy is required. Optional structured helpers are
+allowed only when their need and scope are explicit.
 
-Propose a runtime profile whose session key is `(workspace, lifecycle, participant)`.
-A sprint is one lifecycle example. Thread/context identity is supplied per turn
-and used for history cursors; changing threads does not create a new mind.
+## D4. Work scope and channel mapping are first-class
 
-The shared session requires compatible readership and data-use permissions across
-contexts. Private/restricted conversations cannot be silently folded into it;
-otherwise the binding must block or use a separately authorized isolation policy.
+Each scope has an explicit start/end, lifecycle generation, participating entities,
+and workspace/channel/topic mapping. Scope rollover defines what happens to old
+queues and late events. Routing cannot infer a new scope from whichever message
+arrives most recently.
 
-Open: no unresolved default for the initial profile. Other session policies may
-be negotiated in separate profiles, never inferred from a Slack thread ID.
+Remaining questions: exact start/end controls, drain/cancel/hold defaults, and
+what evidence an adapter can expose for a channel's historical boundary.
 
-## D5. Separate observation, activation, and authority
+## D5. Keep identity, session, context, and worker separate
 
-Propose explicit addressed activation, with acknowledgement/status/result
-observation non-activating by default. A result intended to resume another agent
-must explicitly request that continuation. Humans use the same conversation and
-can explicitly address any permitted participant.
+The initial proposed session default is one continuing session per entity/scope
+across compatible conversations. A thread is not automatically a new session.
+Context-window compaction does not end a session or scope. Worker replacement
+does not prove a session can be resumed or moved to another provider.
 
-Addressing does not narrow the authorized shared observer audience. Empty/omitted
-`to` is visible to that audience but does not automatically activate everyone.
+Remaining questions: provider-specific session retention/resume behavior,
+compaction visibility, and which configurations need per-conversation isolation.
 
-Open: should unaddressed human replies inherit a last addressee? Initial
-recommendation is no implicit affinity until its rules are specified and tested.
+## D6. Scale within configured authority
 
-## D6. At-least-once transport, durable admission, explicit uncertainty
+The pool chooses eligible local or managed capacity within approved limits.
+Scaling does not grant workspace access. Replicas of one entity need an explicit
+single-active/concurrency policy; separate participants normally have separate
+identities. Scope end must not imply unapproved deletion or credential revocation.
 
-Propose durable dedupe plus idempotency/reconciliation contracts. Never promise
-exactly-once arbitrary external effects. An unknown result is held and surfaced,
-not blindly retried. Missing history is a blocker for action, not success with
-truncated context.
+Remaining questions: minimum provider/pool status model, resource ceilings, and
+what recovery choices can be automated for each supported runtime.
 
-Open: choose retention/checkpoint windows, root work budgets, and stale thresholds
-in the deployment profile. They are policy values, not universal protocol numbers.
+## D7. Participation is adaptable and evaluated
 
-## D7. Cancellation has distinct observable states
+Use instructions, classifiers, messaging tools, and social norms to shape when an
+entity engages, remains quiet, hands off, or seeks help. Actual authorization
+continues to come from configured platforms and runtimes. Model coordination is
+a hypothesis, with missed work, duplication, loops, and intervention measured.
 
-Propose preserving `chat/cancel` as attention withdrawal and specifying runtime
-cancel-requested versus cancel-confirmed versus unsupported/unknown separately.
-Do not invent successful interruption when a provider only queues new input.
+Remaining questions: initial affinity/engagement defaults, evaluation tasks,
+operational loop/noise limits, and acceptable tradeoffs between missed requests
+and unnecessary turns. These should be learned through explicit evaluation.
 
-Open: exact new work/control kind names and provider conformance fixtures.
+## D8. Do not preserve old guarantees by implication
 
-## D8. Draft version and release boundary
+The old wire protocol's tool/proposal/capability mediation is not the default
+foundation of this v2 direction. Complete native-tool observability, uniform
+recovery, and universal session/interrupt semantics are not promised. V2 also
+does not turn prompts into access control.
 
-Propose `mew/v2-draft` in examples only and explicit profile negotiation. Do not
-silently reinterpret v0.4 envelopes or publish a v2 release from this proposal.
-
-Open: release numbering, final wire identifier, and whether migration is a native
-v2 gateway or an explicitly versioned bridge. Review these after the core contract.
+Remaining question: once this design is reviewed, choose versioning and any
+migration bridge needed by existing implementations. No released wire identifier,
+legacy compatibility promise, or automatic migration is established here.
