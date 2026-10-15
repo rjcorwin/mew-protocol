@@ -116,3 +116,6 @@ BACKLOG.md
 .mew/fifos/
 .mew/tokens/
 .mew/.env
+# Isolated local v2 prototype output and work records
+dist-mewpod/
+.mewpod/

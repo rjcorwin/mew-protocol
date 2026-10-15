@@ -1,6 +1,6 @@
 # [m2s] Existing primitives, MEW glue, and tradeoffs
 
-Status: background for the revised specification-only proposal.
+Status: background for the revised proposal; see [prototype feedback](implementation.md).
 Official documentation checked on 2026-10-14. Adapter implementations must pin and
 verify the actual protocol/API versions and configured permissions they use.
 
@@ -167,5 +167,6 @@ unauthorized actions/targets/fields, self-escalation, revoked access, and stale
 configuration changes. These tests must distinguish actual service enforcement
 from a model merely following its instructions on one example.
 
-No live account configuration, provider call, permission change, worker operation,
-or implementation was performed for this revised specification proposal.
+The [offline prototype](implementation.md) tests integration contracts with mocks.
+No live account configuration, provider call, permission change, or external worker
+operation was performed.

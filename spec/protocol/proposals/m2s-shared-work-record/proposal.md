@@ -1,6 +1,6 @@
 # [m2s] MEW v2: glue for a multi-entity workspace
 
-Status: **revised proposal for review; specification only**.
+Status: **proposal under review, with an isolated exploratory prototype**.
 
 ## The proposal
 
@@ -86,4 +86,5 @@ need a mandatory envelope, two-part exchange, or special subthread hierarchy.
 - [Design decisions and remaining questions](decision-m2s-shared-work-record.md)
 
 Review the adapter boundaries, work-scope lifecycle, and participation examples
-before implementation. This revision contains no implementation or deployment.
+alongside the [Mewpod prototype and feedback](implementation.md). This branch
+contains an offline local experiment; it configures no live integration or deployment.

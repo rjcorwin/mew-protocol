@@ -4,6 +4,13 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ## [Unreleased]
 
+### Prototypes
+
+- **[m2s] Mewpod v2 (exploratory prototype):** isolated local workspace/runtime prototype
+  in `prototypes/mewpod-v2`, based on the v2 proposal. Mock adapters, explicit
+  work scopes, bounded capacity, visible background tasks, and verified local
+  completion publication. No released v0.4 wire or live integration changes.
+
 ## [0.11.0] - 2025-12-17
 
 ### Added

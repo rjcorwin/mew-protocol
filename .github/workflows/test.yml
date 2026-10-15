@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, spec/mew-v2-shared-work-record ]
 
 jobs:
   test:
@@ -36,6 +36,9 @@ jobs:
 
     - name: Build packages
       run: npm run build
+
+    - name: Build and lint Mewpod prototype
+      run: npm run build:mewpod && npm run lint:mewpod
 
     - name: Install PM2 globally
       run: npm install -g pm2

@@ -1,7 +1,8 @@
 # MEW v2 draft: multi-entity workspace integration
 
-Status: **revised design contract for review; not a released wire protocol or
-implementation**. This draft replaces the earlier control-plane-centered proposal.
+Status: **design contract for review; not a released wire protocol**. An isolated
+[offline prototype](implementation.md) now exercises part of this draft. This
+draft replaces the earlier control-plane-centered proposal.
 The existing released specification remains unchanged.
 
 MUST, SHOULD, and MAY below describe candidate integration requirements. They do
@@ -527,8 +528,9 @@ role unless that separate action and target are authorized. A non-admin saying
 
 ## 8. Validation plan and implementation gate
 
-First review these contracts, mappings, and examples. Then define minimal adapter
-interfaces and scenario fixtures. Implementation remains a separate next step.
+Review these contracts, mappings, and examples against the isolated prototype.
+Its interfaces and scenario fixtures are exploratory; a real runtime/workspace
+binding remains a separate reviewed step.
 
 The first evaluation should cover:
 
@@ -596,5 +598,5 @@ Five bounded lifecycle/adapter/administration scenarios refine those cases:
 
 Mocks can validate interface/routing behavior. They cannot validate modern-model
 coordination, native provider behavior, live permissions, or workspace API behavior.
-No deployment, model/provider call, worker operation, or implementation is part
-of this specification-only revision.
+The offline prototype exercises a subset of these cases with mock adapters.
+No live deployment, model/provider call, or external worker operation is included.
