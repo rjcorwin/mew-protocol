@@ -1,7 +1,20 @@
-# [m2s] Mewpod v2 prototype and feedback
+# [m2s] Catbox reference demo and feedback
 
-Status: exploratory implementation on a separate prototype branch; not a release
+Status: runnable reference demo on a separate prototype branch; not a release
 or live integration. See [setup and limits](../../../../prototypes/mewpod-v2/README.md).
+
+## Purpose of the reference
+
+MEW's software has always been a way to express collaboration patterns and
+requirements through concrete examples. Catbox makes those examples runnable,
+inspectable, and easy to adapt or replace. It is successful when a reader can
+identify the requirements and carry them into their own implementation; keeping
+these classes or turning them into durable packages is not a requirement.
+
+The [pattern guide and source map](../../../../prototypes/mewpod-v2/DESIGN.md)
+connect scenarios to requirements and tests. The existing directory, internal
+Mewpod names, commands, and data format remain compatible. Catbox names the demo,
+not a new wire protocol or package contract.
 
 ## Bounded vertical slice
 
@@ -40,8 +53,12 @@ wire/API shape or prove equivalent behavior across providers. The local JSON
 store retains the work record, closes old scopes after restart, and reports
 interrupted work as uncertain. It is not a native-session recovery layer.
 
-## Next review gate
+## Questions to explore
 
-Review the runnable local behavior and adapter boundaries before choosing a
-first real runtime/workspace binding. Actual platform credentials, permissions,
-model/provider calls, provisioning, and deployment remain separate decisions.
+Which collaboration requirements are clear in the runnable behavior? Which need
+different examples? Which implementation choices would another harness or
+workspace replace? Use the demo and tests to make those tradeoffs concrete.
+
+A real runtime/workspace experiment is optional and requires its own evidence.
+Actual platform credentials, permissions, model/provider calls, provisioning,
+and deployment remain separate decisions.

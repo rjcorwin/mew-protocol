@@ -37,8 +37,8 @@ jobs:
     - name: Build packages
       run: npm run build
 
-    - name: Build and lint Mewpod prototype
-      run: npm run build:mewpod && npm run lint:mewpod
+    - name: Build and lint Catbox reference demo
+      run: npm run build:catbox && npm run lint:catbox
 
     - name: Install PM2 globally
       run: npm install -g pm2

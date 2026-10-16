@@ -5,7 +5,7 @@ import { JsonFileStore } from './store.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  if (args.includes('--help')) { console.log('Mewpod v2 local mock prototype\n  npm run mewpod -- [--port 8087] [--data .mewpod/work-record.json] [--new-scope]\n  npm run demo:mewpod\nNo live workspace, model, provider, or repository access.'); return; }
+  if (args.includes('--help')) { console.log('Catbox · MEW collaboration reference demo\n  npm run catbox -- [--port 8087] [--data .mewpod/work-record.json] [--new-scope]\n  npm run demo:catbox\nExisting mewpod commands and data paths remain compatible.\nInspect, adapt, or replace the patterns: prototypes/mewpod-v2/DESIGN.md\nNo live workspace, model, provider, or repository access.'); return; }
   let port = 8087; let path = '.mewpod/work-record.json'; let demo = false; let newScope = false;
   for (let index = 0; index < args.length; index++) {
     switch (args[index]) {
@@ -37,7 +37,7 @@ async function main(): Promise<void> {
   const server = createConsoleServer({ snapshot: () => pod.snapshot(), postMessage: input => pod.postMessage(input), setCapacity: value => pod.setCapacity(value), cancelTask: id => pod.cancelTask(id), endScope: id => pod.endScope(id) });
   server.on('error', () => { console.error('Console failed to listen; check the port.'); pod.dispose(); store.close(); process.exitCode = 1; });
   server.listen(port, '127.0.0.1', () => {
-    console.log(`Mewpod v2 local mock console: http://127.0.0.1:${port}\nWork record: ${resolve(path)}\nTry “@builder prepare a change” in project / ticket-a.\nNo live Slack, model, provider, or repository calls.`);
+    console.log(`Catbox local reference demo: http://127.0.0.1:${port}\nWork record: ${resolve(path)}\nTry “@builder prepare a change” in project / ticket-a.\nNo live Slack, model, provider, or repository calls.`);
     if (!pod.snapshot().scopes.some(scope => scope.status === 'active')) console.log('Prior scopes are closed. Restart with --new-scope to explicitly begin another work period.');
   });
   let closing = false;
@@ -53,4 +53,4 @@ async function main(): Promise<void> {
   process.once('SIGINT', () => { void close(); }); process.once('SIGTERM', () => { void close(); });
 }
 
-main().catch(() => { console.error('Mewpod could not complete the requested operation. Check arguments, work-record validity, and whether another process owns its .lock file. No automatic retry.'); process.exitCode = 1; });
+main().catch(() => { console.error('Catbox could not complete the requested operation. Check arguments, work-record validity, and whether another process owns its .lock file. No automatic retry.'); process.exitCode = 1; });

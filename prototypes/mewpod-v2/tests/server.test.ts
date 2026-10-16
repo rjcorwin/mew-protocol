@@ -91,7 +91,7 @@ describe('local work console', () => {
     state.messages[0].text = '</script><script>alert("injected")</script>';
     const response = await request('/');
     expect(response.status).toBe(200);
-    expect(response.body).toContain('Local mock prototype, no live Slack/model/real repo access');
+    expect(response.body).toContain('Local reference demo. Entity replies and runtime behavior are scripted');
     expect(response.body).toContain('Desired configuration and observed application');
     expect(response.body).toContain('setInterval(refresh, 1000)');
     expect(response.body).not.toContain(state.messages[0].text);
@@ -104,6 +104,20 @@ describe('local work console', () => {
     expect(response.headers['x-frame-options']).toBe('DENY');
     const second = await request('/');
     expect(second.headers['content-security-policy']).not.toBe(response.headers['content-security-policy']);
+  });
+
+  it('frames Catbox as an inspectable reference demo with a passive pattern guide', async () => {
+    const response = await request('/');
+    expect(response.body).toContain('<title>Catbox · collaboration reference demo</title>');
+    expect(response.body).toContain('<h1>Catbox</h1>');
+    expect(response.body).toContain('Inspect, adapt, or replace the implementation.');
+    expect(response.body).toContain('<summary>Explore the collaboration patterns</summary>');
+    expect(response.body).toContain('Requirement: handoffs happen through shared messages.');
+    expect(response.body).toContain('Requirement: report verified outcomes and actual adapter capabilities.');
+    expect(response.body).toContain('prototypes/mewpod-v2/DESIGN.md');
+    expect(response.body).toContain('Try @builder prepare a change and watch the visible review handoff.');
+    expect(api.postMessage).not.toHaveBeenCalled();
+    expect(api.setCapacity).not.toHaveBeenCalled();
   });
 
   it('posts only text and routing fields through the fixed local-human callback', async () => {

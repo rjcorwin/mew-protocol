@@ -1,6 +1,6 @@
 # [m2s] MEW v2: glue for a multi-entity workspace
 
-Status: **proposal under review, with an isolated exploratory prototype**.
+Status: **proposal under review, illustrated by the isolated Catbox reference demo**.
 
 ## The proposal
 
@@ -86,5 +86,7 @@ need a mandatory envelope, two-part exchange, or special subthread hierarchy.
 - [Design decisions and remaining questions](decision-m2s-shared-work-record.md)
 
 Review the adapter boundaries, work-scope lifecycle, and participation examples
-alongside the [Mewpod prototype and feedback](implementation.md). This branch
-contains an offline local experiment; it configures no live integration or deployment.
+alongside the [Catbox reference demo and feedback](implementation.md). The demo
+makes the patterns and requirements inspectable, adaptable, and replaceable;
+its code is not a prescribed package architecture. This branch contains an
+offline local experiment; it configures no live integration or deployment.

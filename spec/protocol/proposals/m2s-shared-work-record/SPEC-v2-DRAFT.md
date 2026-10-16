@@ -1,7 +1,9 @@
 # MEW v2 draft: multi-entity workspace integration
 
 Status: **design contract for review; not a released wire protocol**. An isolated
-[offline prototype](implementation.md) now exercises part of this draft. This
+[Catbox reference demo](implementation.md) exercises part of this draft. Its
+code illustrates the patterns and requirements; it is not a stable package API
+or a required implementation. This
 draft replaces the earlier control-plane-centered proposal.
 The existing released specification remains unchanged.
 

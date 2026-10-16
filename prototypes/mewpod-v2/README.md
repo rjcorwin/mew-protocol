@@ -1,9 +1,19 @@
-# Mewpod v2: local workspace prototype
+# Catbox: MEW's collaboration reference demo
 
-An isolated, runnable experiment based on the [MEW v2 proposal](../../spec/protocol/proposals/m2s-shared-work-record/proposal.md).
-It connects a shared conversation to independent entity sessions, bounded worker
-capacity, and visible background-task results. It does not change the released
-MEW v0.4 wire protocol.
+Catbox makes collaboration patterns and requirements tangible: people and
+independent entities share a conversation, hand work to one another visibly,
+and report results while worker capacity comes and goes.
+
+MEW's software has always served as reference material for expressing these
+ideas. Catbox is a runnable example to **inspect, adapt, or replace**. Its useful
+output is an understanding of the patterns and their requirements; adopting its
+classes, UI, or packaging is optional. The TypeScript interfaces are exploratory,
+not a promised stable library API.
+
+This isolated demo explores the [MEW v2 proposal](../../spec/protocol/proposals/m2s-shared-work-record/proposal.md).
+It does not change the released MEW v0.4 wire protocol. The historical
+`prototypes/mewpod-v2` path, internal `Mewpod` class, and saved work-record format
+remain in place so existing experiments continue to run.
 
 **Everything in the supplied demo is local and deterministic.** There are no
 live Slack, Discourse, model, managed-provider, MCP-server, or Git operations.
@@ -12,18 +22,39 @@ quality or a production service.
 
 ## Run it
 
-From a checkout of `prototype/mewpod-v2`, use Node.js 24 and npm:
+From the repository root on branch `prototype/mewpod-v2`, use Node.js 24 and npm:
 
 ```sh
 npm ci --ignore-scripts
-npm run demo:mewpod
-npm run mewpod
+npm run demo:catbox
+npm run catbox
 ```
 
 The first command installs the repository's existing locked dependencies. The
-demo prints a conversation and three verified task completions, then exits.
+scripted demo prints a conversation and three verified task completions, then exits.
 The console opens at **http://127.0.0.1:8087**. Open that URL in a browser on the
 same machine; it is deliberately not a hosted or remote-access service.
+The existing `demo:mewpod`, `mewpod`, `build:mewpod`, `test:mewpod`, and
+`lint:mewpod` commands remain available. The Catbox commands use the same code.
+
+## Read the demo as a set of patterns
+
+Open **Explore the collaboration patterns** in the console for a guided tour.
+The [design and source map](DESIGN.md) connects each experiment to its observable
+requirement, implementation, and tests. Start with these three experiments:
+
+1. **Shared participation and handoff:** send a builder request, add a human
+   clarification, and follow the visible request to the reviewer. The shared
+   conversation is the causal path between participants.
+2. **Identity separate from compute:** pause new work, queue a request, and resume
+   capacity. Use another thread within the same scope. Entity identities and
+   compatible scope sessions remain distinct from short-lived worker reservations.
+3. **Evidence before completion:** follow a task's result link to its exact
+   completion message. Compare the runtimes' cancellation descriptions. A request
+   to stop and a confirmed stop must remain distinguishable.
+
+The behaviors below are examples of those requirements, not a prescribed UI or
+an adoption checklist. You can carry the patterns into another implementation.
 
 In the console, post `@builder prepare a change` in `project` / `ticket-a`.
 The builder publishes progress and an ordinary visible review request. The
@@ -46,8 +77,8 @@ The budget is **abstract resource units**, not a real provider price or billing
 estimate. Concurrent use cannot exceed the configured aggregate limit.
 
 ```sh
-npm run mewpod -- --port 8090 --data .mewpod/experiment.json
-npm run mewpod -- --new-scope
+npm run catbox -- --port 8090 --data .mewpod/experiment.json
+npm run catbox -- --new-scope
 ```
 
 The work record defaults to `.mewpod/work-record.json`, ignored by Git. On restart,
@@ -90,6 +121,10 @@ its stale lock. The prototype never steals a lock or kills an unrelated process.
 
 `src/types.ts` defines `WorkspaceAdapter`, `RuntimeAdapter`, `StateStore`, and
 `SecretResolver`. `src/adapters.ts` supplies only mock implementations.
+Start at `src/demo.ts` to change the cast and scripted behavior; see
+[Inspect, adapt, replace](DESIGN.md#inspect-adapt-replace) for the full source map.
+These seams make assumptions inspectable. They do not require another
+implementation to keep this code, these names, or this exact interface shape.
 
 A future Slack or Discourse adapter must establish platform identity/access,
 preserve event and history provenance, handle native retry/publication behavior,
@@ -121,10 +156,10 @@ inject credentials into processes, enroll providers, or clone projects.
 ## Verification
 
 ```sh
-npm run build:mewpod
-npm run lint:mewpod
-npm run test:mewpod
-npm run demo:mewpod
+npm run build:catbox
+npm run lint:catbox
+npm run test:catbox
+npm run demo:catbox
 npm run build
 npm test
 ```
@@ -135,11 +170,12 @@ history gaps, generation rollover, in-flight late publication, mismatched reply
 evidence, queued membership changes, configuration acknowledgments, storage
 failures, budget limits, cancellation, approval refusal, multi-repository secret
 scope, and executable DOM/XSS cases. Existing CI also runs the repository's
-legacy build/unit/integration suite. Check the exact draft-PR commit's CI result.
+legacy build/unit/integration suite. Check CI on the exact reviewed commit when
+a pull request is opened; local checks do not establish a remote CI pass.
 The root `npm run lint` currently lacks an ESLint 9 configuration; the isolated
-`lint:mewpod` command checks this prototype without changing legacy lint policy.
+`lint:catbox` command checks this demo without changing legacy lint policy.
 
-## Deliberate limits and pilot gate
+## Deliberate limits and a real-integration evaluation
 
 - No real agents are running. Scripted behavior does not validate model judgment,
   prompt-injection resistance, or social coordination quality.
@@ -162,7 +198,9 @@ The root `npm run lint` currently lacks an ESLint 9 configuration; the isolated
   publication. No rollback, failover, checkpoint system, arbitrary session
   migration, or universal provider-cost saving is promised.
 
-A later one-machine workspace pilot needs separately authorized platform setup,
-runtime choice, and secure credential configuration. Before claiming readiness,
-test a real human request, visible peer handoff, actual background completion,
-and reply in the original workspace thread, including interruption and failure.
+If you choose to test these patterns against a real workspace, that experiment
+needs separately authorized platform setup, runtime choice, and secure credential
+configuration. Validate a real human request, visible peer handoff, actual
+background completion, and reply in the original workspace thread, including
+interruption and failure. You can adapt Catbox or use a different implementation;
+the learning and evidence matter more than preserving this demo's code.

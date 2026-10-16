@@ -39,7 +39,12 @@
     "test:mewpod": "vitest run prototypes/mewpod-v2/tests",
     "mewpod": "npm run build:mewpod && node dist-mewpod/cli.js",
     "demo:mewpod": "npm run build:mewpod && node dist-mewpod/cli.js --demo",
-    "lint:mewpod": "eslint --config prototypes/mewpod-v2/eslint.config.mjs prototypes/mewpod-v2"
+    "lint:mewpod": "eslint --config prototypes/mewpod-v2/eslint.config.mjs prototypes/mewpod-v2",
+    "build:catbox": "npm run build:mewpod",
+    "test:catbox": "npm run test:mewpod",
+    "catbox": "npm run build:catbox && node dist-mewpod/cli.js",
+    "demo:catbox": "npm run build:catbox && node dist-mewpod/cli.js --demo",
+    "lint:catbox": "npm run lint:mewpod"
   },
   "keywords": [
     "mew",

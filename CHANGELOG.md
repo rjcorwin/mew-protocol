@@ -6,8 +6,11 @@ All notable changes to the MEW Protocol will be documented in this file.
 
 ### Prototypes
 
-- **[m2s] Mewpod v2 (exploratory prototype):** isolated local workspace/runtime prototype
-  in `prototypes/mewpod-v2`, based on the v2 proposal. Mock adapters, explicit
+- **[m2s] Catbox (reference demo):** isolated, runnable demonstration of MEW's
+  collaboration patterns and requirements in `prototypes/mewpod-v2`, based on
+  the v2 proposal. A guided console and source map make the design easy to
+  inspect, adapt, or replace; existing Mewpod commands and data paths still work.
+  Mock adapters, explicit
   work scopes, bounded capacity, visible background tasks, and verified local
   completion publication. No released v0.4 wire or live integration changes.
 
